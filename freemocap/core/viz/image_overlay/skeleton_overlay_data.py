@@ -15,6 +15,10 @@ import numpy as np
 from skellycam.core.types.type_overloads import CameraIdString
 from skellytracker.trackers.rtmpose_tracker.names_and_connections import RTMPOSE_WHOLEBODY_DEFINITION
 from skellytracker.trackers.rtmpose_tracker.rtmpose_observation import RTMPoseObservation
+from skellytracker.trackers.mediapipe_tracker.composite.mediapipe_composite_observation import (
+    MediapipeCompositeObservation,
+)
+from skellytracker.trackers.mediapipe_tracker.names_and_connections import MEDIAPIPE_HOLISTIC_DEFINITION
 
 
 class SkeletonPointModel(msgspec.Struct):
@@ -81,6 +85,44 @@ class SkeletonOverlayData(msgspec.Struct):
             camera_id=camera_id,
             frame_number=observation.frame_number,
             tracker_id=RTMPOSE_WHOLEBODY_DEFINITION.name,
+            image_width=observation.image_size[1],
+            image_height=observation.image_size[0],
+            message_type="skeleton_overlay",
+            points=points,
+        )
+
+    @classmethod
+    def from_mediapipe_composite_observation(
+            cls,
+            *,
+            camera_id: CameraIdString,
+            observation: MediapipeCompositeObservation,
+            scale: float = 1.0,
+    ) -> "SkeletonOverlayData":
+        """Flatten a fused MediaPipe holistic PointCloud into the schema-driven payload."""
+        xyz: np.ndarray = observation.points.xyz * scale
+        visibility: np.ndarray = observation.points.visibility
+        names: tuple[str, ...] = observation.points.names
+
+        points: list[SkeletonPointModel] = []
+        for i, name in enumerate(names):
+            x, y, z = xyz[i]
+            if np.isnan(x) or np.isnan(y) or np.isnan(z):
+                continue
+            points.append(
+                SkeletonPointModel(
+                    name=name,
+                    x=float(x),
+                    y=float(y),
+                    z=float(z),
+                    visibility=float(visibility[i]),
+                ),
+            )
+
+        return cls(
+            camera_id=camera_id,
+            frame_number=observation.frame_number,
+            tracker_id=MEDIAPIPE_HOLISTIC_DEFINITION.name,
             image_width=observation.image_size[1],
             image_height=observation.image_size[0],
             message_type="skeleton_overlay",

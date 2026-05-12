@@ -45,6 +45,10 @@ class MessageType(IntEnum):
     KEYPOINTS_PAYLOAD_HEADER = 3
     KEYPOINTS_BLOCK_HEADER = 4
     KEYPOINTS_PAYLOAD_FOOTER = 5
+    # Client → server: same per-block layout as KEYPOINTS_BLOCK_HEADER + float32
+    # interleaved rows (x, y, visibility), dims=2, block_kind=SKELETON_OVERLAY_2D.
+    CLIENT_SKELETON_PAYLOAD_HEADER = 6
+    CLIENT_SKELETON_PAYLOAD_FOOTER = 7
 
 
 class BlockKind(IntEnum):

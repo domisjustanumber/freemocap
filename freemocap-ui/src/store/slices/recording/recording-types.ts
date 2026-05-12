@@ -51,6 +51,9 @@ export const StopRecordingResponseSchema = z.object({
     framerate_stats: StatsSummarySchema,
     frame_duration_stats: StatsSummarySchema,
     inter_camera_grab_range_ms_stats: StatsSummarySchema,
+    grab_request_to_success_ms_stats: StatsSummarySchema,
+    grab_timestamp_range_per_frame_ms_stats: StatsSummarySchema,
+    retrieve_request_to_success_ms_stats: StatsSummarySchema,
 });
 
 export type RecordingCompletionData = z.infer<typeof StopRecordingResponseSchema>;

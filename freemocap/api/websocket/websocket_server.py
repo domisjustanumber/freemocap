@@ -17,19 +17,40 @@ from skellylogs import get_websocket_log_queue
 from skellylogs.handlers.websocket_log_queue_handler import MIN_LOG_LEVEL_FOR_WEBSOCKET
 from starlette.websockets import WebSocket, WebSocketState, WebSocketDisconnect
 
+from freemocap.api.websocket.client_skeleton_binary import parse_client_skeleton_binary
 from freemocap.api.websocket.tracker_schema_message import TrackerSchemasMessage, collect_active_tracker_schemas
 from freemocap.api.websocket.websocket_message_types import WebsocketMessageType
 from freemocap.app.freemocap_application import FreemocapApplication, get_freemocap_app
 
 from freemocap.utilities.wait_functions import await_10ms
+from freemocap.pubsub.pubsub_topics import PipelineTimingMessage
 from skellycam.core.types.type_overloads import CameraGroupIdString, FrameNumberInt
 from skellycam.core.recorders.framerate_tracker import FramerateTracker, CurrentFramerate
+from skellycam.core.types.frontend_payload_bytearray import (
+    get_and_clear_frontend_preview_multiframe_samples,
+    get_and_clear_frontend_preview_timing_samples,
+)
 
 logger = logging.getLogger(__name__)
 
 BACKPRESSURE_WARNING_THRESHOLD: int = 300
 # When outstanding acks exceed this, reset rather than stalling the pipeline indefinitely.
 BACKPRESSURE_RESET_THRESHOLD: int = 300
+
+
+def _merge_pipeline_timing_sample(
+        per_node: dict[str, dict[str, list[float]]],
+        per_camera: dict[str, dict[str, list[float]]],
+        msg: PipelineTimingMessage,
+) -> None:
+    if msg.node_kind == "camera" and msg.camera_id:
+        cam_bucket = per_camera.setdefault(str(msg.camera_id), {})
+        for stage, vals in msg.samples.items():
+            cam_bucket.setdefault(stage, []).extend(vals)
+    else:
+        node_bucket = per_node.setdefault(msg.node_kind, {})
+        for stage, vals in msg.samples.items():
+            node_bucket.setdefault(stage, []).extend(vals)
 
 
 def _msgspec_enc_hook(obj: object) -> object:
@@ -94,6 +115,55 @@ class WebsocketServer:
         async with self._send_lock:
             if self.websocket.client_state == WebSocketState.CONNECTED:
                 await self.websocket.send_text(_ws_json_encoder.encode(data).decode("utf-8"))
+
+    def _build_pipeline_timing_payload(
+            self,
+            camera_group_id: CameraGroupIdString,
+    ) -> dict[str, object] | None:
+        """Drain preview JPEG/resize telemetry (which also includes per-frame grab/retrieve durations) and optionally pub/sub pipeline stages.
+
+        Preview / grab / retrieve timing is always merged into ``per_camera`` when samples
+        exist, even if ``log_pipeline_times`` is off, so the UI can show those metrics
+        without enabling full pipeline logging.
+        """
+        preview_by_cam = get_and_clear_frontend_preview_timing_samples(str(camera_group_id))
+        multiframe_preview = get_and_clear_frontend_preview_multiframe_samples(str(camera_group_id))
+        pipeline = self._app.get_realtime_pipeline_for_camera_group(camera_group_id)
+        want_pubsub_timing = (
+            pipeline is not None and pipeline.config.log_pipeline_times
+        )
+
+        per_node: dict[str, dict[str, list[float]]] = {}
+        per_camera: dict[str, dict[str, list[float]]] = {}
+
+        if want_pubsub_timing:
+            sub = self._app.get_pipeline_timing_subscription(camera_group_id)
+            if sub is not None:
+                while True:
+                    try:
+                        msg: PipelineTimingMessage = sub.get_nowait()
+                    except Empty:
+                        break
+                    _merge_pipeline_timing_sample(per_node, per_camera, msg)
+
+        for cam_id, stages in preview_by_cam.items():
+            for stage, samples in stages.items():
+                per_camera.setdefault(cam_id, {}).setdefault(stage, []).extend(samples)
+
+        if multiframe_preview:
+            mf_bucket = per_node.setdefault("multiframe", {})
+            for stage, samples in multiframe_preview.items():
+                mf_bucket.setdefault(stage, []).extend(samples)
+
+        if not per_node and not per_camera:
+            return None
+        return {
+            "message_type": WebsocketMessageType.PIPELINE_TIMING.value,
+            "camera_group_id": str(camera_group_id),
+            "log_pipeline_times_enabled": want_pubsub_timing,
+            "per_node": per_node,
+            "per_camera": per_camera,
+        }
 
     async def __aenter__(self):
         logger.debug("Entering WebsocketRunner context manager...")
@@ -268,6 +338,14 @@ class WebsocketServer:
                             # the interval since this report.
                             server_calc.clear()
                             display_tracker.clear()
+
+                        # Decoupled from framerate: otherwise pipeline_timing (and JPEG encode
+                        # telemetry merged into the same payload) is skipped whenever the server
+                        # framerate calculator has <2 samples or the display tracker is empty—common
+                        # right after the trackers clear.
+                        timing_payload = self._build_pipeline_timing_payload(camera_group_id)
+                        if timing_payload is not None:
+                            await self._send_msgspec_json(timing_payload)
                     self._last_framerate_send_time = now
         except WebSocketDisconnect:
             logger.api("Client disconnected, ending Frontend Image relay task...")
@@ -357,7 +435,23 @@ class WebsocketServer:
                             else:
                                 logger.info(f"Websocket received message: `{text_content}`")
                     elif "bytes" in message:
-                        logger.trace(f"Received binary websocket message ({len(message['bytes'])} bytes)")
+                        raw = message["bytes"]
+                        if isinstance(raw, memoryview):
+                            raw = raw.tobytes()
+                        parsed = parse_client_skeleton_binary(raw)
+                        if parsed is not None:
+                            cg_id, skel_msg = parsed
+                            ok = self._app.publish_client_skeleton_inference(
+                                camera_group_id=cg_id,
+                                message=skel_msg,
+                            )
+                            if not ok:
+                                logger.trace(
+                                    "Dropped client skeleton message: no alive pipeline for group %s",
+                                    cg_id,
+                                )
+                        else:
+                            logger.trace(f"Received binary websocket message ({len(raw)} bytes)")
                     else:
                         raise RuntimeError(f"Received unexpected message format: {message}")
 

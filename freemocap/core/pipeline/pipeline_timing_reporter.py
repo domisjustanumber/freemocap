@@ -47,16 +47,16 @@ SECTION_LAYOUTS: dict[str, _SectionLayout] = {
             "skeleton_filter",
         ),
         wrapper="full_frame_processing",
-        framing=("frame_collection_wait", "loop_time"),
+        framing=("capture_to_aggregator_ms", "frame_collection_wait", "loop_time"),
     ),
     "skeleton_inference": _SectionLayout(
         substages=("frame_read", "predict_batch"),
         wrapper=None,
-        framing=("predict_per_camera", "dropped_frames"),
+        framing=("dropped_frames",),
     ),
     "camera": _SectionLayout(
         substages=("skeleton_detection", "charuco_detection"),
-        wrapper="total_camera_node",
+        wrapper=None,
     ),
 }
 

@@ -11,6 +11,7 @@ from typing import Any
 import msgspec
 from skellytracker.trackers.base_tracker.tracked_object_definition import TrackedObjectDefinition
 from skellytracker.trackers.rtmpose_tracker.names_and_connections import RTMPOSE_WHOLEBODY_DEFINITION
+from skellytracker.trackers.mediapipe_tracker.names_and_connections import MEDIAPIPE_HOLISTIC_DEFINITION
 
 from freemocap.api.websocket.websocket_message_types import WebsocketMessageType
 
@@ -27,13 +28,13 @@ class TrackerSchemasMessage(msgspec.Struct):
 
 
 def collect_active_tracker_schemas() -> dict[str, dict[str, Any]]:
-    """Collect every active tracker schema the freemocap pipeline can emit.
+    """Return tracker schemas the UI may need for realtime overlays.
 
-    For now this returns the RTMPose wholebody definition unconditionally —
-    that's the only skeleton detector wired up in the realtime pipeline. When
-    additional detectors land (or the detector is made configurable per
-    pipeline), this function should inspect the active pipeline config and
-    return the matching definitions.
+    Both RTMPose whole-body and MediaPipe holistic are included so the client
+    can switch detector mode without reconnecting.
     """
-    active: tuple[TrackedObjectDefinition, ...] = (RTMPOSE_WHOLEBODY_DEFINITION,)
+    active: tuple[TrackedObjectDefinition, ...] = (
+        RTMPOSE_WHOLEBODY_DEFINITION,
+        MEDIAPIPE_HOLISTIC_DEFINITION,
+    )
     return {definition.name: definition.model_dump() for definition in active}

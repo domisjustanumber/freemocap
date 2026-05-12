@@ -1,9 +1,10 @@
 import type {RealtimeModelSize} from '@/store/slices/realtime/realtime-types';
 import type {FrameData} from '@/services/server/server-helpers/frame-processor/frame-processor';
 
-import MediapipeWorkerConstructor from './mediapipe-engine.worker?worker';
+/** Per-camera wall times for each MediaPipe Tasks landmarker in one infer batch. */
+export type MediapipePerCameraTimings = {cameraId: string; poseMs: number; handMs: number; faceMs: number};
 
-export type MediapipeInferTimings = {poseMs: number; handMs: number; faceMs: number};
+export type MediapipeInferTimings = {perCamera: MediapipePerCameraTimings[]};
 
 type WorkerMessage =
     | {type: 'ready'}
@@ -43,8 +44,10 @@ export class MediapipeRealtimeEngine {
 
     public async start(modelSize: RealtimeModelSize): Promise<void> {
         this.stop();
-        const WorkerCtor = MediapipeWorkerConstructor as unknown as new () => Worker;
-        const worker = new WorkerCtor();
+        // Constructor + `new URL(...)` (not `import ... ?worker`): Vite then respects
+        // `worker.format` in dev too. `?worker` uses module workers during dev where
+        // @mediapipe/tasks-vision's WASM bootstrap cannot call importScripts().
+        const worker = new Worker(new URL('./mediapipe-engine.worker.ts', import.meta.url));
         this.worker = worker;
         worker.addEventListener('message', this.handleMessage);
         worker.addEventListener('error', this.handleWorkerError);
@@ -105,8 +108,8 @@ export class MediapipeRealtimeEngine {
         }
         const cameras = frames.map((f) => ({
             cameraId: f.cameraId,
-            origWidth: f.width,
-            origHeight: f.height,
+            origWidth: f.bitmap.width,
+            origHeight: f.bitmap.height,
             bitmap: f.bitmap,
         }));
         const transfers = cameras.map((c) => c.bitmap);

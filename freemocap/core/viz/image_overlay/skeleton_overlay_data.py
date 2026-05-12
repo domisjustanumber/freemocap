@@ -52,14 +52,16 @@ class SkeletonOverlayData(msgspec.Struct):
             *,
             camera_id: CameraIdString,
             observation: RTMPoseObservation,
-            scale: float = 0.5,
+            scale: float = 1.0,
     ) -> "SkeletonOverlayData":
         """Flatten an RTMPose COCO-WholeBody observation into the schema-driven
         payload.
 
-        Names come straight from `observation.points.names`, which already match
-        the prefixed names in `RTMPOSE_WHOLEBODY_DEFINITION.tracked_points`
-        (`body.*`, `face.*`, `left_hand.*`, `right_hand.*`). NaN rows are dropped.
+        Names come straight from `observation.points.names`, matching
+        `RTMPOSE_WHOLEBODY_DEFINITION.tracked_points`. NaN rows are dropped.
+
+        Coordinates are image-space pixels from inference (GPU or browser); use
+        ``scale=1.0`` unchanged. ``scale`` exists for rare non-pixel pipelines.
         RTMPose is 2D only so z is always 0.
         """
         xyz: np.ndarray = observation.points.xyz * scale

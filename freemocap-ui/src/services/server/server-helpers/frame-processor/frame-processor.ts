@@ -106,16 +106,23 @@ export class FrameProcessor {
             return;
         }
 
-        // Reassemble FrameData by zipping metadata + bitmaps
-        const frames: FrameData[] = msg.frameData.map((meta, i) => ({
-            cameraId: meta.cameraId,
-            cameraIndex: meta.cameraIndex,
-            frameNumber: meta.frameNumber,
-            width: meta.width,
-            height: meta.height,
-            colorChannels: meta.colorChannels,
-            bitmap: msg.bitmaps[i],
-        }));
+        // Reassemble FrameData by zipping metadata + bitmaps.
+        // Authoritative dimensions are the decoded bitmap — multiplex metadata
+        // width/height must match JPEG pixels but can drift (mis-reported capture
+        // headers, rotation, etc.). Landmark pipelines and overlays index in
+        // bitmap pixel space.
+        const frames: FrameData[] = msg.frameData.map((meta, i) => {
+            const bitmap = msg.bitmaps[i];
+            return {
+                cameraId: meta.cameraId,
+                cameraIndex: meta.cameraIndex,
+                frameNumber: meta.frameNumber,
+                width: bitmap.width,
+                height: bitmap.height,
+                colorChannels: meta.colorChannels,
+                bitmap,
+            };
+        });
 
         const cameraIds = new Set<string>();
         const frameNumbers = new Set<number>();

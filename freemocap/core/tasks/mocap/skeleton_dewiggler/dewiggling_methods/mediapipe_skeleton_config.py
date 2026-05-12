@@ -241,6 +241,76 @@ class SkeletonDefinition(BaseModel):
             keypoint_names=cls._collect_keypoint_names(bones=bones, connections=connections),
         )
 
+    @classmethod
+    def rtmpose_coco23_body(cls) -> "SkeletonDefinition":
+        """
+        COCO-WholeBody 23 body joints (same names as RTMPose whole-body schema).
+
+        Used for FABRIK + overlays that consume ``left_big_toe`` / ``right_small_toe``
+        rather than BlazePose ``left_foot_index``.
+        """
+        bones = tuple(
+            Bone(parent=p, child=c) for p, c in (
+                ("left_shoulder", "left_elbow"),
+                ("left_elbow", "left_wrist"),
+                ("right_shoulder", "right_elbow"),
+                ("right_elbow", "right_wrist"),
+                ("left_hip", "left_knee"),
+                ("left_knee", "left_ankle"),
+                ("right_hip", "right_knee"),
+                ("right_knee", "right_ankle"),
+                ("left_ankle", "left_heel"),
+                ("left_ankle", "left_big_toe"),
+                ("left_ankle", "left_small_toe"),
+                ("right_ankle", "right_heel"),
+                ("right_ankle", "right_big_toe"),
+                ("right_ankle", "right_small_toe"),
+            )
+        )
+
+        connections = tuple(
+            Connection(parent=p, child=c) for p, c in (
+                ("nose", "left_eye"),
+                ("nose", "right_eye"),
+                ("left_eye", "left_ear"),
+                ("right_eye", "right_ear"),
+                ("left_ear", "right_ear"),
+                ("left_shoulder", "right_shoulder"),
+                ("left_shoulder", "left_elbow"),
+                ("left_elbow", "left_wrist"),
+                ("right_shoulder", "right_elbow"),
+                ("right_elbow", "right_wrist"),
+                ("left_shoulder", "left_hip"),
+                ("right_shoulder", "right_hip"),
+                ("left_hip", "right_hip"),
+                ("left_hip", "left_knee"),
+                ("left_knee", "left_ankle"),
+                ("right_hip", "right_knee"),
+                ("right_knee", "right_ankle"),
+                ("left_ankle", "left_heel"),
+                ("left_heel", "left_big_toe"),
+                ("left_ankle", "left_big_toe"),
+                ("left_ankle", "left_small_toe"),
+                ("right_ankle", "right_heel"),
+                ("right_heel", "right_big_toe"),
+                ("right_ankle", "right_big_toe"),
+                ("right_ankle", "right_small_toe"),
+            )
+        )
+
+        root_joints = frozenset({
+            "left_shoulder", "right_shoulder",
+            "left_hip", "right_hip",
+        })
+
+        return cls(
+            name="rtmpose_coco23_body",
+            bones=bones,
+            connections=connections,
+            root_joints=root_joints,
+            keypoint_names=cls._collect_keypoint_names(bones=bones, connections=connections),
+        )
+
     # ============================================================
     # Mediapipe Hands
     # ============================================================

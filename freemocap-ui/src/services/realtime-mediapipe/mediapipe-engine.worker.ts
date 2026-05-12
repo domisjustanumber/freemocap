@@ -12,8 +12,8 @@ import {
     type NormalizedLandmark,
 } from '@mediapipe/tasks-vision';
 
-import faceContourIndices from './holistic-face-indices.json';
-import {buildClientSkeletonBinary, HOLISTIC_NUM_POINTS} from './client-skeleton-binary';
+import {buildClientSkeletonBinary, RTMPOSE_WHOLEBODY_NUM_POINTS} from './client-skeleton-binary';
+import {fillRtmposeWholeBodyBuffer} from './rtmpose-wholebody-pack';
 
 const WASM_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm';
 
@@ -28,23 +28,13 @@ const HAND_MODEL =
 const FACE_MODEL =
     'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task';
 
-const FACE_IDX: number[] = faceContourIndices as number[];
-
 let poseLm: PoseLandmarker | null = null;
 let handLm: HandLandmarker | null = null;
 let faceLm: FaceLandmarker | null = null;
 
-function lmToPx(lm: NormalizedLandmark, w: number, h: number): {x: number; y: number; v: number} {
-    return {
-        x: lm.x * w,
-        y: lm.y * h,
-        v: (lm.visibility ?? (lm as {presence?: number}).presence ?? 1) as number,
-    };
-}
-
 type HolisticTaskTimings = {poseMs: number; handMs: number; faceMs: number};
 
-function fillHolisticBuffer(
+function fillRtmposeWholeBody(
     out: Float32Array,
     origW: number,
     origH: number,
@@ -55,45 +45,20 @@ function fillHolisticBuffer(
     const ih = image.height;
     const sx = origW / iw;
     const sy = origH / ih;
-    out.fill(NaN);
-    const setTri = (i: number, x: number, y: number, v: number) => {
-        const b = i * 3;
-        out[b] = x * sx;
-        out[b + 1] = y * sy;
-        out[b + 2] = v;
-    };
 
     let t0 = performance.now();
     const poseRes = poseLm!.detectForVideo(image, ts);
     const poseMs = performance.now() - t0;
-    const plm = poseRes.landmarks[0];
-    if (plm) {
-        for (let i = 0; i < 33; i++) {
-            const lm = plm[i];
-            if (!lm) continue;
-            const {x, y, v} = lmToPx(lm, iw, ih);
-            setTri(i, x, y, v);
-        }
-    }
 
     t0 = performance.now();
     const handRes = handLm!.detectForVideo(image, ts);
     const handMs = performance.now() - t0;
-    const fillHand = (startIdx: number, landmarks: NormalizedLandmark[] | undefined) => {
-        if (!landmarks) return;
-        for (let j = 0; j < 21; j++) {
-            const lm = landmarks[j];
-            if (!lm) continue;
-            const {x, y, v} = lmToPx(lm, iw, ih);
-            setTri(startIdx + j, x, y, v);
-        }
-    };
+    const hands: Array<{landmarks: NormalizedLandmark[]; category: string | undefined}> = [];
     if (handRes.landmarks) {
         for (let hi = 0; hi < handRes.landmarks.length; hi++) {
-            const cat = handRes.handednesses?.[hi]?.[0]?.categoryName?.toLowerCase();
+            const cat = handRes.handednesses?.[hi]?.[0]?.categoryName;
             const lm = handRes.landmarks[hi];
-            if (cat === 'right') fillHand(33, lm);
-            if (cat === 'left') fillHand(54, lm);
+            if (lm) hands.push({landmarks: lm, category: cat});
         }
     }
 
@@ -101,16 +66,12 @@ function fillHolisticBuffer(
     const faceRes = faceLm!.detectForVideo(image, ts);
     const faceMs = performance.now() - t0;
     const faceLmks = faceRes.faceLandmarks?.[0];
-    const base = 75;
-    if (faceLmks) {
-        for (let f = 0; f < FACE_IDX.length; f++) {
-            const srcIdx = FACE_IDX[f];
-            const lm = faceLmks[srcIdx];
-            if (!lm) continue;
-            const px = lmToPx(lm, iw, ih);
-            setTri(base + f, px.x, px.y, px.v);
-        }
-    }
+
+    fillRtmposeWholeBodyBuffer(out, iw, ih, sx, sy, {
+        poseLm: poseRes.landmarks[0],
+        hands,
+        faceLmks,
+    });
 
     return {poseMs, handMs, faceMs};
 }
@@ -206,25 +167,25 @@ self.onmessage = async (e: MessageEvent) => {
         }
 
         const packed: Array<{cameraId: string; width: number; height: number; landmarks: Float32Array}> = [];
-        let sumPose = 0;
-        let sumHand = 0;
-        let sumFace = 0;
-        const n = cameras.length;
+        const perCamera: Array<{cameraId: string; poseMs: number; handMs: number; faceMs: number}> = [];
 
         try {
             for (const cam of cameras) {
-                const buf = new Float32Array(HOLISTIC_NUM_POINTS * 3);
+                const buf = new Float32Array(RTMPOSE_WHOLEBODY_NUM_POINTS * 3);
                 try {
-                    const t = fillHolisticBuffer(
+                    const t = fillRtmposeWholeBody(
                         buf,
                         cam.origWidth,
                         cam.origHeight,
                         nextTimestampMs(),
                         cam.bitmap,
                     );
-                    sumPose += t.poseMs;
-                    sumHand += t.handMs;
-                    sumFace += t.faceMs;
+                    perCamera.push({
+                        cameraId: cam.cameraId,
+                        poseMs: t.poseMs,
+                        handMs: t.handMs,
+                        faceMs: t.faceMs,
+                    });
                 } finally {
                     cam.bitmap.close();
                 }
@@ -249,10 +210,7 @@ self.onmessage = async (e: MessageEvent) => {
             cameraGroupId,
             cameras: packed,
         });
-        const timings =
-            n > 0
-                ? {poseMs: sumPose / n, handMs: sumHand / n, faceMs: sumFace / n}
-                : {poseMs: 0, handMs: 0, faceMs: 0};
+        const timings = {perCamera};
         self.postMessage({type: 'result', frameNumber, buffer: binary, timings}, [binary]);
     }
 };

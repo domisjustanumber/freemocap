@@ -9,6 +9,16 @@ export interface CharucoBoardConfigForPipeline {
 export type RealtimeDetectorKind = 'rtmpose' | 'mediapipe_js';
 export type RealtimeModelSize = 'lite' | 'full' | 'heavy';
 
+/**
+ * `TrackedObjectDefinition.name` shipped in `tracker_schemas` — must stay aligned
+ * with skellytracker (see `tracker_schema_message.collect_active_tracker_schemas`).
+ */
+export const TRACKER_SCHEMA_NAME_BY_DETECTOR_KIND: Record<RealtimeDetectorKind, string> = {
+    rtmpose: 'rtmpose_wholebody',
+    /** Browser MediaPipe packs into the same rtmpose_wholebody point order/names. */
+    mediapipe_js: 'rtmpose_wholebody',
+};
+
 export interface CameraNodeConfig {
     charuco_tracking_enabled: boolean;
     skeleton_tracking_enabled: boolean;

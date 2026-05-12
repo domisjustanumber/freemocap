@@ -231,21 +231,26 @@ export class PipelineTimingStore {
     }
 
     /**
-     * MediaPipe Tasks worker: mean wall time per camera for each landmarker call
-     * in one infer batch (pose / hands / face), in milliseconds.
+     * MediaPipe Tasks worker: wall time per camera for each landmarker
+     * (pose / hands / face) in one infer batch, in milliseconds.
+     * Row keys: `mediapipe_js:<cameraId>:pose_detect_ms` (and hand/face).
      */
-    recordMediapipeJsDetectTimings(sample: {poseMs: number; handMs: number; faceMs: number}): void {
+    recordMediapipeJsDetectTimings(sample: {
+        perCamera: Array<{cameraId: string; poseMs: number; handMs: number; faceMs: number}>;
+    }): void {
         const ts = Date.now();
-        const rows: [string, number][] = [
-            ["mediapipe_js:pose_detect_ms", sample.poseMs],
-            ["mediapipe_js:hand_detect_ms", sample.handMs],
-            ["mediapipe_js:face_detect_ms", sample.faceMs],
-        ];
-        for (const [rowKey, v] of rows) {
-            if (!Number.isFinite(v) || v < 0) continue;
-            const buf = this.ensureBuffer(rowKey);
-            buf.push(ts, v);
-            this.recentValues.set(rowKey, v);
+        for (const c of sample.perCamera) {
+            const rows: [string, number][] = [
+                [`mediapipe_js:${c.cameraId}:pose_detect_ms`, c.poseMs],
+                [`mediapipe_js:${c.cameraId}:hand_detect_ms`, c.handMs],
+                [`mediapipe_js:${c.cameraId}:face_detect_ms`, c.faceMs],
+            ];
+            for (const [rowKey, v] of rows) {
+                if (!Number.isFinite(v) || v < 0) continue;
+                const buf = this.ensureBuffer(rowKey);
+                buf.push(ts, v);
+                this.recentValues.set(rowKey, v);
+            }
         }
         this._writeVersion++;
         this._cachedSnapshot = null;

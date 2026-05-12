@@ -127,6 +127,26 @@ class AnthropometricPrior(BaseModel):
             "right_ankle->right_foot_index": 0.085,
         })
 
+    @classmethod
+    def rtmpose_coco23_body(cls) -> "AnthropometricPrior":
+        """Same limb proportions as ``mediapipe_body``; foot bones use COCO toe names."""
+        return cls(ratios={
+            "left_shoulder->left_elbow": 0.186,
+            "left_elbow->left_wrist": 0.146,
+            "right_shoulder->right_elbow": 0.186,
+            "right_elbow->right_wrist": 0.146,
+            "left_hip->left_knee": 0.245,
+            "left_knee->left_ankle": 0.246,
+            "right_hip->right_knee": 0.245,
+            "right_knee->right_ankle": 0.246,
+            "left_ankle->left_heel": 0.024,
+            "left_ankle->left_big_toe": 0.085,
+            "left_ankle->left_small_toe": 0.075,
+            "right_ankle->right_heel": 0.024,
+            "right_ankle->right_big_toe": 0.085,
+            "right_ankle->right_small_toe": 0.075,
+        })
+
     # --------------------------------------------------------
     # Mediapipe Hands
     # --------------------------------------------------------

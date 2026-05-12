@@ -32,6 +32,7 @@ import {
 import {RigidBodyPose} from "@/components/viewport3d";
 import {MediapipeRealtimeEngine} from '@/services/realtime-mediapipe/mediapipe-engine';
 import {cloneFrameBitmapForMediapipe} from '@/services/realtime-mediapipe/clone-frame-for-mediapipe';
+import {parseClientSkeletonBinaryToObservations} from '@/services/realtime-mediapipe/parse-client-skeleton-overlay';
 import {
     KeypointsCallback,
     KeypointsFrame,
@@ -39,6 +40,10 @@ import {
 } from "@/components/viewport3d/KeypointsSourceContext";
 import {store} from "@/store";
 import {pipelineProgressUpdated, PipelinePhase, PipelineType} from "@/store/slices/pipelines";
+import {
+    TRACKER_SCHEMA_NAME_BY_DETECTOR_KIND,
+    type RealtimeDetectorKind,
+} from "@/store/slices/realtime/realtime-types";
 
 // Compare two already-sorted string arrays without allocating
 function sortedArraysEqual(a: string[], b: string[]): boolean {
@@ -250,6 +255,30 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
         let lastFrontendFrameTime = 0;
         const frontendDurations: number[] = [];
 
+        /**
+         * When the realtime skeleton source switches (RTMPose vs browser MediaPipe), the
+         * stream embeds one schema's point order but `tracker_schemas` includes both —
+         * the active id must track the detector or limb connections resolve to missing
+         * names and nothing draws between joints.
+         */
+        const syncActiveTrackerId = (candidate: string | null | undefined): void => {
+            if (!candidate) return;
+            const schemas = trackerSchemasRef.current;
+            if (!schemas[candidate]) return;
+            if (activeTrackerIdRef.current === candidate) return;
+            activeTrackerIdRef.current = candidate;
+            setActiveTrackerId(candidate);
+            overlayManagerRef.current?.setTrackerSchemas(schemas, candidate);
+        };
+
+        const preferredTrackerIdFromUi = (): string | null => {
+            const kind = (store.getState().mocap.config.realtime_detector_kind ??
+                'rtmpose') as RealtimeDetectorKind;
+            const want = TRACKER_SCHEMA_NAME_BY_DETECTOR_KIND[kind];
+            const schemas = trackerSchemasRef.current;
+            return schemas[want] ? want : null;
+        };
+
         // Process a decoded frame result: update camera list, dispatch to workers.
         // Synchronous — overlay compositing is fire-and-forget so it never blocks
         // the rAF loop. The ack is sent at the top of processFrameLoop, well before
@@ -442,6 +471,13 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
                 }
             }
 
+            const kpRawLen = payload.keypoints_raw ? Object.keys(payload.keypoints_raw).length : 0;
+            const kpFiltLen = payload.keypoints_filtered ? Object.keys(payload.keypoints_filtered).length : 0;
+            if (kpRawLen > 0 || kpFiltLen > 0) {
+                const preferred = preferredTrackerIdFromUi();
+                if (preferred) syncActiveTrackerId(preferred);
+            }
+
             if (payload.keypoints_raw) {
                 const frame = pointDictToFrame(payload.keypoints_raw as Record<string, {x:number;y:number;z:number}>);
                 trackedPointsRef.current = frame;
@@ -468,11 +504,16 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
         // directly — no Point3d object creation, no JSON parsing.
         const dispatchBinaryKeypoints = (buf: ArrayBuffer): void => {
             const parsed = parseKeypointsMessage(buf);
+            let syncedTrackerForMessage = false;
             for (const block of parsed.blocks) {
                 const schema = trackerSchemasRef.current[block.trackerId];
                 if (!schema) {
                     // Schema handshake hasn't arrived yet — drop silently.
                     continue;
+                }
+                if (!syncedTrackerForMessage) {
+                    syncActiveTrackerId(block.trackerId);
+                    syncedTrackerForMessage = true;
                 }
                 // Cast to Float32Array (the serializer always uses float32).
                 const interleaved = block.interleaved instanceof Float32Array
@@ -590,6 +631,7 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
                         const mpCfg = st.mocap.config;
                         const rt = st.realtime;
                         const ws = wsConnectionRef.current;
+                        let mediapipeInferBeforeDispatch: Promise<void> | null = null;
                         if (
                             mpCfg.realtime_detector_kind === 'mediapipe_js'
                             && rt.isConnected
@@ -635,20 +677,50 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
                                             bitmap: await cloneFrameBitmapForMediapipe(f.bitmap, f.width, f.height),
                                         })),
                                     );
-                                    engine.inferFrame(
-                                        mpFrames[0].frameNumber,
-                                        cameraGroupId,
-                                        mpFrames,
-                                        ({buffer, timings}) => {
-                                            ws.sendBinary(buffer);
-                                            pipelineTimingStoreRef.current.recordMediapipeJsDetectTimings(timings);
-                                        },
-                                        (err) => console.error('[MediapipeRealtime] infer error', err),
-                                    );
+                                    const trackerId = TRACKER_SCHEMA_NAME_BY_DETECTOR_KIND.mediapipe_js;
+                                    const pointNames = trackerSchemasRef.current[trackerId]?.tracked_points;
+                                    mediapipeInferBeforeDispatch = new Promise<void>((resolve) => {
+                                        const done = (): void => {
+                                            resolve();
+                                        };
+                                        const ok = engine.inferFrame(
+                                            mpFrames[0].frameNumber,
+                                            cameraGroupId,
+                                            mpFrames,
+                                            ({buffer, timings}) => {
+                                                ws.sendBinary(buffer);
+                                                pipelineTimingStoreRef.current.recordMediapipeJsDetectTimings(timings);
+                                                if (pointNames?.length) {
+                                                    const parsed = parseClientSkeletonBinaryToObservations(
+                                                        buffer,
+                                                        pointNames,
+                                                    );
+                                                    if (parsed) {
+                                                        const t = performance.now();
+                                                        for (const [camId, obs] of parsed) {
+                                                            latestMediapipeRef.current.set(camId, obs);
+                                                            lastOverlayTimeRef.current.set(camId, t);
+                                                        }
+                                                    }
+                                                }
+                                                done();
+                                            },
+                                            (err) => {
+                                                console.error('[MediapipeRealtime] infer error', err);
+                                                done();
+                                            },
+                                        );
+                                        if (!ok) {
+                                            done();
+                                        }
+                                    });
                                 } catch (err) {
                                     console.error('[MediapipeRealtime] clone failed', err);
                                 }
                             }
+                        }
+                        if (mediapipeInferBeforeDispatch) {
+                            await mediapipeInferBeforeDispatch;
                         }
                         const decodeWorkerMs = result.decodeWorkerMs;
                         const jpegDecodeMainWaitMs = dispatchEnter - decodeStartTime;
@@ -736,7 +808,13 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
                         const schemas = jsonData.schemas;
                         trackerSchemasRef.current = schemas;
                         const keys = Object.keys(schemas);
-                        const firstId = keys.length > 0 ? keys[0] : null;
+                        const preferred = preferredTrackerIdFromUi();
+                        let firstId: string | null = null;
+                        if (preferred !== null) {
+                            firstId = preferred;
+                        } else if (keys.length > 0) {
+                            firstId = keys[0];
+                        }
                         activeTrackerIdRef.current = firstId;
                         setTrackerSchemas(schemas);
                         setActiveTrackerId(firstId);

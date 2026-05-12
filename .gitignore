@@ -3,7 +3,10 @@
 
 __pycache__/
 Data/
-.vscode/
+# VS Code / Cursor: share interpreter + extensions; keep other paths local
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 *.py[cod]
 *$py.class
 freemocap\user_preferences.yaml
@@ -130,8 +133,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-.vscode/launch.json
-
 
 update_pip.txt
 freemocap/user_preferences.yaml
@@ -150,6 +151,9 @@ data/
 .DS_Store
 
 desktop.ini
+
+# TypeScript incremental / composite build info (local cache)
+*.tsbuildinfo
 
 node_modules/
 freemocap/system/gui_state.json

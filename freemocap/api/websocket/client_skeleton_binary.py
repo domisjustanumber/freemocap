@@ -1,4 +1,4 @@
-"""Parse client → server MediaPipe holistic skeleton binary messages.
+"""Parse client → server MediaPipe browser snapshots packed as RTMPose whole-body (133 points).
 
 Wire layout (little-endian):
 
@@ -14,7 +14,7 @@ Repeated ``num_cameras`` times:
 * ``camera_id`` S16 (ASCII / UTF-8, zero padded — matches skellycam width)
 * ``image_width`` u4
 * ``image_height`` u4
-* ``num_points`` u4  (must match holistic schema length)
+* ``num_points`` u4  (must match ``rtmpose_wholebody`` schema length — 133)
 * ``data`` float32 ``num_points * 3`` — interleaved ``(x_px, y_px, visibility)``
 
 ``CLIENT_SKELETON_PAYLOAD_FOOTER`` mirrors the header (integrity check).
@@ -27,12 +27,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 from skellycam.core.types.type_overloads import CameraGroupIdString, CameraIdString
 from skellytracker.trackers.base_tracker.point_cloud import PointCloud
-from skellytracker.trackers.mediapipe_tracker.composite.mediapipe_composite_observation import (
-    MediapipeCompositeObservation,
-)
-from skellytracker.trackers.mediapipe_tracker.names_and_connections import (
-    MEDIAPIPE_HOLISTIC_DEFINITION,
-)
+from skellytracker.trackers.rtmpose_tracker.names_and_connections import RTMPOSE_WHOLEBODY_DEFINITION
+from skellytracker.trackers.rtmpose_tracker.rtmpose_observation import RTMPoseObservation
 
 from freemocap.api.websocket.binary_keypoints_protocol import (
     MessageType,
@@ -44,8 +40,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_EXPECTED_NUM_POINTS: int = len(MEDIAPIPE_HOLISTIC_DEFINITION.tracked_points)
-_HOLISTIC_NAMES: tuple[str, ...] = MEDIAPIPE_HOLISTIC_DEFINITION.tracked_points
+_EXPECTED_NUM_POINTS: int = len(RTMPOSE_WHOLEBODY_DEFINITION.tracked_points)
+_POINT_NAMES: tuple[str, ...] = RTMPOSE_WHOLEBODY_DEFINITION.tracked_points
 
 _CLIENT_HEADER_DTYPE = np.dtype(
     [
@@ -79,7 +75,7 @@ def parse_client_skeleton_binary(data: bytes | bytearray) -> tuple[CameraGroupId
     camera_group_id = str(np.char.decode(header["camera_group_id"], "utf-8")).strip("\x00").strip()
 
     offset = _CLIENT_HEADER_DTYPE.itemsize
-    per_camera: dict[CameraIdString, MediapipeCompositeObservation | None] = {}
+    per_camera: dict[CameraIdString, RTMPoseObservation | None] = {}
 
     for _ in range(num_cameras):
         meta_end = offset + _PER_CAMERA_META_DTYPE.itemsize
@@ -113,8 +109,8 @@ def parse_client_skeleton_binary(data: bytes | bytearray) -> tuple[CameraGroupId
         xyz = np.column_stack([xy[:, 0], xy[:, 1], z_zeros])
         nan_rows = vis <= 1e-6
         xyz[nan_rows] = np.nan
-        cloud = PointCloud(names=_HOLISTIC_NAMES, xyz=xyz, visibility=vis)
-        per_camera[cam_id] = MediapipeCompositeObservation(
+        cloud = PointCloud(names=_POINT_NAMES, xyz=xyz, visibility=vis)
+        per_camera[cam_id] = RTMPoseObservation(
             frame_number=frame_number,
             image_size=(h, w),
             points=cloud,

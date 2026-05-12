@@ -8,6 +8,29 @@ import {TrackedObjectDefinition} from "@/services/server/server-helpers/tracked-
 
 type PointClass = 'face' | 'left_hand' | 'right_hand' | 'left' | 'right' | 'center' | 'aruco';
 
+/** COCO-wholebody upper-head joints on the body list — omit wires / dots for a cleaner silhouette. */
+const RTMPOSE_HEAD_BODY_ONLY: ReadonlySet<string> = new Set([
+    'nose',
+    'left_eye',
+    'right_eye',
+    'left_ear',
+    'right_ear',
+]);
+
+export const RTMPOSE_WHOLEBODY_HEAD_BODY_JOINTS: ReadonlySet<string> = RTMPOSE_HEAD_BODY_ONLY;
+function skipRtmposeHeadOnlyBodyEdge(a: string, b: string, defName: string | undefined): boolean {
+    if (defName !== 'rtmpose_wholebody') return false;
+    return RTMPOSE_WHOLEBODY_HEAD_BODY_JOINTS.has(a) && RTMPOSE_WHOLEBODY_HEAD_BODY_JOINTS.has(b);
+}
+
+export function skipRtmposeHeadOnlyBodyConnection(
+    a: string,
+    b: string,
+    schemaName: string | undefined,
+): boolean {
+    return skipRtmposeHeadOnlyBodyEdge(a, b, schemaName);
+}
+
 const classifyCache = new Map<string, PointClass>();
 
 export function classifyPointName(name: string): PointClass {
@@ -138,6 +161,7 @@ export function buildSegmentsFromSchema(
 
     if (def) {
         for (const [a, b] of def.connections) {
+            if (skipRtmposeHeadOnlyBodyConnection(a, b, def.name)) continue;
             segments.push({proximal: a, distal: b});
             colors.push(getSegmentColor(a, b, def.color_hints));
         }
@@ -145,7 +169,9 @@ export function buildSegmentsFromSchema(
         // If the schema includes face landmarks (by name-class), layer the
         // legacy MediaPipe face contours on top.
         const hasFace = def.tracked_points.some(n => classifyPointName(n) === 'face');
-        if (hasFace) {
+        const usesIbugFaceNames = def.tracked_points.some(n => /^face_\d{4}$/.test(n));
+        // iBUG face uses face_0000… names — mesh contour segment IDs do not apply.
+        if (hasFace && !usesIbugFaceNames) {
             const faceSegs = buildFaceContourSegments();
             const faceCols = buildFaceContourColors();
             for (const key of Object.keys(faceSegs)) {

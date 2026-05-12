@@ -19,7 +19,6 @@ from queue import Empty
 
 from pydantic import BaseModel, ConfigDict
 from skellytracker.trackers.rtmpose_tracker.names_and_connections import RTMPOSE_WHOLEBODY_DEFINITION
-from skellytracker.trackers.mediapipe_tracker.names_and_connections import MEDIAPIPE_HOLISTIC_DEFINITION
 from skellycam.core.camera.config.camera_config import CameraConfigs
 from skellycam.core.camera_group.camera_group import CameraGroup
 from skellycam.core.ipc.process_management.managed_worker import WorkerMode
@@ -375,8 +374,8 @@ class RealtimePipeline:
             keypoints_binary_payload: bytearray | None = None
             if _BINARY_KEYPOINTS_ENABLED:
                 if aggregation_output.pipeline_config.realtime_detector_kind == "mediapipe_js":
-                    _tid = MEDIAPIPE_HOLISTIC_DEFINITION.name
-                    _pnames = MEDIAPIPE_HOLISTIC_DEFINITION.tracked_points
+                    _tid = RTMPOSE_WHOLEBODY_DEFINITION.name
+                    _pnames = RTMPOSE_WHOLEBODY_DEFINITION.tracked_points
                 else:
                     _tid = RTMPOSE_WHOLEBODY_DEFINITION.name
                     _pnames = RTMPOSE_WHOLEBODY_DEFINITION.tracked_points

@@ -170,6 +170,16 @@ function humanizeRowKey(rowKey: string): string {
         "ui:raf_to_rendered_ms": "UI: rAF tick → rendered",
     };
     if (pretty[rowKey]) return pretty[rowKey];
+    if (rowKey.startsWith("mediapipe_js:")) {
+        const rest = rowKey.slice("mediapipe_js:".length);
+        const lastColon = rest.lastIndexOf(":");
+        if (lastColon !== -1) {
+            const cam = rest.slice(0, lastColon);
+            const stage = rest.slice(lastColon + 1);
+            const label = pretty[`mediapipe_js:${stage}`] ?? stage;
+            return `${cam} · ${label}`;
+        }
+    }
     if (rowKey.startsWith("camera:")) {
         const parts = rowKey.split(":");
         const cam = parts[1];
@@ -257,7 +267,12 @@ function pipelineStagesRowTooltipId(rowKey: string): string {
     const head = parts[0];
     if (head === "aggregator") return `agg_${parts.slice(1).join("_")}`;
     if (head === "skeleton_inference") return `skel_${parts.slice(1).join("_")}`;
-    if (head === "mediapipe_js") return `mpjs_${parts.slice(1).join("_")}`;
+    if (head === "mediapipe_js") {
+        if (parts.length >= 3) {
+            return `mpjs_${parts.slice(2).join("_")}`;
+        }
+        return `mpjs_${parts.slice(1).join("_")}`;
+    }
     if (head === "multiframe") return `mf_${parts.slice(1).join("_")}`;
     if (head === "camera") return `cam_${parts.slice(2).join("_")}`;
     if (head === "ui") return `ui_${parts.slice(2).join("_")}`;

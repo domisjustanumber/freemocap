@@ -39,9 +39,9 @@ export class OverlayRendererFactory {
     ): boolean {
         const mapping: Record<ObservationType, string[]> = {
             'charuco_overlay': ['CharucoTracker'],
-            'mediapipe_overlay': ['MediapipeHolisticTracker', 'MediapipeTracker', 'mediapipe_holistic'],
+            'mediapipe_overlay': ['MediapipeHolisticTracker', 'MediapipeTracker'],
             'rtmpose_overlay': ['RTMPoseTracker'],
-            'skeleton_overlay': ['RTMPoseTracker', 'MediapipeHolisticTracker', 'MediapipeTracker', 'mediapipe_holistic'],
+            'skeleton_overlay': ['RTMPoseTracker', 'MediapipeHolisticTracker', 'MediapipeTracker'],
         };
 
         return mapping[rendererType]?.includes(trackerName) || false;

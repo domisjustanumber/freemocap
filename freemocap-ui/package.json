@@ -27,7 +27,6 @@
     "@emotion/react": "^11.13.3",
     "@emotion/styled": "^11.13.0",
     "@fontsource/roboto": "^5.1.0",
-    "@mediapipe/tasks-vision": "^0.10.21",
     "@monaco-editor/react": "^4.7.0",
     "@mui/icons-material": "^6.4.5",
     "@mui/material": "^6.1.1",

@@ -11,7 +11,6 @@ import {
     Point2D,
 } from "@/services/server/server-helpers/image-overlay/image-overlay-system";
 import {TrackedObjectDefinition} from "@/services/server/server-helpers/tracked-object-definition";
-import {skipRtmposeHeadOnlyBodyConnection, RTMPOSE_WHOLEBODY_HEAD_BODY_JOINTS} from "@/components/viewport3d/helpers/skeleton-config";
 
 export interface MediapipePoint {
     name: string;
@@ -147,31 +146,20 @@ export class MediapipeOverlayRenderer extends BaseOverlayRenderer {
         this.prepareCanvas(sourceBitmap);
 
         if (observation) {
-            this.drawSkeletonOverlay(sourceBitmap, observation);
+            this.drawSkeletonOverlay(observation);
         }
 
         return this.createBitmap(sourceBitmap);
     }
 
-    /**
-     * Map landmark coordinates from the observation's declared image size to the
-     * decoded frame bitmap (SkellyCam metadata vs JPEG intrinsic size can differ).
-     */
-    private drawSkeletonOverlay(sourceBitmap: ImageBitmap, observation: MediapipeObservation): void {
+    private drawSkeletonOverlay(observation: MediapipeObservation): void {
         this.ctx.save();
-
-        const bw = sourceBitmap.width;
-        const bh = sourceBitmap.height;
-        const ow = observation.image_width;
-        const oh = observation.image_height;
-        const sx = ow > 0 ? bw / ow : 1;
-        const sy = oh > 0 ? bh / oh : 1;
 
         const pointMap = new Map<string, Point2D>();
         for (const p of observation.points) {
             pointMap.set(p.name, {
-                x: p.x * sx,
-                y: p.y * sy,
+                x: p.x,
+                y: p.y,
                 id: p.name,
                 visibility: p.visibility,
             });
@@ -182,7 +170,7 @@ export class MediapipeOverlayRenderer extends BaseOverlayRenderer {
             this.drawConnections(pointMap, this.schema);
         }
 
-        this.drawAllPoints(pointMap, this.schema);
+        this.drawAllPoints(pointMap);
         this.drawInfo(observation);
 
         this.ctx.restore();
@@ -204,7 +192,6 @@ export class MediapipeOverlayRenderer extends BaseOverlayRenderer {
         schema: TrackedObjectDefinition,
     ): void {
         for (const [a, b] of schema.connections) {
-            if (skipRtmposeHeadOnlyBodyConnection(a, b, schema.name)) continue;
             const start = pointMap.get(a);
             const end = pointMap.get(b);
             if (!start || !end || !this.isValidPoint(start) || !this.isValidPoint(end)) continue;
@@ -222,18 +209,11 @@ export class MediapipeOverlayRenderer extends BaseOverlayRenderer {
         }
     }
 
-    private drawAllPoints(pointMap: Map<string, Point2D>, schema: TrackedObjectDefinition | null): void {
+    private drawAllPoints(pointMap: Map<string, Point2D>): void {
         // Bucket by style so we can call drawPoints with one style per batch.
         const buckets = new Map<DrawStyle, Point2D[]>();
         for (const point of pointMap.values()) {
-            const id = point.id as string;
-            if (
-                schema?.name === 'rtmpose_wholebody' &&
-                RTMPOSE_WHOLEBODY_HEAD_BODY_JOINTS.has(id)
-            ) {
-                continue;
-            }
-            const style = this.styleFor(id);
+            const style = this.styleFor(point.id as string);
             const list = buckets.get(style);
             if (list) list.push(point);
             else buckets.set(style, [point]);

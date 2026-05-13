@@ -4,7 +4,6 @@ import {defineConfig} from 'vite'
 import react from '@vitejs/plugin-react'
 import electron from 'vite-plugin-electron/simple'
 import pkg from './package.json'
-import {mediapipeClassicWorkerDevPlugin} from './vite/mediapipeClassicWorkerDevPlugin'
 
 // https://vitejs.dev/config/
 export default defineConfig(({command}) => {
@@ -21,7 +20,6 @@ export default defineConfig(({command}) => {
             },
         },
         plugins: [
-            mediapipeClassicWorkerDevPlugin(),
             // Exclude worker files from React fast-refresh — the @react-refresh
             // preamble references `window` which doesn't exist in worker scope.
             react({ exclude: [/\.worker\.[jt]sx?$/] }),
@@ -68,12 +66,10 @@ export default defineConfig(({command}) => {
                 renderer: {},
             }),
         ],
-        // IIFE emits classic workers. ES worker format yields module workers, which cannot
-        // run importScripts() — breaks @mediapipe/tasks-vision WASM loading in mediapipe-engine.worker.ts.
         worker: {
-            format: "iife",
-            // Apply JSX transform when bundling workers (no Worker-specific React options needed).
-            plugins: () => [react()],
+            format: "es",
+            // Apply React JSX transform in workers without fast-refresh (no window).
+            plugins: () => [react({ fastRefresh: false })],
         },
         optimizeDeps: {},
         server: process.env.VSCODE_DEBUG

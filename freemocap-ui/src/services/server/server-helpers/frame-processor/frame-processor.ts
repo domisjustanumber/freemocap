@@ -20,8 +20,6 @@ export interface ProcessedFrameResult {
     frames: FrameData[];
     cameraIds: Set<string>;
     frameNumbers: Set<number>;
-    /** Wall time spent inside the decode worker (parse multiplex + sequential JPEG→ImageBitmap). */
-    decodeWorkerMs: number;
 }
 
 /** Message sent from main thread → decode worker. */
@@ -35,7 +33,6 @@ interface DecodeRequest {
 interface DecodeResultMessage {
     type: 'result';
     requestId: number;
-    decodeWorkerMs?: number;
     frameData: Array<{
         cameraId: string;
         cameraIndex: number;
@@ -106,23 +103,16 @@ export class FrameProcessor {
             return;
         }
 
-        // Reassemble FrameData by zipping metadata + bitmaps.
-        // Authoritative dimensions are the decoded bitmap — multiplex metadata
-        // width/height must match JPEG pixels but can drift (mis-reported capture
-        // headers, rotation, etc.). Landmark pipelines and overlays index in
-        // bitmap pixel space.
-        const frames: FrameData[] = msg.frameData.map((meta, i) => {
-            const bitmap = msg.bitmaps[i];
-            return {
-                cameraId: meta.cameraId,
-                cameraIndex: meta.cameraIndex,
-                frameNumber: meta.frameNumber,
-                width: bitmap.width,
-                height: bitmap.height,
-                colorChannels: meta.colorChannels,
-                bitmap,
-            };
-        });
+        // Reassemble FrameData by zipping metadata + bitmaps
+        const frames: FrameData[] = msg.frameData.map((meta, i) => ({
+            cameraId: meta.cameraId,
+            cameraIndex: meta.cameraIndex,
+            frameNumber: meta.frameNumber,
+            width: meta.width,
+            height: meta.height,
+            colorChannels: meta.colorChannels,
+            bitmap: msg.bitmaps[i],
+        }));
 
         const cameraIds = new Set<string>();
         const frameNumbers = new Set<number>();
@@ -141,12 +131,7 @@ export class FrameProcessor {
             this.lastFrameTime.set(frame.cameraId, now);
         }
 
-        pending.resolve({
-            frames,
-            cameraIds,
-            frameNumbers,
-            decodeWorkerMs: typeof msg.decodeWorkerMs === 'number' ? msg.decodeWorkerMs : 0,
-        });
+        pending.resolve({ frames, cameraIds, frameNumbers });
     }
 
     public processFramePayload(data: ArrayBuffer): Promise<ProcessedFrameResult | null> {

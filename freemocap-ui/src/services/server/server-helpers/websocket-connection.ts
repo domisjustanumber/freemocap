@@ -109,20 +109,6 @@ export class WebSocketConnection {
         }
     }
 
-    /** Send a raw binary frame (e.g. client skeleton observations). */
-    public sendBinary(data: ArrayBuffer): boolean {
-        if (!this.isConnected()) {
-            return false;
-        }
-        try {
-            this.ws!.send(data);
-            return true;
-        } catch (error) {
-            console.error('Failed to send WebSocket binary:', error);
-            return false;
-        }
-    }
-
     public isConnected(): boolean {
         return this.ws?.readyState === WebSocket.OPEN;
     }

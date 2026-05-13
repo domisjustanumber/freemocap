@@ -5,12 +5,12 @@ import ExpandMore from "@mui/icons-material/ExpandMore";
 import ChevronRight from "@mui/icons-material/ChevronRight";
 
 import {RealtimePipelineStageTreeItem} from "./RealtimePipelineStageTreeItem";
-import {MediapipeConfigPanel, realtimeDetectionModelLabel} from "@/components/control-panels/mocap-control-panel/MediapipeConfigPanel";
+import {MediapipeConfigPanel} from "@/components/control-panels/mocap-control-panel/MediapipeConfigPanel";
 import {SkeletonFilterConfigPanel} from "@/components/control-panels/mocap-control-panel/SkeletonFilterConfigPanel";
 import {useAppDispatch, useAppSelector} from "@/store/hooks";
 import {applyRealtimePipeline, selectIsPipelineConnected, selectPipelineConfig} from "@/store/slices/realtime";
 import {useMocap} from "@/hooks/useMocap";
-import {MediapipeDetectorConfig, RealtimeFilterConfig, selectMocapConfig} from "@/store/slices/mocap";
+import {MediapipeDetectorConfig, RealtimeFilterConfig} from "@/store/slices/mocap";
 
 export type PipelineContext = "realtime" | "posthoc";
 
@@ -47,7 +47,6 @@ export const RealtimePipelineConfigTree: React.FC<PipelineConfigTreeProps> = ({
     const dispatch = useAppDispatch();
     const isConnected = useAppSelector(selectIsPipelineConnected);
     const pipelineConfig = useAppSelector(selectPipelineConfig);
-    const mocapConfig = useAppSelector(selectMocapConfig);
     const {
         updateDetectorConfigLocalOnly,
         replaceDetectorConfigLocalOnly,
@@ -169,18 +168,10 @@ export const RealtimePipelineConfigTree: React.FC<PipelineConfigTreeProps> = ({
                     checked={skeletonEnabled}
                     onToggle={onSkeletonToggle}
                     isExpanded={isExpanded("2d-skeleton")}
-                    summaryWhenCollapsed={
-                        context === "realtime"
-                            ? realtimeDetectionModelLabel(
-                                mocapConfig.realtime_detector_kind,
-                                mocapConfig.realtime_model_size,
-                            )
-                            : "Posthoc preset"
-                    }
+                    summaryWhenCollapsed={context === "realtime" ? "Realtime preset" : "Posthoc preset"}
                 >
                     <Box sx={{p: 1, pl: 2, borderLeft: `2px solid ${theme.palette.divider}`}}>
                         <MediapipeConfigPanel
-                            variant="realtime"
                             updateDetectorConfig={handleUpdateDetectorConfig}
                             replaceDetectorConfig={handleReplaceDetectorConfig}
                         />

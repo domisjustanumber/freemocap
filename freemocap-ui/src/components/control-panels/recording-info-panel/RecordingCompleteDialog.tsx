@@ -39,9 +39,6 @@ function TimingStatsTable({ data }: { data: RecordingCompletionData }) {
         { label: 'Framerate / FPS (Hz)', stats: data.framerate_stats },
         { label: 'Frame Duration (ms)', stats: data.frame_duration_stats },
         { label: 'Inter-Camera Frame Grab Sync (ms)', stats: data.inter_camera_grab_range_ms_stats },
-        { label: 'Grab Request → Grab Success (ms)', stats: data.grab_request_to_success_ms_stats },
-        { label: 'Grab Timestamp Span / Frame Across Cameras (ms)', stats: data.grab_timestamp_range_per_frame_ms_stats },
-        { label: 'Retrieve Request → Retrieve Success (ms)', stats: data.retrieve_request_to_success_ms_stats },
     ];
 
     return (

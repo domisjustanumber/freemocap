@@ -11,7 +11,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useWorkerData } from "../WorkerDataContext";
 import { useViewportState } from "../scene/ViewportStateContext";
 import { COLORS } from "../helpers/colors";
-import { classifyPointName, getPointStyle, RTMPOSE_WHOLEBODY_HEAD_BODY_JOINTS } from "../helpers/skeleton-config";
+import { classifyPointName, getPointStyle } from "../helpers/skeleton-config";
 import { useKeypointsSource, type KeypointsSource, type KeypointsFrame } from "../KeypointsSourceContext";
 
 const MAX_POINTS = 1024;
@@ -105,20 +105,15 @@ function KeypointLayer({ subscribeKey, color, radius, statsKey, colorMode = "uni
                 for (let i = 0; i < frame.pointNames.length; i++) {
                     const name = frame.pointNames[i];
                     frameIdxByName.current.set(name, i);
-                    const schema = workerData.getActiveSchema();
-                    const hideRtmposeHeadCluster =
-                        schema?.name === "rtmpose_wholebody" &&
-                        RTMPOSE_WHOLEBODY_HEAD_BODY_JOINTS.has(name);
                     if (!nameToInstanceIdx.current.has(name)
                         && nextIdx.current < MAX_POINTS
-                        && classifyPointName(name) !== 'face'
-                        && !hideRtmposeHeadCluster) {
+                        && classifyPointName(name) !== 'face') {
                         nameToInstanceIdx.current.set(name, nextIdx.current++);
                     }
                 }
             }
         });
-    }, [keypointsSource, subscribeKey, invalidate, workerData.activeTrackerId, workerData.trackerSchemas]);
+    }, [keypointsSource, subscribeKey, invalidate]);
 
     useEffect(() => {
         const mesh = meshRef.current;

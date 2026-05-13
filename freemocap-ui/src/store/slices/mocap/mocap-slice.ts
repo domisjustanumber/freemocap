@@ -11,7 +11,6 @@ import {
     selectActiveRecordingOrigin,
     selectEffectiveRecordingPath,
 } from "@/store/slices/active-recording/active-recording-slice";
-import type {RealtimeDetectorKind, RealtimeModelSize} from '@/store/slices/realtime/realtime-types';
 
 // ==================== Types ====================
 
@@ -77,9 +76,6 @@ export interface RealtimeFilterConfig {
 export interface MocapConfig {
     detector: MediapipeDetectorConfig;
     skeleton_filter: RealtimeFilterConfig;
-    /** Mirrored into `RealtimePipelineConfig` on `/realtime/apply`. */
-    realtime_detector_kind: RealtimeDetectorKind;
-    realtime_model_size: RealtimeModelSize;
 }
 
 /** Realtime preset matching MEDIAPIPE_TRACKER_REALTIME_PRESET on the backend. */
@@ -160,23 +156,11 @@ export interface MocapState {
 
 const _persistedMocapConfig = loadFromStorage<MocapConfig | null>('mocap.config', null);
 
-function normalizeMocapConfig(c: MocapConfig): MocapConfig {
-    return {
-        ...c,
-        realtime_detector_kind: c.realtime_detector_kind ?? 'rtmpose',
-        realtime_model_size: c.realtime_model_size ?? 'full',
-    };
-}
-
 const initialState: MocapState = {
-    config: _persistedMocapConfig
-        ? normalizeMocapConfig(_persistedMocapConfig)
-        : {
-              detector: {...MEDIAPIPE_REALTIME_PRESET},
-              skeleton_filter: {...DEFAULT_REALTIME_FILTER_CONFIG},
-              realtime_detector_kind: 'rtmpose',
-              realtime_model_size: 'full',
-          },
+    config: _persistedMocapConfig ?? {
+        detector: { ...MEDIAPIPE_REALTIME_PRESET },
+        skeleton_filter: { ...DEFAULT_REALTIME_FILTER_CONFIG },
+    },
     isRecording: false,
     recordingProgress: 0,
     isLoading: false,
@@ -211,16 +195,6 @@ export const mocapSlice = createSlice({
         /** Partially update individual skeleton filter fields. */
         skeletonFilterConfigUpdated: (state, action: PayloadAction<Partial<RealtimeFilterConfig>>) => {
             state.config.skeleton_filter = { ...state.config.skeleton_filter, ...action.payload };
-        },
-
-        mocapRealtimeDetectionSet: (
-            state,
-            action: PayloadAction<{kind: RealtimeDetectorKind; size: RealtimeModelSize}>,
-        ) => {
-            state.config.realtime_detector_kind = action.payload.kind;
-            state.config.realtime_model_size = action.payload.size;
-            const mc = action.payload.size === 'lite' ? 0 : action.payload.size === 'full' ? 1 : 2;
-            state.config.detector.model_complexity = mc as MediapipeModelComplexity;
         },
 
         mocapProgressUpdated: (state, action: PayloadAction<number>) => {
@@ -363,7 +337,6 @@ export const {
     mocapDetectorConfigUpdated,
     skeletonFilterConfigReplaced,
     skeletonFilterConfigUpdated,
-    mocapRealtimeDetectionSet,
     mocapProgressUpdated,
     mocapErrorCleared,
     mocapDirectoryInfoUpdated,

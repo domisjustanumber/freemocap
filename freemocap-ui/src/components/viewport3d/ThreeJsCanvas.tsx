@@ -17,13 +17,14 @@ import { type ViewportStats } from "./helpers/viewport3d-types";
 Object3D.DEFAULT_UP.set(0, 0, 1);
 
 // ---------------------------------------------------------------------------
-// Worker (classic bundle; singleton — survives React re-renders / StrictMode)
+// Worker (module-level singleton — survives React re-renders / StrictMode)
 // ---------------------------------------------------------------------------
 
 console.log("[ThreeJsCanvas] creating viewport3d worker");
-// Must stay a classic worker: vite `worker.format: "iife"` bundles deps into non-module scripts.
-// `{ type: "module" }` would mis-parse that bundle as an ES module and break initialization.
-export const VIEWPORT_WORKER = new Worker(new URL("./viewport3d.worker.tsx", import.meta.url));
+export const VIEWPORT_WORKER = new Worker(
+    new URL("./viewport3d.worker.tsx", import.meta.url),
+    { type: "module" },
+);
 console.log("[ThreeJsCanvas] viewport3d worker created", VIEWPORT_WORKER);
 VIEWPORT_WORKER.addEventListener("error", (e) =>
     console.error("[ThreeJsCanvas] worker error", e),

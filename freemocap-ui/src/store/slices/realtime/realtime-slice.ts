@@ -31,7 +31,7 @@ export const realtimeSlice = createSlice({
             .addCase(applyRealtimePipeline.fulfilled, (state, action) => {
                 state.cameraGroupId = action.payload.camera_group_id;
                 state.pipelineId = action.payload.pipeline_id;
-                state.pipelineConfig = action.payload.mergedRealtimeConfig;
+                state.pipelineConfig = action.meta.arg;
                 state.isConnected = true;
                 state.isLoading = false;
             })

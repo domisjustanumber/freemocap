@@ -3,10 +3,9 @@ import {RootState, selectRealtimeEnabledCameraConfigs, selectSelectedCameraConfi
 import {serverUrls} from "@/services";
 import {PipelineApplyResponse, RealtimePipelineConfig} from "@/store/slices/realtime/realtime-types";
 import {selectCalibrationConfig} from "@/store/slices/calibration/calibration-slice";
-import {selectMocapConfig} from "@/store/slices/mocap/mocap-slice";
 
 export const applyRealtimePipeline = createAsyncThunk<
-    PipelineApplyResponse & {mergedRealtimeConfig: RealtimePipelineConfig},
+    PipelineApplyResponse,
     RealtimePipelineConfig,
     { state: RootState }
 >(
@@ -15,17 +14,11 @@ export const applyRealtimePipeline = createAsyncThunk<
         const cameraConfigs = selectSelectedCameraConfigs(getState());
         const realtimeCameraIds = Object.keys(selectRealtimeEnabledCameraConfigs(getState()));
         const calibrationConfig = selectCalibrationConfig(getState());
-        const mocapCfg = selectMocapConfig(getState());
 
         const configWithBoard: RealtimePipelineConfig = {
             ...realtimeConfig,
-            realtime_detector_kind: mocapCfg.realtime_detector_kind,
-            realtime_model_size: mocapCfg.realtime_model_size,
             camera_node_config: {
                 ...realtimeConfig.camera_node_config,
-                realtime_detector_kind: mocapCfg.realtime_detector_kind,
-                realtime_model_size: mocapCfg.realtime_model_size,
-                use_centralized_gpu_inference: realtimeConfig.use_centralized_gpu_inference ?? true,
                 charuco_detector_config: {
                     board: calibrationConfig.charucoBoard,
                 },
@@ -47,8 +40,7 @@ export const applyRealtimePipeline = createAsyncThunk<
             throw new Error(`Failed to apply realtime: ${error.detail || response.statusText}`);
         }
 
-        const data = (await response.json()) as PipelineApplyResponse;
-        return {...data, mergedRealtimeConfig: configWithBoard};
+        return response.json() as Promise<PipelineApplyResponse>;
     }
 );
 

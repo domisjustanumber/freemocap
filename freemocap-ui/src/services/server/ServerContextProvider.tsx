@@ -4,11 +4,10 @@ import { ServerContext, type ServerContextValue } from './server-context';
 export { useServer, useServerOptional, ServerContext, type ServerContextValue } from './server-context';
 
 import {ConnectionState, WebSocketConnection} from "@/services/server/server-helpers/websocket-connection";
-import {FrameProcessor, type FrameData} from "@/services/server/server-helpers/frame-processor/frame-processor";
+import {FrameProcessor} from "@/services/server/server-helpers/frame-processor/frame-processor";
 import {CanvasManager} from "@/services/server/server-helpers/canvas-manager";
 import {serverUrls} from "@/services";
 import {FramerateStore} from "@/services/server/server-helpers/framerate-store";
-import {PipelineTimingStore} from "@/services/server/server-helpers/pipeline-timing-store";
 import {LogStore} from "@/services/server/server-helpers/log-store";
 import {installConsoleLogBridge} from "@/services/server/server-helpers/console-log-bridge";
 import {OverlayManager} from "@/services/server/server-helpers/image-overlay/overlay-renderer-factory";
@@ -19,7 +18,6 @@ import {
     isFramerateUpdate,
     isFrontendPayload,
     isLogRecord,
-    isPipelineTiming,
     isPosthocProgress,
     isTrackerSchemas,
 } from "@/services/server/server-helpers/websocket-message-types";
@@ -30,9 +28,6 @@ import {
     parseKeypointsMessage,
 } from "@/services/server/server-helpers/frame-processor/keypoints-binary-parser";
 import {RigidBodyPose} from "@/components/viewport3d";
-import {MediapipeRealtimeEngine} from '@/services/realtime-mediapipe/mediapipe-engine';
-import {cloneFrameBitmapForMediapipe} from '@/services/realtime-mediapipe/clone-frame-for-mediapipe';
-import {parseClientSkeletonBinaryToObservations} from '@/services/realtime-mediapipe/parse-client-skeleton-overlay';
 import {
     KeypointsCallback,
     KeypointsFrame,
@@ -40,10 +35,6 @@ import {
 } from "@/components/viewport3d/KeypointsSourceContext";
 import {store} from "@/store";
 import {pipelineProgressUpdated, PipelinePhase, PipelineType} from "@/store/slices/pipelines";
-import {
-    TRACKER_SCHEMA_NAME_BY_DETECTOR_KIND,
-    type RealtimeDetectorKind,
-} from "@/store/slices/realtime/realtime-types";
 
 // Compare two already-sorted string arrays without allocating
 function sortedArraysEqual(a: string[], b: string[]): boolean {
@@ -72,7 +63,6 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
     const frameProcessorRef = useRef<FrameProcessor | null>(null);
     const canvasManagerRef = useRef<CanvasManager | null>(null);
     const framerateStoreRef = useRef<FramerateStore>(new FramerateStore());
-    const pipelineTimingStoreRef = useRef<PipelineTimingStore>(new PipelineTimingStore());
     const logStoreRef = useRef<LogStore>(new LogStore());
     const overlayManagerRef = useRef<OverlayManager | null>(null);
 
@@ -123,21 +113,6 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
     // finishes — so the backend can pipeline the next frame without waiting
     // for our JPEG decode + overlay compositing to complete.
     const pendingAckFrameNumberRef = useRef<number | null>(null);
-    /** Browser MediaPipe engine (Tasks) for `mediapipe_js` realtime mode. */
-    const mediapipeEngineRef = useRef<MediapipeRealtimeEngine | null>(null);
-    const mediapipeModelKeyRef = useRef<string>('');
-    const mediapipeStartingRef = useRef<boolean>(false);
-    /** Set when we send frameAcknowledgment; used to measure until next JPEG binary arrives. */
-    const lastFrameAckSentMsRef = useRef<number>(0);
-    /** Populated when image binary is received; snapped when decode starts (matches pending payload). */
-    const pendingJpegAckToReceiveMsRef = useRef<number | null>(null);
-    /** performance.now() at last multiplex JPEG binary (excludes keypoints). Used for inter-arrival spacing. */
-    const lastJpegWsBinaryArrivalMsRef = useRef<number>(0);
-    /** WS binary timing sampled in onmessage; cleared when rAF consumes matching pending payload. */
-    const pendingWsBinaryTimingRef = useRef<{
-        intervalMs: number | null;
-        dispatchLagMs: number;
-    } | null>(null);
 
     // Cached sorted camera IDs from the last frame — compared by value to avoid
     // per-frame Array.from().sort() allocations when the camera list hasn't changed.
@@ -164,23 +139,6 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
         });
         frameProcessorRef.current = new FrameProcessor();
         canvasManagerRef.current = new CanvasManager();
-        canvasManagerRef.current.setRenderAckHandler((payload) => {
-            const store = pipelineTimingStoreRef.current;
-            const rafStart = payload.rafCycleStartMs;
-            if (rafStart != null && rafStart > 0) {
-                store.recordRafToRendered(payload.cameraId, payload.completedAt - rafStart);
-            }
-            store.recordCanvasBitmapTransfer(payload.cameraId, payload.renderMs);
-            if (typeof payload.canvasWorkerRafWaitMs === 'number') {
-                store.recordCanvasWorkerRafWait(payload.cameraId, payload.canvasWorkerRafWaitMs);
-            }
-            if (typeof payload.canvasWorkerReceiveLagMs === 'number') {
-                store.recordCanvasWorkerReceiveLag(payload.cameraId, payload.canvasWorkerReceiveLagMs);
-            }
-            if (typeof payload.renderAckDeliveryMs === 'number' && Number.isFinite(payload.renderAckDeliveryMs)) {
-                store.recordRenderAckDelivery(payload.cameraId, payload.renderAckDeliveryMs);
-            }
-        });
         overlayManagerRef.current = new OverlayManager();
 
         // Persist logs on tab close / navigation so the last batch isn't lost.
@@ -199,7 +157,6 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
                 wsConnectionRef.current.disconnect();
             }
             if (canvasManagerRef.current) {
-                canvasManagerRef.current.setRenderAckHandler(null);
                 canvasManagerRef.current.terminateAllWorkers();
             }
             if (frameProcessorRef.current) {
@@ -227,13 +184,8 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
                 pendingJsonPayloadRef.current = null;
                 pendingKeypointsRef.current = null;
                 pendingAckFrameNumberRef.current = null;
-                lastFrameAckSentMsRef.current = 0;
-                pendingJpegAckToReceiveMsRef.current = null;
-                lastJpegWsBinaryArrivalMsRef.current = 0;
-                pendingWsBinaryTimingRef.current = null;
                 lastCameraIdsRef.current = [];
                 framerateStoreRef.current.clear();
-                pipelineTimingStoreRef.current.clear();
                 trackedPointsRef.current = null;
                 rigidBodiesRef.current = new Map();
                 keypointsFilteredRef.current = null;
@@ -242,9 +194,6 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
                 lastOverlayTimeRef.current.clear();
                 overlayManagerRef.current?.clearAll();
                 trackerSchemasRef.current = {};
-                mediapipeEngineRef.current?.stop();
-                mediapipeEngineRef.current = null;
-                mediapipeModelKeyRef.current = '';
                 activeTrackerIdRef.current = null;
                 setTrackerSchemas({});
                 setActiveTrackerId(null);
@@ -255,62 +204,16 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
         let lastFrontendFrameTime = 0;
         const frontendDurations: number[] = [];
 
-        /**
-         * When the realtime skeleton source switches (RTMPose vs browser MediaPipe), the
-         * stream embeds one schema's point order but `tracker_schemas` includes both —
-         * the active id must track the detector or limb connections resolve to missing
-         * names and nothing draws between joints.
-         */
-        const syncActiveTrackerId = (candidate: string | null | undefined): void => {
-            if (!candidate) return;
-            const schemas = trackerSchemasRef.current;
-            if (!schemas[candidate]) return;
-            if (activeTrackerIdRef.current === candidate) return;
-            activeTrackerIdRef.current = candidate;
-            setActiveTrackerId(candidate);
-            overlayManagerRef.current?.setTrackerSchemas(schemas, candidate);
-        };
-
-        const preferredTrackerIdFromUi = (): string | null => {
-            const kind = (store.getState().mocap.config.realtime_detector_kind ??
-                'rtmpose') as RealtimeDetectorKind;
-            const want = TRACKER_SCHEMA_NAME_BY_DETECTOR_KIND[kind];
-            const schemas = trackerSchemasRef.current;
-            return schemas[want] ? want : null;
-        };
-
         // Process a decoded frame result: update camera list, dispatch to workers.
         // Synchronous — overlay compositing is fire-and-forget so it never blocks
         // the rAF loop. The ack is sent at the top of processFrameLoop, well before
         // decode finishes, so the backend pipelines the next frame sooner.
-        type DispatchFramesTiming = {
-            jpegAckToReceiveMs: number | null;
-            rafCycleStartMs: number;
-            /** Multiplex JPEG binary: spacing since previous WS payload + MessageEvent dispatch lag. */
-            wsBinaryTiming?: {
-                intervalMs: number | null;
-                dispatchLagMs: number;
-            };
-            /** Present for multiplex JPEG frames: splits rAF→rendered into decode, dispatch, canvas worker, and paint. */
-            decodeBreakdown?: {
-                rafBodyBeforeDecodeMs: number;
-                decodeWorkerMs: number;
-                jpegDecodeMainWaitMs: number;
-                jpegDecodeBridgeMs: number;
-                dispatchFramesEnterMs: number;
-            };
-        };
-
         const dispatchFrames = (
-            result: Awaited<ReturnType<FrameProcessor['processFramePayload']>>,
-            timing?: DispatchFramesTiming,
+            result: Awaited<ReturnType<FrameProcessor['processFramePayload']>>
         ): void => {
             if (!result) return;
 
             const {frames, cameraIds} = result;
-            const jpegAckMs = timing?.jpegAckToReceiveMs ?? null;
-            const rafCycleStartMs = timing?.rafCycleStartMs ?? 0;
-            const wsBinaryTiming = timing?.wsBinaryTiming;
 
             // Only allocate a new sorted array if the camera set actually changed.
             const lastIds = lastCameraIdsRef.current;
@@ -347,42 +250,7 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
             // blocks the rAF loop. The canvas worker renders the composited bitmap
             // when it arrives (overwriting any earlier raw frame for that camera).
             const overlayManager = overlayManagerRef.current!;
-            const timingStore = pipelineTimingStoreRef.current;
-            const jpegAckMsValue = jpegAckMs != null && jpegAckMs > 0 && Number.isFinite(jpegAckMs) ? jpegAckMs : null;
-            const frameMetaBase = {
-                rafCycleStartMs: rafCycleStartMs > 0 ? rafCycleStartMs : undefined,
-            };
-            const decodeBreakdown = timing?.decodeBreakdown;
-            if (decodeBreakdown) {
-                for (const cameraId of cameraIds) {
-                    timingStore.recordRafBodyBeforeDecode(cameraId, decodeBreakdown.rafBodyBeforeDecodeMs);
-                    timingStore.recordJpegDecodeWorker(cameraId, decodeBreakdown.decodeWorkerMs);
-                    timingStore.recordJpegDecodeMainWait(cameraId, decodeBreakdown.jpegDecodeMainWaitMs);
-                    timingStore.recordJpegDecodeBridge(cameraId, decodeBreakdown.jpegDecodeBridgeMs);
-                }
-            }
-            const recordMainDispatch = (cameraId: string): void => {
-                if (!decodeBreakdown) return;
-                const sendAt = performance.now();
-                timingStore.recordMainDispatchToCanvas(cameraId, sendAt - decodeBreakdown.dispatchFramesEnterMs);
-            };
             for (const frameData of frames) {
-                if (jpegAckMsValue !== null) {
-                    timingStore.recordJpegAckToReceive(frameData.cameraId, jpegAckMsValue);
-                }
-                if (wsBinaryTiming) {
-                    const { intervalMs, dispatchLagMs } = wsBinaryTiming;
-                    if (
-                        intervalMs != null
-                        && intervalMs > 0
-                        && Number.isFinite(intervalMs)
-                    ) {
-                        timingStore.recordJpegWsBinaryInterval(frameData.cameraId, intervalMs);
-                    }
-                    if (Number.isFinite(dispatchLagMs) && dispatchLagMs >= 0) {
-                        timingStore.recordJpegWsBinaryDispatchLag(frameData.cameraId, dispatchLagMs);
-                    }
-                }
                 const overlayAge = performance.now() - (lastOverlayTimeRef.current.get(frameData.cameraId) ?? 0);
                 const overlayFresh = overlayAge <= OVERLAY_STALE_MS;
                 if (!overlayFresh) {
@@ -404,20 +272,10 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
                         charucoObs,
                         mediapipeObs,
                     ).then(compositeBitmap => {
-                        recordMainDispatch(frameData.cameraId);
-                        canvasManagerRef.current?.sendFrameToWorker(
-                            frameData.cameraId,
-                            compositeBitmap,
-                            {frameNumber: frameData.frameNumber, ...frameMetaBase},
-                        );
+                        canvasManagerRef.current?.sendFrameToWorker(frameData.cameraId, compositeBitmap);
                     }).catch(err => console.error('Overlay error for camera', frameData.cameraId, err));
                 } else {
-                    recordMainDispatch(frameData.cameraId);
-                    canvasManagerRef.current!.sendFrameToWorker(
-                        frameData.cameraId,
-                        frameData.bitmap,
-                        {frameNumber: frameData.frameNumber, ...frameMetaBase},
-                    );
+                    canvasManagerRef.current!.sendFrameToWorker(frameData.cameraId, frameData.bitmap);
                 }
             }
 
@@ -471,13 +329,6 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
                 }
             }
 
-            const kpRawLen = payload.keypoints_raw ? Object.keys(payload.keypoints_raw).length : 0;
-            const kpFiltLen = payload.keypoints_filtered ? Object.keys(payload.keypoints_filtered).length : 0;
-            if (kpRawLen > 0 || kpFiltLen > 0) {
-                const preferred = preferredTrackerIdFromUi();
-                if (preferred) syncActiveTrackerId(preferred);
-            }
-
             if (payload.keypoints_raw) {
                 const frame = pointDictToFrame(payload.keypoints_raw as Record<string, {x:number;y:number;z:number}>);
                 trackedPointsRef.current = frame;
@@ -504,16 +355,11 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
         // directly — no Point3d object creation, no JSON parsing.
         const dispatchBinaryKeypoints = (buf: ArrayBuffer): void => {
             const parsed = parseKeypointsMessage(buf);
-            let syncedTrackerForMessage = false;
             for (const block of parsed.blocks) {
                 const schema = trackerSchemasRef.current[block.trackerId];
                 if (!schema) {
                     // Schema handshake hasn't arrived yet — drop silently.
                     continue;
-                }
-                if (!syncedTrackerForMessage) {
-                    syncActiveTrackerId(block.trackerId);
-                    syncedTrackerForMessage = true;
                 }
                 // Cast to Float32Array (the serializer always uses float32).
                 const interleaved = block.interleaved instanceof Float32Array
@@ -581,7 +427,6 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
             if (pendingAckFrameNumberRef.current !== null) {
                 ws.send({type: 'frameAcknowledgment', frameNumber: pendingAckFrameNumberRef.current});
                 pendingAckFrameNumberRef.current = null;
-                lastFrameAckSentMsRef.current = performance.now();
                 tick.sentAck = true;
             }
 
@@ -613,131 +458,15 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
 
             if (!processingFrameRef.current && pendingPayloadRef.current !== null) {
                 const payload = pendingPayloadRef.current;
-                const jpegAckToReceiveMs = pendingJpegAckToReceiveMsRef.current;
-                const wsBinaryTimingSnapshot = pendingWsBinaryTimingRef.current;
-                pendingWsBinaryTimingRef.current = null;
-                const rafCycleStartMsForDecode = bodyStart;
                 pendingPayloadRef.current = null;
                 processingFrameRef.current = true;
                 decodeStartTime = performance.now();
                 tick.startedDecode = true;
                 frameProcessorRef.current!.processFramePayload(payload)
-                    .then(async (result) => {
+                    .then(result => {
                         const decodeMs = performance.now() - decodeStartTime;
                         if (decodeMs > 20) console.warn(`decode spike: ${decodeMs.toFixed(1)}ms`);
-                        if (!result) return;
-                        const dispatchEnter = performance.now();
-                        const st = store.getState();
-                        const mpCfg = st.mocap.config;
-                        const rt = st.realtime;
-                        const ws = wsConnectionRef.current;
-                        let mediapipeInferBeforeDispatch: Promise<void> | null = null;
-                        if (
-                            mpCfg.realtime_detector_kind === 'mediapipe_js'
-                            && rt.isConnected
-                            && rt.cameraGroupId
-                            && ws?.isConnected()
-                        ) {
-                            const wantKey = mpCfg.realtime_model_size;
-                            const engine = mediapipeEngineRef.current;
-                            const cameraGroupId = rt.cameraGroupId;
-                            const needsRestart = !engine?.isRunning() || mediapipeModelKeyRef.current !== wantKey;
-                            if (needsRestart) {
-                                // (Re)start the worker asynchronously; this batch's bitmaps go to canvas only.
-                                if (!mediapipeStartingRef.current) {
-                                    mediapipeStartingRef.current = true;
-                                    void (async () => {
-                                        try {
-                                            mediapipeEngineRef.current?.stop();
-                                            const eng = new MediapipeRealtimeEngine();
-                                            await eng.start(wantKey);
-                                            mediapipeEngineRef.current = eng;
-                                            mediapipeModelKeyRef.current = wantKey;
-                                        } catch (err) {
-                                            console.error('[MediapipeRealtime] init failed', err);
-                                            mediapipeEngineRef.current?.stop();
-                                            mediapipeEngineRef.current = null;
-                                            mediapipeModelKeyRef.current = '';
-                                        } finally {
-                                            mediapipeStartingRef.current = false;
-                                        }
-                                    })();
-                                }
-                            } else if (engine && !engine.isBusy()) {
-                                /* Clone bitmaps BEFORE `dispatchFrames` transfers the decode worker bitmaps to the canvas path. */
-                                try {
-                                    const mpFrames: FrameData[] = await Promise.all(
-                                        result.frames.map(async (f) => ({
-                                            cameraId: f.cameraId,
-                                            cameraIndex: f.cameraIndex,
-                                            frameNumber: f.frameNumber,
-                                            width: f.width,
-                                            height: f.height,
-                                            colorChannels: f.colorChannels,
-                                            bitmap: await cloneFrameBitmapForMediapipe(f.bitmap, f.width, f.height),
-                                        })),
-                                    );
-                                    const trackerId = TRACKER_SCHEMA_NAME_BY_DETECTOR_KIND.mediapipe_js;
-                                    const pointNames = trackerSchemasRef.current[trackerId]?.tracked_points;
-                                    mediapipeInferBeforeDispatch = new Promise<void>((resolve) => {
-                                        const done = (): void => {
-                                            resolve();
-                                        };
-                                        const ok = engine.inferFrame(
-                                            mpFrames[0].frameNumber,
-                                            cameraGroupId,
-                                            mpFrames,
-                                            ({buffer, timings}) => {
-                                                ws.sendBinary(buffer);
-                                                pipelineTimingStoreRef.current.recordMediapipeJsDetectTimings(timings);
-                                                if (pointNames?.length) {
-                                                    const parsed = parseClientSkeletonBinaryToObservations(
-                                                        buffer,
-                                                        pointNames,
-                                                    );
-                                                    if (parsed) {
-                                                        const t = performance.now();
-                                                        for (const [camId, obs] of parsed) {
-                                                            latestMediapipeRef.current.set(camId, obs);
-                                                            lastOverlayTimeRef.current.set(camId, t);
-                                                        }
-                                                    }
-                                                }
-                                                done();
-                                            },
-                                            (err) => {
-                                                console.error('[MediapipeRealtime] infer error', err);
-                                                done();
-                                            },
-                                        );
-                                        if (!ok) {
-                                            done();
-                                        }
-                                    });
-                                } catch (err) {
-                                    console.error('[MediapipeRealtime] clone failed', err);
-                                }
-                            }
-                        }
-                        if (mediapipeInferBeforeDispatch) {
-                            await mediapipeInferBeforeDispatch;
-                        }
-                        const decodeWorkerMs = result.decodeWorkerMs;
-                        const jpegDecodeMainWaitMs = dispatchEnter - decodeStartTime;
-                        const jpegDecodeBridgeMs = Math.max(0, jpegDecodeMainWaitMs - decodeWorkerMs);
-                        const rafBodyBeforeDecodeMs = Math.max(0, decodeStartTime - rafCycleStartMsForDecode);
-                        dispatchFrames(result, {
-                            jpegAckToReceiveMs,
-                            rafCycleStartMs: rafCycleStartMsForDecode,
-                            wsBinaryTiming: wsBinaryTimingSnapshot ?? undefined,
-                            decodeBreakdown: {
-                                rafBodyBeforeDecodeMs,
-                                decodeWorkerMs,
-                                jpegDecodeMainWaitMs,
-                                jpegDecodeBridgeMs,
-                                dispatchFramesEnterMs: dispatchEnter,
-                            },
-                        });
+                        dispatchFrames(result);
                     })
                     .catch(err => console.error('Error processing frame:', err))
                     .finally(() => { processingFrameRef.current = false; });
@@ -767,25 +496,6 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
                         const view = new DataView(event.data);
                         pendingAckFrameNumberRef.current = Number(view.getBigInt64(8, true));
                     }
-                    const receiveAt = performance.now();
-                    const evTs = event.timeStamp;
-                    const dispatchLagMs =
-                        typeof evTs === 'number' && evTs > 0 && Number.isFinite(evTs)
-                            ? Math.max(0, receiveAt - evTs)
-                            : 0;
-                    let wsBinaryIntervalMs: number | null = null;
-                    if (lastJpegWsBinaryArrivalMsRef.current > 0) {
-                        wsBinaryIntervalMs = receiveAt - lastJpegWsBinaryArrivalMsRef.current;
-                    }
-                    lastJpegWsBinaryArrivalMsRef.current = receiveAt;
-                    pendingWsBinaryTimingRef.current = {
-                        intervalMs: wsBinaryIntervalMs,
-                        dispatchLagMs,
-                    };
-                    pendingJpegAckToReceiveMsRef.current =
-                        lastFrameAckSentMsRef.current > 0
-                            ? receiveAt - lastFrameAckSentMsRef.current
-                            : null;
                     pendingPayloadRef.current = event.data;
                 }
             }
@@ -808,13 +518,7 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
                         const schemas = jsonData.schemas;
                         trackerSchemasRef.current = schemas;
                         const keys = Object.keys(schemas);
-                        const preferred = preferredTrackerIdFromUi();
-                        let firstId: string | null = null;
-                        if (preferred !== null) {
-                            firstId = preferred;
-                        } else if (keys.length > 0) {
-                            firstId = keys[0];
-                        }
+                        const firstId = keys.length > 0 ? keys[0] : null;
                         activeTrackerIdRef.current = firstId;
                         setTrackerSchemas(schemas);
                         setActiveTrackerId(firstId);
@@ -825,9 +529,6 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
                     else if (isFramerateUpdate(jsonData)) {
                         serverFpsRef.current = jsonData.backend_framerate.mean_frames_per_second;
                         framerateStoreRef.current.updateBackend(jsonData.backend_framerate);
-                    }
-                    else if (isPipelineTiming(jsonData)) {
-                        pipelineTimingStoreRef.current.ingestBackendMessage(jsonData);
                     }
                     // Buffer frontend_payload for dispatch in the rAF loop.
                     // Older unprocessed payloads are overwritten (keep latest only).
@@ -949,10 +650,6 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
         return framerateStoreRef.current;
     }, []);
 
-    const getPipelineTimingStore = useCallback((): PipelineTimingStore => {
-        return pipelineTimingStoreRef.current;
-    }, []);
-
     const getLogStore = useCallback((): LogStore => {
         return logStoreRef.current;
     }, []);
@@ -1014,7 +711,6 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
         getFps,
         getServerFps,
         getFramerateStore,
-        getPipelineTimingStore,
         getLogStore,
         connectedCameraIds,
         updateServerConnection,
@@ -1026,7 +722,7 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
         trackerSchemas,
         activeTrackerId,
         getActiveSchema,
-    }), [isConnected, connectedCameraIds, trackerSchemas, activeTrackerId, connect, disconnect, sendWebsocketMessage, setCanvasForCamera, getFps, getServerFps, getFramerateStore, getPipelineTimingStore, getLogStore, updateServerConnection, subscribeToKeypointsRaw, subscribeToKeypointsFiltered, subscribeToRigidBodies, getLatestKeypointsRaw, setOverlayVisibility, getActiveSchema]);
+    }), [isConnected, connectedCameraIds, trackerSchemas, activeTrackerId, connect, disconnect, sendWebsocketMessage, setCanvasForCamera, getFps, getServerFps, getFramerateStore, getLogStore, updateServerConnection, subscribeToKeypointsRaw, subscribeToKeypointsFiltered, subscribeToRigidBodies, getLatestKeypointsRaw, setOverlayVisibility, getActiveSchema]);
 
     return (
         <ServerContext.Provider value={contextValue}>

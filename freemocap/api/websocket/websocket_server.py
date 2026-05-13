@@ -26,10 +26,18 @@ from freemocap.utilities.wait_functions import await_10ms
 from freemocap.pubsub.pubsub_topics import PipelineTimingMessage
 from skellycam.core.types.type_overloads import CameraGroupIdString, FrameNumberInt
 from skellycam.core.recorders.framerate_tracker import FramerateTracker, CurrentFramerate
-from skellycam.core.types.frontend_payload_bytearray import (
-    get_and_clear_frontend_preview_multiframe_samples,
-    get_and_clear_frontend_preview_timing_samples,
-)
+try:
+    from skellycam.core.types.frontend_payload_bytearray import (
+        get_and_clear_frontend_preview_multiframe_samples,
+        get_and_clear_frontend_preview_timing_samples,
+    )
+except ImportError:
+    # Older skellycam builds (or non-editable installs) may not expose these drains yet.
+    def get_and_clear_frontend_preview_timing_samples(_camera_group_id: str) -> dict[str, dict[str, list[float]]]:
+        return {}
+
+    def get_and_clear_frontend_preview_multiframe_samples(_camera_group_id: str) -> dict[str, list[float]]:
+        return {}
 
 logger = logging.getLogger(__name__)
 

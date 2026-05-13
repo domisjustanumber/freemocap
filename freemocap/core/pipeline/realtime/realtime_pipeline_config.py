@@ -39,11 +39,11 @@ class RealtimePipelineConfig(BaseModel):
 
     @model_validator(mode="after")
     def _sync_detector_fields_into_camera_node_config(self) -> "RealtimePipelineConfig":
-        cnc = self.camera_node_config.model_copy(
+        self.camera_node_config = self.camera_node_config.model_copy(
             update={
                 "realtime_detector_kind": self.realtime_detector_kind,
                 "realtime_model_size": self.realtime_model_size,
                 "use_centralized_gpu_inference": self.use_centralized_gpu_inference,
             },
         )
-        return self.model_copy(update={"camera_node_config": cnc})
+        return self

@@ -52,7 +52,7 @@ class SkeletonOverlayData(msgspec.Struct):
             *,
             camera_id: CameraIdString,
             observation: RTMPoseObservation,
-            scale: float = 1.0,
+            scale: float = 0.5,
     ) -> "SkeletonOverlayData":
         """Flatten an RTMPose COCO-WholeBody observation into the schema-driven
         payload.
@@ -60,8 +60,8 @@ class SkeletonOverlayData(msgspec.Struct):
         Names come straight from `observation.points.names`, matching
         `RTMPOSE_WHOLEBODY_DEFINITION.tracked_points`. NaN rows are dropped.
 
-        Coordinates are image-space pixels from inference (GPU or browser); use
-        ``scale=1.0`` unchanged. ``scale`` exists for rare non-pixel pipelines.
+        ``scale`` maps inference-space pixels to the WebSocket preview JPEG (0.5 linear).
+
         RTMPose is 2D only so z is always 0.
         """
         xyz: np.ndarray = observation.points.xyz * scale
@@ -99,9 +99,12 @@ class SkeletonOverlayData(msgspec.Struct):
             *,
             camera_id: CameraIdString,
             observation: MediapipeCompositeObservation,
-            scale: float = 1.0,
+            scale: float = 0.5,
     ) -> "SkeletonOverlayData":
-        """Flatten a fused MediaPipe holistic PointCloud into the schema-driven payload."""
+        """Flatten a fused MediaPipe holistic PointCloud into the schema-driven payload.
+
+        ``scale`` matches preview JPEG linear scale (same default as RTMPose overlay).
+        """
         xyz: np.ndarray = observation.points.xyz * scale
         visibility: np.ndarray = observation.points.visibility
         names: tuple[str, ...] = observation.points.names

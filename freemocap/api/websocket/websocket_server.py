@@ -388,6 +388,9 @@ class WebsocketServer:
                 for update_message in posthoc_progress:
                     await self._send_msgspec_json(update_message)
 
+                for error_message in self._app.realtime_pipeline_manager.get_realtime_error_updates():
+                    await self._send_msgspec_json(error_message)
+
                 # Pipeline timing is small JSON — never gate behind frame ack backpressure.
                 now = time.perf_counter()
                 if now - self._last_pipeline_timing_send_time >= 0.25:
@@ -422,7 +425,7 @@ class WebsocketServer:
                 await self._app.wait_for_realtime_result(timeout=0.5)
 
                 try:
-                    packets, progress_updates = self._app.get_latest_frontend_payloads(if_newer_than=int(self.last_sent_frame_number))
+                    packets, progress_updates, realtime_errors = self._app.get_latest_frontend_payloads(if_newer_than=int(self.last_sent_frame_number))
                 except IndexError:
                     logger.warning("Ring buffer overwrite — resetting to latest frame")
                     self.last_sent_frame_number = -1
@@ -463,6 +466,9 @@ class WebsocketServer:
 
                 for update_message in progress_updates:
                     await self._send_msgspec_json(update_message)
+
+                for error_message in realtime_errors:
+                    await self._send_msgspec_json(error_message)
 
                 # Send framerate updates from our local trackers (throttled to ~4Hz)
                 now = time.perf_counter()

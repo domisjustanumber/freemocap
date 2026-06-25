@@ -1,6 +1,6 @@
 """Tests for GET /freemocap/system/gpu and RTMPose session config wiring."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -9,13 +9,18 @@ from fastapi.testclient import TestClient
 from freemocap.api.http.system.system_router import system_router
 from freemocap.core.pipeline.realtime.camera_node_config import CameraNodeConfig
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
-from freemocap.core.pipeline.realtime.realtime_skeleton_inference_node import _build_session
+from freemocap.core.pipeline.realtime.realtime_pipeline_error import RealtimePipelineErrorMessage
+from freemocap.core.pipeline.realtime.realtime_skeleton_inference_node import (
+    RealtimeSessionConfigError,
+    _build_session,
+)
 from freemocap.core.pipeline.realtime.realtime_skeleton_inference_node_config import (
     RealtimeSkeletonInferenceNodeConfig,
 )
 from freemocap.system.gpu_capabilities_cache import GpuCapabilitiesSnapshot
 from skellytracker.trackers.rtmpose_tracker.rtmpose_detector import RTMPoseDetectorConfig
 from skellytracker.utilities.gpu_utils import resolve_provider
+from skellytracker.utilities.gpu_utils.ort_session_utils import OnnxExecutionProviderStartupError
 
 
 @pytest.fixture
@@ -113,7 +118,7 @@ class TestBuildSessionConfig:
 
         def fake_create(config):
             captured.append(config)
-            return None
+            return MagicMock(active_provider="cuda")
 
         with patch(
             "freemocap.core.pipeline.realtime.realtime_skeleton_inference_node.RTMPoseSession.create",
@@ -121,13 +126,38 @@ class TestBuildSessionConfig:
         ):
             session = _build_session(pipeline_config)
 
-        assert session is None
+        assert session is not None
         assert len(captured) == 1
         session_config = captured[0]
         assert session_config.mode == "balanced"
         assert session_config.detector_model == "yolox-tiny"
         assert session_config.pose_model == "rtmw-l-m_256x192"
         assert session_config.execution_provider is None
+        assert not hasattr(session_config, "on_provider_missing")
+
+    def test_build_session_raises_for_non_rtmpose_config(self) -> None:
+        pipeline_config = RealtimePipelineConfig()
+        pipeline_config.camera_node_config.skeleton_detector_config = MagicMock()
+
+        with pytest.raises(RealtimeSessionConfigError):
+            _build_session(pipeline_config)
+
+    def test_build_session_propagates_ep_startup_error(self) -> None:
+        pipeline_config = RealtimePipelineConfig(
+            skeleton_inference_node_config=RealtimeSkeletonInferenceNodeConfig(
+                execution_provider="trt",
+            ),
+        )
+        with patch(
+            "freemocap.core.pipeline.realtime.realtime_skeleton_inference_node.RTMPoseSession.create",
+            side_effect=OnnxExecutionProviderStartupError(
+                "TRT unavailable",
+                requested_provider="trt",
+                expected_ort_provider="TensorrtExecutionProvider",
+            ),
+        ):
+            with pytest.raises(OnnxExecutionProviderStartupError):
+                _build_session(pipeline_config)
 
 
 class TestExecutionProviderResolution:
@@ -137,3 +167,36 @@ class TestExecutionProviderResolution:
             requested=cfg.skeleton_inference_node_config.execution_provider,
         )
         assert resolved in {"trt-trx", "trt", "cuda", "cpu", "directml", "coreml"}
+
+    def test_explicit_missing_provider_raises(self) -> None:
+        with pytest.raises(OnnxExecutionProviderStartupError):
+            resolve_provider(
+                requested="trt",
+                available_ort={"CUDAExecutionProvider", "CPUExecutionProvider"},
+            )
+
+
+class TestRealtimePipelineErrorMessage:
+    def test_from_ep_startup_error_maps_fields(self) -> None:
+        error = OnnxExecutionProviderStartupError(
+            "CUDA session failed",
+            model_label="rtmpose",
+            requested_provider="cuda",
+            expected_ort_provider="CUDAExecutionProvider",
+            active_ort_providers=["CPUExecutionProvider"],
+            device_id=0,
+            install_hint="install gpu extra",
+        )
+        message = RealtimePipelineErrorMessage.from_ep_startup_error(
+            pipeline_id="abc123",
+            error=error,
+            detector_model="yolox-m",
+            pose_model="rtmw-x-l_256x192",
+            batch_size=4,
+        )
+        assert message.pipeline_id == "abc123"
+        assert message.requested_execution_provider == "cuda"
+        assert message.model_label == "rtmpose"
+        assert message.detector_model == "yolox-m"
+        assert message.batch_size == 4
+        assert message.message_type == "realtime_pipeline_error"

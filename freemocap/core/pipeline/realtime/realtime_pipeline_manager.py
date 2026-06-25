@@ -24,6 +24,7 @@ from skellycam.core.types.type_overloads import CameraGroupIdString, CameraIdStr
 from freemocap.core.pipeline.abcs.pipeline_manager_abc import PipelineManagerABC
 from freemocap.core.pipeline.realtime.realtime_aggregator_node import RealtimePipelineConfig
 from freemocap.core.pipeline.realtime.realtime_pipeline import RealtimePipeline
+from freemocap.core.pipeline.realtime.realtime_pipeline_error import RealtimePipelineErrorMessage
 from freemocap.core.types.type_overloads import PipelineIdString, FrameNumberInt
 from freemocap.core.viz.frontend_payload import FrontendPayload, FrontendImagePacket
 
@@ -161,6 +162,13 @@ class RealtimePipelineManager(PipelineManagerABC):
                 if packet is not None:
                     latest.append(packet)
         return latest
+
+    def get_realtime_error_updates(self) -> list[RealtimePipelineErrorMessage]:
+        errors: list[RealtimePipelineErrorMessage] = []
+        with self.lock:
+            for pipeline in self.pipelines.values():
+                errors.extend(pipeline.drain_pipeline_errors())
+        return errors
 
     # ------------------------------------------------------------------
     # Lifecycle

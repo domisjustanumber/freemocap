@@ -35,7 +35,6 @@ export interface CameraNodeConfig {
 
 export interface SkeletonInferenceNodeConfig {
     execution_provider: ExecutionProviderName | null;
-    fallback_on_missing_provider?: boolean;
     max_batch_size?: number;
 }
 
@@ -70,7 +69,6 @@ export const defaultRealtimePipelineConfig: RealtimePipelineConfig = {
     use_centralized_gpu_inference: true,
     skeleton_inference_node_config: {
         execution_provider: null,
-        fallback_on_missing_provider: true,
         max_batch_size: 8,
     },
     camera_node_config: {
@@ -96,10 +94,28 @@ export interface PipelineApplyRequest {
 export interface PipelineApplyResponse {
     camera_group_id: string;
     pipeline_id: string;
+    requested_execution_provider?: string | null;
     active_execution_provider?: string | null;
 }
 
-// ==================== Redux State ====================
+export interface RealtimePipelineErrorMessage {
+    message_type: 'realtime_pipeline_error';
+    pipeline_id: string;
+    node_kind?: string;
+    requested_execution_provider?: string | null;
+    expected_ort_provider?: string | null;
+    active_ort_providers?: string[];
+    active_execution_provider?: string | null;
+    model_label?: string | null;
+    device_id?: number | null;
+    error_type?: string;
+    message: string;
+    install_hint?: string | null;
+    recoverable?: boolean;
+    detector_model?: string | null;
+    pose_model?: string | null;
+    batch_size?: number | null;
+}
 
 export interface PipelineState {
     pipelineConfig: RealtimePipelineConfig;

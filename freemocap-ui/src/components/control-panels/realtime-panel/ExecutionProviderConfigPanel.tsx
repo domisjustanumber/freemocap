@@ -7,6 +7,7 @@ import {
     selectGpuCapabilities,
     selectIsPipelineConnected,
     selectPipelineConfig,
+    selectPipelineError,
     selectSkeletonInferenceNodeConfig,
 } from '@/store/slices/realtime';
 import {ExecutionProviderName, RealtimePipelineConfig, SkeletonInferenceNodeConfig} from '@/store/slices/realtime/realtime-types';
@@ -33,6 +34,7 @@ export const ExecutionProviderConfigPanel: React.FC<ExecutionProviderConfigPanel
     const pipelineConfig = useAppSelector(selectPipelineConfig);
     const isConnected = useAppSelector(selectIsPipelineConnected);
     const skeletonInfConfig = useAppSelector(selectSkeletonInferenceNodeConfig);
+    const pipelineError = useAppSelector(selectPipelineError);
     const gpuCapabilities = useAppSelector(selectGpuCapabilities);
 
     const availableProviders = useMemo(
@@ -114,8 +116,6 @@ export const ExecutionProviderConfigPanel: React.FC<ExecutionProviderConfigPanel
             const nextSkeletonInf: SkeletonInferenceNodeConfig = {
                 ...pipelineConfig.skeleton_inference_node_config,
                 execution_provider,
-                fallback_on_missing_provider:
-                    pipelineConfig.skeleton_inference_node_config?.fallback_on_missing_provider ?? true,
                 max_batch_size: pipelineConfig.skeleton_inference_node_config?.max_batch_size ?? 8,
             };
 
@@ -178,6 +178,12 @@ export const ExecutionProviderConfigPanel: React.FC<ExecutionProviderConfigPanel
             {cudaDriverWarning && (
                 <p className="text sm text-warning p-2 border-1 border-warning br-1 text-wrap">
                     {cudaDriverWarning}
+                </p>
+            )}
+
+            {pipelineError && (
+                <p className="text sm text-error p-2 border-1 border-error br-1 text-wrap">
+                    {pipelineError}
                 </p>
             )}
 

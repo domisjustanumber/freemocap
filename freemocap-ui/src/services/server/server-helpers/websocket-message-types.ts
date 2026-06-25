@@ -134,3 +134,23 @@ export function isPosthocProgress(data: unknown): data is PosthocProgressMessage
     }
     return result.success;
 }
+
+export function isRealtimePipelineError(data: unknown): data is import('@/store/slices/realtime/realtime-types').RealtimePipelineErrorMessage {
+    if (!data || typeof data !== 'object') return false;
+    const o = data as Record<string, unknown>;
+    return o.message_type === 'realtime_pipeline_error' && typeof o.message === 'string';
+}
+
+export function formatRealtimePipelineError(data: import('@/store/slices/realtime/realtime-types').RealtimePipelineErrorMessage): string {
+    const parts = [data.message];
+    if (data.requested_execution_provider) {
+        parts.push(`Requested provider: ${data.requested_execution_provider}`);
+    }
+    if (data.model_label) {
+        parts.push(`Model: ${data.model_label}`);
+    }
+    if (data.install_hint) {
+        parts.push(data.install_hint);
+    }
+    return parts.join(' — ');
+}

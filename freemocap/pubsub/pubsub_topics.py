@@ -14,6 +14,7 @@ from skellyforge.data_models.trajectory_3d import Point3d
 from skellytracker.trackers.base_tracker.base_tracker_abcs import BaseObservation
 
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
+from freemocap.core.pipeline.realtime.realtime_pipeline_error import RealtimePipelineErrorMessage
 from freemocap.core.tasks.mocap.skeleton_dewiggler.dewiggling_methods.rigid_body_estimator import RigidBodyPose
 from freemocap.core.types.type_overloads import (
     FrameNumberInt,
@@ -85,6 +86,13 @@ class SkeletonInferenceResultMessage(TopicMessageABC):
     def __post_init__(self) -> None:
         if self.frame_number < 0:
             raise ValueError(f"frame_number must be >= 0, got {self.frame_number}")
+
+
+@dataclass
+class RealtimePipelineErrorTopicMessage(TopicMessageABC):
+    """Worker-reported recoverable realtime pipeline failure."""
+
+    error: RealtimePipelineErrorMessage = field(default_factory=RealtimePipelineErrorMessage)
 
 
 # ---------------------------------------------------------------------------
@@ -226,6 +234,7 @@ ProcessFrameNumberTopic = create_topic(ProcessFrameNumberMessage)
 PipelineConfigUpdateTopic = create_topic(PipelineConfigUpdateMessage)
 CameraNodeOutputTopic = create_topic(CameraNodeOutputMessage)
 SkeletonInferenceResultTopic = create_topic(SkeletonInferenceResultMessage)
+RealtimePipelineErrorTopic = create_topic(RealtimePipelineErrorTopicMessage)
 VideoNodeOutputTopic = create_topic(VideoNodeOutputMessage, queue_maxsize=0)  # unbounded: posthoc video nodes finish before aggregation node starts
 AggregationNodeOutputTopic = create_topic(AggregationNodeOutputMessage)
 PipelineTimingTopic = create_topic(PipelineTimingMessage)

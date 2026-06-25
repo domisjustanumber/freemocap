@@ -44,8 +44,6 @@ export const applyRealtimePipeline = createAsyncThunk<
                 skeleton_inference_node_config: {
                     ...config.skeleton_inference_node_config,
                     execution_provider: recommended,
-                    fallback_on_missing_provider:
-                        config.skeleton_inference_node_config?.fallback_on_missing_provider ?? true,
                     max_batch_size: config.skeleton_inference_node_config?.max_batch_size ?? 8,
                 },
             };

@@ -60,8 +60,10 @@ from skellytracker.trackers.rtmpose_tracker.rtmpose_session import (
     RTMPoseSession,
     RTMPoseSessionConfig,
 )
+from skellytracker.utilities.gpu_utils.ort_session_utils import OnnxExecutionProviderStartupError
 
 from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC
+from freemocap.core.pipeline.realtime.realtime_pipeline_error import RealtimePipelineErrorMessage
 from freemocap.core.pipeline.abcs.source_node_abc import SourceNode
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
 from freemocap.core.pipeline.pipeline_stage_timer import PipelineStageTimer
@@ -81,6 +83,8 @@ from freemocap.pubsub.pubsub_topics import (
     ProcessFrameNumberTopic,
     SkeletonInferenceResultMessage,
     SkeletonInferenceResultTopic,
+    RealtimePipelineErrorTopic,
+    RealtimePipelineErrorTopicMessage,
     PipelineTimingTopic,
 )
 
@@ -117,6 +121,7 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                 process_frame_number_sub=pubsub.get_subscription(ProcessFrameNumberTopic),
                 pipeline_config_sub=pubsub.get_subscription(PipelineConfigUpdateTopic),
                 skeleton_result_pub=pubsub.get_publication_queue(SkeletonInferenceResultTopic),
+                pipeline_error_pub=pubsub.get_publication_queue(RealtimePipelineErrorTopic),
                 timing_pub=pubsub.get_publication_queue(PipelineTimingTopic),
             ),
         )
@@ -137,9 +142,21 @@ class RealtimeSkeletonInferenceNode(SourceNode):
             process_frame_number_sub: TopicSubscriptionQueue,
             pipeline_config_sub: TopicSubscriptionQueue,
             skeleton_result_pub: TopicPublicationQueue,
+            pipeline_error_pub: TopicPublicationQueue,
             timing_pub: TopicPublicationQueue,
     ) -> None:
         logger.debug(f"RealtimeSkeletonInferenceNode [{camera_group_id}] initializing")
+
+        def _publish_recoverable_error(error: RealtimePipelineErrorMessage) -> None:
+            pipeline_error_pub.put(RealtimePipelineErrorTopicMessage(error=error))
+
+        def _handle_recoverable_startup_failure(error: RealtimePipelineErrorMessage) -> None:
+            logger.error(
+                f"RealtimeSkeletonInferenceNode [{camera_group_id}] recoverable startup failure: "
+                f"{error.message}"
+            )
+            _publish_recoverable_error(error)
+            ipc.shutdown_pipeline()
 
         camera_group_shm = CameraGroupSharedMemory.recreate(
             shm_dto=camera_group_shm_dto,
@@ -156,13 +173,27 @@ class RealtimeSkeletonInferenceNode(SourceNode):
             for camera_id in camera_ids
         }
 
-        session = _build_session(pipeline_config)
-        if session is None:
-            logger.error(
-                f"RealtimeSkeletonInferenceNode [{camera_group_id}] could not "
-                f"construct RTMPoseSession; exiting."
+        try:
+            session = _build_session(pipeline_config)
+        except OnnxExecutionProviderStartupError as exc:
+            skel_config = pipeline_config.camera_node_config.skeleton_detector_config
+            _handle_recoverable_startup_failure(
+                RealtimePipelineErrorMessage.from_ep_startup_error(
+                    pipeline_id=ipc.pipeline_id,
+                    error=exc,
+                    detector_model=getattr(skel_config, "detector_model", None),
+                    pose_model=getattr(skel_config, "pose_model", None),
+                    batch_size=pipeline_config.skeleton_inference_node_config.max_batch_size,
+                )
             )
-            ipc.kill_everything()
+            return
+        except RealtimeSessionConfigError as exc:
+            _handle_recoverable_startup_failure(
+                RealtimePipelineErrorMessage.from_config_error(
+                    pipeline_id=ipc.pipeline_id,
+                    message=str(exc),
+                )
+            )
             return
 
         timer: PipelineStageTimer | None = None
@@ -305,13 +336,28 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                         return
                     del session
                     gc.collect()
-                    session = _build_session(pipeline_config)
-                    if session is None:
+                    try:
+                        session = _build_session(pipeline_config)
+                    except (OnnxExecutionProviderStartupError, RealtimeSessionConfigError) as rebuild_exc:
+                        skel_config = pipeline_config.camera_node_config.skeleton_detector_config
+                        if isinstance(rebuild_exc, OnnxExecutionProviderStartupError):
+                            error = RealtimePipelineErrorMessage.from_ep_startup_error(
+                                pipeline_id=ipc.pipeline_id,
+                                error=rebuild_exc,
+                                detector_model=getattr(skel_config, "detector_model", None),
+                                pose_model=getattr(skel_config, "pose_model", None),
+                                batch_size=pipeline_config.skeleton_inference_node_config.max_batch_size,
+                            )
+                        else:
+                            error = RealtimePipelineErrorMessage.from_config_error(
+                                pipeline_id=ipc.pipeline_id,
+                                message=str(rebuild_exc),
+                            )
                         logger.error(
                             f"RealtimeSkeletonInferenceNode [{camera_group_id}] failed to rebuild "
-                            f"session after MemoryError — giving up."
+                            f"session after MemoryError — {error.message}"
                         )
-                        ipc.kill_everything()
+                        _handle_recoverable_startup_failure(error)
                         return
                     session_restart_count += 1
                     logger.info(
@@ -400,23 +446,23 @@ class RealtimeSkeletonInferenceNode(SourceNode):
 # ---------------------------------------------------------------------------
 
 
-def _build_session(pipeline_config: RealtimePipelineConfig) -> RTMPoseSession | None:
+class RealtimeSessionConfigError(RuntimeError):
+    """Centralized GPU inference misconfiguration."""
+
+
+def _build_session(pipeline_config: RealtimePipelineConfig) -> RTMPoseSession:
     """Construct the centralized RTMPoseSession from the pipeline config.
 
     Reads model size / mode from `camera_node_config.skeleton_detector_config`
     so a single source of truth governs which model is used in either pipeline
     mode. Reads provider / cache settings from `skeleton_inference_node_config`.
-    Returns None if the skeleton detector isn't an RTMPose config (caller
-    should treat this as a fatal misconfiguration in GPU mode).
     """
     skel_config = pipeline_config.camera_node_config.skeleton_detector_config
     if not isinstance(skel_config, RTMPoseDetectorConfig):
-        logger.warning(
+        raise RealtimeSessionConfigError(
             f"Centralized GPU inference is enabled but the skeleton detector "
-            f"config is not RTMPoseDetectorConfig (got {type(skel_config).__name__}). "
-            f"Falling back to legacy per-camera inference."
+            f"config is not RTMPoseDetectorConfig (got {type(skel_config).__name__})."
         )
-        return None
 
     inf_config = pipeline_config.skeleton_inference_node_config
 
@@ -427,17 +473,9 @@ def _build_session(pipeline_config: RealtimePipelineConfig) -> RTMPoseSession | 
         execution_provider=inf_config.execution_provider,
         engine_cache_dir=inf_config.engine_cache_dir,
         max_batch_size=inf_config.max_batch_size,
-        on_provider_missing="fallback" if inf_config.fallback_on_missing_provider else "raise",
     )
 
-    try:
-        return RTMPoseSession.create(session_config)
-    except Exception as e:
-        logger.error(
-            f"Failed to construct RTMPoseSession with provider={inf_config.execution_provider!r}: {e!r}",
-            exc_info=True,
-        )
-        return None
+    return RTMPoseSession.create(session_config)
 
 
 def _read_frames(

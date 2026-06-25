@@ -12,3 +12,4 @@ class WebsocketMessageType(str, enum.Enum):
     LOG_RECORD = "log_record"
     TRACKER_SCHEMAS = "tracker_schemas"
     PIPELINE_TIMING = "pipeline_timing"
+    REALTIME_PIPELINE_ERROR = "realtime_pipeline_error"

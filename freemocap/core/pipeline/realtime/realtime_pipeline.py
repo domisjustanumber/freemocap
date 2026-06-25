@@ -29,6 +29,7 @@ from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC
 from freemocap.core.pipeline.realtime.camera_node import CameraNode
 from freemocap.core.pipeline.realtime.realtime_aggregator_node import RealtimeAggregatorNode
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
+from freemocap.core.pipeline.realtime.realtime_pipeline_error import RealtimePipelineErrorMessage
 from freemocap.core.pipeline.realtime.realtime_skeleton_inference_node import (
     RealtimeSkeletonInferenceNode,
 )
@@ -42,6 +43,7 @@ from freemocap.pubsub.pubsub_topics import (
     PipelineConfigUpdateMessage,
     PipelineConfigUpdateTopic,
     PipelineTimingTopic,
+    RealtimePipelineErrorTopic,
 )
 
 logger = logging.getLogger(__name__)
@@ -77,6 +79,7 @@ class RealtimePipeline:
     pubsub: PubSubTopicManager
     worker_registry: WorkerRegistry
     pipeline_timing_subscription: TopicSubscriptionQueue
+    pipeline_error_subscription: TopicSubscriptionQueue
     started: bool = False
 
     @property
@@ -196,6 +199,9 @@ class RealtimePipeline:
         pipeline_timing_subscription = pubsub.get_subscription(
             PipelineTimingTopic,
         )
+        pipeline_error_subscription = pubsub.get_subscription(
+            RealtimePipelineErrorTopic,
+        )
 
         return cls(
             id=str(uuid.uuid4())[:6],
@@ -211,6 +217,7 @@ class RealtimePipeline:
             pubsub=pubsub,
             worker_registry=worker_registry,
             pipeline_timing_subscription=pipeline_timing_subscription,
+            pipeline_error_subscription=pipeline_error_subscription,
         )
 
     def start(self) -> None:
@@ -316,6 +323,16 @@ class RealtimePipeline:
                 pubsub=self.pubsub,
             )
             self.skeleton_inference_node.start()
+
+    def drain_pipeline_errors(self) -> list[RealtimePipelineErrorMessage]:
+        errors: list[RealtimePipelineErrorMessage] = []
+        while True:
+            try:
+                message = self.pipeline_error_subscription.get_nowait()
+            except Empty:
+                break
+            errors.append(message.error)
+        return errors
 
     async def update_camera_configs(self, camera_configs: CameraConfigs) -> CameraConfigs:
         return await self.camera_group.update_camera_settings(

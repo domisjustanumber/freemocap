@@ -19,6 +19,7 @@ from freemocap.core.pipeline.posthoc.posthoc_pipeline_manager import PosthocPipe
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
 from freemocap.core.pipeline.realtime.realtime_pipeline import RealtimePipeline
 from freemocap.core.pipeline.realtime.realtime_pipeline_manager import RealtimePipelineManager
+from freemocap.core.pipeline.realtime.realtime_pipeline_error import RealtimePipelineErrorMessage
 from freemocap.core.tasks.calibration.calibration_task_config import PosthocCalibrationPipelineConfig
 from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
 from freemocap.core.types.type_overloads import FrameNumberInt
@@ -143,10 +144,11 @@ class FreemocapApplication:
     def get_latest_frontend_payloads(
             self,
             if_newer_than: FrameNumberInt,
-    ) -> tuple[list[FrontendImagePacket], list[PipelineProgressMessage]]:
+    ) -> tuple[list[FrontendImagePacket], list[PipelineProgressMessage], list[RealtimePipelineErrorMessage]]:
         # Drain BEFORE evicting so terminal COMPLETE/FAILED messages aren't lost
         posthoc_progress = self.posthoc_pipeline_manager.get_progress_updates()
         posthoc_progress.extend(self.posthoc_pipeline_manager.evict_completed())
+        realtime_errors = self.realtime_pipeline_manager.get_realtime_error_updates()
 
         realtime_pipelines = self.realtime_pipeline_manager.pipelines
         active_pipelines = [p for p in realtime_pipelines.values() if p.alive]
@@ -163,14 +165,14 @@ class FreemocapApplication:
                     multiframe_timestamp=mf_timestamp,
                     frontend_payload=FrontendPayload(camera_group_id=cg_id, frame_number=frame_number),
                 ))
-            return results, posthoc_progress
+            return results, posthoc_progress, realtime_errors
 
         # Realtime pipeline path — delegate to manager, which also returns FrontendImagePacket
         realtime_pipeline_packets = self.realtime_pipeline_manager.get_latest_frontend_payloads(
             if_newer_than=if_newer_than
         )
 
-        return realtime_pipeline_packets, posthoc_progress
+        return realtime_pipeline_packets, posthoc_progress, realtime_errors
 
     def get_realtime_pipeline_for_camera_group(
         self,

@@ -21,6 +21,8 @@ import {
     isLogRecord,
     isPipelineTiming,
     isPosthocProgress,
+    isRealtimePipelineError,
+    formatRealtimePipelineError,
     isTrackerSchemas,
 } from "@/services/server/server-helpers/websocket-message-types";
 import {TrackedObjectDefinition} from "@/services/server/server-helpers/tracked-object-definition";
@@ -36,7 +38,7 @@ import {
     pointDictToFrame,
 } from "@/components/viewport3d/KeypointsSourceContext";
 import {store} from "@/store";
-import {fetchGpuCapabilities} from "@/store/slices/realtime";
+import {fetchGpuCapabilities, realtimePipelineErrorReceived} from "@/store/slices/realtime";
 import {pipelineProgressUpdated, PipelinePhase, PipelineType} from "@/store/slices/pipelines";
 
 // Compare two already-sorted string arrays without allocating
@@ -765,6 +767,8 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
                                 }
                             }
                         }
+                    } else if (isRealtimePipelineError(jsonData)) {
+                        store.dispatch(realtimePipelineErrorReceived(formatRealtimePipelineError(jsonData)));
                     } else {
                         console.warn('[WS] unhandled JSON message:', jsonData.message_type ?? '(no message_type)', jsonData);
                     }

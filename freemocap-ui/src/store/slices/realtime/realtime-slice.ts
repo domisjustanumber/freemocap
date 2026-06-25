@@ -28,6 +28,14 @@ export const realtimeSlice = createSlice({
         activeExecutionProviderCleared: (state) => {
             state.activeExecutionProvider = null;
         },
+
+        realtimePipelineErrorReceived: (state, action: PayloadAction<string>) => {
+            state.error = action.payload;
+            state.isLoading = false;
+            state.isConnected = false;
+            state.pipelineId = null;
+            state.activeExecutionProvider = null;
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -49,8 +57,6 @@ export const realtimeSlice = createSlice({
                         skeleton_inference_node_config: {
                             ...state.pipelineConfig.skeleton_inference_node_config,
                             execution_provider: recommended,
-                            fallback_on_missing_provider:
-                                state.pipelineConfig.skeleton_inference_node_config?.fallback_on_missing_provider ?? true,
                             max_batch_size:
                                 state.pipelineConfig.skeleton_inference_node_config?.max_batch_size ?? 8,
                         },
@@ -99,4 +105,4 @@ export const realtimeSlice = createSlice({
     },
 });
 
-export const {pipelineStateReset, pipelineConfigUpdated, activeExecutionProviderCleared} = realtimeSlice.actions;
+export const {pipelineStateReset, pipelineConfigUpdated, activeExecutionProviderCleared, realtimePipelineErrorReceived} = realtimeSlice.actions;

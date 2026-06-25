@@ -73,6 +73,14 @@
   visibility: visible;
 }
 
+.tooltip-wrapper:hover .tooltip-container.pos-bottom-left {
+  transform: translateY(-4px);
+}
+
+.gpu-ep-status-tooltip .tooltip-inner {
+  max-width: min(320px, calc(100vw - 16px));
+}
+
 /* =========================================
    TOOLTIP INNER
 ========================================= */

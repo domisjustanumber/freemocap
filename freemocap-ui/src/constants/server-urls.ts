@@ -99,6 +99,9 @@ class ServerUrls {
             blenderExport: `${baseUrl}/freemocap/blender/export`,
             blenderOpen: `${baseUrl}/freemocap/blender/open`,
 
+            // System / GPU introspection
+            systemGpu: `${baseUrl}/freemocap/system/gpu`,
+
             // WebSocket
             websocket: this.getWebSocketUrl(),
         };

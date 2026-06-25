@@ -20,7 +20,6 @@ from skellycam.core.types.type_overloads import CameraIdString, TopicSubscriptio
 from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC
 from freemocap.core.pipeline.abcs.source_node_abc import SourceNode
 from freemocap.core.pipeline.realtime.camera_node_config import CameraNodeConfig
-from freemocap.core.pipeline.realtime.rtmpose_model_size import rtmpose_mode_for_size
 from freemocap.core.types.type_overloads import TopicPublicationQueue
 from freemocap.core.pipeline.pipeline_stage_timer import PipelineStageTimer
 from freemocap.core.pipeline.pipeline_timing_events import make_stage_interval_event, perf_counter_ns
@@ -36,7 +35,7 @@ from freemocap.pubsub.pubsub_topics import (
 )
 
 import numpy as np
-from skellytracker.trackers.rtmpose_tracker.rtmpose_detector import RTMPoseDetector, RTMPoseDetectorConfig
+from skellytracker.trackers.rtmpose_tracker.rtmpose_detector import RTMPoseDetector
 
 logger = logging.getLogger(__name__)
 
@@ -132,10 +131,6 @@ class CameraNode(SourceNode):
             #     config=config.skeleton_detector_config ,
             # )
             skel_cfg = config.skeleton_detector_config
-            if isinstance(skel_cfg, RTMPoseDetectorConfig):
-                skel_cfg = skel_cfg.model_copy(
-                    update={"mode": rtmpose_mode_for_size(config.realtime_model_size)},
-                )
             skeleton_detector = RTMPoseDetector.create(
                 config=skel_cfg,
             )
@@ -170,10 +165,6 @@ class CameraNode(SourceNode):
                             and not new_config.skip_inline_skeleton_detection
                     ):
                         skel_cfg = new_config.skeleton_detector_config
-                        if isinstance(skel_cfg, RTMPoseDetectorConfig):
-                            skel_cfg = skel_cfg.model_copy(
-                                update={"mode": rtmpose_mode_for_size(new_config.realtime_model_size)},
-                            )
                         skeleton_detector = RTMPoseDetector.create(
                             config=skel_cfg,
                         )

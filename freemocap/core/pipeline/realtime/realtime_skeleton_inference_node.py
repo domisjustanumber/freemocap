@@ -52,7 +52,10 @@ from skellycam.utilities.wait_functions import wait_1ms
 from skellytracker.trackers.base_tracker.base_tracker_abcs import BaseObservation
 from skellytracker.trackers.rtmpose_tracker.rtmpose_detector import RTMPoseDetectorConfig
 from skellytracker.trackers.rtmpose_tracker.rtmpose_observation import RTMPoseObservation
-from skellytracker.trackers.base_tracker.task_events import TrackerTaskEventCollector
+try:
+    from skellytracker.trackers.base_tracker.task_events import TrackerTaskEventCollector
+except ModuleNotFoundError:
+    TrackerTaskEventCollector = None  # type: ignore[misc, assignment]
 from skellytracker.trackers.rtmpose_tracker.rtmpose_session import (
     RTMPoseSession,
     RTMPoseSessionConfig,
@@ -61,7 +64,6 @@ from skellytracker.trackers.rtmpose_tracker.rtmpose_session import (
 from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC
 from freemocap.core.pipeline.abcs.source_node_abc import SourceNode
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
-from freemocap.core.pipeline.realtime.rtmpose_model_size import rtmpose_mode_for_size
 from freemocap.core.pipeline.pipeline_stage_timer import PipelineStageTimer
 from freemocap.core.pipeline.pipeline_timing_events import (
     call_with_supported_kwargs,
@@ -268,8 +270,8 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                     node_kind="skeleton_inference",
                     stage="predict_batch",
                 )
-                tracker_collector: TrackerTaskEventCollector | None = (
-                    TrackerTaskEventCollector() if timer is not None else None
+                tracker_collector = (
+                    TrackerTaskEventCollector() if timer is not None and TrackerTaskEventCollector is not None else None
                 )
                 try:
                     batch_results = call_with_supported_kwargs(
@@ -417,13 +419,11 @@ def _build_session(pipeline_config: RealtimePipelineConfig) -> RTMPoseSession | 
         return None
 
     inf_config = pipeline_config.skeleton_inference_node_config
-    #TODO - this is dumb, I think? WE should be able to just use the inference node config directly  without this nonsense?
-
-    # UI ``realtime_model_size`` overrides static config mode for RTMPose.
-    mode = rtmpose_mode_for_size(pipeline_config.realtime_model_size)
 
     session_config = RTMPoseSessionConfig(
-        mode=mode,
+        mode=skel_config.mode,
+        detector_model=skel_config.detector_model,
+        pose_model=skel_config.pose_model,
         execution_provider=inf_config.execution_provider,
         engine_cache_dir=inf_config.engine_cache_dir,
         max_batch_size=inf_config.max_batch_size,

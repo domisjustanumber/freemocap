@@ -7,7 +7,7 @@ so a single source of truth governs which model is used in either pipeline mode.
 from pathlib import Path
 
 from pydantic import BaseModel, Field
-from skellytracker.utilities.gpu_utils.execution_provider_name import ExecutionProviderName
+from skellytracker.utilities.gpu_utils import ExecutionProviderName
 
 
 def _default_engine_cache_dir() -> Path:
@@ -33,4 +33,5 @@ class RealtimeSkeletonInferenceNodeConfig(BaseModel):
     #         cached to engine_cache_dir on all subsequent runs.
     # "cuda": CUDA EP — requires NVIDIA GPU + onnxruntime-gpu, no extra install.
     # "cpu":  CPU EP — no GPU required, slowest.
-    execution_provider: ExecutionProviderName = "cuda"#"trt"
+    # None:   Auto — resolve installed-best EP at session create.
+    execution_provider: ExecutionProviderName | None = None

@@ -2,6 +2,7 @@ import React, {useMemo} from 'react';
 import {useLocation} from 'react-router-dom';
 import {useTranslation} from 'react-i18next';
 import IconButton from '@/components/ui-components/IconButton';
+import GpuExecutionProviderStatus from '@/components/ui-components/GpuExecutionProviderStatus';
 
 import {CameraConfigTreeView} from '@/components/control-panels/camera-config-panel/camera-config-tree-view/CameraConfigTreeView';
 import {RecordingPathPanel} from "@/components/control-panels/recording-info-panel/RecordingPathPanel";
@@ -82,7 +83,7 @@ export const SidePanelContent = ({ isCollapsed = false, onToggleCollapse, onOpen
 
             <div className="playback-mode left-side-panel flex gap-1 flex-col bg-darkgray br-2 w-full h-full"
                 style={{ display: isCollapsed ? 'none' : 'flex' }}>
-                {/* Header — home + connection + collapse button */}
+                {/* Header — home + GPU status + connection + collapse button */}
 
                 <div className="left-side-top-bar flex flex-row items-center gap-1 p-1"
                 >
@@ -95,6 +96,7 @@ export const SidePanelContent = ({ isCollapsed = false, onToggleCollapse, onOpen
                             tooltipPosition="pos-right"
                         />
                     )}
+                    <GpuExecutionProviderStatus />
                     <div
                         data-onboarding="connection:server-connection"
                         className="flex-1 overflow-hidden min-w-0"

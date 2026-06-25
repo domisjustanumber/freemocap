@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 from skellycam.core.camera_group.camera_group import CameraConfigs
 from skellycam.core.types.type_overloads import CameraGroupIdString, CameraIdString
 
+from skellytracker.utilities.gpu_utils import resolve_provider
+
 from freemocap.app.freemocap_application import get_freemocap_app
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
 from freemocap.core.pipeline.realtime.realtime_pipeline import RealtimePipeline
@@ -37,11 +39,28 @@ class RealtimePipelineCreateResponse(BaseModel):
     pipeline_id: str = Field(
         description="ID of the processing pipeline",
     )
+    active_execution_provider: str | None = Field(
+        default=None,
+        description="Resolved ONNX execution provider for skeleton inference (auto or explicit)",
+    )
+
     @classmethod
-    def from_pipeline(cls, pipeline: RealtimePipeline) -> "RealtimePipelineCreateResponse":
+    def from_pipeline(
+        cls,
+        pipeline: RealtimePipeline,
+        *,
+        pipeline_config: RealtimePipelineConfig | None = None,
+    ) -> "RealtimePipelineCreateResponse":
+        cfg = pipeline_config or pipeline.config
+        requested = cfg.skeleton_inference_node_config.execution_provider
+        try:
+            active_ep = resolve_provider(requested=requested)
+        except Exception:
+            active_ep = None
         return cls(
             camera_group_id=pipeline.camera_group.id,
             pipeline_id=pipeline.id,
+            active_execution_provider=active_ep,
         )
 
 class RealtimePipelineCloseResponse(BaseModel):
@@ -83,7 +102,10 @@ async def pipeline_apply_endpoint(
         pipeline = await app.create_or_update_realtime_pipeline(pipeline_config=request.realtime_config,
                                                                                 camera_configs=camera_configs,
                                                                                 realtime_camera_ids=request.realtime_camera_ids,)
-        response = RealtimePipelineCreateResponse.from_pipeline(pipeline=pipeline)
+        response = RealtimePipelineCreateResponse.from_pipeline(
+            pipeline=pipeline,
+            pipeline_config=request.realtime_config,
+        )
         logger.api(f"`pipeline/connect` POST request handled successfully - \n {response.model_dump_json(indent=2)}")
         return response
     except Exception as e:

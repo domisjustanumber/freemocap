@@ -10,7 +10,7 @@ import IconButton from "@/components/ui-components/IconButton";
 import ValueSelector from "@/components/ui-components/ValueSelector";
 import { useRealtimePipelineSync } from "@/hooks/useRealtimePipelineSync";
 
-import RTPMediaPipeDetectorSettings from "@/components/pipeline-progress/realtime/realtimepipeline-mediapipedetector-settings";
+import RTPRtmposeSkeletonSettings from "@/components/pipeline-progress/realtime/realtimepipeline-rtmpose-settings";
 import RTPthreeDReconstructionSettings from "@/components/pipeline-progress/realtime/realtimepipeline-3dreconstruction-settings";
 import RTPPipelineActionsFlyout from "@/components/pipeline-progress/realtime/realtimepipeline-actions-flyout";
 
@@ -178,8 +178,7 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
                 disabled={false}
                 className={`is-menu icon-size-25 ${active.trackingSettings ? "active" : ""}`}
               />
-              {/* RTP MediaPipe Settings Modal */}
-              <RTPMediaPipeDetectorSettings
+              <RTPRtmposeSkeletonSettings
                 open={active.trackingSettings}
                 onClose={() => toggleActive("trackingSettings")}
               />

@@ -36,6 +36,7 @@ import {
     pointDictToFrame,
 } from "@/components/viewport3d/KeypointsSourceContext";
 import {store} from "@/store";
+import {fetchGpuCapabilities} from "@/store/slices/realtime";
 import {pipelineProgressUpdated, PipelinePhase, PipelineType} from "@/store/slices/pipelines";
 
 // Compare two already-sorted string arrays without allocating
@@ -206,6 +207,10 @@ export const ServerContextProvider: React.FC<{ children: ReactNode }> = ({childr
             const connected = newState === ConnectionState.CONNECTED;
             setIsConnected(connected);
             setIsFailed(newState === ConnectionState.FAILED);
+
+            if (connected) {
+                store.dispatch(fetchGpuCapabilities());
+            }
 
             if (newState === ConnectionState.DISCONNECTED || newState === ConnectionState.FAILED) {
                 canvasManagerRef.current?.terminateAllWorkers();

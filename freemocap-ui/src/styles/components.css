@@ -97,6 +97,40 @@
 
 }
 
+.RTP-skeleton-settings-flyout {
+  width: min(420px, calc(100vw - 24px));
+  min-width: 360px;
+}
+
+.RTP-skeleton-settings-flyout .name-dropdown-selector {
+  width: 100%;
+  display: block;
+}
+
+.RTP-skeleton-settings-flyout .name-dropdown-selector > button {
+  width: 100%;
+  min-width: 0;
+}
+
+.RTP-skeleton-settings-flyout .name-dropdown-selector > button > p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.RTP-skeleton-settings-flyout .dropdown-container {
+  left: 0;
+  right: auto;
+  min-width: 100%;
+  max-width: 100%;
+}
+
+.RTP-skeleton-settings-flyout .dropdown-container button > p {
+  white-space: normal;
+  word-break: break-word;
+}
+
 .calibration-settings-flyout {
   top: 340px;
   left: 300px;

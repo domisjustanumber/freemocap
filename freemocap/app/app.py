@@ -29,6 +29,7 @@ from freemocap.app.freemocap_application import create_freemocap_app
 from freemocap.system.default_paths import (
     get_default_freemocap_base_folder_path, FREEMOCAP_FAVICON_ICO_PATH
 )
+from freemocap.system.gpu_capabilities_cache import warm_execution_provider_cache
 
 logger = logging.getLogger(__name__)
 
@@ -335,6 +336,7 @@ async def app_lifespan(
     # ===== STARTUP =====
     logger.api("FreeMoCap API starting...")
     _log_system_info()
+    warm_execution_provider_cache()
 
     # Ensure base folder exists
     base_path = Path(get_default_freemocap_base_folder_path())

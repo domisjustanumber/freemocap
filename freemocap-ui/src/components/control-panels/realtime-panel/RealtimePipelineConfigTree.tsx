@@ -1,10 +1,12 @@
 import React, {useCallback} from "react";
 import {RealtimePipelineStageTreeItem} from "./RealtimePipelineStageTreeItem";
 import {MediapipeConfigPanel} from "@/components/control-panels/mocap-control-panel/MediapipeConfigPanel";
+import {RtmposeModelConfigPanel} from "@/components/control-panels/realtime-panel/RtmposeModelConfigPanel";
 import {SkeletonFilterConfigPanel} from "@/components/control-panels/mocap-control-panel/SkeletonFilterConfigPanel";
 import {useMocap} from "@/hooks/useMocap";
 import {useRealtimePipelineSync} from "@/hooks/useRealtimePipelineSync";
 import {MediapipeDetectorConfig, RealtimeFilterConfig} from "@/store/slices/mocap";
+import {defaultRtmposeDetectorConfig, RtmposeDetectorConfig} from "@/store/slices/realtime/realtime-types";
 
 export type PipelineContext = "realtime" | "posthoc";
 
@@ -43,7 +45,8 @@ export const RealtimePipelineConfigTree: React.FC<PipelineConfigTreeProps> = ({
         updateSkeletonFilterConfigLocalOnly,
         replaceSkeletonFilterConfigLocalOnly,
     } = useMocap();
-    const {triggerRealtimeApply} = useRealtimePipelineSync();
+    const {triggerRealtimeApply, applyOrUpdatePipelineConfig, pipelineConfig, cameraNodeConfig} =
+        useRealtimePipelineSync();
 
     const handleUpdateDetectorConfig = useCallback(
         (updates: Partial<MediapipeDetectorConfig>) => {
@@ -59,6 +62,24 @@ export const RealtimePipelineConfigTree: React.FC<PipelineConfigTreeProps> = ({
             if (context === "realtime") triggerRealtimeApply();
         },
         [replaceDetectorConfigLocalOnly, context, triggerRealtimeApply]
+    );
+
+    const handleUpdateRtmposeDetectorConfig = useCallback(
+        (updates: Partial<RtmposeDetectorConfig>) => {
+            const current =
+                cameraNodeConfig.skeleton_detector_config ?? defaultRtmposeDetectorConfig;
+            applyOrUpdatePipelineConfig({
+                ...pipelineConfig,
+                camera_node_config: {
+                    ...cameraNodeConfig,
+                    skeleton_detector_config: {
+                        ...current,
+                        ...updates,
+                    },
+                },
+            });
+        },
+        [applyOrUpdatePipelineConfig, pipelineConfig, cameraNodeConfig],
     );
 
     const handleUpdateSkeletonFilterConfig = useCallback(
@@ -132,20 +153,26 @@ export const RealtimePipelineConfigTree: React.FC<PipelineConfigTreeProps> = ({
                     </div>
                 </RealtimePipelineStageTreeItem>
 
-                {/* Skeleton (MediaPipe) */}
+                {/* Skeleton */}
                 <RealtimePipelineStageTreeItem
                     itemId="2d-skeleton"
                     label="Skeleton"
                     checked={skeletonEnabled}
                     onToggle={onSkeletonToggle}
                     
-                    summaryWhenCollapsed={context === "realtime" ? "Realtime preset" : "Posthoc preset"}
+                    summaryWhenCollapsed={context === "realtime" ? "RTMPose" : "Posthoc preset"}
                 >
                     <div className="p-1 border-1 border-mid-black pl-4" style={{borderLeft: '2px solid var(--color-border-secondary)'}}>
-                        <MediapipeConfigPanel
-                            updateDetectorConfig={handleUpdateDetectorConfig}
-                            replaceDetectorConfig={handleReplaceDetectorConfig}
-                        />
+                        {context === "realtime" ? (
+                            <RtmposeModelConfigPanel
+                                updateDetectorConfig={handleUpdateRtmposeDetectorConfig}
+                            />
+                        ) : (
+                            <MediapipeConfigPanel
+                                updateDetectorConfig={handleUpdateDetectorConfig}
+                                replaceDetectorConfig={handleReplaceDetectorConfig}
+                            />
+                        )}
                     </div>
                 </RealtimePipelineStageTreeItem>
             </RealtimePipelineStageTreeItem>

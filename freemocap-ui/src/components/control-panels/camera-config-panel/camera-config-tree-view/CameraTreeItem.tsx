@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
+import { store } from "@/store";
 
 import { CameraSettingsModal } from "./CameraSettingsModal";
 import { ROTATION_DEGREE_LABELS, RotationValue, useAppDispatch } from "@/store";
@@ -11,6 +12,13 @@ import {
 import { Camera } from "@/store/slices/cameras/cameras-types";
 import Checkbox from "@/components/ui-components/Checkbox";
 import IconButton from "@/components/ui-components/IconButton";
+import {
+  REALTIME_AT_LEAST_ONE_CAMERA_MESSAGE,
+  realtimeApplyBlocked,
+  scheduleRealtimeRestartRequiredAfterCameraToggle,
+  selectIsLastRealtimePipelineCamera,
+  selectIsPipelineConnected,
+} from "@/store/slices/realtime";
 
 interface CameraTreeItemProps {
   camera: Camera;
@@ -59,12 +67,30 @@ export const CameraTreeItem: React.FC<CameraTreeItemProps> = ({ camera }) => {
     e: React.ChangeEvent<HTMLInputElement>,
   ): void => {
     e.stopPropagation();
+    const getState = () => store.getState();
+    const isConnected = selectIsPipelineConnected(getState());
+    if (selectIsLastRealtimePipelineCamera(getState(), camera.id) && isConnected) {
+      dispatch(realtimeApplyBlocked({ message: REALTIME_AT_LEAST_ONE_CAMERA_MESSAGE }));
+      return;
+    }
     dispatch(cameraSelectionToggled(camera.id));
+    if (isConnected) {
+      scheduleRealtimeRestartRequiredAfterCameraToggle(dispatch, getState);
+    }
   };
 
   const handleToggleRealtime = (e: React.MouseEvent): void => {
     e.stopPropagation();
+    const getState = () => store.getState();
+    const isConnected = selectIsPipelineConnected(getState());
+    if (selectIsLastRealtimePipelineCamera(getState(), camera.id) && isConnected) {
+      dispatch(realtimeApplyBlocked({ message: REALTIME_AT_LEAST_ONE_CAMERA_MESSAGE }));
+      return;
+    }
     dispatch(cameraRealtimeToggled(camera.id));
+    if (isConnected) {
+      scheduleRealtimeRestartRequiredAfterCameraToggle(dispatch, getState);
+    }
   };
 
   const handleOpenSettings = (e: React.MouseEvent): void => {

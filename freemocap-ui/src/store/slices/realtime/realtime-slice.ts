@@ -1,10 +1,17 @@
-import {createSlice, PayloadAction} from '@reduxjs/toolkit';
+import {createSlice, isRejectedWithValue, PayloadAction} from '@reduxjs/toolkit';
 import {defaultRealtimePipelineConfig, PipelineState, RealtimePipelineConfig} from '@/store/slices/realtime/realtime-types';
 import {applyRealtimePipeline, closePipeline, fetchGpuCapabilities} from '@/store/slices/realtime/realtime-thunks';
+import {REALTIME_AT_LEAST_ONE_CAMERA_MESSAGE} from '@/store/slices/realtime/realtime-messages';
+import {
+    pipelineErrorDismissed,
+    realtimeApplyBlocked,
+    realtimeApplyBlockedDismissed,
+    realtimePipelineRestartRequired,
+    realtimePipelineRestartRequiredDismissed,
+} from '@/store/slices/realtime/realtime-notify-actions';
 
 const initialState: PipelineState = {
     pipelineConfig: defaultRealtimePipelineConfig,
-    cameraGroupId: null,
     pipelineId: null,
     isConnected: false,
     isLoading: false,
@@ -12,7 +19,11 @@ const initialState: PipelineState = {
     gpuCapabilities: null,
     gpuCapabilitiesLoading: false,
     gpuCapabilitiesError: null,
-    activeExecutionProvider: null,
+    executionProvider: null,
+    latestApplyRequestId: null,
+    realtimeApplyBlockedMessage: null,
+    restartRequired: false,
+    restartRequiredMessage: null,
 };
 
 export const realtimeSlice = createSlice({
@@ -25,8 +36,8 @@ export const realtimeSlice = createSlice({
             state.pipelineConfig = action.payload;
         },
 
-        activeExecutionProviderCleared: (state) => {
-            state.activeExecutionProvider = null;
+        executionProviderCleared: (state) => {
+            state.executionProvider = null;
         },
 
         realtimePipelineErrorReceived: (state, action: PayloadAction<string>) => {
@@ -34,7 +45,10 @@ export const realtimeSlice = createSlice({
             state.isLoading = false;
             state.isConnected = false;
             state.pipelineId = null;
-            state.activeExecutionProvider = null;
+            state.executionProvider = null;
+            state.realtimeApplyBlockedMessage = null;
+            state.restartRequired = false;
+            state.restartRequiredMessage = null;
         },
     },
     extraReducers: (builder) => {
@@ -68,35 +82,83 @@ export const realtimeSlice = createSlice({
                 state.gpuCapabilitiesError = action.error.message || 'Failed to fetch GPU capabilities';
             })
 
-            // ========== Apply Pipeline (POST /realtime/apply) ==========
-            .addCase(applyRealtimePipeline.pending, (state) => {
-                state.isLoading = true;
+            .addCase(realtimeApplyBlocked, (state, action) => {
+                state.realtimeApplyBlockedMessage = action.payload.message;
+            })
+            .addCase(realtimeApplyBlockedDismissed, (state) => {
+                state.realtimeApplyBlockedMessage = null;
+            })
+            .addCase(pipelineErrorDismissed, (state) => {
                 state.error = null;
             })
-            .addCase(applyRealtimePipeline.fulfilled, (state, action) => {
-                state.cameraGroupId = action.payload.camera_group_id;
-                state.pipelineId = action.payload.pipeline_id;
-                state.pipelineConfig = action.meta.arg;
-                state.activeExecutionProvider = action.payload.active_execution_provider ?? null;
-                state.isConnected = true;
-                state.isLoading = false;
+            .addCase(realtimePipelineRestartRequired, (state, action) => {
+                state.restartRequired = true;
+                state.restartRequiredMessage = action.payload.message;
             })
-            .addCase(applyRealtimePipeline.rejected, (state, action) => {
-                state.isLoading = false;
-                state.error = action.error.message || 'Failed to apply pipeline';
+            .addCase(realtimePipelineRestartRequiredDismissed, (state) => {
+                state.restartRequired = false;
+                state.restartRequiredMessage = null;
             })
 
-            // ========== Close Pipeline (DELETE /realtime/all/close) ==========
-            .addCase(closePipeline.pending, (state) => {
+            .addCase(applyRealtimePipeline.pending, (state, action) => {
+                state.latestApplyRequestId = action.meta.requestId;
                 state.isLoading = true;
                 state.error = null;
+                state.realtimeApplyBlockedMessage = null;
+                state.restartRequired = false;
+                state.restartRequiredMessage = null;
+            })
+            .addCase(applyRealtimePipeline.fulfilled, (state, action) => {
+                if (state.latestApplyRequestId !== action.meta.requestId) return;
+                state.latestApplyRequestId = null;
+                state.pipelineId = action.payload.pipeline_id;
+                state.pipelineConfig = action.meta.arg;
+                state.executionProvider = action.payload.execution_provider ?? null;
+                state.isConnected = true;
+                state.isLoading = false;
+                state.error = null;
+                state.realtimeApplyBlockedMessage = null;
+                state.restartRequired = false;
+                state.restartRequiredMessage = null;
+            })
+            .addCase(applyRealtimePipeline.rejected, (state, action) => {
+                if (state.latestApplyRequestId !== action.meta.requestId) return;
+                state.latestApplyRequestId = null;
+                state.isLoading = false;
+                if (!isRejectedWithValue(action)) {
+                    state.error = action.error.message ?? 'Failed to apply pipeline';
+                    state.isConnected = false;
+                    state.pipelineId = null;
+                    state.executionProvider = null;
+                    return;
+                }
+                const message = action.payload as string;
+                if (message === REALTIME_AT_LEAST_ONE_CAMERA_MESSAGE) {
+                    state.realtimeApplyBlockedMessage = message;
+                    return;
+                }
+                state.error = message;
+                state.isConnected = false;
+                state.pipelineId = null;
+                state.executionProvider = null;
+            })
+
+            .addCase(closePipeline.pending, (state) => {
+                state.latestApplyRequestId = null;
+                state.isLoading = true;
+                state.error = null;
+                state.realtimeApplyBlockedMessage = null;
             })
             .addCase(closePipeline.fulfilled, (state) => {
-                state.cameraGroupId = null;
                 state.pipelineId = null;
                 state.isConnected = false;
-                state.activeExecutionProvider = null;
+                state.executionProvider = null;
                 state.isLoading = false;
+                state.error = null;
+                state.realtimeApplyBlockedMessage = null;
+                state.latestApplyRequestId = null;
+                state.restartRequired = false;
+                state.restartRequiredMessage = null;
             })
             .addCase(closePipeline.rejected, (state, action) => {
                 state.isLoading = false;
@@ -105,4 +167,12 @@ export const realtimeSlice = createSlice({
     },
 });
 
-export const {pipelineStateReset, pipelineConfigUpdated, activeExecutionProviderCleared, realtimePipelineErrorReceived} = realtimeSlice.actions;
+export const {
+    pipelineStateReset,
+    pipelineConfigUpdated,
+    executionProviderCleared,
+    realtimePipelineErrorReceived,
+} = realtimeSlice.actions;
+
+// Back-compat alias
+export const activeExecutionProviderCleared = executionProviderCleared;

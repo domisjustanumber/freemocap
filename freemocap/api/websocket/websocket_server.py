@@ -183,7 +183,7 @@ class WebsocketServer:
         else:
             preview_by_cam = {}
             multiframe_preview = {}
-        pipeline = self._app.get_realtime_pipeline_for_camera_group(camera_group_id)
+        pipeline = self._app.get_pipeline()
         want_pubsub_timing = (
             pipeline is not None and pipeline.config.log_pipeline_times
         )
@@ -194,7 +194,7 @@ class WebsocketServer:
         dropped_timing_events = 0
 
         if want_pubsub_timing:
-            sub = self._app.get_pipeline_timing_subscription(camera_group_id)
+            sub = self._app.get_pipeline_timing_subscription()
             if sub is not None:
                 while True:
                     try:

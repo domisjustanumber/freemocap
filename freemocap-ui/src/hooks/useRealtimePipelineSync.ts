@@ -1,9 +1,14 @@
-import {useCallback} from "react";
-import {useAppDispatch, useAppSelector} from "@/store/hooks";
+import {useCallback} from 'react';
+import {store} from '@/store';
+import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {
-    applyRealtimePipeline,
+    cancelQueuedRealtimeApply,
+    cancelScheduledRealtimeCameraApply,
     closePipeline,
+    markRealtimePipelineRestartRequired,
     pipelineConfigUpdated,
+    REALTIME_RESTART_REQUIRED_MESSAGE,
+    requestCoordinatedRealtimeApply,
     selectAggregatorConfig,
     selectCameraNodeConfig,
     selectCanConnectPipeline,
@@ -11,13 +16,21 @@ import {
     selectIsPipelineConnected,
     selectIsPipelineLoading,
     selectPipelineConfig,
-} from "@/store/slices/realtime";
-import {RealtimePipelineConfig} from "@/store/slices/realtime/realtime-types";
+} from '@/store/slices/realtime';
+import type {RealtimePipelineConfig} from '@/store/slices/realtime/realtime-types';
+
+export type RealtimePipelineConfigUpdate =
+    | RealtimePipelineConfig
+    | ((current: RealtimePipelineConfig) => RealtimePipelineConfig);
+
+function resolveRealtimeConfigUpdate(update: RealtimePipelineConfigUpdate): RealtimePipelineConfig {
+    const current = selectPipelineConfig(store.getState());
+    return typeof update === 'function' ? update(current) : update;
+}
 
 /**
  * Shared realtime-pipeline sync logic used by the Realtime Pipeline sidebar panel,
- * the streaming-view settings overlay, and the RTP settings modals — keeping all of
- * them in sync with the same `realtime` slice state and apply/connect behavior.
+ * the streaming-view settings overlay, and the RTP settings modals.
  */
 export function useRealtimePipelineSync() {
     const dispatch = useAppDispatch();
@@ -30,34 +43,51 @@ export function useRealtimePipelineSync() {
     const cameraNodeConfig = useAppSelector(selectCameraNodeConfig);
     const aggregatorConfig = useAppSelector(selectAggregatorConfig);
 
-    /** Applies a new pipeline config live if connected, otherwise updates local config only. */
     const applyOrUpdatePipelineConfig = useCallback(
-        (newConfig: RealtimePipelineConfig) => {
-            if (isConnected) {
-                dispatch(applyRealtimePipeline(newConfig));
-            } else {
-                dispatch(pipelineConfigUpdated(newConfig));
+        (update: RealtimePipelineConfigUpdate) => {
+            const newConfig = resolveRealtimeConfigUpdate(update);
+            dispatch(pipelineConfigUpdated(newConfig));
+            if (selectIsPipelineConnected(store.getState())) {
+                markRealtimePipelineRestartRequired(dispatch, REALTIME_RESTART_REQUIRED_MESSAGE);
             }
         },
-        [dispatch, isConnected]
+        [dispatch],
     );
 
-    /** Re-applies the current pipeline config if connected — call after a mocap detector/filter config change. */
     const triggerRealtimeApply = useCallback(() => {
-        if (isConnected) {
-            dispatch(applyRealtimePipeline(pipelineConfig));
-        }
-    }, [dispatch, isConnected, pipelineConfig]);
+        if (!selectIsPipelineConnected(store.getState())) return;
+        markRealtimePipelineRestartRequired(dispatch, REALTIME_RESTART_REQUIRED_MESSAGE);
+    }, [dispatch]);
 
-    /** Connects or disconnects the realtime pipeline. */
+    const restartPipelineWithLatestConfig = useCallback(async () => {
+        cancelScheduledRealtimeCameraApply();
+        cancelQueuedRealtimeApply();
+        await dispatch(closePipeline());
+        const getState = () => store.getState();
+        requestCoordinatedRealtimeApply(
+            dispatch,
+            getState,
+            () => selectPipelineConfig(getState()),
+        );
+    }, [dispatch]);
+
     const toggleConnection = useCallback(async () => {
-        if (isLoading) return;
-        if (isConnected) {
+        if (selectIsPipelineLoading(store.getState())) return;
+        if (selectIsPipelineConnected(store.getState())) {
+            cancelScheduledRealtimeCameraApply();
+            cancelQueuedRealtimeApply();
             await dispatch(closePipeline());
         } else {
-            await dispatch(applyRealtimePipeline(pipelineConfig));
+            cancelScheduledRealtimeCameraApply();
+            cancelQueuedRealtimeApply();
+            const getState = () => store.getState();
+            requestCoordinatedRealtimeApply(
+                dispatch,
+                getState,
+                () => selectPipelineConfig(getState()),
+            );
         }
-    }, [dispatch, isConnected, isLoading, pipelineConfig]);
+    }, [dispatch]);
 
     return {
         isConnected,
@@ -70,5 +100,6 @@ export function useRealtimePipelineSync() {
         applyOrUpdatePipelineConfig,
         triggerRealtimeApply,
         toggleConnection,
+        restartPipelineWithLatestConfig,
     };
 }

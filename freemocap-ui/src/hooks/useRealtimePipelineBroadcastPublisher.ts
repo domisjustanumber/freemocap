@@ -1,7 +1,10 @@
 import {useEffect} from 'react';
+import {store} from '@/store';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {
-    applyRealtimePipeline,
+    markRealtimePipelineRestartRequired,
+    pipelineConfigUpdated,
+    REALTIME_RESTART_REQUIRED_MESSAGE,
     selectIsPipelineConnected,
     selectPipelineConfig,
 } from '@/store/slices/realtime';
@@ -43,10 +46,12 @@ export function useRealtimePipelineBroadcastPublisher(enabled = true): void {
             if (message.type !== 'set-log-pipeline-times' || !isConnected) {
                 return;
             }
-            dispatch(applyRealtimePipeline({
-                ...pipelineConfig,
+            const current = selectPipelineConfig(store.getState());
+            dispatch(pipelineConfigUpdated({
+                ...current,
                 log_pipeline_times: message.enabled,
             }));
+            markRealtimePipelineRestartRequired(dispatch, REALTIME_RESTART_REQUIRED_MESSAGE);
         });
-    }, [dispatch, enabled, isConnected, logPipelineTimes, pipelineConfig]);
+    }, [dispatch, enabled, isConnected, logPipelineTimes]);
 }

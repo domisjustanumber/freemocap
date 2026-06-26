@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import clsx from "clsx";
 import { useServer } from "@/services/server/ServerContextProvider";
 import { useTranslation } from "react-i18next";
 import type {
@@ -9,6 +10,12 @@ import ToggleComponent from "@/components/ui-components/ToggleComponent";
 import IconButton from "@/components/ui-components/IconButton";
 import ValueSelector from "@/components/ui-components/ValueSelector";
 import { useRealtimePipelineSync } from "@/hooks/useRealtimePipelineSync";
+import { useAppSelector } from "@/store/hooks";
+import {
+  selectPipelineError,
+  selectRealtimeApplyBlockedMessage,
+  selectRealtimePipelineRestartRequiredMessage,
+} from "@/store/slices/realtime";
 
 import RTPRtmposeSkeletonSettings from "@/components/pipeline-progress/realtime/realtimepipeline-rtmpose-settings";
 import RTPthreeDReconstructionSettings from "@/components/pipeline-progress/realtime/realtimepipeline-3dreconstruction-settings";
@@ -63,7 +70,12 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
     canConnect,
     canDisconnect,
     toggleConnection,
+    restartPipelineWithLatestConfig,
   } = useRealtimePipelineSync();
+
+  const pipelineError = useAppSelector(selectPipelineError);
+  const restartRequiredMessage = useAppSelector(selectRealtimePipelineRestartRequiredMessage);
+  const realtimeApplyBlockedMessage = useAppSelector(selectRealtimeApplyBlockedMessage);
 
   const charucoEnabled = cameraNodeConfig.charuco_tracking_enabled;
   const skeletonEnabled = cameraNodeConfig.skeleton_tracking_enabled;
@@ -94,9 +106,42 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
       aggregator_config: { ...aggregatorConfig, filter_enabled: !filterEnabled },
     });
 
-  const liveClickable = canConnect || canDisconnect;
+  const liveClickable = canConnect || canDisconnect || !!pipelineError || !!restartRequiredMessage;
+
+  const boltStatus = pipelineError
+    ? "error"
+    : restartRequiredMessage
+      ? "restart-required"
+      : isPipelineLoading && !isConnected
+        ? "loading-trt"
+        : isPipelineLoading
+          ? "loading"
+          : isConnected
+            ? "active"
+            : "inactive";
+
+  const liveTooltip = pipelineError
+    ?? (restartRequiredMessage ? t("realtime_restartRequired") : null)
+    ?? (realtimeApplyBlockedMessage ? t("realtime_atLeastOneCameraRequired") : null)
+    ?? (isConnected
+      ? "Disconnect pipeline"
+      : canConnect
+        ? "Connect pipeline"
+        : t("realtime_atLeastOneCameraRequired"));
 
   const handleLiveButtonClick = () => {
+    if (isPipelineLoading && !isConnected) {
+      void toggleConnection();
+      return;
+    }
+    if (pipelineError) {
+      toggleActive("pipelineSettings");
+      return;
+    }
+    if (restartRequiredMessage) {
+      void restartPipelineWithLatestConfig();
+      return;
+    }
     if (!liveClickable || isPipelineLoading) return;
     toggleConnection();
   };
@@ -221,17 +266,17 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
               icon={isConnected ? "live-active-icon" : "live-icon"}
               onClick={handleLiveButtonClick}
               tooltip
-              tooltipText={
-                isConnected
-                  ? "Disconnect pipeline"
-                  : canConnect
-                    ? "Connect pipeline"
-                    : "Select cameras first"
-              }
+              tooltipText={liveTooltip}
               tooltipPosition="pos-bottom"
-              disabled={isPipelineLoading}
+              disabled={isPipelineLoading && isConnected}
               style={!liveClickable && !isPipelineLoading ? { opacity: 0.5 } : undefined}
-              className={`icon-size-25 ${isConnected ? "active" : ""}`}
+              className={clsx(
+                "icon-size-25 realtime-pipeline-bolt",
+                boltStatus === "active" && "active",
+                boltStatus === "error" && "realtime-pipeline-bolt-error",
+                boltStatus === "restart-required" && "realtime-pipeline-bolt-restart-required",
+                (boltStatus === "loading" || boltStatus === "loading-trt") && "realtime-pipeline-bolt-loading",
+              )}
             />
 
             <div className="modal-container pos-rel">

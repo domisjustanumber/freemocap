@@ -92,10 +92,8 @@ export interface PipelineApplyRequest {
 }
 
 export interface PipelineApplyResponse {
-    camera_group_id: string;
     pipeline_id: string;
-    requested_execution_provider?: string | null;
-    active_execution_provider?: string | null;
+    execution_provider?: string | null;
 }
 
 export interface RealtimePipelineErrorMessage {
@@ -119,7 +117,6 @@ export interface RealtimePipelineErrorMessage {
 
 export interface PipelineState {
     pipelineConfig: RealtimePipelineConfig;
-    cameraGroupId: string | null;
     pipelineId: string | null;
     isConnected: boolean;
     isLoading: boolean;
@@ -127,5 +124,9 @@ export interface PipelineState {
     gpuCapabilities: GpuCapabilitiesResponse | null;
     gpuCapabilitiesLoading: boolean;
     gpuCapabilitiesError: string | null;
-    activeExecutionProvider: string | null;
+    executionProvider: string | null;
+    latestApplyRequestId: string | null;
+    realtimeApplyBlockedMessage: string | null;
+    restartRequired: boolean;
+    restartRequiredMessage: string | null;
 }

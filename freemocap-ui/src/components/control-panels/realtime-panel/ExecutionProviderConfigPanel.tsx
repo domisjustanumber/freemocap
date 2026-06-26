@@ -2,15 +2,14 @@ import React, {useCallback, useMemo} from 'react';
 import NameDropdownSelector from '@/components/ui-components/NameDropdownSelector';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {
-    applyRealtimePipeline,
+    markRealtimePipelineRestartRequired,
     pipelineConfigUpdated,
+    REALTIME_RESTART_REQUIRED_MESSAGE,
     selectGpuCapabilities,
     selectIsPipelineConnected,
     selectPipelineConfig,
-    selectPipelineError,
     selectSkeletonInferenceNodeConfig,
-} from '@/store/slices/realtime';
-import {ExecutionProviderName, RealtimePipelineConfig, SkeletonInferenceNodeConfig} from '@/store/slices/realtime/realtime-types';
+} from '@/store/slices/realtime';import {ExecutionProviderName, RealtimePipelineConfig, SkeletonInferenceNodeConfig} from '@/store/slices/realtime/realtime-types';
 import {executionProviderDisplayLabel} from '@/types/gpu-capabilities';
 
 interface ExecutionProviderConfigPanelProps {
@@ -34,7 +33,6 @@ export const ExecutionProviderConfigPanel: React.FC<ExecutionProviderConfigPanel
     const pipelineConfig = useAppSelector(selectPipelineConfig);
     const isConnected = useAppSelector(selectIsPipelineConnected);
     const skeletonInfConfig = useAppSelector(selectSkeletonInferenceNodeConfig);
-    const pipelineError = useAppSelector(selectPipelineError);
     const gpuCapabilities = useAppSelector(selectGpuCapabilities);
 
     const availableProviders = useMemo(
@@ -130,7 +128,8 @@ export const ExecutionProviderConfigPanel: React.FC<ExecutionProviderConfigPanel
             }
 
             if (isConnected) {
-                dispatch(applyRealtimePipeline(newConfig));
+                dispatch(pipelineConfigUpdated(newConfig));
+                markRealtimePipelineRestartRequired(dispatch, REALTIME_RESTART_REQUIRED_MESSAGE);
             } else {
                 dispatch(pipelineConfigUpdated(newConfig));
             }
@@ -178,12 +177,6 @@ export const ExecutionProviderConfigPanel: React.FC<ExecutionProviderConfigPanel
             {cudaDriverWarning && (
                 <p className="text sm text-warning p-2 border-1 border-warning br-1 text-wrap">
                     {cudaDriverWarning}
-                </p>
-            )}
-
-            {pipelineError && (
-                <p className="text sm text-error p-2 border-1 border-error br-1 text-wrap">
-                    {pipelineError}
                 </p>
             )}
 

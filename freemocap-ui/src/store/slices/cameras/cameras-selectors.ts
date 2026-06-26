@@ -56,6 +56,14 @@ export const selectRealtimeEnabledCameraConfigs = createSelector(
     }
 );
 
+export const selectIsLastRealtimePipelineCamera = createSelector(
+    [selectCameras, (_: RootState, cameraId: string) => cameraId],
+    (cameras, cameraId) => {
+        const pipelineCameras = cameras.filter((c) => c.selected && c.realtimeEnabled);
+        return pipelineCameras.length === 1 && pipelineCameras[0].id === cameraId;
+    },
+);
+
 // Get actual configs for all cameras
 export const selectActualCameraConfigs = createSelector(
     [selectCameras],

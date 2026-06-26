@@ -77,8 +77,6 @@ from freemocap.core.pipeline.pipeline_timing_task_ids import batch_task_id
 from freemocap.core.types.type_overloads import TopicPublicationQueue
 from freemocap.pubsub.pubsub_manager import PubSubTopicManager
 from freemocap.pubsub.pubsub_topics import (
-    PipelineConfigUpdateMessage,
-    PipelineConfigUpdateTopic,
     ProcessFrameNumberMessage,
     ProcessFrameNumberTopic,
     SkeletonInferenceResultMessage,
@@ -119,7 +117,6 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                 ipc=ipc,
                 camera_group_shm_dto=camera_group_shm_dto,
                 process_frame_number_sub=pubsub.get_subscription(ProcessFrameNumberTopic),
-                pipeline_config_sub=pubsub.get_subscription(PipelineConfigUpdateTopic),
                 skeleton_result_pub=pubsub.get_publication_queue(SkeletonInferenceResultTopic),
                 pipeline_error_pub=pubsub.get_publication_queue(RealtimePipelineErrorTopic),
                 timing_pub=pubsub.get_publication_queue(PipelineTimingTopic),
@@ -140,7 +137,6 @@ class RealtimeSkeletonInferenceNode(SourceNode):
             shutdown_self_flag: Synchronized,
             camera_group_shm_dto: CameraGroupSharedMemoryDTO,
             process_frame_number_sub: TopicSubscriptionQueue,
-            pipeline_config_sub: TopicSubscriptionQueue,
             skeleton_result_pub: TopicPublicationQueue,
             pipeline_error_pub: TopicPublicationQueue,
             timing_pub: TopicPublicationQueue,
@@ -211,19 +207,6 @@ class RealtimeSkeletonInferenceNode(SourceNode):
             )
             while ipc.should_continue and not shutdown_self_flag.value:
                 wait_1ms()
-
-                # ---- Handle config updates (only act on flips that change session shape) ----
-                while True:
-                    try:
-                        msg: PipelineConfigUpdateMessage = pipeline_config_sub.get_nowait()
-                    except Empty:
-                        break
-                    pipeline_config = msg.pipeline_config
-                    logger.debug(
-                        f"RealtimeSkeletonInferenceNode [{camera_group_id}] "
-                        f"received config update (no hot-reload of session; "
-                        f"changes to detector mode require a pipeline restart)"
-                    )
 
                 if pipeline_config.log_pipeline_times:
                     if timer is None:

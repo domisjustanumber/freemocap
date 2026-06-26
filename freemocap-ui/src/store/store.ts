@@ -1,10 +1,11 @@
 import {configureStore} from "@reduxjs/toolkit";
 import {cameraConfigListenerMiddleware} from "@/store/camera-config-listener";
 import {persistenceListenerMiddleware} from "@/store/persistence-listener";
+import {realtimeApplyListenerMiddleware} from "@/store/realtime-apply-listener";
 import {cameraSlice} from "@/store/slices/cameras";
 import {recordingSlice} from "@/store/slices/recording";
 import {videosSlice} from "@/store/slices/videos";
-import {realtimeSlice} from "@/store/slices/realtime";
+import {realtimeSlice} from "@/store/slices/realtime/realtime-slice";
 import {calibrationSlice} from "@/store/slices/calibration/calibration-slice";
 import {mocapSlice} from "@/store/slices/mocap/mocap-slice";
 import {localeSlice} from "@/store/slices/locale";
@@ -19,7 +20,8 @@ export const store = configureStore({
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware()
             .concat(cameraConfigListenerMiddleware.middleware)
-            .concat(persistenceListenerMiddleware.middleware),
+            .concat(persistenceListenerMiddleware.middleware)
+            .concat(realtimeApplyListenerMiddleware.middleware),
     reducer: {
         cameras: cameraSlice.reducer,
         recording: recordingSlice.reducer,

@@ -1,9 +1,15 @@
 import {createAsyncThunk} from '@reduxjs/toolkit';
-import {RootState, selectRealtimeEnabledCameraConfigs, selectSelectedCameraConfigs} from '@/store';
-import {serverUrls} from '@/services';
+import type {AppDispatch, RootState} from '@/store/types';
+import {selectRealtimeEnabledCameraConfigs, selectSelectedCameraConfigs} from '@/store/slices/cameras/cameras-selectors';
+import {serverUrls} from '@/constants/server-urls';
 import {GpuCapabilitiesResponse} from '@/types/gpu-capabilities';
 import {PipelineApplyResponse, RealtimePipelineConfig} from '@/store/slices/realtime/realtime-types';
-import {selectCalibrationConfig} from '@/store/slices/calibration/calibration-slice';
+import {guardRealtimeApply} from '@/store/slices/realtime/guardRealtimeApply';
+import {countRealtimeApplyCameras} from '@/store/slices/realtime/realtime-apply-camera-count';
+import {formatApplyErrorDetail} from '@/store/slices/realtime/formatApplyErrorDetail';
+import {REALTIME_AT_LEAST_ONE_CAMERA_MESSAGE} from '@/store/slices/realtime/realtime-messages';
+import {cancelQueuedRealtimeApply} from '@/store/slices/realtime/realtime-apply-coordinator-state';
+import {cancelScheduledRealtimeCameraApply} from '@/store/slices/realtime/realtime-camera-apply-scheduler';
 
 export const fetchGpuCapabilities = createAsyncThunk<
     GpuCapabilitiesResponse,
@@ -23,14 +29,17 @@ export const fetchGpuCapabilities = createAsyncThunk<
 export const applyRealtimePipeline = createAsyncThunk<
     PipelineApplyResponse,
     RealtimePipelineConfig,
-    { state: RootState }
+    { state: RootState; dispatch: AppDispatch; rejectValue: string }
 >(
     'realtime/apply',
-    async (realtimeConfig, {getState}) => {
+    async (realtimeConfig, {dispatch, getState, rejectWithValue}) => {
+        if (!guardRealtimeApply(dispatch, getState)) {
+            return rejectWithValue(REALTIME_AT_LEAST_ONE_CAMERA_MESSAGE);
+        }
         const state = getState();
         const cameraConfigs = selectSelectedCameraConfigs(state);
         const realtimeCameraIds = Object.keys(selectRealtimeEnabledCameraConfigs(state));
-        const calibrationConfig = selectCalibrationConfig(state);
+        const calibrationConfig = state.calibration.config;
         const recommended =
             state.realtime.gpuCapabilities?.execution_providers.recommended_provider_id;
 
@@ -54,6 +63,7 @@ export const applyRealtimePipeline = createAsyncThunk<
             camera_node_config: {
                 ...config.camera_node_config,
                 charuco_detector_config: {
+                    ...config.camera_node_config.charuco_detector_config,
                     board: calibrationConfig.charucoBoard,
                 },
             },
@@ -70,17 +80,22 @@ export const applyRealtimePipeline = createAsyncThunk<
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(`Failed to apply realtime: ${error.detail || response.statusText}`);
+            const body = await response.json().catch(() => ({}));
+            return rejectWithValue(formatApplyErrorDetail(body, response.status));
         }
 
-        return response.json() as Promise<PipelineApplyResponse>;
+        return (await response.json()) as PipelineApplyResponse;
+    },
+    {
+        condition: (_, {getState}) => countRealtimeApplyCameras(getState()) > 0,
     },
 );
 
 export const closePipeline = createAsyncThunk<void, void, { state: RootState }>(
     'realtime/close',
     async () => {
+        cancelQueuedRealtimeApply();
+        cancelScheduledRealtimeCameraApply();
         const response = await fetch(serverUrls.endpoints.realtimeClose, {
             method: 'DELETE',
         });

@@ -28,7 +28,13 @@ from skellycam.core.types.type_overloads import CameraIdString, CameraGroupIdStr
 from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC
 from freemocap.core.pipeline.realtime.camera_node import CameraNode
 from freemocap.core.pipeline.realtime.realtime_aggregator_node import RealtimeAggregatorNode
+from freemocap.core.pipeline.realtime.realtime_camera_selection import (
+    camera_ids_for_realtime_pipeline,
+)
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
+from freemocap.core.pipeline.realtime.realtime_pipeline_lifecycle import (
+    needs_centralized_rtmpose,
+)
 from freemocap.core.pipeline.realtime.realtime_pipeline_error import RealtimePipelineErrorMessage
 from freemocap.core.pipeline.realtime.realtime_skeleton_inference_node import (
     RealtimeSkeletonInferenceNode,
@@ -132,13 +138,9 @@ class RealtimePipeline:
                 worker_mode=WorkerMode.THREAD,
             )
 
-        # Use the realtime subset if provided, otherwise all cameras in the group.
-        # The camera group is always started with all selected cameras so their
-        # shared memory exists; we just choose which ones feed the pipeline nodes.
-        pipeline_camera_ids: list[CameraIdString] = (
-            [cid for cid in camera_group.configs.keys() if cid in realtime_camera_ids]
-            if realtime_camera_ids is not None
-            else list(camera_group.configs.keys())
+        pipeline_camera_ids = camera_ids_for_realtime_pipeline(
+            camera_group,
+            realtime_camera_ids,
         )
 
         camera_nodes = {
@@ -155,11 +157,7 @@ class RealtimePipeline:
         }
 
         skeleton_inference_node: RealtimeSkeletonInferenceNode | None = None
-        if (
-                pipeline_config.use_centralized_gpu_inference
-                and pipeline_config.camera_node_config.skeleton_tracking_enabled
-                and pipeline_config.realtime_detector_kind == "rtmpose"
-        ):
+        if needs_centralized_rtmpose(pipeline_config):
             skeleton_inference_node = RealtimeSkeletonInferenceNode.create(
                 camera_group_id=camera_group.id,
                 camera_ids=pipeline_camera_ids,
@@ -281,13 +279,6 @@ class RealtimePipeline:
         or the RTMPose-vs-browser detector selection changes.
         """
         old_cfg = self.config
-
-        def needs_centralized_rtmpose(cfg: RealtimePipelineConfig) -> bool:
-            return (
-                cfg.use_centralized_gpu_inference
-                and cfg.camera_node_config.skeleton_tracking_enabled
-                and cfg.realtime_detector_kind == "rtmpose"
-            )
 
         old_rtmpose_gpu = needs_centralized_rtmpose(old_cfg)
         new_rtmpose_gpu = needs_centralized_rtmpose(new_config)

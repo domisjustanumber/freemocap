@@ -188,6 +188,8 @@
   "rawMessage": "Raw message",
   "cameraPerformanceMetrics": "Camera Performance Metrics",
   "pipelineActions": "Pipeline actions",
+  "realtime_atLeastOneCameraRequired": "At least one camera must be selected for realtime.",
+  "realtime_restartRequired": "Pipeline settings have changed. Click to restart realtime pipeline.",
   "openPipelineMetricsWindow": "Open pipeline metrics timeline",
   "logPipelineTimes": "Log pipeline times",
   "serverLogs": "Server Logs",

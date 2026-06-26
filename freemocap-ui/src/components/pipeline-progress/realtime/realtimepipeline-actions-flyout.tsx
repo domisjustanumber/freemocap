@@ -4,8 +4,16 @@ import SubactionHeader from "@/components/ui-components/SubactionHeader";
 import IconButton from "@/components/ui-components/IconButton";
 import ButtonSm from "@/components/ui-components/ButtonSm";
 import ToggleComponent from "@/components/ui-components/ToggleComponent";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { useRealtimePipelineSync } from "@/hooks/useRealtimePipelineSync";
 import { openPipelineMetricsWindow } from "@/services/electron-ipc/open-pipeline-metrics-window";
+import {
+    closePipeline,
+    pipelineErrorDismissed,
+    selectCanConnectPipeline,
+    selectPipelineError,
+    selectRealtimePipelineRestartRequiredMessage,
+} from "@/store/slices/realtime";
 
 interface RTPPipelineActionsFlyoutProps {
     open: boolean;
@@ -17,12 +25,18 @@ const RTPPipelineActionsFlyout: React.FC<RTPPipelineActionsFlyoutProps> = ({
     onClose,
 }) => {
     const { t } = useTranslation();
+    const dispatch = useAppDispatch();
     const modalRef = useRef<HTMLDivElement>(null);
     const {
         pipelineConfig,
         applyOrUpdatePipelineConfig,
         isLoading,
+        restartPipelineWithLatestConfig,
     } = useRealtimePipelineSync();
+
+    const pipelineError = useAppSelector(selectPipelineError);
+    const restartRequiredMessage = useAppSelector(selectRealtimePipelineRestartRequiredMessage);
+    const canConnect = useAppSelector(selectCanConnectPipeline);
 
     const logPipelineTimes = pipelineConfig.log_pipeline_times !== false;
 
@@ -62,6 +76,18 @@ const RTPPipelineActionsFlyout: React.FC<RTPPipelineActionsFlyoutProps> = ({
         });
     };
 
+    const handleDismissError = (): void => {
+        dispatch(pipelineErrorDismissed());
+    };
+
+    const handleRestart = (): void => {
+        void restartPipelineWithLatestConfig();
+    };
+
+    const handleCancelTrtCompile = (): void => {
+        void dispatch(closePipeline());
+    };
+
     return (
         <div
             ref={modalRef}
@@ -72,6 +98,50 @@ const RTPPipelineActionsFlyout: React.FC<RTPPipelineActionsFlyoutProps> = ({
                     <SubactionHeader text={t("pipelineActions")} />
                     <IconButton icon="close-icon" className="button sm" onClick={onClose} />
                 </div>
+
+                {pipelineError && (
+                    <div className="realtime-pipeline-popout-error flex flex-col gap-1 p-2 br-1 border-1 border-error">
+                        <p className="text sm text-error text-wrap">{pipelineError}</p>
+                        <div className="flex flex-row gap-1">
+                            <ButtonSm
+                                text="Dismiss error"
+                                onClick={handleDismissError}
+                                className="secondary"
+                            />
+                            {canConnect && (
+                                <ButtonSm
+                                    text="Retry"
+                                    onClick={handleRestart}
+                                    className="primary"
+                                />
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {restartRequiredMessage && !pipelineError && (
+                    <div className="realtime-pipeline-popout-restart flex flex-col gap-1 p-2 br-1 border-1 border-warning">
+                        <p className="text sm text-warning text-wrap">{t("realtime_restartRequired")}</p>
+                        <ButtonSm
+                            text="Restart pipeline"
+                            onClick={handleRestart}
+                            className="primary"
+                        />
+                    </div>
+                )}
+
+                {isLoading && !pipelineError && (
+                    <div className="flex flex-col gap-1 p-2">
+                        <p className="text sm text-gray text-wrap">
+                            Initializing pipeline — first run may take 1–3 minutes for TensorRT compilation.
+                        </p>
+                        <ButtonSm
+                            text="Cancel"
+                            onClick={handleCancelTrtCompile}
+                            className="secondary"
+                        />
+                    </div>
+                )}
 
                 <ButtonSm
                     text={t("openPipelineMetricsWindow")}

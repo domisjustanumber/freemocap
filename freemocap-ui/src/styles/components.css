@@ -921,10 +921,6 @@
   filter: hue-rotate(35deg) saturate(1.8) brightness(1.05);
 }
 
-.realtime-pipeline-bolt-loading {
-  animation: realtime-bolt-spin 1s linear infinite;
-}
-
 .realtime-pipeline-bolt-wrapper {
   display: inline-flex;
   position: relative;
@@ -935,9 +931,4 @@
   inset: 0;
   margin: auto;
   pointer-events: none;
-}
-
-@keyframes realtime-bolt-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }

@@ -264,11 +264,7 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
           <div className="p-1 br-2 bg-gray live-action-buttons-group-3 flex flex-row items-center gap-1">
             <div className="realtime-pipeline-bolt-wrapper">
               <IconButton
-                icon={
-                  boltStatus === "active" || boltStatus === "loading-trt"
-                    ? "live-pipeline-active-icon"
-                    : "live-icon"
-                }
+                icon={isConnected || isPipelineLoading ? "live-pipeline-active-icon" : "live-icon"}
                 onClick={handleLiveButtonClick}
                 tooltip
                 tooltipText={liveTooltip}
@@ -279,10 +275,9 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
                   "icon-size-25 realtime-pipeline-bolt",
                   boltStatus === "error" && "realtime-pipeline-bolt-error",
                   boltStatus === "restart-required" && "realtime-pipeline-bolt-restart-required",
-                  boltStatus === "loading" && "realtime-pipeline-bolt-loading",
                 )}
               />
-              {boltStatus === "loading-trt" && (
+              {isPipelineLoading && (
                 <span
                   className="icon loader-icon icon-size-25 realtime-pipeline-bolt-loader-overlay"
                   aria-hidden

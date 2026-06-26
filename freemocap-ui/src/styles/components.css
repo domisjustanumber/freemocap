@@ -913,10 +913,6 @@
 }
 
 /* Realtime pipeline lightning-bolt status */
-.realtime-pipeline-bolt.active {
-  filter: hue-rotate(90deg) saturate(1.5);
-}
-
 .realtime-pipeline-bolt-error {
   filter: hue-rotate(-30deg) saturate(2) brightness(1.1);
 }
@@ -927,6 +923,18 @@
 
 .realtime-pipeline-bolt-loading {
   animation: realtime-bolt-spin 1s linear infinite;
+}
+
+.realtime-pipeline-bolt-wrapper {
+  display: inline-flex;
+  position: relative;
+}
+
+.realtime-pipeline-bolt-loader-overlay {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  pointer-events: none;
 }
 
 @keyframes realtime-bolt-spin {

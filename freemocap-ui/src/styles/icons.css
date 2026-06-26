@@ -117,6 +117,7 @@ Study the codebase HTML structure carefully. You will notice that whenever icons
   --filter-active-icon: url("../assets/icons/filter_active_icon.svg");
 
   --live-active-icon: url("../assets/icons/live_active_icon.svg");
+  --live-pipeline-active-icon: url("../assets/icons/live_pipeline_active_icon.svg");
   --twodtracking-active-icon: url("../assets/icons/2dtracking_active_icon.svg");
   --threedtracking-active-icon: url("../assets/icons/3dtracking_active_icon.svg");
   --triangulate-active-icon: url("../assets/icons/triangulate_active_icon.svg");
@@ -449,6 +450,9 @@ Study the codebase HTML structure carefully. You will notice that whenever icons
 }
 .live-active-icon {
   background-image: var(--live-active-icon);
+}
+.live-pipeline-active-icon {
+  background-image: var(--live-pipeline-active-icon);
 }
 .threedtracking-active-icon {
   background-image: var(--threedtracking-active-icon);

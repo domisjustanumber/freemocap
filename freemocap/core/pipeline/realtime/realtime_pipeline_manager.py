@@ -1,9 +1,11 @@
 """
 RealtimePipelineManager: lifecycle manager for long-lived realtime pipelines.
 
-At most one global realtime pipeline may be active. Apply operations are
-serialized via lifecycle_lock; slow create/start/shutdown work runs outside
-the short pipelines dict lock.
+At most one global realtime pipeline runs at a time. Responsibilities:
+  - Creating/updating the sole realtime pipeline via _apply_pipeline_config
+  - Streaming aggregated frontend payloads
+  - Recording orchestration (start/stop)
+  - Orderly shutdown
 """
 import asyncio
 import logging
@@ -16,17 +18,13 @@ from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 from skellycam.core.types.type_overloads import CameraIdString
 
 from freemocap.core.pipeline.abcs.pipeline_manager_abc import PipelineManagerABC
-from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
-from freemocap.core.pipeline.realtime.realtime_camera_selection import (
-    camera_ids_for_realtime_pipeline,
-)
+from freemocap.core.pipeline.realtime.realtime_aggregator_node import RealtimePipelineConfig
+from freemocap.core.pipeline.realtime.realtime_camera_selection import camera_ids_for_realtime_pipeline
 from freemocap.core.pipeline.realtime.realtime_pipeline import RealtimePipeline
 from freemocap.core.pipeline.realtime.realtime_pipeline_error import RealtimePipelineErrorMessage
-from freemocap.core.pipeline.realtime.realtime_pipeline_lifecycle import (
-    skeleton_session_config_changed,
-)
+from freemocap.core.pipeline.realtime.realtime_pipeline_lifecycle import skeleton_session_config_changed
 from freemocap.core.types.type_overloads import PipelineIdString, FrameNumberInt
-from freemocap.core.viz.frontend_payload import FrontendPayload, FrontendImagePacket
+from freemocap.core.viz.frontend_payload import FrontendImagePacket
 
 logger = logging.getLogger(__name__)
 
@@ -36,14 +34,13 @@ class RealtimePipelineManager(PipelineManagerABC):
     """
     Manages the lifecycle of realtime (camera-bound) pipelines.
 
-    At most one global realtime pipeline is active at a time.
+    Holds at most one global realtime pipeline. Starting a new session
+  shuts down any existing pipeline when recreate is required.
     """
 
     worker_registry: WorkerRegistry
     lock: multiprocessing.synchronize.Lock = field(default_factory=multiprocessing.Lock)
-    lifecycle_lock: multiprocessing.synchronize.Lock = field(
-        default_factory=multiprocessing.Lock,
-    )
+    lifecycle_lock: multiprocessing.synchronize.Lock = field(default_factory=multiprocessing.Lock)
     pipelines: dict[PipelineIdString, RealtimePipeline] = field(default_factory=dict)
 
     # ------------------------------------------------------------------
@@ -70,7 +67,7 @@ class RealtimePipelineManager(PipelineManagerABC):
         new_config: RealtimePipelineConfig,
     ) -> RealtimePipeline:
         with self.lock:
-            pipeline = self.pipelines[pipeline_id]  # KeyError if missing
+            pipeline = self.pipelines[pipeline_id]
             camera_group = pipeline.camera_group
             realtime_camera_ids = list(pipeline.camera_ids)
         return self._apply_pipeline_config(
@@ -78,6 +75,40 @@ class RealtimePipelineManager(PipelineManagerABC):
             pipeline_config=new_config,
             realtime_camera_ids=realtime_camera_ids,
         )
+
+    def get_pipeline(self) -> RealtimePipeline | None:
+        with self.lock:
+            return self._get_realtime_pipeline()
+
+    def has_active_realtime_pipeline(self) -> bool:
+        """True when a sole alive pipeline is registered (realtime streaming path)."""
+        with self.lock:
+            pipeline = self._get_realtime_pipeline()
+        return pipeline is not None and pipeline.alive
+
+    def _get_realtime_pipeline(self) -> RealtimePipeline | None:
+        if len(self.pipelines) > 1:
+            logger.warning(
+                "Multiple realtime pipelines detected during read; awaiting apply cleanup"
+            )
+            return None
+        return next(iter(self.pipelines.values()), None)
+
+    def _snapshot_and_clear_duplicate_pipelines(
+        self,
+    ) -> tuple[RealtimePipeline | None, list[RealtimePipeline]]:
+        """Return the sole pipeline, or remove legacy duplicates and return them for shutdown."""
+        if not self.pipelines:
+            return None, []
+        if len(self.pipelines) == 1:
+            return next(iter(self.pipelines.values())), []
+        logger.warning(
+            "Multiple realtime pipelines (%d) — shutting down all",
+            len(self.pipelines),
+        )
+        duplicates = list(self.pipelines.values())
+        self.pipelines.clear()
+        return None, duplicates
 
     def _apply_pipeline_config(
         self,
@@ -90,7 +121,7 @@ class RealtimePipelineManager(PipelineManagerABC):
         with self.lifecycle_lock:
             ordered_ids = camera_ids_for_realtime_pipeline(camera_group, realtime_camera_ids)
             desired_cameras = set(ordered_ids)
-            if len(ordered_ids) < 1:
+            if len(desired_cameras) < 1:
                 raise ValueError("At least one realtime camera is required")
 
             with self.lock:
@@ -131,35 +162,10 @@ class RealtimePipelineManager(PipelineManagerABC):
                 return pipeline
 
             existing.update_config(pipeline_config)
-            return existing
-
-    def _snapshot_and_clear_duplicate_pipelines(
-        self,
-    ) -> tuple[RealtimePipeline | None, list[RealtimePipeline]]:
-        """Return the sole pipeline, or remove legacy duplicates and return them for shutdown."""
-        if not self.pipelines:
-            return None, []
-        if len(self.pipelines) == 1:
-            return next(iter(self.pipelines.values())), []
-        logger.warning(
-            "Multiple realtime pipelines (%d) — shutting down all",
-            len(self.pipelines),
-        )
-        duplicates = list(self.pipelines.values())
-        self.pipelines.clear()
-        return None, duplicates
-
-    def _get_realtime_pipeline(self) -> RealtimePipeline | None:
-        if len(self.pipelines) > 1:
-            logger.warning(
-                "Multiple realtime pipelines detected during read; awaiting apply cleanup",
+            logger.info(
+                f"Updated RealtimePipeline [{existing.id}] config via pubsub"
             )
-            return None
-        return next(iter(self.pipelines.values()), None)
-
-    def get_pipeline(self) -> RealtimePipeline | None:
-        with self.lock:
-            return self._get_realtime_pipeline()
+            return existing
 
     # ------------------------------------------------------------------
     # Frontend payload streaming
@@ -181,28 +187,21 @@ class RealtimePipelineManager(PipelineManagerABC):
             self,
             if_newer_than: FrameNumberInt,
     ) -> list[FrontendImagePacket]:
-        latest: list[FrontendImagePacket] = []
         with self.lock:
             pipeline = self._get_realtime_pipeline()
-            if pipeline is None:
-                return latest
-            packet = pipeline.get_latest_frontend_payload(if_newer_than=if_newer_than)
-            if packet is not None:
-                latest.append(packet)
-        return latest
-
-    def has_alive_pipeline(self) -> bool:
-        with self.lock:
-            pipeline = self._get_realtime_pipeline()
-            return pipeline is not None and pipeline.alive
+        if pipeline is None:
+            return []
+        packet = pipeline.get_latest_frontend_payload(if_newer_than=if_newer_than)
+        if packet is not None:
+            return [packet]
+        return []
 
     def get_realtime_error_updates(self) -> list[RealtimePipelineErrorMessage]:
-        errors: list[RealtimePipelineErrorMessage] = []
         with self.lock:
             pipeline = self._get_realtime_pipeline()
-            if pipeline is not None:
-                errors.extend(pipeline.drain_pipeline_errors())
-        return errors
+        if pipeline is None:
+            return []
+        return pipeline.drain_pipeline_errors()
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -210,8 +209,9 @@ class RealtimePipelineManager(PipelineManagerABC):
 
     def pause_unpause_all(self) -> None:
         with self.lock:
-            for pipeline in self.pipelines.values():
-                pipeline.camera_group.pause_unpause()
+            pipeline = self._get_realtime_pipeline()
+        if pipeline is not None:
+            pipeline.camera_group.pause_unpause()
 
     def shutdown(self) -> None:
         with self.lifecycle_lock:

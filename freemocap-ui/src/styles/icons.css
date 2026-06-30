@@ -451,6 +451,19 @@ Study the codebase HTML structure carefully. You will notice that whenever icons
 .live-active-icon {
   background-image: var(--live-active-icon);
 }
+.live-bolt-error {
+  filter: hue-rotate(-50deg) saturate(2);
+}
+.live-bolt-restart-required {
+  filter: hue-rotate(30deg) saturate(1.5);
+}
+.live-bolt-loading {
+  animation: live-bolt-spin 1.2s linear infinite;
+}
+@keyframes live-bolt-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 .live-pipeline-active-icon {
   background-image: var(--live-pipeline-active-icon);
 }

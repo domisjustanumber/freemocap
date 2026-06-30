@@ -1,10 +1,10 @@
 import {useEffect} from 'react';
-import {store} from '@/store';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
+import {store} from '@/store/store';
 import {
-    markRealtimePipelineRestartRequired,
     pipelineConfigUpdated,
     REALTIME_RESTART_REQUIRED_MESSAGE,
+    realtimePipelineRestartRequired,
     selectIsPipelineConnected,
     selectPipelineConfig,
 } from '@/store/slices/realtime';
@@ -51,7 +51,7 @@ export function useRealtimePipelineBroadcastPublisher(enabled = true): void {
                 ...current,
                 log_pipeline_times: message.enabled,
             }));
-            markRealtimePipelineRestartRequired(dispatch, REALTIME_RESTART_REQUIRED_MESSAGE);
+            dispatch(realtimePipelineRestartRequired({message: REALTIME_RESTART_REQUIRED_MESSAGE}));
         });
     }, [dispatch, enabled, isConnected, logPipelineTimes]);
 }

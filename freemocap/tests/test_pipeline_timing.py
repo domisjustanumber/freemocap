@@ -181,7 +181,7 @@ class TestWebsocketPipelineTimingPayload:
             "cam_0": SimpleNamespace(framerate=30.0),
             "cam_1": SimpleNamespace(framerate=20.0),
         }
-        mock_app.get_pipeline.return_value = pipeline
+        mock_app.get_realtime_pipeline.return_value = pipeline
         sub = Queue()
         sub.put_nowait(
             PipelineTimingMessage(
@@ -255,7 +255,7 @@ class TestWebsocketPipelineTimingPayload:
 
     def test_metrics_only_sends_inactive_status_without_pipeline(self) -> None:
         server = self._make_server(metrics_only=True)
-        server._app.get_pipeline.return_value = None
+        server._app.get_realtime_pipeline.return_value = None
         server._app.get_pipeline_timing_subscription.return_value = Queue()
         payload = server._build_pipeline_timing_payload("group_a")
         assert payload is not None

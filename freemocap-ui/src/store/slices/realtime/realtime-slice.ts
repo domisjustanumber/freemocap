@@ -82,24 +82,6 @@ export const realtimeSlice = createSlice({
                 state.gpuCapabilitiesError = action.error.message || 'Failed to fetch GPU capabilities';
             })
 
-            .addCase(realtimeApplyBlocked, (state, action) => {
-                state.realtimeApplyBlockedMessage = action.payload.message;
-            })
-            .addCase(realtimeApplyBlockedDismissed, (state) => {
-                state.realtimeApplyBlockedMessage = null;
-            })
-            .addCase(pipelineErrorDismissed, (state) => {
-                state.error = null;
-            })
-            .addCase(realtimePipelineRestartRequired, (state, action) => {
-                state.restartRequired = true;
-                state.restartRequiredMessage = action.payload.message;
-            })
-            .addCase(realtimePipelineRestartRequiredDismissed, (state) => {
-                state.restartRequired = false;
-                state.restartRequiredMessage = null;
-            })
-
             .addCase(applyRealtimePipeline.pending, (state, action) => {
                 state.latestApplyRequestId = action.meta.requestId;
                 state.isLoading = true;
@@ -163,6 +145,24 @@ export const realtimeSlice = createSlice({
             .addCase(closePipeline.rejected, (state, action) => {
                 state.isLoading = false;
                 state.error = action.error.message || 'Failed to close pipeline';
+            })
+
+            .addCase(realtimeApplyBlocked, (state, action) => {
+                state.realtimeApplyBlockedMessage = action.payload.message;
+            })
+            .addCase(realtimeApplyBlockedDismissed, (state) => {
+                state.realtimeApplyBlockedMessage = null;
+            })
+            .addCase(pipelineErrorDismissed, (state) => {
+                state.error = null;
+            })
+            .addCase(realtimePipelineRestartRequired, (state, action) => {
+                state.restartRequired = true;
+                state.restartRequiredMessage = action.payload.message;
+            })
+            .addCase(realtimePipelineRestartRequiredDismissed, (state) => {
+                state.restartRequired = false;
+                state.restartRequiredMessage = null;
             });
     },
 });
@@ -173,6 +173,3 @@ export const {
     executionProviderCleared,
     realtimePipelineErrorReceived,
 } = realtimeSlice.actions;
-
-// Back-compat alias
-export const activeExecutionProviderCleared = executionProviderCleared;

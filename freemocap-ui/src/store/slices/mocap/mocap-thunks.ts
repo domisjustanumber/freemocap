@@ -1,5 +1,5 @@
 import {createAsyncThunk} from "@reduxjs/toolkit";
-import {RootState} from "@/store";
+import {RootState} from "@/store/types";
 import {selectMocapRecordingPath} from "./mocap-slice";
 import {getDetailedErrorMessage} from "@/store/slices/thunk-helpers";
 import {serverUrls} from "@/services";

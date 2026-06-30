@@ -15,6 +15,7 @@ import { fetchAllRecordings } from "@/store/slices/recording-status/recording-st
 import { WelcomeModal } from "@/components/ui-components/WelcomeModal";
 import PipelineMetricsWindowPage from "@/components/pipeline-metrics/PipelineMetricsWindowPage";
 import {useRealtimePipelineBroadcastPublisher} from "@/hooks/useRealtimePipelineBroadcastPublisher";
+import {RealtimeApplyBlockedToast} from "@/components/realtime/RealtimeApplyBlockedToast";
 
 type AppContentProps = {
     metricsOnly?: boolean;
@@ -72,6 +73,7 @@ export const AppContent = function ({ metricsOnly = false}: AppContentProps) {
                     <WelcomeModal open={welcomeOpen} onClose={() => setWelcomeOpen(false)} />
                 </PlaybackProvider>
                 <UpdateBanner />
+                <RealtimeApplyBlockedToast />
                 <PipelineProgressSnackbar />
             </AutoUpdateProvider>
         </HashRouter>

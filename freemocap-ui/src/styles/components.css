@@ -911,24 +911,3 @@
 
 
 }
-
-/* Realtime pipeline lightning-bolt status */
-.realtime-pipeline-bolt-error {
-  filter: hue-rotate(-30deg) saturate(2) brightness(1.1);
-}
-
-.realtime-pipeline-bolt-restart-required {
-  filter: hue-rotate(35deg) saturate(1.8) brightness(1.05);
-}
-
-.realtime-pipeline-bolt-wrapper {
-  display: inline-flex;
-  position: relative;
-}
-
-.realtime-pipeline-bolt-loader-overlay {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  pointer-events: none;
-}

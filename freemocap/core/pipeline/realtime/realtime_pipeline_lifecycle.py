@@ -1,4 +1,4 @@
-"""Pure restart decisions for the global realtime pipeline manager."""
+"""Pure restart decisions for the global realtime pipeline."""
 
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
 

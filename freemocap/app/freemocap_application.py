@@ -9,11 +9,10 @@ from multiprocessing.sharedctypes import Synchronized
 
 from fastapi import FastAPI
 from skellycam.core.camera.config.camera_config import CameraConfigs
-from skellycam.core.camera_group.camera_group import CameraGroup
 from skellycam.core.camera_group.camera_group_manager import CameraGroupManager, get_or_create_camera_group_manager
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
-from skellycam.core.types.type_overloads import CameraIdString, TopicSubscriptionQueue
+from skellycam.core.types.type_overloads import CameraGroupIdString, CameraIdString, TopicSubscriptionQueue
 
 from freemocap.core.pipeline.posthoc.posthoc_pipeline import PosthocPipeline
 from freemocap.core.pipeline.posthoc.posthoc_pipeline_manager import PosthocPipelineManager
@@ -89,13 +88,10 @@ class FreemocapApplication:
             camera_configs: CameraConfigs,
             pipeline_config: RealtimePipelineConfig,
             realtime_camera_ids: list[CameraIdString] | None = None,
-            *,
-            camera_group: CameraGroup | None = None,
     ) -> RealtimePipeline:
-        if camera_group is None:
-            camera_group = await self.camera_group_manager.create_or_update_camera_group(
-                camera_configs=camera_configs,
-            )
+        camera_group = await self.camera_group_manager.create_or_update_camera_group(
+            camera_configs=camera_configs,
+        )
         return self.realtime_pipeline_manager.create_pipeline(
             camera_group=camera_group,
             pipeline_config=pipeline_config,
@@ -154,28 +150,26 @@ class FreemocapApplication:
         posthoc_progress.extend(self.posthoc_pipeline_manager.evict_completed())
         realtime_errors = self.realtime_pipeline_manager.get_realtime_error_updates()
 
-        if not self.realtime_pipeline_manager.has_alive_pipeline():
-            # Camera-only / posthoc-only path
-            results: list[FrontendImagePacket] = []
-            for cg_id, payload in self.camera_group_manager.get_latest_frontend_payloads(
-                    if_newer_than=if_newer_than
-            ).items():
-                frame_number, mf_timestamp, image_bytes = payload  # unpack the known tuple shape
-                results.append(FrontendImagePacket(
-                    images_bytearray=image_bytes,
-                    multiframe_timestamp=mf_timestamp,
-                    frontend_payload=FrontendPayload(camera_group_id=cg_id, frame_number=frame_number),
-                ))
-            return results, posthoc_progress, realtime_errors
+        if self.realtime_pipeline_manager.has_active_realtime_pipeline():
+            realtime_pipeline_packets = self.realtime_pipeline_manager.get_latest_frontend_payloads(
+                if_newer_than=if_newer_than
+            )
+            return realtime_pipeline_packets, posthoc_progress, realtime_errors
 
-        # Realtime pipeline path — delegate to manager, which also returns FrontendImagePacket
-        realtime_pipeline_packets = self.realtime_pipeline_manager.get_latest_frontend_payloads(
-            if_newer_than=if_newer_than
-        )
+        # Camera-only / posthoc-only path
+        results: list[FrontendImagePacket] = []
+        for cg_id, payload in self.camera_group_manager.get_latest_frontend_payloads(
+                if_newer_than=if_newer_than
+        ).items():
+            frame_number, mf_timestamp, image_bytes = payload  # unpack the known tuple shape
+            results.append(FrontendImagePacket(
+                images_bytearray=image_bytes,
+                multiframe_timestamp=mf_timestamp,
+                frontend_payload=FrontendPayload(camera_group_id=cg_id, frame_number=frame_number),
+            ))
+        return results, posthoc_progress, realtime_errors
 
-        return realtime_pipeline_packets, posthoc_progress, realtime_errors
-
-    def get_pipeline(self) -> RealtimePipeline | None:
+    def get_realtime_pipeline(self) -> RealtimePipeline | None:
         return self.realtime_pipeline_manager.get_pipeline()
 
     def publish_client_skeleton_inference(
@@ -184,7 +178,7 @@ class FreemocapApplication:
         message: SkeletonInferenceResultMessage,
     ) -> bool:
         """Inject browser MediaPipe landmarks into the realtime pub/sub graph."""
-        pipeline = self.get_pipeline()
+        pipeline = self.get_realtime_pipeline()
         if pipeline is None or not pipeline.alive:
             return False
         pipeline.pubsub.publish(SkeletonInferenceResultTopic, message)
@@ -194,7 +188,7 @@ class FreemocapApplication:
         self,
     ) -> TopicSubscriptionQueue | None:
         """Fan-out queue for `PipelineTimingTopic` for the realtime pipeline, if any."""
-        pipeline = self.get_pipeline()
+        pipeline = self.get_realtime_pipeline()
         return pipeline.pipeline_timing_subscription if pipeline else None
 
     # ------------------------------------------------------------------

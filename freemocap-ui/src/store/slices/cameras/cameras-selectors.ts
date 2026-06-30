@@ -1,6 +1,6 @@
 // cameras-selectors.ts
 import {createSelector} from '@reduxjs/toolkit';
-import {RootState} from '../../types';
+import type {RootState} from '../../types';
 import {CameraConfig} from './cameras-types';
 
 // ========== Basic Selectors ==========
@@ -56,14 +56,6 @@ export const selectRealtimeEnabledCameraConfigs = createSelector(
     }
 );
 
-export const selectIsLastRealtimePipelineCamera = createSelector(
-    [selectCameras, (_: RootState, cameraId: string) => cameraId],
-    (cameras, cameraId) => {
-        const pipelineCameras = cameras.filter((c) => c.selected && c.realtimeEnabled);
-        return pipelineCameras.length === 1 && pipelineCameras[0].id === cameraId;
-    },
-);
-
 // Get actual configs for all cameras
 export const selectActualCameraConfigs = createSelector(
     [selectCameras],
@@ -87,6 +79,14 @@ export const selectCamerasWithConfigMismatch = createSelector(
 export const selectHasAnyConfigMismatch = createSelector(
     [selectCamerasWithConfigMismatch],
     (camerasWithMismatch) => camerasWithMismatch.length > 0
+);
+
+export const selectIsLastRealtimePipelineCamera = createSelector(
+    [selectCameras, (_: RootState, cameraId: string) => cameraId],
+    (cameras, cameraId) => {
+        const pipelineCameras = cameras.filter((c) => c.selected && c.realtimeEnabled);
+        return pipelineCameras.length === 1 && pipelineCameras[0].id === cameraId;
+    },
 );
 
 export const selectCameraHasConfigMismatch = createSelector(

@@ -11,6 +11,7 @@ import {
     closePipeline,
     pipelineErrorDismissed,
     selectCanConnectPipeline,
+    selectIsPipelineConnected,
     selectPipelineError,
     selectRealtimePipelineRestartRequiredMessage,
 } from "@/store/slices/realtime";
@@ -31,12 +32,14 @@ const RTPPipelineActionsFlyout: React.FC<RTPPipelineActionsFlyoutProps> = ({
         pipelineConfig,
         applyOrUpdatePipelineConfig,
         isLoading,
-        restartPipelineWithLatestConfig,
+        restartPipeline,
     } = useRealtimePipelineSync();
-
     const pipelineError = useAppSelector(selectPipelineError);
+    const isConnected = useAppSelector(selectIsPipelineConnected);
     const restartRequiredMessage = useAppSelector(selectRealtimePipelineRestartRequiredMessage);
     const canConnect = useAppSelector(selectCanConnectPipeline);
+
+    const isTrtCompiling = isLoading && !isConnected;
 
     const logPipelineTimes = pipelineConfig.log_pipeline_times !== false;
 
@@ -76,18 +79,6 @@ const RTPPipelineActionsFlyout: React.FC<RTPPipelineActionsFlyoutProps> = ({
         });
     };
 
-    const handleDismissError = (): void => {
-        dispatch(pipelineErrorDismissed());
-    };
-
-    const handleRestart = (): void => {
-        void restartPipelineWithLatestConfig();
-    };
-
-    const handleCancelTrtCompile = (): void => {
-        void dispatch(closePipeline());
-    };
-
     return (
         <div
             ref={modalRef}
@@ -99,46 +90,53 @@ const RTPPipelineActionsFlyout: React.FC<RTPPipelineActionsFlyoutProps> = ({
                     <IconButton icon="close-icon" className="button sm" onClick={onClose} />
                 </div>
 
-                {pipelineError && (
-                    <div className="realtime-pipeline-popout-error flex flex-col gap-1 p-2 br-1 border-1 border-error">
-                        <p className="text sm text-error text-wrap">{pipelineError}</p>
-                        <div className="flex flex-row gap-1">
-                            <ButtonSm
-                                text="Dismiss error"
-                                onClick={handleDismissError}
-                                className="secondary"
-                            />
-                            {canConnect && (
-                                <ButtonSm
-                                    text="Retry"
-                                    onClick={handleRestart}
-                                    className="primary"
-                                />
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {restartRequiredMessage && !pipelineError && (
-                    <div className="realtime-pipeline-popout-restart flex flex-col gap-1 p-2 br-1 border-1 border-warning">
-                        <p className="text sm text-warning text-wrap">{t("realtime_restartRequired")}</p>
-                        <ButtonSm
-                            text="Restart pipeline"
-                            onClick={handleRestart}
-                            className="primary"
-                        />
-                    </div>
-                )}
-
-                {isLoading && !pipelineError && (
-                    <div className="flex flex-col gap-1 p-2">
-                        <p className="text sm text-gray text-wrap">
+                {isTrtCompiling && !pipelineError && (
+                    <div className="flex flex-col gap-1 p-1 pipeline-trt-compiling-message">
+                        <p className="text sm text-wrap">
                             Initializing pipeline — first run may take 1–3 minutes for TensorRT compilation.
                         </p>
                         <ButtonSm
                             text="Cancel"
-                            onClick={handleCancelTrtCompile}
-                            className="secondary"
+                            onClick={() => {
+                                void dispatch(closePipeline());
+                                onClose();
+                            }}
+                            className="secondary w-full"
+                        />
+                    </div>
+                )}
+
+                {pipelineError && (
+                    <div className="flex flex-col gap-1 p-1 pipeline-error-message">
+                        <p className="text sm text-error text-wrap">{pipelineError}</p>
+                        <ButtonSm
+                            text="Dismiss error"
+                            onClick={() => dispatch(pipelineErrorDismissed())}
+                            className="secondary w-full"
+                        />
+                        {canConnect && (
+                            <ButtonSm
+                                text="Retry"
+                                onClick={() => {
+                                    void restartPipeline();
+                                    onClose();
+                                }}
+                                className="primary w-full"
+                            />
+                        )}
+                    </div>
+                )}
+
+                {restartRequiredMessage && !pipelineError && (
+                    <div className="flex flex-col gap-1 p-1 pipeline-restart-required-message">
+                        <p className="text sm text-warning text-wrap">{t("realtime_restartRequired")}</p>
+                        <ButtonSm
+                            text="Restart pipeline"
+                            onClick={() => {
+                                void restartPipeline();
+                                onClose();
+                            }}
+                            className="primary w-full"
                         />
                     </div>
                 )}

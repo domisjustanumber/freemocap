@@ -1,5 +1,5 @@
 import {createAsyncThunk} from "@reduxjs/toolkit";
-import {RootState} from "@/store";
+import {RootState} from "@/store/types";
 import {selectCalibrationRecordingPath} from "./calibration-slice";
 import {getDetailedErrorMessage} from "@/store/slices/thunk-helpers";
 import {serverUrls} from "@/services";

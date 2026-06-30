@@ -1,31 +1,34 @@
 import type {AppDispatch, RootState} from '@/store/types';
 import {applyRealtimePipeline} from './realtime-thunks';
 import {guardRealtimeApply} from './guardRealtimeApply';
-import {realtimePipelineRestartRequired} from './realtime-notify-actions';
 import {selectPipelineConfig} from './realtime-selectors';
 import type {RealtimePipelineConfig} from './realtime-types';
-import {
-    cancelQueuedRealtimeApply,
-    consumeReconcileAfterStaleResponse,
-    getCoordinatorInFlight,
-    getCurrentInFlightRequestId,
-    peekQueuedUpdate,
-    requestRealtimeApplyReconciliation,
-    resetCoordinatorForTesting,
-    setCoordinatorInFlight,
-    setCurrentInFlightRequestId,
-    setQueuedUpdate,
-    takeQueuedUpdate,
-    type RealtimePipelineConfigUpdate,
-} from './realtime-apply-coordinator-state';
 
-export type {RealtimePipelineConfigUpdate};
-export {
-    cancelQueuedRealtimeApply,
-    getCurrentInFlightRequestId,
-    requestRealtimeApplyReconciliation,
-    resetCoordinatorForTesting,
-};
+export type RealtimePipelineConfigUpdate =
+    | RealtimePipelineConfig
+    | ((current: RealtimePipelineConfig) => RealtimePipelineConfig);
+
+let inFlight: Promise<unknown> | null = null;
+let currentInFlightRequestId: string | null = null;
+let queuedUpdate: RealtimePipelineConfigUpdate | null = null;
+let reconcileAfterStaleResponse = false;
+
+export function getCurrentInFlightRequestId(): string | null {
+    return currentInFlightRequestId;
+}
+
+export function resetCoordinatorForTesting(): void {
+    inFlight = null;
+    currentInFlightRequestId = null;
+    queuedUpdate = null;
+    reconcileAfterStaleResponse = false;
+}
+
+if (import.meta.hot) {
+    import.meta.hot.dispose(() => {
+        resetCoordinatorForTesting();
+    });
+}
 
 function resolveConfig(
     getState: () => RootState,
@@ -41,8 +44,8 @@ export function requestCoordinatedRealtimeApply(
     update: RealtimePipelineConfigUpdate = () => selectPipelineConfig(getState()),
 ): void {
     if (!guardRealtimeApply(dispatch, getState)) return;
-    setQueuedUpdate(update);
-    if (getCoordinatorInFlight()) return;
+    queuedUpdate = update;
+    if (inFlight) return;
     void drainRealtimeApplyQueue(dispatch, getState);
 }
 
@@ -50,26 +53,31 @@ async function drainRealtimeApplyQueue(
     dispatch: AppDispatch,
     getState: () => RootState,
 ): Promise<void> {
-    while (peekQueuedUpdate()) {
-        const update = takeQueuedUpdate();
-        if (!update) break;
+    while (queuedUpdate) {
+        const update = queuedUpdate;
+        queuedUpdate = null;
         const config = resolveConfig(getState, update);
         const thunkAction = dispatch(applyRealtimePipeline(config));
-        setCurrentInFlightRequestId(thunkAction.requestId);
-        setCoordinatorInFlight(thunkAction);
-        await thunkAction;
-        setCoordinatorInFlight(null);
-        setCurrentInFlightRequestId(null);
+        currentInFlightRequestId = thunkAction.requestId;
+        inFlight = thunkAction;
+        const action = await inFlight;
+        inFlight = null;
+        currentInFlightRequestId = null;
 
-        if (consumeReconcileAfterStaleResponse()) {
-            setQueuedUpdate(() => selectPipelineConfig(getState()));
+        if (reconcileAfterStaleResponse) {
+            reconcileAfterStaleResponse = false;
+            queuedUpdate = () => selectPipelineConfig(getState());
         }
+
+        void action;
     }
 }
 
-export function markRealtimePipelineRestartRequired(
-    dispatch: AppDispatch,
-    message: string,
-): void {
-    dispatch(realtimePipelineRestartRequired({message}));
+export function cancelQueuedRealtimeApply(): void {
+    queuedUpdate = null;
+    reconcileAfterStaleResponse = false;
+}
+
+export function requestRealtimeApplyReconciliation(): void {
+    reconcileAfterStaleResponse = true;
 }

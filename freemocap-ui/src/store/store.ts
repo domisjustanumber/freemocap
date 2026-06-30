@@ -5,7 +5,7 @@ import {realtimeApplyListenerMiddleware} from "@/store/realtime-apply-listener";
 import {cameraSlice} from "@/store/slices/cameras";
 import {recordingSlice} from "@/store/slices/recording";
 import {videosSlice} from "@/store/slices/videos";
-import {realtimeSlice} from "@/store/slices/realtime/realtime-slice";
+import {realtimeSlice} from "@/store/slices/realtime";
 import {calibrationSlice} from "@/store/slices/calibration/calibration-slice";
 import {mocapSlice} from "@/store/slices/mocap/mocap-slice";
 import {localeSlice} from "@/store/slices/locale";

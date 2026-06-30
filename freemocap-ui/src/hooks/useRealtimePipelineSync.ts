@@ -1,13 +1,13 @@
 import {useCallback} from 'react';
-import {store} from '@/store';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
+import {store} from '@/store/store';
 import {
     cancelQueuedRealtimeApply,
     cancelScheduledRealtimeCameraApply,
     closePipeline,
-    markRealtimePipelineRestartRequired,
     pipelineConfigUpdated,
     REALTIME_RESTART_REQUIRED_MESSAGE,
+    realtimePipelineRestartRequired,
     requestCoordinatedRealtimeApply,
     selectAggregatorConfig,
     selectCameraNodeConfig,
@@ -48,45 +48,40 @@ export function useRealtimePipelineSync() {
             const newConfig = resolveRealtimeConfigUpdate(update);
             dispatch(pipelineConfigUpdated(newConfig));
             if (selectIsPipelineConnected(store.getState())) {
-                markRealtimePipelineRestartRequired(dispatch, REALTIME_RESTART_REQUIRED_MESSAGE);
+                dispatch(realtimePipelineRestartRequired({message: REALTIME_RESTART_REQUIRED_MESSAGE}));
             }
         },
         [dispatch],
     );
 
     const triggerRealtimeApply = useCallback(() => {
-        if (!selectIsPipelineConnected(store.getState())) return;
-        markRealtimePipelineRestartRequired(dispatch, REALTIME_RESTART_REQUIRED_MESSAGE);
-    }, [dispatch]);
-
-    const restartPipelineWithLatestConfig = useCallback(async () => {
+        if (selectIsPipelineConnected(store.getState())) {
+            dispatch(realtimePipelineRestartRequired({message: REALTIME_RESTART_REQUIRED_MESSAGE}));
+            return;
+        }
         cancelScheduledRealtimeCameraApply();
         cancelQueuedRealtimeApply();
-        await dispatch(closePipeline());
-        const getState = () => store.getState();
-        requestCoordinatedRealtimeApply(
-            dispatch,
-            getState,
-            () => selectPipelineConfig(getState()),
-        );
+        requestCoordinatedRealtimeApply(dispatch, () => store.getState());
     }, [dispatch]);
 
     const toggleConnection = useCallback(async () => {
         if (selectIsPipelineLoading(store.getState())) return;
+        cancelScheduledRealtimeCameraApply();
+        cancelQueuedRealtimeApply();
         if (selectIsPipelineConnected(store.getState())) {
-            cancelScheduledRealtimeCameraApply();
-            cancelQueuedRealtimeApply();
             await dispatch(closePipeline());
         } else {
-            cancelScheduledRealtimeCameraApply();
-            cancelQueuedRealtimeApply();
-            const getState = () => store.getState();
-            requestCoordinatedRealtimeApply(
-                dispatch,
-                getState,
-                () => selectPipelineConfig(getState()),
-            );
+            requestCoordinatedRealtimeApply(dispatch, () => store.getState());
         }
+    }, [dispatch]);
+
+    const restartPipeline = useCallback(async () => {
+        cancelScheduledRealtimeCameraApply();
+        cancelQueuedRealtimeApply();
+        if (selectIsPipelineConnected(store.getState())) {
+            await dispatch(closePipeline());
+        }
+        requestCoordinatedRealtimeApply(dispatch, () => store.getState());
     }, [dispatch]);
 
     return {
@@ -100,6 +95,6 @@ export function useRealtimePipelineSync() {
         applyOrUpdatePipelineConfig,
         triggerRealtimeApply,
         toggleConnection,
-        restartPipelineWithLatestConfig,
+        restartPipeline,
     };
 }

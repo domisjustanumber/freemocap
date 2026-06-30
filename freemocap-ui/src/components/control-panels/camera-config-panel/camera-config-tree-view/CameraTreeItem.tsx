@@ -1,17 +1,14 @@
 import React, { useRef, useState } from "react";
 import clsx from "clsx";
 import { useTranslation } from "react-i18next";
-import { store } from "@/store";
 
 import { CameraSettingsModal } from "./CameraSettingsModal";
 import { ROTATION_DEGREE_LABELS, RotationValue, useAppDispatch } from "@/store";
+import { store } from "@/store/store";
 import {
   cameraRealtimeToggled,
   cameraSelectionToggled,
 } from "@/store/slices/cameras/cameras-slice";
-import { Camera } from "@/store/slices/cameras/cameras-types";
-import Checkbox from "@/components/ui-components/Checkbox";
-import IconButton from "@/components/ui-components/IconButton";
 import {
   REALTIME_AT_LEAST_ONE_CAMERA_MESSAGE,
   realtimeApplyBlocked,
@@ -19,6 +16,9 @@ import {
   selectIsLastRealtimePipelineCamera,
   selectIsPipelineConnected,
 } from "@/store/slices/realtime";
+import { Camera } from "@/store/slices/cameras/cameras-types";
+import Checkbox from "@/components/ui-components/Checkbox";
+import IconButton from "@/components/ui-components/IconButton";
 
 interface CameraTreeItemProps {
   camera: Camera;

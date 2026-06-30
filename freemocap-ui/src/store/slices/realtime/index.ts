@@ -6,7 +6,6 @@ export * from './realtime-messages';
 export * from './realtime-notify-actions';
 export * from './realtime-apply-camera-count';
 export * from './guardRealtimeApply';
-export * from './realtime-apply-coordinator-state';
 export * from './realtime-apply-coordinator';
 export * from './realtime-camera-apply-scheduler';
 export * from './formatApplyErrorDetail';

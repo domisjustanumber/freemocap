@@ -183,7 +183,7 @@ class WebsocketServer:
         else:
             preview_by_cam = {}
             multiframe_preview = {}
-        pipeline = self._app.get_pipeline()
+        pipeline = self._app.get_realtime_pipeline()
         want_pubsub_timing = (
             pipeline is not None and pipeline.config.log_pipeline_times
         )

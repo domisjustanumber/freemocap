@@ -1,15 +1,13 @@
 import {createAsyncThunk} from '@reduxjs/toolkit';
 import type {AppDispatch, RootState} from '@/store/types';
 import {selectRealtimeEnabledCameraConfigs, selectSelectedCameraConfigs} from '@/store/slices/cameras/cameras-selectors';
-import {serverUrls} from '@/constants/server-urls';
+import {serverUrls} from '@/services';
 import {GpuCapabilitiesResponse} from '@/types/gpu-capabilities';
 import {PipelineApplyResponse, RealtimePipelineConfig} from '@/store/slices/realtime/realtime-types';
 import {guardRealtimeApply} from '@/store/slices/realtime/guardRealtimeApply';
 import {countRealtimeApplyCameras} from '@/store/slices/realtime/realtime-apply-camera-count';
-import {formatApplyErrorDetail} from '@/store/slices/realtime/formatApplyErrorDetail';
 import {REALTIME_AT_LEAST_ONE_CAMERA_MESSAGE} from '@/store/slices/realtime/realtime-messages';
-import {cancelQueuedRealtimeApply} from '@/store/slices/realtime/realtime-apply-coordinator-state';
-import {cancelScheduledRealtimeCameraApply} from '@/store/slices/realtime/realtime-camera-apply-scheduler';
+import {formatApplyErrorDetail} from '@/store/slices/realtime/formatApplyErrorDetail';
 
 export const fetchGpuCapabilities = createAsyncThunk<
     GpuCapabilitiesResponse,
@@ -39,7 +37,7 @@ export const applyRealtimePipeline = createAsyncThunk<
         const state = getState();
         const cameraConfigs = selectSelectedCameraConfigs(state);
         const realtimeCameraIds = Object.keys(selectRealtimeEnabledCameraConfigs(state));
-        const calibrationConfig = state.calibration.config;
+        const calibrationConfig = getState().calibration;
         const recommended =
             state.realtime.gpuCapabilities?.execution_providers.recommended_provider_id;
 
@@ -84,7 +82,7 @@ export const applyRealtimePipeline = createAsyncThunk<
             return rejectWithValue(formatApplyErrorDetail(body, response.status));
         }
 
-        return (await response.json()) as PipelineApplyResponse;
+        return response.json() as Promise<PipelineApplyResponse>;
     },
     {
         condition: (_, {getState}) => countRealtimeApplyCameras(getState()) > 0,
@@ -94,8 +92,6 @@ export const applyRealtimePipeline = createAsyncThunk<
 export const closePipeline = createAsyncThunk<void, void, { state: RootState }>(
     'realtime/close',
     async () => {
-        cancelQueuedRealtimeApply();
-        cancelScheduledRealtimeCameraApply();
         const response = await fetch(serverUrls.endpoints.realtimeClose, {
             method: 'DELETE',
         });

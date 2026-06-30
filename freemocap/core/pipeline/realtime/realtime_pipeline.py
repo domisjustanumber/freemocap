@@ -28,13 +28,9 @@ from skellycam.core.types.type_overloads import CameraIdString, CameraGroupIdStr
 from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC
 from freemocap.core.pipeline.realtime.camera_node import CameraNode
 from freemocap.core.pipeline.realtime.realtime_aggregator_node import RealtimeAggregatorNode
-from freemocap.core.pipeline.realtime.realtime_camera_selection import (
-    camera_ids_for_realtime_pipeline,
-)
+from freemocap.core.pipeline.realtime.realtime_camera_selection import camera_ids_for_realtime_pipeline
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
-from freemocap.core.pipeline.realtime.realtime_pipeline_lifecycle import (
-    needs_centralized_rtmpose,
-)
+from freemocap.core.pipeline.realtime.realtime_pipeline_lifecycle import needs_centralized_rtmpose
 from freemocap.core.pipeline.realtime.realtime_pipeline_error import RealtimePipelineErrorMessage
 from freemocap.core.pipeline.realtime.realtime_skeleton_inference_node import (
     RealtimeSkeletonInferenceNode,
@@ -138,9 +134,11 @@ class RealtimePipeline:
                 worker_mode=WorkerMode.THREAD,
             )
 
+        # Use the realtime subset if provided, otherwise all cameras in the group.
+        # The camera group is always started with all selected cameras so their
+        # shared memory exists; we just choose which ones feed the pipeline nodes.
         pipeline_camera_ids = camera_ids_for_realtime_pipeline(
-            camera_group,
-            realtime_camera_ids,
+            camera_group, realtime_camera_ids
         )
 
         camera_nodes = {

@@ -2,14 +2,15 @@ import React, {useCallback, useMemo} from 'react';
 import NameDropdownSelector from '@/components/ui-components/NameDropdownSelector';
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {
-    markRealtimePipelineRestartRequired,
     pipelineConfigUpdated,
     REALTIME_RESTART_REQUIRED_MESSAGE,
+    realtimePipelineRestartRequired,
     selectGpuCapabilities,
     selectIsPipelineConnected,
     selectPipelineConfig,
     selectSkeletonInferenceNodeConfig,
-} from '@/store/slices/realtime';import {ExecutionProviderName, RealtimePipelineConfig, SkeletonInferenceNodeConfig} from '@/store/slices/realtime/realtime-types';
+} from '@/store/slices/realtime';
+import {ExecutionProviderName, RealtimePipelineConfig, SkeletonInferenceNodeConfig} from '@/store/slices/realtime/realtime-types';
 import {executionProviderDisplayLabel} from '@/types/gpu-capabilities';
 
 interface ExecutionProviderConfigPanelProps {
@@ -127,11 +128,9 @@ export const ExecutionProviderConfigPanel: React.FC<ExecutionProviderConfigPanel
                 return;
             }
 
+            dispatch(pipelineConfigUpdated(newConfig));
             if (isConnected) {
-                dispatch(pipelineConfigUpdated(newConfig));
-                markRealtimePipelineRestartRequired(dispatch, REALTIME_RESTART_REQUIRED_MESSAGE);
-            } else {
-                dispatch(pipelineConfigUpdated(newConfig));
+                dispatch(realtimePipelineRestartRequired({message: REALTIME_RESTART_REQUIRED_MESSAGE}));
             }
         },
         [dispatch, isConnected, onConfigChange, pipelineConfig],

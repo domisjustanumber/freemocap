@@ -1,7 +1,6 @@
 import type {RootState} from '@/store/types';
 import {createSelector} from '@reduxjs/toolkit';
-import {selectCameras} from '@/store/slices/cameras/cameras-selectors';
-import {countRealtimeApplyCameras} from './realtime-apply-camera-count';
+import {countRealtimeApplyCameras} from '@/store/slices/realtime/realtime-apply-camera-count';
 
 export const selectPipelineState = (state: RootState) => state.realtime;
 export const selectIsPipelineConnected = (state: RootState) => state.realtime.isConnected;
@@ -18,17 +17,16 @@ export const selectRtmposeDetectorConfig = (state: RootState) =>
 export const selectGpuCapabilities = (state: RootState) => state.realtime.gpuCapabilities;
 export const selectGpuCapabilitiesLoading = (state: RootState) => state.realtime.gpuCapabilitiesLoading;
 export const selectExecutionProvider = (state: RootState) => state.realtime.executionProvider;
-export const selectRealtimeApplyBlockedMessage = (state: RootState) =>
-    state.realtime.realtimeApplyBlockedMessage;
-export const selectIsRealtimePipelineRestartRequired = (state: RootState) =>
-    state.realtime.restartRequired;
+export const selectRealtimeApplyBlockedMessage = (state: RootState) => state.realtime.realtimeApplyBlockedMessage;
+export const selectIsRealtimePipelineRestartRequired = (state: RootState) => state.realtime.restartRequired;
 export const selectRealtimePipelineRestartRequiredMessage = (state: RootState) =>
     state.realtime.restartRequiredMessage;
 
 export const selectCanConnectPipeline = createSelector(
-    [selectIsPipelineConnected, selectIsPipelineLoading, (state: RootState) => state],
-    (isConnected, isLoading, state) =>
-        !isConnected && !isLoading && countRealtimeApplyCameras(state) > 0,
+    [selectIsPipelineConnected, selectIsPipelineLoading, (state: RootState) => countRealtimeApplyCameras(state)],
+    (isConnected, isLoading, cameraCount) => {
+        return !isConnected && !isLoading && cameraCount > 0;
+    },
 );
 
 export const selectCanDisconnectPipeline = createSelector(
@@ -38,9 +36,9 @@ export const selectCanDisconnectPipeline = createSelector(
 
 export const selectDisplayedExecutionProvider = createSelector(
     [selectExecutionProvider, selectIsPipelineConnected, selectSkeletonInferenceNodeConfig, selectGpuCapabilities],
-    (activeProvider, isConnected, skeletonInfConfig, gpuCapabilities) => {
-        if (isConnected && activeProvider) {
-            return activeProvider;
+    (executionProvider, isConnected, skeletonInfConfig, gpuCapabilities) => {
+        if (isConnected && executionProvider) {
+            return executionProvider;
         }
         const requested = skeletonInfConfig?.execution_provider;
         if (requested) {
@@ -49,6 +47,3 @@ export const selectDisplayedExecutionProvider = createSelector(
         return gpuCapabilities?.execution_providers.recommended_provider_id ?? null;
     },
 );
-
-// Back-compat alias
-export const selectActiveExecutionProvider = selectExecutionProvider;

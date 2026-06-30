@@ -1,4 +1,4 @@
-"""Shared realtime API message strings (must match frontend realtime-messages.ts)."""
+"""Shared realtime API message strings."""
 
 REALTIME_AT_LEAST_ONE_CAMERA_MESSAGE = (
     "At least one camera must be selected for realtime."

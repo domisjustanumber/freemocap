@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import clsx from "clsx";
 import { useServer } from "@/services/server/ServerContextProvider";
 import { useTranslation } from "react-i18next";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
@@ -110,15 +111,6 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
   const liveClickable = canConnect || canDisconnect || !!pipelineError || !!restartRequiredMessage;
 
   const isTrtCompiling = isPipelineLoading && !isConnected;
-  const boltStatusClass = pipelineError
-    ? "live-bolt-error"
-    : restartRequiredMessage
-      ? "live-bolt-restart-required"
-      : isTrtCompiling
-        ? "live-bolt-loading"
-        : isConnected
-          ? "live-active-icon"
-          : "live-icon";
 
   const liveTooltip = pipelineError
     ?? (restartRequiredMessage ? t("realtime_restartRequired") : null)
@@ -264,16 +256,28 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
 
           {/* GROUP 3 */}
           <div className="p-1 br-2 bg-gray live-action-buttons-group-3 flex flex-row items-center gap-1">
-            <IconButton
-              icon={isConnected && !pipelineError && !restartRequiredMessage ? "live-active-icon" : "live-icon"}
-              onClick={handleLiveButtonClick}
-              tooltip
-              tooltipText={liveTooltip}
-              tooltipPosition="pos-bottom"
-              disabled={isPipelineLoading && isConnected}
-              style={!liveClickable && !isPipelineLoading && !pipelineError && !restartRequiredMessage ? { opacity: 0.5 } : undefined}
-              className={`icon-size-25 ${boltStatusClass} ${isConnected && !pipelineError && !restartRequiredMessage ? "active" : ""}`}
-            />
+            <div className="realtime-pipeline-bolt-wrapper">
+              <IconButton
+                icon={isConnected || isPipelineLoading ? "live-pipeline-active-icon" : "live-icon"}
+                onClick={handleLiveButtonClick}
+                tooltip
+                tooltipText={liveTooltip}
+                tooltipPosition="pos-bottom"
+                disabled={isPipelineLoading && isConnected}
+                style={!liveClickable && !isPipelineLoading && !pipelineError && !restartRequiredMessage ? { opacity: 0.5 } : undefined}
+                className={clsx(
+                  "icon-size-25 realtime-pipeline-bolt",
+                  pipelineError && "realtime-pipeline-bolt-error",
+                  restartRequiredMessage && "realtime-pipeline-bolt-restart-required",
+                )}
+              />
+              {isPipelineLoading && (
+                <span
+                  className="icon loader-icon icon-size-25 realtime-pipeline-bolt-loader-overlay"
+                  aria-hidden
+                />
+              )}
+            </div>
 
             <div className="modal-container pos-rel">
               <IconButton

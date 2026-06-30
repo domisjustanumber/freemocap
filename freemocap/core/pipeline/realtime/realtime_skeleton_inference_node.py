@@ -27,7 +27,6 @@ Backpressure:
 """
 import gc
 import logging
-import time
 from dataclasses import dataclass
 from multiprocessing.sharedctypes import Synchronized
 from queue import Empty
@@ -49,9 +48,7 @@ from skellycam.core.types.type_overloads import (
     TopicSubscriptionQueue,
 )
 from skellycam.utilities.wait_functions import wait_1ms
-from skellytracker.trackers.base_tracker.base_tracker_abcs import BaseObservation
 from skellytracker.trackers.rtmpose_tracker.rtmpose_detector import RTMPoseDetectorConfig
-from skellytracker.trackers.rtmpose_tracker.rtmpose_observation import RTMPoseObservation
 try:
     from skellytracker.trackers.base_tracker.task_events import TrackerTaskEventCollector
 except ModuleNotFoundError:
@@ -66,9 +63,12 @@ from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC
 from freemocap.core.pipeline.realtime.realtime_pipeline_error import RealtimePipelineErrorMessage
 from freemocap.core.pipeline.abcs.source_node_abc import SourceNode
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
+from freemocap.core.pipeline.realtime.realtime_skeleton_batch_logic import (
+    infer_or_skip_batch,
+    publish_skipped_batch,
+)
 from freemocap.core.pipeline.pipeline_stage_timer import PipelineStageTimer
 from freemocap.core.pipeline.pipeline_timing_events import (
-    call_with_supported_kwargs,
     collect_tracker_batch_events,
     make_stage_interval_event,
     perf_counter_ns,
@@ -170,7 +170,7 @@ class RealtimeSkeletonInferenceNode(SourceNode):
         }
 
         try:
-            session = _build_session(pipeline_config)
+            session = _build_session(pipeline_config, batch_size=len(camera_ids))
         except OnnxExecutionProviderStartupError as exc:
             skel_config = pipeline_config.camera_node_config.skeleton_detector_config
             _handle_recoverable_startup_failure(
@@ -179,7 +179,7 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                     error=exc,
                     detector_model=getattr(skel_config, "detector_model", None),
                     pose_model=getattr(skel_config, "pose_model", None),
-                    batch_size=pipeline_config.skeleton_inference_node_config.max_batch_size,
+                    batch_size=len(camera_ids),
                 )
             )
             return
@@ -188,6 +188,18 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                 RealtimePipelineErrorMessage.from_config_error(
                     pipeline_id=ipc.pipeline_id,
                     message=str(exc),
+                )
+            )
+            return
+
+        if session.batch_size != len(camera_ids):
+            _handle_recoverable_startup_failure(
+                RealtimePipelineErrorMessage.from_config_error(
+                    pipeline_id=ipc.pipeline_id,
+                    message=(
+                        f"RTMPose session batch_size={session.batch_size} does not match "
+                        f"camera count={len(camera_ids)}"
+                    ),
                 )
             )
             return
@@ -261,19 +273,22 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                         ),
                     )
 
+                t_inf_start_ns = perf_counter_ns() if timer is not None else 0
+
                 if not images:
-                    # Ring buffer race or frame already overwritten — still publish so the
-                    # aggregator never blocks forever waiting for this frame_number.
-                    skeleton_result_pub.put(
-                        SkeletonInferenceResultMessage(
-                            frame_number=requested_frame_number,
-                            per_camera_skeleton={camera_id: None for camera_id in camera_ids},
-                        ),
+                    publish_skipped_batch(
+                        frame_number=requested_frame_number,
+                        camera_ids=camera_ids,
+                        pub=skeleton_result_pub,
                     )
+                    if timer is not None:
+                        timer.record("predict_batch", (perf_counter_ns() - t_inf_start_ns) / 1e6)
+                        timer.maybe_flush(
+                            publication_queue=timing_pub,
+                            node_kind="skeleton_inference",
+                        )
                     continue
 
-                # ---- Batched skeleton inference ----
-                t_inf_start_ns = perf_counter_ns() if timer is not None else 0
                 frame_read_task_id = batch_task_id(
                     frame_number=requested_frame_number,
                     node_kind="skeleton_inference",
@@ -288,11 +303,12 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                     TrackerTaskEventCollector() if timer is not None and TrackerTaskEventCollector is not None else None
                 )
                 try:
-                    batch_results = call_with_supported_kwargs(
-                        session.predict_batch,
-                        images,
+                    outcome = infer_or_skip_batch(
                         frame_number=requested_frame_number,
-                        camera_ids=ordered_camera_ids,
+                        images=images,
+                        ordered_camera_ids=ordered_camera_ids,
+                        camera_ids=camera_ids,
+                        session=session,
                         parent_task_ids=[predict_batch_task_id],
                         event_collector=tracker_collector,
                     )
@@ -320,7 +336,7 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                     del session
                     gc.collect()
                     try:
-                        session = _build_session(pipeline_config)
+                        session = _build_session(pipeline_config, batch_size=len(camera_ids))
                     except (OnnxExecutionProviderStartupError, RealtimeSessionConfigError) as rebuild_exc:
                         skel_config = pipeline_config.camera_node_config.skeleton_detector_config
                         if isinstance(rebuild_exc, OnnxExecutionProviderStartupError):
@@ -329,7 +345,7 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                                 error=rebuild_exc,
                                 detector_model=getattr(skel_config, "detector_model", None),
                                 pose_model=getattr(skel_config, "pose_model", None),
-                                batch_size=pipeline_config.skeleton_inference_node_config.max_batch_size,
+                                batch_size=len(camera_ids),
                             )
                         else:
                             error = RealtimePipelineErrorMessage.from_config_error(
@@ -351,60 +367,80 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                 if timer is not None:
                     inf_ms = (perf_counter_ns() - t_inf_start_ns) / 1e6
                     timer.record("predict_batch", inf_ms)
-                    timer.record("human_detection_letterbox", session.last_human_detection_letterbox_ms)
-                    timer.record("human_detection_batch_pack", session.last_human_detection_batch_pack_ms)
-                    timer.record("human_detection_preprocess", session.last_human_detection_preprocess_ms)
-                    timer.record("human_detection", session.last_human_detection_ms)
-                    timer.record("human_detection_postprocess", session.last_human_detection_postprocess_ms)
-                    timer.record("pose_estimation_preprocess", session.last_pose_estimation_preprocess_ms)
-                    timer.record("pose_estimation", session.last_pose_estimation_ms)
-                    timer.record("pose_estimation_postprocess", session.last_pose_estimation_postprocess_ms)
-                    if tracker_collector is not None:
-                        timer.dropped_events += tracker_collector.dropped_events
-                    timer.extend_task_events(
-                        collect_tracker_batch_events(
-                            session,
-                            node_kind="skeleton_inference",
-                            frame_number=requested_frame_number,
-                            camera_ids=ordered_camera_ids,
-                            batch_parent_task_id=frame_read_task_id,
-                            batch_start_time_ns=t_inf_start_ns,
-                            tracker_events=tracker_collector.events if tracker_collector else None,
-                        ),
-                    )
-                    timer.record_stage_interval(
-                        event=make_stage_interval_event(
-                            frame_number=requested_frame_number,
-                            stage="predict_batch",
-                            node_kind="skeleton_inference",
-                            start_time_ns=t_inf_start_ns,
-                            end_time_ns=perf_counter_ns(),
-                            parent_task_ids=[frame_read_task_id],
-                            batch_size=len(ordered_camera_ids),
-                        ),
-                    )
+                    if outcome.kind == "infer":
+                        timer.record("human_detection_letterbox", session.last_human_detection_letterbox_ms)
+                        timer.record("human_detection_batch_pack", session.last_human_detection_batch_pack_ms)
+                        timer.record("human_detection_preprocess", session.last_human_detection_preprocess_ms)
+                        timer.record("human_detection", session.last_human_detection_ms)
+                        timer.record("human_detection_postprocess", session.last_human_detection_postprocess_ms)
+                        timer.record("pose_estimation_preprocess", session.last_pose_estimation_preprocess_ms)
+                        timer.record("pose_estimation", session.last_pose_estimation_ms)
+                        timer.record("pose_estimation_postprocess", session.last_pose_estimation_postprocess_ms)
+                        if tracker_collector is not None:
+                            timer.dropped_events += tracker_collector.dropped_events
+                        timer.extend_task_events(
+                            collect_tracker_batch_events(
+                                session,
+                                node_kind="skeleton_inference",
+                                frame_number=requested_frame_number,
+                                camera_ids=ordered_camera_ids,
+                                batch_parent_task_id=frame_read_task_id,
+                                batch_start_time_ns=t_inf_start_ns,
+                                tracker_events=tracker_collector.events if tracker_collector else None,
+                            ),
+                        )
+                        timer.record_stage_interval(
+                            event=make_stage_interval_event(
+                                frame_number=requested_frame_number,
+                                stage="predict_batch",
+                                node_kind="skeleton_inference",
+                                start_time_ns=t_inf_start_ns,
+                                end_time_ns=perf_counter_ns(),
+                                parent_task_ids=[frame_read_task_id],
+                                batch_size=len(ordered_camera_ids),
+                            ),
+                        )
 
-                # ---- Build per-camera observations ----
-                per_camera_skeleton: dict[CameraIdString, BaseObservation | None] = {}
-                for camera_id, image, (keypoints, scores) in zip(
-                        ordered_camera_ids, images, batch_results,
-                ):
-                    per_camera_skeleton[camera_id] = RTMPoseObservation.from_detection_results(
-                        frame_number=requested_frame_number,
-                        keypoints=keypoints,
-                        scores=scores,
-                        image_size=(int(image.shape[0]), int(image.shape[1])),
+                if outcome.kind == "skip":
+                    logger.debug(
+                        f"RealtimeSkeletonInferenceNode [{camera_group_id}] partial read "
+                        f"cameras={camera_ids} frame={requested_frame_number} "
+                        f"got={len(images)}/{len(camera_ids)} — skipping batch"
                     )
-                # Cameras whose frame we couldn't read get None — aggregator
-                # treats this as "no skeleton this frame for this camera"
-                # (same semantics as today's missing-detection path).
-                for camera_id in camera_ids:
-                    per_camera_skeleton.setdefault(camera_id, None)
+                    publish_skipped_batch(
+                        frame_number=requested_frame_number,
+                        camera_ids=camera_ids,
+                        pub=skeleton_result_pub,
+                    )
+                    if timer is not None:
+                        timer.maybe_flush(
+                            publication_queue=timing_pub,
+                            node_kind="skeleton_inference",
+                        )
+                    continue
+                if outcome.kind == "catch_mismatch":
+                    logger.warning(
+                        f"RealtimeSkeletonInferenceNode [{camera_group_id}] batch size mismatch "
+                        f"cameras={camera_ids} frame={requested_frame_number} "
+                        f"actual={outcome.mismatch_actual} expected={outcome.mismatch_expected} "
+                        f"— dropping batch"
+                    )
+                    publish_skipped_batch(
+                        frame_number=requested_frame_number,
+                        camera_ids=camera_ids,
+                        pub=skeleton_result_pub,
+                    )
+                    if timer is not None:
+                        timer.maybe_flush(
+                            publication_queue=timing_pub,
+                            node_kind="skeleton_inference",
+                        )
+                    continue
 
                 skeleton_result_pub.put(
                     SkeletonInferenceResultMessage(
                         frame_number=requested_frame_number,
-                        per_camera_skeleton=per_camera_skeleton,
+                        per_camera_skeleton=outcome.per_camera_skeleton or {},
                     ),
                 )
                 if timer is not None:
@@ -433,7 +469,11 @@ class RealtimeSessionConfigError(RuntimeError):
     """Centralized GPU inference misconfiguration."""
 
 
-def _build_session(pipeline_config: RealtimePipelineConfig) -> RTMPoseSession:
+def _build_session(
+    pipeline_config: RealtimePipelineConfig,
+    *,
+    batch_size: int,
+) -> RTMPoseSession:
     """Construct the centralized RTMPoseSession from the pipeline config.
 
     Reads model size / mode from `camera_node_config.skeleton_detector_config`
@@ -455,7 +495,7 @@ def _build_session(pipeline_config: RealtimePipelineConfig) -> RTMPoseSession:
         pose_model=skel_config.pose_model,
         execution_provider=inf_config.execution_provider,
         engine_cache_dir=inf_config.engine_cache_dir,
-        max_batch_size=inf_config.max_batch_size,
+        batch_size=batch_size,
     )
 
     return RTMPoseSession.create(session_config)

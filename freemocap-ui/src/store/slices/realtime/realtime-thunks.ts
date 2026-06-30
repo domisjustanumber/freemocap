@@ -51,7 +51,6 @@ export const applyRealtimePipeline = createAsyncThunk<
                 skeleton_inference_node_config: {
                     ...config.skeleton_inference_node_config,
                     execution_provider: recommended,
-                    max_batch_size: config.skeleton_inference_node_config?.max_batch_size ?? 8,
                 },
             };
         }

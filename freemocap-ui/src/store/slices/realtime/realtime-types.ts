@@ -35,7 +35,6 @@ export interface CameraNodeConfig {
 
 export interface SkeletonInferenceNodeConfig {
     execution_provider: ExecutionProviderName | null;
-    max_batch_size?: number;
 }
 
 export interface RealtimeAggregatorNodeConfig {
@@ -69,7 +68,6 @@ export const defaultRealtimePipelineConfig: RealtimePipelineConfig = {
     use_centralized_gpu_inference: true,
     skeleton_inference_node_config: {
         execution_provider: null,
-        max_batch_size: 8,
     },
     camera_node_config: {
         charuco_tracking_enabled: true,

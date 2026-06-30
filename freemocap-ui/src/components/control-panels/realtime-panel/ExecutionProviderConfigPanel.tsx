@@ -115,7 +115,6 @@ export const ExecutionProviderConfigPanel: React.FC<ExecutionProviderConfigPanel
             const nextSkeletonInf: SkeletonInferenceNodeConfig = {
                 ...pipelineConfig.skeleton_inference_node_config,
                 execution_provider,
-                max_batch_size: pipelineConfig.skeleton_inference_node_config?.max_batch_size ?? 8,
             };
 
             const newConfig: RealtimePipelineConfig = {

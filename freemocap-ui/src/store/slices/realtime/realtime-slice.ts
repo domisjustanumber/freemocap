@@ -71,8 +71,6 @@ export const realtimeSlice = createSlice({
                         skeleton_inference_node_config: {
                             ...state.pipelineConfig.skeleton_inference_node_config,
                             execution_provider: recommended,
-                            max_batch_size:
-                                state.pipelineConfig.skeleton_inference_node_config?.max_batch_size ?? 8,
                         },
                     };
                 }

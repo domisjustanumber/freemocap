@@ -15,11 +15,6 @@ def _default_engine_cache_dir() -> Path:
 
 
 class RealtimeSkeletonInferenceNodeConfig(BaseModel):
-    # Upper bound on batch size. The node uses min(num_cameras, max_batch_size)
-    # at runtime. Set to 1 to disable batching across cameras while keeping the
-    # single-CUDA-context win.
-    max_batch_size: int = 8
-
     # Where TensorRT engine + timing caches live. First TRT run compiles to here
     # (slow, 1-5 minutes); subsequent runs are a cache hit and load instantly.
     engine_cache_dir: Path = Field(default_factory=_default_engine_cache_dir)

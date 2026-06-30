@@ -19,6 +19,7 @@ from freemocap.core.pipeline.realtime.realtime_skeleton_inference_node_config im
 )
 from freemocap.system.gpu_capabilities_cache import GpuCapabilitiesSnapshot
 from skellytracker.trackers.rtmpose_tracker.rtmpose_detector import RTMPoseDetectorConfig
+from skellytracker.trackers.rtmpose_tracker.rtmpose_session import RTMPoseSession
 from skellytracker.utilities.gpu_utils import resolve_provider
 from skellytracker.utilities.gpu_utils.ort_session_utils import OnnxExecutionProviderStartupError
 
@@ -118,13 +119,16 @@ class TestBuildSessionConfig:
 
         def fake_create(config):
             captured.append(config)
-            return MagicMock(active_provider="cuda")
+            return RTMPoseSession(
+                config=config,
+                _active_provider="cuda",
+            )
 
         with patch(
             "freemocap.core.pipeline.realtime.realtime_skeleton_inference_node.RTMPoseSession.create",
             side_effect=fake_create,
         ):
-            session = _build_session(pipeline_config)
+            session = _build_session(pipeline_config, batch_size=3)
 
         assert session is not None
         assert len(captured) == 1
@@ -133,6 +137,7 @@ class TestBuildSessionConfig:
         assert session_config.detector_model == "yolox-tiny"
         assert session_config.pose_model == "rtmw-l-m_256x192"
         assert session_config.execution_provider is None
+        assert session_config.batch_size == 3
         assert not hasattr(session_config, "on_provider_missing")
 
     def test_build_session_raises_for_non_rtmpose_config(self) -> None:
@@ -140,7 +145,7 @@ class TestBuildSessionConfig:
         pipeline_config.camera_node_config.skeleton_detector_config = MagicMock()
 
         with pytest.raises(RealtimeSessionConfigError):
-            _build_session(pipeline_config)
+            _build_session(pipeline_config, batch_size=1)
 
     def test_build_session_propagates_ep_startup_error(self) -> None:
         pipeline_config = RealtimePipelineConfig(
@@ -157,10 +162,15 @@ class TestBuildSessionConfig:
             ),
         ):
             with pytest.raises(OnnxExecutionProviderStartupError):
-                _build_session(pipeline_config)
+                _build_session(pipeline_config, batch_size=2)
 
 
 class TestExecutionProviderResolution:
+    def test_inference_node_config_has_no_batch_size_field(self) -> None:
+        cfg = RealtimeSkeletonInferenceNodeConfig()
+        assert not hasattr(cfg, "max_batch_size")
+        assert "batch_size" not in RealtimeSkeletonInferenceNodeConfig.model_fields
+
     def test_auto_execution_provider_resolves_for_default_config(self) -> None:
         cfg = RealtimePipelineConfig()
         resolved = resolve_provider(

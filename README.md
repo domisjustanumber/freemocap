@@ -27,6 +27,10 @@
 2. Install dependencies
    - `npm install`
 
+## Update Skellytracker after changes
+1. `uv lock --upgrade-package skellytracker`
+2. `uv sync --reinstall-package skellytracker`
+
 ## Run the FreeMoCap application in development mode 
 1. Start the Python Server:
    - `python freemocap/__main__.py`

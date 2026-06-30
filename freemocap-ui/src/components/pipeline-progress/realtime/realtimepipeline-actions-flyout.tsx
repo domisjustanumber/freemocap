@@ -13,7 +13,7 @@ import {
     selectCanConnectPipeline,
     selectIsPipelineConnected,
     selectPipelineError,
-    selectRealtimePipelineRestartRequiredMessage,
+    selectRealtimePipelineRestartNeeded,
 } from "@/store/slices/realtime";
 
 interface RTPPipelineActionsFlyoutProps {
@@ -36,7 +36,7 @@ const RTPPipelineActionsFlyout: React.FC<RTPPipelineActionsFlyoutProps> = ({
     } = useRealtimePipelineSync();
     const pipelineError = useAppSelector(selectPipelineError);
     const isConnected = useAppSelector(selectIsPipelineConnected);
-    const restartRequiredMessage = useAppSelector(selectRealtimePipelineRestartRequiredMessage);
+    const pipelineRestartNeeded = useAppSelector(selectRealtimePipelineRestartNeeded);
     const canConnect = useAppSelector(selectCanConnectPipeline);
 
     const isTrtCompiling = isLoading && !isConnected;
@@ -127,7 +127,7 @@ const RTPPipelineActionsFlyout: React.FC<RTPPipelineActionsFlyoutProps> = ({
                     </div>
                 )}
 
-                {restartRequiredMessage && !pipelineError && (
+                {pipelineRestartNeeded && !pipelineError && (
                     <div className="flex flex-col gap-1 p-1 pipeline-restart-required-message">
                         <p className="text sm text-warning text-wrap">{t("realtime_restartRequired")}</p>
                         <ButtonSm

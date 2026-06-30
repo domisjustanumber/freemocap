@@ -7,6 +7,6 @@ export * from './realtime-notify-actions';
 export * from './realtime-apply-camera-count';
 export * from './guardRealtimeApply';
 export * from './realtime-apply-coordinator';
-export * from './realtime-camera-apply-scheduler';
+export * from './realtime-camera-selection';
 export * from './formatApplyErrorDetail';
 export {selectIsLastRealtimePipelineCamera} from '../cameras/cameras-selectors';

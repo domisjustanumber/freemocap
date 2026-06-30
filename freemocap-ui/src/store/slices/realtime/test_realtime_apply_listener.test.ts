@@ -27,7 +27,6 @@ vi.mock('./realtime-thunks', () => {
 
 const coordinatedApply = vi.fn();
 const cancelQueued = vi.fn();
-const cancelScheduled = vi.fn();
 const getCurrentInFlightRequestId = vi.fn(() => null as string | null);
 const requestRealtimeApplyReconciliation = vi.fn();
 
@@ -36,10 +35,6 @@ vi.mock('@/store/slices/realtime/realtime-apply-coordinator', () => ({
     getCurrentInFlightRequestId: () => getCurrentInFlightRequestId(),
     requestCoordinatedRealtimeApply: (...args: unknown[]) => coordinatedApply(...args),
     requestRealtimeApplyReconciliation: () => requestRealtimeApplyReconciliation(),
-}));
-
-vi.mock('@/store/slices/realtime/realtime-camera-apply-scheduler', () => ({
-    cancelScheduledRealtimeCameraApply: () => cancelScheduled(),
 }));
 
 import {configureStore} from '@reduxjs/toolkit';
@@ -72,7 +67,6 @@ describe('realtimeApplyListenerMiddleware', () => {
     beforeEach(() => {
         coordinatedApply.mockClear();
         cancelQueued.mockClear();
-        cancelScheduled.mockClear();
         requestRealtimeApplyReconciliation.mockClear();
         getCurrentInFlightRequestId.mockReturnValue(null);
     });
@@ -113,13 +107,12 @@ describe('realtimeApplyListenerMiddleware', () => {
         expect(coordinatedApply).not.toHaveBeenCalled();
     });
 
-    it('cancels queued and scheduled applies on close pending', () => {
+    it('cancels queued applies on close pending', () => {
         const store = makeStore(true);
         store.dispatch({
             type: 'realtime/close/pending',
             meta: {requestId: 'close-1'},
         });
         expect(cancelQueued).toHaveBeenCalledTimes(1);
-        expect(cancelScheduled).toHaveBeenCalledTimes(1);
     });
 });

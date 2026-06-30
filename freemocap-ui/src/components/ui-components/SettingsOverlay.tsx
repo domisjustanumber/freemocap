@@ -1,13 +1,11 @@
 import React, { useState } from "react";
-import clsx from "clsx";
 import { useServer } from "@/services/server/ServerContextProvider";
 import { useTranslation } from "react-i18next";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   closePipeline,
-  selectCanConnectPipeline,
   selectPipelineError,
-  selectRealtimePipelineRestartRequiredMessage,
+  selectRealtimePipelineRestartNeeded,
 } from "@/store/slices/realtime";
 import type {
   CameraSettings,
@@ -76,8 +74,7 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
 
   const dispatch = useAppDispatch();
   const pipelineError = useAppSelector(selectPipelineError);
-  const restartRequiredMessage = useAppSelector(selectRealtimePipelineRestartRequiredMessage);
-  const canConnectFromSelector = useAppSelector(selectCanConnectPipeline);
+  const pipelineRestartNeeded = useAppSelector(selectRealtimePipelineRestartNeeded);
 
   const charucoEnabled = cameraNodeConfig.charuco_tracking_enabled;
   const skeletonEnabled = cameraNodeConfig.skeleton_tracking_enabled;
@@ -108,17 +105,25 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
       aggregator_config: { ...aggregatorConfig, filter_enabled: !filterEnabled },
     });
 
-  const liveClickable = canConnect || canDisconnect || !!pipelineError || !!restartRequiredMessage;
+  const liveClickable = canConnect || canDisconnect || !!pipelineError || pipelineRestartNeeded;
 
   const isTrtCompiling = isPipelineLoading && !isConnected;
 
+  const boltIcon = pipelineError
+    ? "live-pipeline-error-icon"
+    : pipelineRestartNeeded
+      ? "live-pipeline-restart-icon"
+      : isConnected || isPipelineLoading || canConnect
+        ? "live-pipeline-active-icon"
+        : "live-icon";
+
   const liveTooltip = pipelineError
-    ?? (restartRequiredMessage ? t("realtime_restartRequired") : null)
+    ?? (pipelineRestartNeeded ? t("realtime_restartRequired") : null)
     ?? (isTrtCompiling
       ? "Initializing pipeline — first run may take 1–3 minutes for TensorRT compilation."
       : isConnected
         ? "Disconnect pipeline"
-        : canConnectFromSelector
+        : canConnect
           ? "Connect pipeline"
           : t("realtime_atLeastOneCameraRequired"));
 
@@ -128,7 +133,7 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
       toggleActive("pipelineSettings");
       return;
     }
-    if (restartRequiredMessage) {
+    if (pipelineRestartNeeded) {
       void restartPipeline();
       return;
     }
@@ -258,18 +263,14 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
           <div className="p-1 br-2 bg-gray live-action-buttons-group-3 flex flex-row items-center gap-1">
             <div className="realtime-pipeline-bolt-wrapper">
               <IconButton
-                icon={isConnected || isPipelineLoading ? "live-pipeline-active-icon" : "live-icon"}
+                icon={boltIcon}
                 onClick={handleLiveButtonClick}
                 tooltip
                 tooltipText={liveTooltip}
                 tooltipPosition="pos-bottom"
                 disabled={isPipelineLoading && isConnected}
-                style={!liveClickable && !isPipelineLoading && !pipelineError && !restartRequiredMessage ? { opacity: 0.5 } : undefined}
-                className={clsx(
-                  "icon-size-25 realtime-pipeline-bolt",
-                  pipelineError && "realtime-pipeline-bolt-error",
-                  restartRequiredMessage && "realtime-pipeline-bolt-restart-required",
-                )}
+                style={!liveClickable && !isPipelineLoading && !pipelineError && !pipelineRestartNeeded ? { opacity: 0.5 } : undefined}
+                className="icon-size-25 realtime-pipeline-bolt"
               />
               {isPipelineLoading && (
                 <span

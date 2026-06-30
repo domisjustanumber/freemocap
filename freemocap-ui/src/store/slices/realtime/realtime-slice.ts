@@ -24,6 +24,7 @@ const initialState: PipelineState = {
     realtimeApplyBlockedMessage: null,
     restartRequired: false,
     restartRequiredMessage: null,
+    appliedRealtimeCameraIds: [],
 };
 
 export const realtimeSlice = createSlice({
@@ -49,6 +50,7 @@ export const realtimeSlice = createSlice({
             state.realtimeApplyBlockedMessage = null;
             state.restartRequired = false;
             state.restartRequiredMessage = null;
+            state.appliedRealtimeCameraIds = [];
         },
     },
     extraReducers: (builder) => {
@@ -100,6 +102,7 @@ export const realtimeSlice = createSlice({
                 state.realtimeApplyBlockedMessage = null;
                 state.restartRequired = false;
                 state.restartRequiredMessage = null;
+                state.appliedRealtimeCameraIds = action.payload.applied_realtime_camera_ids;
             })
             .addCase(applyRealtimePipeline.rejected, (state, action) => {
                 if (state.latestApplyRequestId !== action.meta.requestId) return;
@@ -139,6 +142,7 @@ export const realtimeSlice = createSlice({
                 state.latestApplyRequestId = null;
                 state.restartRequired = false;
                 state.restartRequiredMessage = null;
+                state.appliedRealtimeCameraIds = [];
             })
             .addCase(closePipeline.rejected, (state, action) => {
                 state.isLoading = false;

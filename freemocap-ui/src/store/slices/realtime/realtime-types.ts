@@ -92,6 +92,7 @@ export interface PipelineApplyRequest {
 export interface PipelineApplyResponse {
     pipeline_id: string;
     execution_provider?: string | null;
+    applied_realtime_camera_ids: string[];
 }
 
 export interface RealtimePipelineErrorMessage {
@@ -127,4 +128,5 @@ export interface PipelineState {
     realtimeApplyBlockedMessage: string | null;
     restartRequired: boolean;
     restartRequiredMessage: string | null;
+    appliedRealtimeCameraIds: string[];
 }

@@ -12,7 +12,6 @@ import {
 import {
   REALTIME_AT_LEAST_ONE_CAMERA_MESSAGE,
   realtimeApplyBlocked,
-  scheduleRealtimeRestartRequiredAfterCameraToggle,
   selectIsLastRealtimePipelineCamera,
   selectIsPipelineConnected,
 } from "@/store/slices/realtime";
@@ -74,9 +73,6 @@ export const CameraTreeItem: React.FC<CameraTreeItemProps> = ({ camera }) => {
       return;
     }
     dispatch(cameraSelectionToggled(camera.id));
-    if (isConnected) {
-      scheduleRealtimeRestartRequiredAfterCameraToggle(dispatch, getState);
-    }
   };
 
   const handleToggleRealtime = (e: React.MouseEvent): void => {
@@ -88,9 +84,6 @@ export const CameraTreeItem: React.FC<CameraTreeItemProps> = ({ camera }) => {
       return;
     }
     dispatch(cameraRealtimeToggled(camera.id));
-    if (isConnected) {
-      scheduleRealtimeRestartRequiredAfterCameraToggle(dispatch, getState);
-    }
   };
 
   const handleOpenSettings = (e: React.MouseEvent): void => {

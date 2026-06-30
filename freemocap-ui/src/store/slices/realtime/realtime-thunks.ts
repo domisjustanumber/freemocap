@@ -8,6 +8,7 @@ import {guardRealtimeApply} from '@/store/slices/realtime/guardRealtimeApply';
 import {countRealtimeApplyCameras} from '@/store/slices/realtime/realtime-apply-camera-count';
 import {REALTIME_AT_LEAST_ONE_CAMERA_MESSAGE} from '@/store/slices/realtime/realtime-messages';
 import {formatApplyErrorDetail} from '@/store/slices/realtime/formatApplyErrorDetail';
+import {sortCameraIds} from '@/store/slices/realtime/realtime-camera-selection';
 
 export const fetchGpuCapabilities = createAsyncThunk<
     GpuCapabilitiesResponse,
@@ -81,7 +82,10 @@ export const applyRealtimePipeline = createAsyncThunk<
             return rejectWithValue(formatApplyErrorDetail(body, response.status));
         }
 
-        return response.json() as Promise<PipelineApplyResponse>;
+        return {
+            ...(await response.json() as Omit<PipelineApplyResponse, 'applied_realtime_camera_ids'>),
+            applied_realtime_camera_ids: sortCameraIds(realtimeCameraIds),
+        };
     },
     {
         condition: (_, {getState}) => countRealtimeApplyCameras(getState()) > 0,

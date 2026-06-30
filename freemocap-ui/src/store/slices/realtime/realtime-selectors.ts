@@ -1,6 +1,8 @@
 import type {RootState} from '@/store/types';
 import {createSelector} from '@reduxjs/toolkit';
+import {selectRealtimeEnabledCameraConfigs} from '@/store/slices/cameras/cameras-selectors';
 import {countRealtimeApplyCameras} from '@/store/slices/realtime/realtime-apply-camera-count';
+import {areSortedCameraIdSetsEqual, sortCameraIds} from '@/store/slices/realtime/realtime-camera-selection';
 
 export const selectPipelineState = (state: RootState) => state.realtime;
 export const selectIsPipelineConnected = (state: RootState) => state.realtime.isConnected;
@@ -21,6 +23,27 @@ export const selectRealtimeApplyBlockedMessage = (state: RootState) => state.rea
 export const selectIsRealtimePipelineRestartRequired = (state: RootState) => state.realtime.restartRequired;
 export const selectRealtimePipelineRestartRequiredMessage = (state: RootState) =>
     state.realtime.restartRequiredMessage;
+
+export const selectAppliedRealtimeCameraIds = (state: RootState) =>
+    state.realtime.appliedRealtimeCameraIds;
+
+export const selectDesiredRealtimeCameraIds = createSelector(
+    [selectRealtimeEnabledCameraConfigs],
+    (configs) => sortCameraIds(Object.keys(configs)),
+);
+
+export const selectRealtimeCameraSelectionDrift = createSelector(
+    [selectIsPipelineConnected, selectAppliedRealtimeCameraIds, selectDesiredRealtimeCameraIds],
+    (isConnected, appliedCameraIds, desiredCameraIds) => {
+        if (!isConnected) return false;
+        return !areSortedCameraIdSetsEqual(appliedCameraIds, desiredCameraIds);
+    },
+);
+
+export const selectRealtimePipelineRestartNeeded = createSelector(
+    [selectIsRealtimePipelineRestartRequired, selectRealtimeCameraSelectionDrift],
+    (configRestartRequired, cameraSelectionDrift) => configRestartRequired || cameraSelectionDrift,
+);
 
 export const selectCanConnectPipeline = createSelector(
     [selectIsPipelineConnected, selectIsPipelineLoading, (state: RootState) => countRealtimeApplyCameras(state)],

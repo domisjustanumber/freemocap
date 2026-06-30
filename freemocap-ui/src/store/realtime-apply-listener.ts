@@ -5,7 +5,6 @@ import {
     requestCoordinatedRealtimeApply,
     requestRealtimeApplyReconciliation,
 } from '@/store/slices/realtime/realtime-apply-coordinator';
-import {cancelScheduledRealtimeCameraApply} from '@/store/slices/realtime/realtime-camera-apply-scheduler';
 import {selectIsPipelineConnected, selectPipelineConfig} from '@/store/slices/realtime/realtime-selectors';
 
 export const realtimeApplyListenerMiddleware = createListenerMiddleware();
@@ -41,6 +40,5 @@ realtimeApplyListenerMiddleware.startListening({
     predicate: (action) => action.type === closePendingType,
     effect: () => {
         cancelQueuedRealtimeApply();
-        cancelScheduledRealtimeCameraApply();
     },
 });

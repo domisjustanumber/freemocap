@@ -3,7 +3,6 @@ import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {store} from '@/store/store';
 import {
     cancelQueuedRealtimeApply,
-    cancelScheduledRealtimeCameraApply,
     closePipeline,
     pipelineConfigUpdated,
     REALTIME_RESTART_REQUIRED_MESSAGE,
@@ -59,14 +58,12 @@ export function useRealtimePipelineSync() {
             dispatch(realtimePipelineRestartRequired({message: REALTIME_RESTART_REQUIRED_MESSAGE}));
             return;
         }
-        cancelScheduledRealtimeCameraApply();
         cancelQueuedRealtimeApply();
         requestCoordinatedRealtimeApply(dispatch, () => store.getState());
     }, [dispatch]);
 
     const toggleConnection = useCallback(async () => {
         if (selectIsPipelineLoading(store.getState())) return;
-        cancelScheduledRealtimeCameraApply();
         cancelQueuedRealtimeApply();
         if (selectIsPipelineConnected(store.getState())) {
             await dispatch(closePipeline());
@@ -76,7 +73,6 @@ export function useRealtimePipelineSync() {
     }, [dispatch]);
 
     const restartPipeline = useCallback(async () => {
-        cancelScheduledRealtimeCameraApply();
         cancelQueuedRealtimeApply();
         if (selectIsPipelineConnected(store.getState())) {
             await dispatch(closePipeline());

@@ -13,14 +13,12 @@ FreeMoCap uses ONNX Runtime for GPU-accelerated pose detection via RTMPose. GPU 
 
 ## How GPU Detection Works
 
-On startup, the Python backend (`freemocap/app/app.py`) detects system capabilities:
+FreeMoCap does not detect GPUs or execution providers itself; SkellyTracker does. On startup, the Python backend (`freemocap/app/app.py`) logs what SkellyTracker reports:
 
-- **NVIDIA GPUs**: queried via `nvidia-smi`
-- **AMD GPUs**: detected via ROCm
-- **Apple Silicon**: MPS / CoreML detection
-- **ONNX Runtime**: checks available execution providers (CUDA, TensorRT, CoreML, DirectML, CPU)
+- **Host**: OS, CPU, cores, memory and each GPU (name, vendor, VRAM, driver), from SkellyTracker's host probe
+- **Execution providers**: each one SkellyTracker knows on this host with its state, and its recommendation for performance
 
-The detected capabilities are logged at startup and influence which execution providers are available for pipeline configuration.
+The execution provider menu offers Auto (SkellyTracker's recommendation) and the providers SkellyTracker lists as usable on this host. Run `skellytracker-eps status` for the same report in a terminal.
 
 ## Supported Execution Providers
 

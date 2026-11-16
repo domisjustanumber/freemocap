@@ -82,7 +82,7 @@ FastAPI(lifespan=app_lifespan)
 
 ### Lifespan Events
 
-**Startup**: Detects system capabilities — OS, CPU cores, RAM, Python version, GPU detection (NVIDIA via `nvidia-smi`, AMD, Apple Silicon), ONNX Runtime version and available execution providers (CUDA, TensorRT, CoreML, DirectML). Creates `~/freemocap_data/` if it doesn't exist.
+**Startup**: Logs the Python and FreeMoCap versions, the host (OS, CPU, memory, GPUs) and the execution provider states and recommendation, all as SkellyTracker reports them. Creates `~/freemocap_data/` if it doesn't exist.
 
 **Shutdown**: Sets `global_kill_flag.value = True`, which cascades to all child processes via their `PipelineIPC.should_continue` checks.
 

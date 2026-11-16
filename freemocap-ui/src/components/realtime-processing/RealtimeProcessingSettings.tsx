@@ -22,10 +22,11 @@ export default function RealtimeProcessingSettings({onClose}: {onClose: () => vo
     const [active, setActive] = useState<Section>('tracking');
     const {pipelineConfig, cameraNodeConfig: camera, aggregatorConfig: aggregator, applyOrUpdatePipelineConfig} = useRealtimePipelineSync();
     const provider = pipelineConfig.skeleton_inference_node_config.execution_provider ?? null;
+    const device = pipelineConfig.skeleton_inference_node_config.execution_device ?? null;
     const providers = useExecutionProviderOptions(provider);
     const value: DetectorSettingsValue = {
         detector: camera.detector_type ?? 'rtmpose', model: camera.rtmpose_model_name ?? 'rtmw-x-l_256x192',
-        provider, confidence: camera.rtmpose_confidence_threshold ?? 0.0025,
+        provider, confidence: camera.rtmpose_confidence_threshold ?? 0.0025, device,
     };
     const changeDetector = (change: Partial<DetectorSettingsValue>) => applyOrUpdatePipelineConfig({
         ...pipelineConfig,
@@ -34,7 +35,8 @@ export default function RealtimeProcessingSettings({onClose}: {onClose: () => vo
             rtmpose_model_name: change.model ?? camera.rtmpose_model_name,
             rtmpose_confidence_threshold: change.confidence ?? camera.rtmpose_confidence_threshold},
         skeleton_inference_node_config: {...pipelineConfig.skeleton_inference_node_config,
-            execution_provider: change.provider !== undefined ? change.provider : provider},
+            execution_provider: change.provider !== undefined ? change.provider : provider,
+            execution_device: change.device !== undefined ? change.device : device},
     });
     const toggle = (label: string, enabled: boolean, update: (enabled: boolean) => void) =>
         <SettingToggleSwitch label={label} isToggled={enabled} onToggle={update}/>;

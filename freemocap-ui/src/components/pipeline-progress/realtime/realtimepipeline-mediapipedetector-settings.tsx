@@ -35,7 +35,7 @@ const RTPSkeletonSetup: React.FC<RTPSkeletonSetupProps> = ({ open, onClose }) =>
         (provider: ExecutionProviderName | null) => {
             applyOrUpdatePipelineConfig({
                 ...pipelineConfig,
-                skeleton_inference_node_config: { ...pipelineConfig.skeleton_inference_node_config, execution_provider: provider },
+                skeleton_inference_node_config: { ...pipelineConfig.skeleton_inference_node_config, execution_provider: provider, execution_device: null },
             });
         },
         [applyOrUpdatePipelineConfig, pipelineConfig]

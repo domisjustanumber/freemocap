@@ -95,7 +95,7 @@ export const RealtimePipelineConfigTree: React.FC<PipelineConfigTreeProps> = ({
         if (context === "realtime") {
             dispatch(pipelineConfigUpdated({
                 ...pipelineConfig,
-                skeleton_inference_node_config: { ...inferenceNodeConfig, execution_provider: provider },
+                skeleton_inference_node_config: { ...inferenceNodeConfig, execution_provider: provider, execution_device: null },
             }));
             triggerRealtimeApply();
         } else {

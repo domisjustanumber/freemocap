@@ -40,6 +40,7 @@ class InferenceRegistration:
     rtmpose_model_name: str | None = None
     execution_provider: str | None = None
     rtmpose_confidence_threshold: float = RTMW_MIN_SCORE
+    execution_device: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,7 +157,8 @@ class InferenceService:
         run, _ = start_detector_run(
             detector_type=registration.detector_type, camera_ids=registration.camera_ids,
             running_mode=RUNNING_MODES[registration.mode.value],
-            rtmpose_model_name=registration.rtmpose_model_name, execution_provider=registration.execution_provider)
+            rtmpose_model_name=registration.rtmpose_model_name, execution_provider=registration.execution_provider,
+            execution_device=registration.execution_device)
         return run, tuple({"node": node, **model} for node, model in run.models.items())
 
     def submit(self, *, client: InferenceClient, request: InferenceRequest) -> Future[dict[str, Observation]]:

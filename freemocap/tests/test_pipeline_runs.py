@@ -31,7 +31,7 @@ def test_an_ep_is_given_only_when_the_pipeline_needs_one(monkeypatch, detector_t
     monkeypatch.setattr(pipeline_runs, "load_detector_pipeline", lambda *args: "config")
     monkeypatch.setattr(pipelines, "check_pipeline", lambda config: SimpleNamespace(needs_execution_provider=needs_ep))
     monkeypatch.setattr(pipelines, "start_pipeline", lambda config, **kwargs: started.update(kwargs) or "run")
-    monkeypatch.setattr(pipeline_runs, "run_ep_choice", lambda requested: ("cpu", None, None))
+    monkeypatch.setattr(pipeline_runs, "run_ep_choice", lambda requested, device=None: ("cpu", None, None))
     run = pipeline_runs.start_detector_run(detector_type=detector_type, camera_ids=["0", "1"], running_mode="live")
     assert run == ("run", expected)
     assert started["execution_provider"] == expected and started["ep_options"] is None and started["device"] is None
@@ -156,3 +156,19 @@ def test_a_real_holistic_run_gives_one_body_stage_with_its_point_names():
 def test_skellytracker_says_which_detector_takes_an_ep():
     assert pipeline_runs.detector_takes_execution_provider("rtmpose")
     assert not pipeline_runs.detector_takes_execution_provider("mediapipe")
+
+
+def test_the_users_device_of_an_explicit_ep_reaches_the_run_and_auto_ignores_it(monkeypatch):
+    import skellytracker.core.pipelines as pipelines
+    from skellytracker.core import eps
+    recommendation = SimpleNamespace(chosen=SimpleNamespace(ep_key="gpu-ep", device_key="gpu:0"), options=())
+    monkeypatch.setattr(eps, "recommend", lambda form: recommendation)
+    monkeypatch.setattr(pipeline_runs, "load_detector_pipeline", lambda *args: "config")
+    monkeypatch.setattr(pipelines, "check_pipeline", lambda config: SimpleNamespace(needs_execution_provider=True))
+    started = {}
+    monkeypatch.setattr(pipelines, "start_pipeline", lambda config, **kwargs: started.update(kwargs) or "run")
+    pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0"], running_mode="live",
+                                     execution_provider="gpu-ep", execution_device="gpu:1")
+    assert (started["execution_provider"], started["device"]) == ("gpu-ep", "gpu:1")
+    pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0"], running_mode="live", execution_device="gpu:1")
+    assert (started["execution_provider"], started["device"]) == ("gpu-ep", "gpu:0")

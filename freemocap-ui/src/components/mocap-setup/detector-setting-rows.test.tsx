@@ -24,7 +24,7 @@ interface RowProps {label?: ReactNode; info?: Info; control?: ReactElement<{onCh
 const DETECTORS: DetectorType[] = ['rtmpose', 'mediapipe'];
 /** The realtime pipeline's detector defaults. */
 const VALUE: DetectorSettingsValue = {
-    detector: 'rtmpose', model: 'rtmw-x-l_256x192', provider: null, confidence: 0.0025,
+    detector: 'rtmpose', model: 'rtmw-x-l_256x192', provider: null, confidence: 0.0025, device: null,
 };
 const CONFIG: TriangulationConfig = {
     use_outlier_rejection: true, minimum_cameras_for_triangulation: 2, maximum_cameras_to_drop: 1, target_reprojection_error: 0.02,
@@ -36,7 +36,7 @@ const GPU = {key: 'gpu-ep', label: 'GPU EP', description: 'Runs on a GPU.', usab
 /** The server's answer as the hook gives it: here only RTMW takes an EP. */
 const PROVIDERS: ExecutionProviderChoices = {
     options: executionProviderOptions(null, [CPU, GPU]), info: executionProviderInfo([CPU, GPU]),
-    takesExecutionProvider: detector => detector === 'rtmpose',
+    takesExecutionProvider: detector => detector === 'rtmpose', devicesOf: () => [],
 };
 
 /** The detector rows' props as the realtime controls pass them, for one detector. */
@@ -121,6 +121,23 @@ test('the execution provider row follows the server, not the detector name', () 
     assert.ok(!labels(detectorRows('rtmpose', 'all', {providers: none})).includes('Execution provider'));
 });
 
+test('a device row follows an EP with more than one device and reports the device key', () => {
+    const two = [{key: 'gpu:0', name: 'Big GPU', vram_total_bytes: 24 * 2 ** 30}, {key: 'gpu:1', name: null, vram_total_bytes: null}];
+    const providers = {...PROVIDERS, devicesOf: (provider: string | null) => provider === 'gpu-ep' ? two : two.slice(0, 1)};
+    const html = detectorRows('rtmpose', 'all', {providers, value: {...VALUE, provider: 'gpu-ep'}});
+    assert.deepEqual(labels(html), ['Skeleton detector', 'Execution provider', 'Device', 'Model', 'Confidence threshold']);
+    assert.deepEqual(optionsOf(rowLabelled(html, 'Device')), ['auto', 'gpu:0', 'gpu:1']);
+    assert.match(rowLabelled(html, 'Device'), /Big GPU \(24\.0 GiB\)/);
+    assert.ok(!labels(detectorRows('rtmpose', 'all', {providers, value: {...VALUE, provider: 'cpu'}})).includes('Device'));
+    const changes: Partial<DetectorSettingsValue>[] = [];
+    const rows = DetectorSettingRows(detectorProps('rtmpose', 'all', {providers, value: {...VALUE, provider: 'gpu-ep'},
+        onChange: change => changes.push(change)}));
+    handlerOf(rows, 'Device')('gpu:1');
+    handlerOf(rows, 'Device')('auto');
+    handlerOf(rows, 'Execution provider')('cpu');
+    assert.deepEqual(changes, [{device: 'gpu:1'}, {device: null}, {provider: 'cpu', device: null}]);
+});
+
 test('the execution provider explanation is the sentence of each EP, with the install hint of one that is not usable', () => {
     const text = renderToStaticMarkup(<>{PROVIDERS.info.text}</>);
     assert.match(text, /<strong>CPU<\/strong> — Runs on the processor\./);
@@ -154,7 +171,7 @@ test('each control reports its own field', () => {
     handlerOf(rtmw, 'Model')('rtmw-l-m_256x192');
     handlerOf(rtmw, 'Confidence threshold')(0.3);
     handlerOf(all('mediapipe'), 'Skeleton detector')('rtmpose');
-    assert.deepEqual(changes, [{provider: 'cpu'}, {provider: null}, {model: 'rtmw-l-m_256x192'}, {confidence: 0.3},
+    assert.deepEqual(changes, [{provider: 'cpu', device: null}, {provider: null, device: null}, {model: 'rtmw-l-m_256x192'}, {confidence: 0.3},
         {detector: 'rtmpose'}]);
 
     // The outlier rows report the whole configuration with the one field changed.

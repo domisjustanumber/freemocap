@@ -80,7 +80,8 @@ class InferenceServiceTests(unittest.TestCase):
         report = PerformanceReport()
         client = self.service.register(InferenceRegistration(
             pipeline_id="diagnostics", mode=InferenceMode.POSTHOC, detector_type="rtmpose", camera_ids=("0", "1", "2"),
-            rtmpose_model_name="rtmw-x-l_384x288", execution_provider="gpu-ep", shutdown_flag=multiprocessing.Value("b", False)))
+            rtmpose_model_name="rtmw-x-l_384x288", execution_provider="gpu-ep", execution_device="gpu:1",
+            shutdown_flag=multiprocessing.Value("b", False)))
         images = {str(i): np.zeros((8, 12, 3), dtype=np.uint8) for i in range(3)}
         for frame in range(2):
             result = client.submit(InferenceRequest(frame_number=frame, images=images, performance=report,
@@ -91,7 +92,8 @@ class InferenceServiceTests(unittest.TestCase):
         self.assertEqual(rows["inference.queue_wait"]["count"], 2)
         self.assertEqual(rows["inference.process_batch.images=3"]["count"], 2)
         self.assertEqual(self.started, [dict(detector_type="rtmpose", camera_ids=("0", "1", "2"), running_mode="video",
-                                             rtmpose_model_name="rtmw-x-l_384x288", execution_provider="gpu-ep")])
+                                             rtmpose_model_name="rtmw-x-l_384x288", execution_provider="gpu-ep",
+                                             execution_device="gpu:1")])
         self.assertEqual(self.runs[0].process_batch.call_count, 2)
 
     def test_the_registered_confidence_threshold_reaches_the_boundary(self) -> None:

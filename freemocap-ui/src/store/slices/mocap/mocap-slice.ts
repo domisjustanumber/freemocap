@@ -58,6 +58,8 @@ export interface MocapConfig {
     rtmPoseModelName: RTMPoseModelName;
     rtmPoseConfidenceThreshold: number;
     executionProvider: ExecutionProviderName | null;
+    /** A skellytracker device key of the chosen EP; null = skellytracker's choice. */
+    executionDevice: string | null;
     mediapipeNumHands: 2;
 
     bodyAlignmentMode: 'auto' | 'calibration' | 'person';
@@ -123,6 +125,7 @@ const DEFAULT_MOCAP_CONFIG: MocapConfig = {
     rtmPoseModelName: "rtmw-x-l_256x192",
     rtmPoseConfidenceThreshold: 0.004,
     executionProvider: null,
+    executionDevice: null,
     mediapipeNumHands: 2,
     bodyAlignmentMode: 'auto',
     anchorSegmentName: "pelvis",
@@ -228,7 +231,11 @@ export const mocapSlice = createSlice({
 
         /** Change the ONNX execution provider (null = auto). */
         mocapExecutionProviderChanged: (state, action: PayloadAction<ExecutionProviderName | null>) => {
+            if (state.config.executionProvider !== action.payload) state.config.executionDevice = null;
             state.config.executionProvider = action.payload;
+        },
+        mocapExecutionDeviceChanged: (state, action: PayloadAction<string | null>) => {
+            state.config.executionDevice = action.payload;
         },
 
         /** Change the RTMPose keypoint confidence threshold. */
@@ -336,6 +343,7 @@ export const selectReferenceTransformEnabled = (state: RootState) => state.mocap
 export const selectMocapDetectorType = (state: RootState) => state.mocap.config.detectorType;
 export const selectMocapRtmPoseModelName = (state: RootState) => state.mocap.config.rtmPoseModelName;
 export const selectMocapExecutionProvider = (state: RootState) => state.mocap.config.executionProvider;
+export const selectMocapExecutionDevice = (state: RootState) => state.mocap.config.executionDevice;
 export const selectMocapRtmPoseConfidenceThreshold = (state: RootState) => state.mocap.config.rtmPoseConfidenceThreshold;
 export const selectMocapMediapipeNumHands = (state: RootState) => state.mocap.config.mediapipeNumHands;
 export const selectMocapIsLoading = (state: RootState) => state.mocap.isLoading;
@@ -387,6 +395,7 @@ export const {
     mocapRtmPoseModelNameChanged,
     mocapRtmPoseConfidenceThresholdChanged,
     mocapExecutionProviderChanged,
+    mocapExecutionDeviceChanged,
     triangulationConfigUpdated,
     posthocFilterConfigUpdated,
     mocapProgressUpdated,

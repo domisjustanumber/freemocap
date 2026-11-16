@@ -24,6 +24,8 @@ export interface RealtimeSkeletonInferenceNodeConfig {
     max_batch_size?: number;
     /** null = auto-select the best available provider. */
     execution_provider?: ExecutionProviderName | null;
+    /** A skellytracker device key of the chosen EP; null = skellytracker's choice. */
+    execution_device?: string | null;
 }
 
 export interface RealtimeAggregatorNodeConfig {
@@ -54,6 +56,7 @@ export const defaultRealtimePipelineConfig: RealtimePipelineConfig = {
     },
     skeleton_inference_node_config: {
         execution_provider: null,
+        execution_device: null,
     },
     aggregator_config: {
         reference_transform: null,

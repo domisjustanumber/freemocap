@@ -67,7 +67,7 @@ def require_every_camera(batch_cameras, run_cameras, frame_number: int) -> None:
 class SkellyTrackerAdapter:
     def __init__(self, *, inference_service: InferenceService, detector_type: str,
                  performance_report: PerformanceReport, rtmpose_model_name: str | None = None,
-                 execution_provider: str | None = None, charuco_board=None,
+                 execution_provider: str | None = None, execution_device: str | None = None, charuco_board=None,
                  rtmpose_confidence_threshold: float = RTMW_MIN_SCORE) -> None:
         """With a `charuco_board`, each observation also gets the charuco stage of that board."""
         self.inference_service = inference_service
@@ -77,6 +77,7 @@ class SkellyTrackerAdapter:
         self.rtmpose_model_name = rtmpose_model_name
         self.performance_report = performance_report
         self.execution_provider = execution_provider
+        self.execution_device = execution_device
 
     def track_recording(self, *, sources: RecordingVideoSources, execution_id: str,
                         shutdown_flag: Synchronized, queued_frames_per_camera: int = 2,
@@ -96,7 +97,7 @@ class SkellyTrackerAdapter:
             pipeline_id=execution_id, mode=InferenceMode.POSTHOC,
             detector_type=self.detector_type, camera_ids=tuple(active_cameras),
             rtmpose_model_name=self.rtmpose_model_name, execution_provider=self.execution_provider,
-            rtmpose_confidence_threshold=self.rtmpose_confidence_threshold,
+            execution_device=self.execution_device, rtmpose_confidence_threshold=self.rtmpose_confidence_threshold,
             shutdown_flag=client_shutdown,
         ))
         frame_count = sources.camera_sources[0].video_metadata.frame_count

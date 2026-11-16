@@ -97,6 +97,11 @@ class PosthocMocapPipelineConfig(BaseModel):
         alias="executionProvider",
         description="A skellytracker EP key for RTMPose. None is Auto, the skellytracker recommendation; skellytracker refuses a key it does not have, or one that cannot start, when the run starts.",
     )
+    execution_device: str | None = Field(
+        default=None,
+        alias="executionDevice",
+        description="A skellytracker device key of the chosen EP. None is skellytracker's choice; Auto ignores it.",
+    )
     # MediaPipe Holistic takes no model size, confidences or face count (user F1, 2026-11-16).
     mediapipe_num_hands: Literal[2] = Field(
         default=2,

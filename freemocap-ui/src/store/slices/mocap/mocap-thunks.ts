@@ -37,6 +37,7 @@ function buildPosthocConfig(state: RootState) {
         rtmPoseModelName: config.rtmPoseModelName,
         rtmPoseConfidenceThreshold: config.rtmPoseConfidenceThreshold,
         executionProvider: config.executionProvider,
+        executionDevice: config.executionDevice,
         mediapipeNumHands: config.mediapipeNumHands,
         calibrationTomlPath,
         triangulationConfig: {

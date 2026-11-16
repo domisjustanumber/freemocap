@@ -32,6 +32,8 @@ export function useExecutionProviderOptions(selected: ExecutionProviderName | nu
     return {
         options: executionProviderOptions(selected, catalog.providers),
         info,
+        /** The GPUs of an EP, most VRAM first, as skellytracker gives them; none for Auto or an unknown key. */
+        devicesOf: (provider: ExecutionProviderName | null) => catalog.providers.find(({key}) => key === provider)?.devices ?? [],
         /** Unknown until the server answers: the row stays hidden, as no EP can be offered yet. */
         takesExecutionProvider: (detector: string) => catalog.detectorTakesExecutionProvider[detector] ?? false,
     };

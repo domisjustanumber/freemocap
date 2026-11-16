@@ -150,6 +150,7 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                 rtmpose_model_name=settings.rtmpose_model_name,
                 rtmpose_confidence_threshold=settings.rtmpose_confidence_threshold,
                 execution_provider=pipeline_config.skeleton_inference_node_config.execution_provider,
+                execution_device=pipeline_config.skeleton_inference_node_config.execution_device,
                 shutdown_flag=ipc.pipeline_shutdown_flag,
             ))
 

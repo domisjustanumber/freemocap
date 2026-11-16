@@ -7034,6 +7034,18 @@
             "title": "Executionprovider",
             "description": "A skellytracker EP key for RTMPose. None is Auto, the skellytracker recommendation; skellytracker refuses a key it does not have, or one that cannot start, when the run starts."
           },
+          "executionDevice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executiondevice",
+            "description": "A skellytracker device key of the chosen EP. None is skellytracker's choice; Auto ignores it."
+          },
           "mediapipeNumHands": {
             "type": "integer",
             "const": 2,
@@ -7658,6 +7670,17 @@
               }
             ],
             "title": "Execution Provider"
+          },
+          "execution_device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Device"
           },
           "debug_draw_bboxes": {
             "type": "boolean",

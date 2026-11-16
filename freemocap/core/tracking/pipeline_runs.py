@@ -47,14 +47,16 @@ def load_detector_pipeline(detector_type: str, rtmpose_model_name: str | None = 
     return config
 
 
-def run_ep_choice(requested: str | None) -> tuple[str, dict[str, str] | None, str | None]:
-    """The EP key, EP options and device of a run: the user's key, or for Auto skellytracker's performance recommendation.
+def run_ep_choice(requested: str | None, device: str | None = None) -> tuple[str, dict[str, str] | None, str | None]:
+    """The EP key, EP options and device of a run: the user's key and device, or for Auto skellytracker's
+    performance recommendation (which ignores `device`).
 
-    skellytracker checks the user's key when the run starts and raises `EpRequestError` for a key it does not have.
+    skellytracker checks the user's key and device when the run starts and raises `EpRequestError` or
+    `EpUnavailableError` for one that it does not have or cannot use.
     """
     from skellytracker.core import eps
     if requested not in (None, "auto"):
-        return requested, None, None
+        return requested, None, device
     recommendation = eps.recommend("performance")
     chosen = recommendation.chosen
     logger.info("Execution provider %s (device %s) chosen for requested %s", chosen.ep_key, chosen.device_key, requested or "auto")
@@ -67,14 +69,15 @@ def run_execution_provider(requested: str | None) -> str:
 
 
 def start_detector_run(*, detector_type: str, camera_ids: Sequence[str], running_mode: str,
-                       rtmpose_model_name: str | None = None, execution_provider: str | None = None):
+                       rtmpose_model_name: str | None = None, execution_provider: str | None = None,
+                       execution_device: str | None = None):
     """Start the run of a detector choice; return it with its EP key. Give an EP only when the pipeline needs one.
 
     Auto passes the recommendation's EP options and device too (a precision such as fp16 can need its options).
     """
     from skellytracker.core.pipelines import check_pipeline, start_pipeline
     config = load_detector_pipeline(detector_type, rtmpose_model_name)
-    provider, options, device = (run_ep_choice(execution_provider) if check_pipeline(config).needs_execution_provider
+    provider, options, device = (run_ep_choice(execution_provider, execution_device) if check_pipeline(config).needs_execution_provider
                                  else (None, None, None))
     run = start_pipeline(config, camera_ids=list(camera_ids), running_mode=running_mode, execution_provider=provider,
                          ep_options=options, device=device)

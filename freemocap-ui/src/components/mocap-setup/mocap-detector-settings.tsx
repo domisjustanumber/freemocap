@@ -16,10 +16,12 @@ export default function MocapDetectorSettings() {
         rtmPoseModelName,
         rtmPoseConfidenceThreshold,
         executionProvider,
+        executionDevice,
         setDetectorType,
         setRtmPoseModelName,
         setRtmPoseConfidenceThreshold,
         setExecutionProvider,
+        setExecutionDevice,
     } = useMocap();
     const executionProviderOptions = useExecutionProviderOptions(executionProvider);
 
@@ -28,12 +30,14 @@ export default function MocapDetectorSettings() {
         detector,
         model: rtmPoseModelName ?? "rtmw-x-l_256x192",
         provider: executionProvider ?? null,
+        device: executionDevice ?? null,
         confidence: rtmPoseConfidenceThreshold ?? 0.4,
     };
     /** Each field the rows report goes to its own setting in the store. */
     const applyChange = (change: Partial<DetectorSettingsValue>) => {
         if (change.detector !== undefined) setDetectorType(change.detector);
         if (change.provider !== undefined) setExecutionProvider(change.provider);
+        if (change.device !== undefined) setExecutionDevice(change.device);
         if (change.model !== undefined) setRtmPoseModelName(change.model);
         if (change.confidence !== undefined) setRtmPoseConfidenceThreshold(change.confidence);
     };

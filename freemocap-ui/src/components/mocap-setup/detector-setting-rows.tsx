@@ -17,6 +17,15 @@ export const DETECTOR_INFO = {
     </>,
 };
 
+export const DEVICE_INFO = {
+    title: 'Device',
+    text: <p>The GPU that the chosen execution provider runs on. <strong>Auto</strong> lets SkellyTracker choose.</p>,
+};
+
+/** A device as the select shows it: its name and VRAM, as skellytracker gives them. */
+const deviceLabel = ({key, name, vram_total_bytes}: {key: string; name: string | null; vram_total_bytes: number | null}) =>
+    `${name ?? key}${vram_total_bytes === null ? '' : ` (${(vram_total_bytes / 2 ** 30).toFixed(1)} GiB)`}`;
+
 export const MODEL_INFO = {
     title: "Model",
     text: <>
@@ -72,6 +81,8 @@ const REALTIME_DETECTOR_INFO = withDetectorNotes(DETECTOR_INFO);
 
 export interface DetectorSettingsValue {
     detector: DetectorType; model: RTMPoseModelName; provider: ExecutionProviderName | null; confidence: number;
+    /** A skellytracker device key of the chosen EP; null = skellytracker's choice. */
+    device: string | null;
 }
 
 interface DetectorSettingRowsProps {
@@ -94,6 +105,8 @@ export function DetectorSettingRows({value, onChange, detectors, providers, cont
     const rtmw = detector === 'rtmpose';
     const realtime = context === 'realtime';
     const detectorInfo = (realtime && REALTIME_DETECTOR_INFO.get(detector)) || DETECTOR_INFO;
+    const takesProvider = all && providers.takesExecutionProvider(detector);
+    const devices = takesProvider ? providers.devicesOf(value.provider) : [];
 
     return <>
         {/* In the posthoc section the detector reframes every row beneath it, so it leads the section. */}
@@ -101,10 +114,15 @@ export function DetectorSettingRows({value, onChange, detectors, providers, cont
             control={<SettingSelectInput label="Skeleton detector" value={detector} options={detectors}
                 onChange={(selected: DetectorType) => onChange({detector: selected})}/>}/>
 
-        {all && providers.takesExecutionProvider(detector) && <SettingRow inactive={inactive} label="Execution provider" info={providers.info}
+        {takesProvider && <SettingRow inactive={inactive} label="Execution provider" info={providers.info}
             control={<SettingSelectInput label="Execution provider" value={value.provider ?? 'auto'}
                 options={providers.options.map(option => ({...option, value: option.value ?? 'auto' as const}))}
-                onChange={(provider: ExecutionProviderName | 'auto') => onChange({provider: provider === 'auto' ? null : provider})}/>}/>}
+                onChange={(provider: ExecutionProviderName | 'auto') => onChange({provider: provider === 'auto' ? null : provider, device: null})}/>}/>}
+
+        {devices.length > 1 && <SettingRow inactive={inactive} label="Device" info={DEVICE_INFO}
+            control={<SettingSelectInput label="Device" value={value.device ?? 'auto'}
+                options={[{label: 'Auto', value: 'auto'}, ...devices.map(device => ({label: deviceLabel(device), value: device.key}))]}
+                onChange={(device: string) => onChange({device: device === 'auto' ? null : device})}/>}/>}
 
         {rtmw && <SettingRow inactive={inactive} label="Model" info={MODEL_INFO}
             control={<SettingSelectInput label="RTMPose model" value={value.model}

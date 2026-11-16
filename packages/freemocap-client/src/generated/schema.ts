@@ -2884,6 +2884,11 @@ export interface components {
              */
             executionProvider?: string | null;
             /**
+             * Executiondevice
+             * @description A skellytracker device key of the chosen EP. None is skellytracker's choice; Auto ignores it.
+             */
+            executionDevice?: string | null;
+            /**
              * Mediapipenumhands
              * @description Two-sided human presets detect one hand per side; the count is fixed at two.
              * @default 2
@@ -3274,6 +3279,8 @@ export interface components {
             max_batch_size?: number;
             /** Execution Provider */
             execution_provider?: string | null;
+            /** Execution Device */
+            execution_device?: string | null;
             /**
              * Debug Draw Bboxes
              * @default false

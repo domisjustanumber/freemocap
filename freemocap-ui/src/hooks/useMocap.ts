@@ -13,10 +13,12 @@ import {
     mocapRtmPoseConfidenceThresholdChanged,
     mocapRtmPoseModelNameChanged,
     mocapExecutionProviderChanged,
+    mocapExecutionDeviceChanged,
     processMocapRecording,
     RTMPoseModelName,
     ExecutionProviderName,
     selectMocapExecutionProvider,
+    selectMocapExecutionDevice,
     selectCanProcessMocapRecording,
     selectCanStartMocapRecording,
     selectIsUsingManualMocapPath,
@@ -58,6 +60,7 @@ export function useMocap() {
     const detectorType = useAppSelector(selectMocapDetectorType);
     const rtmPoseModelName = useAppSelector(selectMocapRtmPoseModelName);
     const executionProvider = useAppSelector(selectMocapExecutionProvider);
+    const executionDevice = useAppSelector(selectMocapExecutionDevice);
     const rtmPoseConfidenceThreshold = useAppSelector(selectMocapRtmPoseConfidenceThreshold);
     const mediapipeNumHands = useAppSelector(selectMocapMediapipeNumHands);
     const canStartRecording = useAppSelector(selectCanStartMocapRecording);
@@ -84,6 +87,13 @@ export function useMocap() {
     const setExecutionProvider = useCallback(
         (provider: ExecutionProviderName | null) => {
             dispatch(mocapExecutionProviderChanged(provider));
+        },
+        [dispatch]
+    );
+
+    const setExecutionDevice = useCallback(
+        (device: string | null) => {
+            dispatch(mocapExecutionDeviceChanged(device));
         },
         [dispatch]
     );
@@ -186,6 +196,8 @@ export function useMocap() {
         setRtmPoseModelName,
         executionProvider,
         setExecutionProvider,
+        executionDevice,
+        setExecutionDevice,
         setRtmPoseConfidenceThreshold,
         setManualRecordingPath,
         clearManualRecordingPath,

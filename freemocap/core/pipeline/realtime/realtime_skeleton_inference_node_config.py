@@ -12,6 +12,8 @@ class RealtimeSkeletonInferenceNodeConfig(BaseModel):
     # Otherwise a skellytracker EP key; skellytracker refuses a key it does not
     # have, or one that cannot start, when the run starts. MediaPipe takes no EP.
     execution_provider: str | None = None
+    # A skellytracker device key of the chosen EP; None is skellytracker's choice. Auto ignores it.
+    execution_device: str | None = None
 
     # When True, writes debug frames with bbox overlays to
     # {freemocap_data}/debug_bboxes/. (requires GPU mode)

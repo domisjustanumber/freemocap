@@ -3,7 +3,7 @@ name = "freemocap"
 version = "2.0.0a25"  # bumpver
 description = "A free and open source markerless motion capture system for everyone 💀✨"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = "==3.13.18"
 dependencies = [
     "pyarrow>=25.0.1",
     "polars>=2.0,<3",
@@ -21,7 +21,7 @@ dependencies = [
     "scikit-learn>=1.7.2",
     "tomli-w>=1.2.0",
     "scipy-stubs~=1.17.1",
-    "beartype>=0.22.9,<0.23",  # 0.23.0 mutates class dictionaries during decoration
+    "beartype==0.23.1",  # the skellytracker pin (ADR-M2C6); the 0.23.0 class-dictionary concern is retested
     "msgspec>=0.19",
     "cbor2>=5.6.0",
     "pylsl>=1.18.6,<2",
@@ -34,19 +34,9 @@ dependencies = [
     "skellylogs",
     "skellypings",
     #    "skellymodels",
+    "skellytracker[mediapipe]",
 ]
 
-# Published, pip-installable variant selection — for PyPI users, not `uv sync`
-# (which gets skellytracker automatically via the "tracker-default" dependency
-# group below; dependency-groups aren't part of a package's published metadata,
-# so this is the only channel pip users have):
-#   pip install freemocap[cuda]   (Windows/Linux, NVIDIA GPU acceleration)
-#   pip install freemocap[trt]    (Windows/Linux, TensorRT with CUDA fallback)
-#   pip install freemocap[cpu]    (macOS, or Windows/Linux without a supported GPU)
-[project.optional-dependencies]
-cuda = ["skellytracker[all-cuda]"]
-trt = ["skellytracker[all-trt]"]
-cpu = ["skellytracker[all-cpu]"]
 
 [tool.uv.sources]
 # Development uses the sibling checkouts managed by the project workspace.
@@ -62,7 +52,7 @@ skellypings = { path = "../utils/skellypings", editable = true }
 # Clone/switch metadata for the workspace tools; UV installs the paths above.
 [tool.freemocap.workspace.sources]
 skellycam = { git = "https://github.com/freemocap/skellycam", branch = "sfn26" }
-skellytracker = { git = "https://github.com/freemocap/skellytracker", branch = "sfn26" }
+skellytracker = { git = "https://github.com/freemocap/skellytracker", branch = "dom/sidecar-implementation" }
 skellyforge = { git = "https://github.com/freemocap/skellyforge", branch = "sfn26" }
 freemocap_blender_addon = { git = "https://github.com/freemocap/freemocap_blender_addon", branch = "sfn26" }
 skellylogs = { git = "https://github.com/freemocap/skellylogs" }
@@ -78,36 +68,27 @@ freemocap = ["tests/streaming_fixtures/*.bin", "tests/fixtures/*.md", "tests/con
 
   [tool.uv]
   package = true
+  # Intel Mac is not supported, as in skellytracker.
   environments = [
-      "sys_platform == 'darwin'",
+      "sys_platform == 'darwin' and platform_machine == 'arm64'",
       "sys_platform == 'linux' and platform_machine == 'x86_64'",
       "sys_platform == 'win32' and platform_machine == 'AMD64'",
   ]
-  # Plain `uv sync` always installs a working skellytracker via the "tracker-default"
-  # group below, which platform-switches between CUDA (Windows/Linux) and CPU
-  # (macOS) automatically. To force a specific variant regardless of platform —
-  # e.g. the CI build matrix building a CPU installer on a Windows/Linux runner —
-  # bypass the default and pick a group explicitly:
-  #   uv sync --no-default-groups --group cuda
-  #   uv sync --no-default-groups --group cpu
-  # (--no-default-groups is required — cuda and cpu both ship skellytracker with a
-  # different onnxruntime backend and can't coexist on disk, see the rtmlib note below.)
-  default-groups = ["tracker-default"]
+  required-environments = [
+      "sys_platform == 'darwin' and platform_machine == 'arm64'",
+      "sys_platform == 'linux' and platform_machine == 'x86_64'",
+      "sys_platform == 'win32' and platform_machine == 'AMD64'",
+  ]
   override-dependencies = [
       # Use core's existing utility source declarations throughout the graph. [@uvDependencyOverrides]
       "skellylogs",
       "skellypings",
-      "numpy>=2.3.4,<2.5",  # <2.5: NumPy 2.5 changed ScalarT internals, breaking beartype's NDArray introspection
-      "mediapipe==0.10.33; sys_platform != 'darwin' or platform_machine != 'x86_64'",
   ]
 
   # This project uses opencv-contrib-python (a superset of opencv-python); having
   # both installed causes a file-collision error.
   exclude-dependencies = ["opencv-python"]
 
-  [[tool.uv.index]]
-  name = "nvidia"
-  url = "https://pypi.nvidia.com"
 
 # ---- Version Bumping (bumpver) ----
 # Run with: uv run poe bump-alpha   (see [tool.poe.tasks] in poe_tasks.toml)
@@ -159,17 +140,6 @@ push = true
 # =============================================================================
 
 [dependency-groups]
-# skellytracker's TensorRT, CUDA-only or CPU backend — select
-# exactly one via --group (see the default-groups note under [tool.uv] above).
-cuda = ["skellytracker[all-cuda]"]
-trt = ["skellytracker[all-trt]"]
-cpu = ["skellytracker[all-cpu]"]
-# Platform-switched default used by plain `uv sync` (via [tool.uv] default-groups):
-# CUDA on Windows/Linux, CPU on macOS.
-tracker-default = [
-    "skellytracker[all-cuda]; sys_platform != 'darwin'",
-    "skellytracker[all-cpu]; sys_platform == 'darwin'",
-]
 dev = [
     "rich>=14.1.0",
     "bumpver",

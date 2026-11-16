@@ -16,18 +16,10 @@ export default function MocapDetectorSettings() {
         rtmPoseModelName,
         rtmPoseConfidenceThreshold,
         executionProvider,
-        mediapipeModelComplexity,
-        mediapipeDetectionConfidence,
-        mediapipePresenceConfidence,
-        mediapipeTrackingConfidence,
         setDetectorType,
         setRtmPoseModelName,
         setRtmPoseConfidenceThreshold,
         setExecutionProvider,
-        setMediapipeModelComplexity,
-        setMediapipeDetectionConfidence,
-        setMediapipePresenceConfidence,
-        setMediapipeTrackingConfidence,
     } = useMocap();
     const executionProviderOptions = useExecutionProviderOptions(executionProvider);
 
@@ -37,10 +29,6 @@ export default function MocapDetectorSettings() {
         model: rtmPoseModelName ?? "rtmw-x-l_256x192",
         provider: executionProvider ?? null,
         confidence: rtmPoseConfidenceThreshold ?? 0.4,
-        poseModelSize: mediapipeModelComplexity ?? "heavy",
-        detectionConfidence: mediapipeDetectionConfidence ?? 0.5,
-        presenceConfidence: mediapipePresenceConfidence ?? 0.5,
-        trackingConfidence: mediapipeTrackingConfidence ?? 0.5,
     };
     /** Each field the rows report goes to its own setting in the store. */
     const applyChange = (change: Partial<DetectorSettingsValue>) => {
@@ -48,10 +36,6 @@ export default function MocapDetectorSettings() {
         if (change.provider !== undefined) setExecutionProvider(change.provider);
         if (change.model !== undefined) setRtmPoseModelName(change.model);
         if (change.confidence !== undefined) setRtmPoseConfidenceThreshold(change.confidence);
-        if (change.poseModelSize !== undefined) setMediapipeModelComplexity(change.poseModelSize);
-        if (change.detectionConfidence !== undefined) setMediapipeDetectionConfidence(change.detectionConfidence);
-        if (change.presenceConfidence !== undefined) setMediapipePresenceConfidence(change.presenceConfidence);
-        if (change.trackingConfidence !== undefined) setMediapipeTrackingConfidence(change.trackingConfidence);
     };
 
     return <>

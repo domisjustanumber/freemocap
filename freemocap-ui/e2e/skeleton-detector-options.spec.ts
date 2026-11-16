@@ -31,14 +31,13 @@ test('Skeleton Setup switches detectors through the real realtime store', async 
     await expect(page.getByText('Skeleton Setup', {exact: true})).toBeVisible();
     const detector = page.getByRole('combobox', {name: 'Skeleton detector', exact: true});
     await detector.selectOption('mediapipe');
-    await expect(page.getByText('Pose model size', {exact: true})).toBeVisible();
-    await expect(page.getByText('Execution provider', {exact: true})).toHaveCount(0);
-    await page.getByRole('combobox', {name: 'Pose model size', exact: true}).selectOption('heavy');
     await expect.poll(() => page.evaluate(() =>
-        (window as any).readPipelineConfig().camera_node_config.mediapipe_model_complexity)).toBe('heavy');
+        (window as any).readPipelineConfig().camera_node_config.detector_type)).toBe('mediapipe');
+    await expect(page.getByText('Execution provider', {exact: true})).toHaveCount(0);
+    await expect(page.getByText('Model', {exact: true})).toHaveCount(0);
     await detector.selectOption('rtmpose');
     await expect.poll(() => page.evaluate(() =>
         (window as any).readPipelineConfig().camera_node_config.detector_type)).toBe('rtmpose');
-    await expect(page.getByText('Detection confidence', {exact: true})).toHaveCount(0);
+    await expect(page.getByText('Model', {exact: true})).toBeVisible();
     await expect(page.getByText('Execution provider', {exact: true})).toBeVisible();
 });

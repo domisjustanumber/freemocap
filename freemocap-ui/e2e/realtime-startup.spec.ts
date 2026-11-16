@@ -29,7 +29,7 @@ async function mountPipeline(page: Page) {
         window.applyConfig = async (detector) => {
             const config = structuredClone(window.readConfig());
             config.camera_node_config.detector_type = detector;
-            config.camera_node_config.mediapipe_detection_confidence = 0.65;
+            config.camera_node_config.rtmpose_confidence_threshold = 0.0065;
             // Reproduce a resolved server recipe retained by an already-open UI.
             config.camera_node_config.skeleton_tracker_config = {stages: [{
                 bbox_smoothing: {alpha: 0.4}, children: [{
@@ -74,7 +74,7 @@ test('Apply sends selected settings without replaying generated tracker recipes'
         expect(settings).not.toHaveProperty('skeleton_tracker_config');
         expect(settings).not.toHaveProperty('charuco_tracker_config');
         expect(settings.detector_type).toBe(detector);
-        expect(settings.mediapipe_detection_confidence).toBe(0.65);
+        expect(settings.rtmpose_confidence_threshold).toBe(0.0065);
         expect(settings.charuco_board.square_length_mm).toBe(42);
         expect(request.realtimeConfig.aggregator_config.calibration_toml_path).toBe('selected-calibration.toml');
         const restored = await page.evaluate(() => (window as any).readConfig().camera_node_config);
@@ -93,7 +93,7 @@ from freemocap.api.http.realtime.realtime_router import RealtimePipelineConnectR
 request = RealtimePipelineConnectRequest.model_validate(json.load(sys.stdin))
 camera = request.realtime_config.camera_node_config
 assert camera.charuco_board.square_length_mm == 42
-assert camera.mediapipe_detection_confidence == 0.65
+assert camera.rtmpose_confidence_threshold == 0.0065
 if camera.detector_type != 'rtmpose':
     hands = [child for child in camera.skeleton_tracker_config.stages[0].children if child.name.endswith('_hand')]
     assert len(hands) == 2

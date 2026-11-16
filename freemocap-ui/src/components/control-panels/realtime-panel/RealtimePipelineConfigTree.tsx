@@ -7,7 +7,7 @@ import {PosthocFilterConfigPanel} from "@/components/control-panels/mocap-contro
 import {useMocap} from "@/hooks/useMocap";
 import {useExecutionProviderOptions} from "@/hooks/useExecutionProviderOptions";
 import {useRealtimePipelineSync} from "@/hooks/useRealtimePipelineSync";
-import {DetectorType, ExecutionProviderName, MediapipeModelComplexity, RTMPOSE_MODELS} from "@/store/slices/mocap";
+import {DetectorType, ExecutionProviderName, RTMPOSE_MODELS} from "@/store/slices/mocap";
 import {useAppDispatch, useAppSelector} from "@/store/hooks";
 import {pipelineConfigUpdated, resetSkeletonFitter} from "@/store/slices/realtime";
 import ValueSelector from "@/components/ui-components/ValueSelector";
@@ -58,17 +58,9 @@ export const RealtimePipelineConfigTree: React.FC<PipelineConfigTreeProps> = ({
         rtmPoseConfidenceThreshold,
         executionProvider: posthocExecutionProvider,
         setExecutionProvider: setPosthocExecutionProvider,
-        mediapipeModelComplexity,
-        mediapipeDetectionConfidence,
-        mediapipePresenceConfidence,
-        mediapipeTrackingConfidence,
         setDetectorType: setPosThocDetectorType,
         setRtmPoseModelName,
         setRtmPoseConfidenceThreshold,
-        setMediapipeModelComplexity,
-        setMediapipeDetectionConfidence,
-        setMediapipePresenceConfidence,
-        setMediapipeTrackingConfidence,
     } = useMocap();
 
     const {triggerRealtimeApply} = useRealtimePipelineSync();
@@ -253,74 +245,10 @@ export const RealtimePipelineConfigTree: React.FC<PipelineConfigTreeProps> = ({
                             </div>
                         )}
 
-                        {/* MediaPipe settings */}
                         {activeDetectorType === "mediapipe" && (
-                            <>
-                                <p className="text-sm text-gray">
-                                    MediaPipe body, hands and face.
-                                </p>
-                                <div className="flex flex-row gap-1 items-center justify-content-space-between">
-                                    <span className="text-sm">Model size</span>
-                                    <div className="flex flex-row gap-1">
-                                        {(["lite", "full", "heavy"] as MediapipeModelComplexity[]).map((c) => {
-                                            const activeComplexity = context === "realtime"
-                                                ? (cameraNodeConfig.mediapipe_model_complexity ?? "lite")
-                                                : (mediapipeModelComplexity ?? "heavy");
-                                            return (
-                                                <button
-                                                    key={c}
-                                                    className={`button sm br-1 ${activeComplexity === c ? "primary accent" : "quaternary"}`}
-                                                    onClick={() => context === "realtime"
-                                                        ? handleCameraNodeConfigUpdate({ mediapipe_model_complexity: c })
-                                                        : setMediapipeModelComplexity(c)
-                                                    }
-                                                >
-                                                    {c.charAt(0).toUpperCase() + c.slice(1)}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                                <div className="flex flex-row gap-1 items-center justify-content-space-between">
-                                    <span className="text-sm">Detection confidence</span>
-                                    <ValueSelector
-                                        value={context === "realtime"
-                                            ? (cameraNodeConfig.mediapipe_detection_confidence ?? 0.5)
-                                            : (mediapipeDetectionConfidence ?? 0.5)}
-                                        min={0} max={1} step={0.05} unit=""
-                                        onChange={(v) => context === "realtime"
-                                            ? handleCameraNodeConfigUpdate({ mediapipe_detection_confidence: v })
-                                            : setMediapipeDetectionConfidence(v)
-                                        }
-                                    />
-                                </div>
-                                <div className="flex flex-row gap-1 items-center justify-content-space-between">
-                                    <span className="text-sm">Presence confidence</span>
-                                    <ValueSelector
-                                        value={context === "realtime"
-                                            ? (cameraNodeConfig.mediapipe_presence_confidence ?? 0.5)
-                                            : (mediapipePresenceConfidence ?? 0.5)}
-                                        min={0} max={1} step={0.05} unit=""
-                                        onChange={(v) => context === "realtime"
-                                            ? handleCameraNodeConfigUpdate({ mediapipe_presence_confidence: v })
-                                            : setMediapipePresenceConfidence(v)
-                                        }
-                                    />
-                                </div>
-                                <div className="flex flex-row gap-1 items-center justify-content-space-between">
-                                    <span className="text-sm">Tracking confidence</span>
-                                    <ValueSelector
-                                        value={context === "realtime"
-                                            ? (cameraNodeConfig.mediapipe_tracking_confidence ?? 0.5)
-                                            : (mediapipeTrackingConfidence ?? 0.5)}
-                                        min={0} max={1} step={0.05} unit=""
-                                        onChange={(v) => context === "realtime"
-                                            ? handleCameraNodeConfigUpdate({ mediapipe_tracking_confidence: v })
-                                            : setMediapipeTrackingConfidence(v)
-                                        }
-                                    />
-                                </div>
-                            </>
+                            <p className="text-sm text-gray">
+                                MediaPipe body, hands and face.
+                            </p>
                         )}
                     </div>
                 </RealtimePipelineStageTreeItem>

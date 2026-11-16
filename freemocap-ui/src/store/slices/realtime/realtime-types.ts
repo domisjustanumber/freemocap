@@ -1,6 +1,6 @@
 import {CameraMatchingOptions, defaultCameraMatchingOptions} from '@/types/camera-matching';
 import type {TemporalConfig, TemporalStatus} from '@/types/temporal-config';
-import {DetectorType, ExecutionProviderName, MediapipeModelComplexity, RTMPoseModelName} from "@/store/slices/mocap";
+import {DetectorType, ExecutionProviderName, RTMPoseModelName} from "@/store/slices/mocap";
 
 export interface CharucoBoardConfigForPipeline {
     squares_x: number;
@@ -17,12 +17,7 @@ export interface CameraNodeConfig {
     detector_type?: DetectorType;
     rtmpose_model_name?: RTMPoseModelName;
     rtmpose_confidence_threshold?: number;
-    mediapipe_model_complexity?: MediapipeModelComplexity;
-    mediapipe_detection_confidence?: number;
-    mediapipe_presence_confidence?: number;
-    mediapipe_tracking_confidence?: number;
     mediapipe_num_hands?: 2;
-    mediapipe_num_faces?: number;
 }
 
 export interface RealtimeSkeletonInferenceNodeConfig {
@@ -55,12 +50,7 @@ export const defaultRealtimePipelineConfig: RealtimePipelineConfig = {
         detector_type: "rtmpose",
         rtmpose_model_name: "rtmw-x-l_256x192",
         rtmpose_confidence_threshold: 0.0025,
-        mediapipe_model_complexity: "lite",
-        mediapipe_detection_confidence: 0.5,
-        mediapipe_presence_confidence: 0.5,
-        mediapipe_tracking_confidence: 0.5,
         mediapipe_num_hands: 2,
-        mediapipe_num_faces: 1,
     },
     skeleton_inference_node_config: {
         execution_provider: null,

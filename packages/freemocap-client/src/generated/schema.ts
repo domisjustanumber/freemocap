@@ -1830,34 +1830,12 @@ export interface components {
              * @default 0.4
              */
             rtmpose_confidence_threshold?: number;
-            /** @default lite */
-            mediapipe_model_complexity?: components["schemas"]["MediapipePoseModelComplexity"];
-            /**
-             * Mediapipe Detection Confidence
-             * @default 0.5
-             */
-            mediapipe_detection_confidence?: number;
-            /**
-             * Mediapipe Presence Confidence
-             * @default 0.5
-             */
-            mediapipe_presence_confidence?: number;
-            /**
-             * Mediapipe Tracking Confidence
-             * @default 0.5
-             */
-            mediapipe_tracking_confidence?: number;
             /**
              * Mediapipe Num Hands
              * @default 2
              * @constant
              */
             mediapipe_num_hands?: 2;
-            /**
-             * Mediapipe Num Faces
-             * @default 1
-             */
-            mediapipe_num_faces?: number;
             charuco_board?: components["schemas"]["CharucoBoardDefinition-Input"];
             /**
              * Confidence Threshold
@@ -1896,34 +1874,12 @@ export interface components {
              * @default 0.4
              */
             rtmpose_confidence_threshold?: number;
-            /** @default lite */
-            mediapipe_model_complexity?: components["schemas"]["MediapipePoseModelComplexity"];
-            /**
-             * Mediapipe Detection Confidence
-             * @default 0.5
-             */
-            mediapipe_detection_confidence?: number;
-            /**
-             * Mediapipe Presence Confidence
-             * @default 0.5
-             */
-            mediapipe_presence_confidence?: number;
-            /**
-             * Mediapipe Tracking Confidence
-             * @default 0.5
-             */
-            mediapipe_tracking_confidence?: number;
             /**
              * Mediapipe Num Hands
              * @default 2
              * @constant
              */
             mediapipe_num_hands?: 2;
-            /**
-             * Mediapipe Num Faces
-             * @default 1
-             */
-            mediapipe_num_faces?: number;
             charuco_board?: components["schemas"]["CharucoBoardDefinition-Output"];
             /**
              * Confidence Threshold
@@ -2464,11 +2420,6 @@ export interface components {
          * @enum {string}
          */
         MatchingFailurePolicy: "continue" | "stop";
-        /**
-         * MediapipePoseModelComplexity
-         * @enum {string}
-         */
-        MediapipePoseModelComplexity: "lite" | "full" | "heavy";
         /** MocapAlignmentConfig */
         MocapAlignmentConfig: {
             /**
@@ -2909,41 +2860,12 @@ export interface components {
              */
             executionProvider?: ("cpu" | "coreml" | "cuda" | "trt-rtx") | null;
             /**
-             * @description MediaPipe pose model size. Only used when detector_type='mediapipe'.
-             * @default heavy
-             */
-            mediapipeModelComplexity?: components["schemas"]["MediapipePoseModelComplexity"];
-            /**
-             * Mediapipedetectionconfidence
-             * @description Minimum detection confidence for all MediaPipe detectors.
-             * @default 0.5
-             */
-            mediapipeDetectionConfidence?: number;
-            /**
-             * Mediapipepresenceconfidence
-             * @description Minimum presence confidence for all MediaPipe detectors.
-             * @default 0.5
-             */
-            mediapipePresenceConfidence?: number;
-            /**
-             * Mediapipetrackingconfidence
-             * @description Minimum tracking confidence for all MediaPipe detectors.
-             * @default 0.5
-             */
-            mediapipeTrackingConfidence?: number;
-            /**
              * Mediapipenumhands
              * @description Two-sided human presets detect one hand per side; the count is fixed at two.
              * @default 2
              * @constant
              */
             mediapipeNumHands?: 2;
-            /**
-             * Mediapipenumfaces
-             * @description Number of faces to detect. Only used when detector_type='mediapipe'.
-             * @default 1
-             */
-            mediapipeNumFaces?: number;
             /**
              * Calibrationtomlpath
              * @description Selected calibration TOML. Required for multicamera processing; no implicit file selection.
@@ -3246,12 +3168,7 @@ export interface components {
              *         "charuco_tracking_enabled": true,
              *         "confidence_threshold": 0.4,
              *         "detector_type": "rtmpose",
-             *         "mediapipe_detection_confidence": 0.5,
-             *         "mediapipe_model_complexity": "lite",
-             *         "mediapipe_num_faces": 1,
              *         "mediapipe_num_hands": 2,
-             *         "mediapipe_presence_confidence": 0.5,
-             *         "mediapipe_tracking_confidence": 0.5,
              *         "rtmpose_confidence_threshold": 0.4,
              *         "rtmpose_model_name": "rtmw-x-l_256x192",
              *         "skeleton_tracker_config": {

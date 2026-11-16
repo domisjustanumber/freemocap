@@ -4,14 +4,8 @@ import type {ReactNode} from 'react';
 import SettingRow from '@/components/common/settings-layout/setting-row';
 import SettingSelectInput from '@/components/common/settings-layout/setting-select-input';
 import ValueSelector from '@/components/ui-components/ValueSelector';
-import {type DetectorType, type MediapipeModelComplexity, RTMPOSE_MODELS, type RTMPoseModelName} from '@/store/slices/mocap';
+import {type DetectorType, RTMPOSE_MODELS, type RTMPoseModelName} from '@/store/slices/mocap';
 import type {ExecutionProviderName} from '@/types/execution-provider';
-
-export const MEDIAPIPE_COMPLEXITIES: { label: string; value: MediapipeModelComplexity }[] = [
-    {label: "Heavy", value: "heavy"},
-    {label: "Full", value: "full"},
-    {label: "Lite", value: "lite"},
-];
 
 export const DETECTOR_INFO = {
     title: "Skeleton detector",
@@ -35,43 +29,11 @@ export const MODEL_INFO = {
     </>,
 };
 
-export const COMPLEXITY_INFO = {
-    title: "Pose model size",
-    text: <>
-        <p><strong>Heavy</strong> is the most accurate and the slowest; <strong>Lite</strong> is the fastest on CPU; <strong>Full</strong> sits between them.</p>
-        <p><em>All three return the same keypoints — only the estimation quality and runtime change.</em></p>
-    </>,
-};
-
 export const CONFIDENCE_INFO = {
     title: "Confidence threshold",
     text: <>
         <p>Keypoints detected below this confidence are <strong>discarded before triangulation</strong>, so they never contribute to a 3D estimate.</p>
         <p><em>Raise it to reject noisy detections; lower it to keep sparse ones and rely on outlier rejection instead.</em></p>
-    </>,
-};
-
-export const DETECTION_CONFIDENCE_INFO = {
-    title: "Detection confidence",
-    text: <>
-        <p>The detection confidence required by the selected MediaPipe detectors.</p>
-        <p><em>Raise it if it locks onto things that are not people; lower it if it fails to pick up a person who is partly out of frame.</em></p>
-    </>,
-};
-
-export const PRESENCE_CONFIDENCE_INFO = {
-    title: "Presence confidence",
-    text: <>
-        <p>The presence confidence required by the selected MediaPipe pose or hand detector.</p>
-        <p><em>Raise it to reject less certain detections; lower it to accept more uncertain detections.</em></p>
-    </>,
-};
-
-export const TRACKING_CONFIDENCE_INFO = {
-    title: "Tracking confidence",
-    text: <>
-        <p>The tracking confidence required by the selected MediaPipe detectors before requesting detection again.</p>
-        <p><em>Lower values hold the track through occlusions; higher values re-detect sooner when the track drifts.</em></p>
     </>,
 };
 
@@ -116,7 +78,6 @@ const REALTIME_PROVIDER_INFO = withDetectorNotes(EXECUTION_PROVIDER_INFO);
 
 export interface DetectorSettingsValue {
     detector: DetectorType; model: RTMPoseModelName; provider: ExecutionProviderName | null; confidence: number;
-    poseModelSize: MediapipeModelComplexity; detectionConfidence: number; presenceConfidence: number; trackingConfidence: number;
 }
 
 interface DetectorSettingRowsProps {
@@ -127,7 +88,7 @@ interface DetectorSettingRowsProps {
     /** The execution providers to offer; the one with no value is Auto. */
     providerOptions: readonly {label: string; value: ExecutionProviderName | null}[];
     context: 'posthoc' | 'realtime';
-    /** 'key' is the detector and its model row: two rows whatever the detector. 'all' is every row the detector has. */
+    /** 'key' is the detector and, for RTMW, its model row. 'all' is every row the detector has. */
     rows: 'all' | 'key';
     /** What the rows belong to is switched off: they stay on screen, dimmed. */
     inactive?: boolean;
@@ -137,7 +98,6 @@ export function DetectorSettingRows({value, onChange, detectors, providerOptions
     const {detector} = value;
     const all = rows === 'all';
     const rtmw = detector === 'rtmpose';
-    const mediapipe = detector === 'mediapipe';
     const realtime = context === 'realtime';
     const detectorInfo = (realtime && REALTIME_DETECTOR_INFO.get(detector)) || DETECTOR_INFO;
     const providerInfo = (realtime && REALTIME_PROVIDER_INFO.get(detector)) || EXECUTION_PROVIDER_INFO;
@@ -153,31 +113,12 @@ export function DetectorSettingRows({value, onChange, detectors, providerOptions
                 options={providerOptions.map(option => ({...option, value: option.value ?? 'auto' as const}))}
                 onChange={(provider: ExecutionProviderName | 'auto') => onChange({provider: provider === 'auto' ? null : provider})}/>}/>}
 
-        {/* Every detector has one model row, so the key rows are two rows whatever the detector. */}
         {rtmw && <SettingRow inactive={inactive} label="Model" info={MODEL_INFO}
             control={<SettingSelectInput label="RTMPose model" value={value.model}
                 options={RTMPOSE_MODELS} onChange={(model: RTMPoseModelName) => onChange({model})}/>}/>}
-        {detector === 'mediapipe' && <SettingRow inactive={inactive} label="Pose model size" info={COMPLEXITY_INFO}
-            control={<SettingSelectInput label="Pose model size" value={value.poseModelSize}
-                options={MEDIAPIPE_COMPLEXITIES} onChange={(poseModelSize: MediapipeModelComplexity) => onChange({poseModelSize})}/>}/>}
 
         {all && rtmw && <SettingRow inactive={inactive} label="Confidence threshold" info={CONFIDENCE_INFO}
             control={<ValueSelector ariaLabel="Confidence threshold" value={value.confidence} min={0} max={1}
                 step={realtime ? 0.0005 : 0.001} unit="" onChange={confidence => onChange({confidence})}/>}/>}
-
-        {all && mediapipe && <>
-            <SettingRow inactive={inactive} label="Detection confidence"
-                info={DETECTION_CONFIDENCE_INFO}
-                control={<ValueSelector ariaLabel="Detection confidence" value={value.detectionConfidence} min={0} max={1} step={0.05}
-                    unit="" onChange={detectionConfidence => onChange({detectionConfidence})}/>}/>
-            <SettingRow inactive={inactive} label="Presence confidence"
-                info={PRESENCE_CONFIDENCE_INFO}
-                control={<ValueSelector ariaLabel="Presence confidence" value={value.presenceConfidence} min={0} max={1} step={0.05}
-                    unit="" onChange={presenceConfidence => onChange({presenceConfidence})}/>}/>
-            <SettingRow inactive={inactive} label="Tracking confidence"
-                info={TRACKING_CONFIDENCE_INFO}
-                control={<ValueSelector ariaLabel="Tracking confidence" value={value.trackingConfidence} min={0} max={1} step={0.05}
-                    unit="" onChange={trackingConfidence => onChange({trackingConfidence})}/>}/>
-        </>}
     </>;
 }

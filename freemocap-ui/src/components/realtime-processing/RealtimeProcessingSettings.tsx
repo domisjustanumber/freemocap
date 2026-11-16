@@ -26,21 +26,13 @@ export default function RealtimeProcessingSettings({onClose}: {onClose: () => vo
     const value: DetectorSettingsValue = {
         detector: camera.detector_type ?? 'rtmpose', model: camera.rtmpose_model_name ?? 'rtmw-x-l_256x192',
         provider, confidence: camera.rtmpose_confidence_threshold ?? 0.0025,
-        poseModelSize: camera.mediapipe_model_complexity ?? 'lite',
-        detectionConfidence: camera.mediapipe_detection_confidence ?? 0.5,
-        presenceConfidence: camera.mediapipe_presence_confidence ?? 0.5,
-        trackingConfidence: camera.mediapipe_tracking_confidence ?? 0.5,
     };
     const changeDetector = (change: Partial<DetectorSettingsValue>) => applyOrUpdatePipelineConfig({
         ...pipelineConfig,
         camera_node_config: {...camera,
             detector_type: change.detector ?? camera.detector_type,
             rtmpose_model_name: change.model ?? camera.rtmpose_model_name,
-            rtmpose_confidence_threshold: change.confidence ?? camera.rtmpose_confidence_threshold,
-            mediapipe_model_complexity: change.poseModelSize ?? camera.mediapipe_model_complexity,
-            mediapipe_detection_confidence: change.detectionConfidence ?? camera.mediapipe_detection_confidence,
-            mediapipe_presence_confidence: change.presenceConfidence ?? camera.mediapipe_presence_confidence,
-            mediapipe_tracking_confidence: change.trackingConfidence ?? camera.mediapipe_tracking_confidence},
+            rtmpose_confidence_threshold: change.confidence ?? camera.rtmpose_confidence_threshold},
         skeleton_inference_node_config: {...pipelineConfig.skeleton_inference_node_config,
             execution_provider: change.provider !== undefined ? change.provider : provider},
     });

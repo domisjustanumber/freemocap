@@ -32,12 +32,7 @@
     "rtmPoseModelName": "rtmw-x-l_256x192",
     "rtmPoseConfidenceThreshold": 0.004,
     "executionProvider": null,
-    "mediapipeModelComplexity": "heavy",
-    "mediapipeDetectionConfidence": 0.5,
-    "mediapipePresenceConfidence": 0.5,
-    "mediapipeTrackingConfidence": 0.5,
     "mediapipeNumHands": 2,
-    "mediapipeNumFaces": 1,
     "calibrationTomlPath": "/recordings/baseline/calibration.toml",
     "triangulationConfig": {
       "useOutlierRejection": true,

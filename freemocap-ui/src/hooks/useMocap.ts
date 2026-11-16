@@ -6,19 +6,10 @@ import {calibrationAutoLoadDismissed, calibrationLoadedFromBundle, loadCalibrati
 import {useElectronIPC} from '@/services';
 import {
     DetectorType,
-    MediapipeDetectorConfig,
-    MediapipeModelComplexity,
     MocapDirectoryInfo,
-    mocapDetectorConfigReplaced,
-    mocapDetectorConfigUpdated,
     mocapDetectorTypeChanged,
     mocapDirectoryInfoUpdated,
     mocapErrorCleared,
-    mocapMediapipeComplexityChanged,
-    mocapMediapipeDetectionConfidenceChanged,
-    mocapMediapipeNumFacesChanged,
-    mocapMediapipePresenceConfidenceChanged,
-    mocapMediapipeTrackingConfidenceChanged,
     mocapRtmPoseConfidenceThresholdChanged,
     mocapRtmPoseModelNameChanged,
     mocapExecutionProviderChanged,
@@ -30,15 +21,9 @@ import {
     selectCanStartMocapRecording,
     selectIsUsingManualMocapPath,
     selectMocap,
-    selectMocapDetectorConfig,
     selectMocapDetectorType,
     selectMocapDirectoryInfo,
-    selectMocapMediapipeComplexity,
-    selectMocapMediapipeDetectionConfidence,
-    selectMocapMediapipeNumFaces,
     selectMocapMediapipeNumHands,
-    selectMocapMediapipePresenceConfidence,
-    selectMocapMediapipeTrackingConfidence,
     selectMocapRecordingPath,
     selectMocapRtmPoseConfidenceThreshold,
     selectMocapRtmPoseModelName,
@@ -70,17 +55,11 @@ export function useMocap() {
     const dispatch = useAppDispatch();
     const {api, isElectron} = useElectronIPC();
     const mocapState = useAppSelector(selectMocap);
-    const detectorConfig = useAppSelector(selectMocapDetectorConfig);
     const detectorType = useAppSelector(selectMocapDetectorType);
     const rtmPoseModelName = useAppSelector(selectMocapRtmPoseModelName);
     const executionProvider = useAppSelector(selectMocapExecutionProvider);
     const rtmPoseConfidenceThreshold = useAppSelector(selectMocapRtmPoseConfidenceThreshold);
-    const mediapipeModelComplexity = useAppSelector(selectMocapMediapipeComplexity);
-    const mediapipeDetectionConfidence = useAppSelector(selectMocapMediapipeDetectionConfidence);
-    const mediapipePresenceConfidence = useAppSelector(selectMocapMediapipePresenceConfidence);
-    const mediapipeTrackingConfidence = useAppSelector(selectMocapMediapipeTrackingConfidence);
     const mediapipeNumHands = useAppSelector(selectMocapMediapipeNumHands);
-    const mediapipeNumFaces = useAppSelector(selectMocapMediapipeNumFaces);
     const canStartRecording = useAppSelector(selectCanStartMocapRecording);
     const canProcessMocapRecording = useAppSelector(selectCanProcessMocapRecording);
     const mocapRecordingPath = useAppSelector(selectMocapRecordingPath);
@@ -112,56 +91,6 @@ export function useMocap() {
     const setRtmPoseConfidenceThreshold = useCallback(
         (threshold: number) => {
             dispatch(mocapRtmPoseConfidenceThresholdChanged(threshold));
-        },
-        [dispatch]
-    );
-
-    const setMediapipeModelComplexity = useCallback(
-        (complexity: MediapipeModelComplexity) => {
-            dispatch(mocapMediapipeComplexityChanged(complexity));
-        },
-        [dispatch]
-    );
-
-    const setMediapipeDetectionConfidence = useCallback(
-        (v: number) => dispatch(mocapMediapipeDetectionConfidenceChanged(v)), [dispatch]
-    );
-    const setMediapipePresenceConfidence = useCallback(
-        (v: number) => dispatch(mocapMediapipePresenceConfidenceChanged(v)), [dispatch]
-    );
-    const setMediapipeTrackingConfidence = useCallback(
-        (v: number) => dispatch(mocapMediapipeTrackingConfidenceChanged(v)), [dispatch]
-    );
-    const setMediapipeNumFaces = useCallback(
-        (v: number) => dispatch(mocapMediapipeNumFacesChanged(v)), [dispatch]
-    );
-
-    const updateDetectorConfig = useCallback(
-        (updates: Partial<MediapipeDetectorConfig>) => {
-            dispatch(mocapDetectorConfigUpdated(updates));
-        },
-        [dispatch]
-    );
-
-    const replaceDetectorConfig = useCallback(
-        (config: MediapipeDetectorConfig) => {
-            dispatch(mocapDetectorConfigReplaced(config));
-        },
-        [dispatch]
-    );
-
-    // Local-only variants — update Redux state without triggering a server call.
-    // Used when the caller (e.g. RealtimePipelineConfigTree) manages server sync itself.
-    const updateDetectorConfigLocalOnly = useCallback(
-        (updates: Partial<MediapipeDetectorConfig>) => {
-            dispatch(mocapDetectorConfigUpdated(updates));
-        },
-        [dispatch]
-    );
-
-    const replaceDetectorConfigLocalOnly = useCallback(
-        (config: MediapipeDetectorConfig) => {
-            dispatch(mocapDetectorConfigReplaced(config));
         },
         [dispatch]
     );
@@ -236,16 +165,10 @@ export function useMocap() {
     return {
         // State
         config: mocapState.config,
-        detectorConfig,
         detectorType,
         rtmPoseModelName,
         rtmPoseConfidenceThreshold,
-        mediapipeModelComplexity,
-        mediapipeDetectionConfidence,
-        mediapipePresenceConfidence,
-        mediapipeTrackingConfidence,
         mediapipeNumHands,
-        mediapipeNumFaces,
         error: mocapState.error,
         isLoading: mocapState.isLoading,
         isRecording: mocapState.isRecording,
@@ -264,15 +187,6 @@ export function useMocap() {
         executionProvider,
         setExecutionProvider,
         setRtmPoseConfidenceThreshold,
-        setMediapipeModelComplexity,
-        setMediapipeDetectionConfidence,
-        setMediapipePresenceConfidence,
-        setMediapipeTrackingConfidence,
-        setMediapipeNumFaces,
-        updateDetectorConfig,
-        replaceDetectorConfig,
-        updateDetectorConfigLocalOnly,
-        replaceDetectorConfigLocalOnly,
         setManualRecordingPath,
         clearManualRecordingPath,
         dispatchStartMocapRecording,

@@ -5,9 +5,6 @@ from freemocap.core.reconstruction.alignment_config import MocapAlignmentConfig
 from freemocap.core.reconstruction.posthoc_filtering import PosthocFilterConfig
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from skellytracker.core.detectors.keypoint_detectors.mediapipe.mediapipe_model_manager import (
-    MediapipePoseModelComplexity,
-)
 from freemocap.core.tracking.execution_providers import RequestedExecutionProvider
 
 from freemocap.core.tasks.triangulation.helpers.triangulation_config import TriangulationConfig
@@ -96,44 +93,11 @@ class PosthocMocapPipelineConfig(BaseModel):
             raise ValueError("executionProvider and graphExecutionProvider disagree; use executionProvider")
         return self
 
-    # MediaPipe settings (shared across pose/hands/face detectors)
-    mediapipe_model_complexity: MediapipePoseModelComplexity = Field(
-        default=MediapipePoseModelComplexity.HEAVY,
-        alias="mediapipeModelComplexity",
-        description="MediaPipe pose model size. Only used when detector_type='mediapipe'.",
-    )
-    mediapipe_detection_confidence: float = Field(
-        default=0.5,
-        alias="mediapipeDetectionConfidence",
-        ge=0.0,
-        le=1.0,
-        description="Minimum detection confidence for all MediaPipe detectors.",
-    )
-    mediapipe_presence_confidence: float = Field(
-        default=0.5,
-        alias="mediapipePresenceConfidence",
-        ge=0.0,
-        le=1.0,
-        description="Minimum presence confidence for all MediaPipe detectors.",
-    )
-    mediapipe_tracking_confidence: float = Field(
-        default=0.5,
-        alias="mediapipeTrackingConfidence",
-        ge=0.0,
-        le=1.0,
-        description="Minimum tracking confidence for all MediaPipe detectors.",
-    )
+    # MediaPipe Holistic takes no model size, confidences or face count (user F1, 2026-11-16).
     mediapipe_num_hands: Literal[2] = Field(
         default=2,
         alias="mediapipeNumHands",
         description="Two-sided human presets detect one hand per side; the count is fixed at two.",
-    )
-    mediapipe_num_faces: int = Field(
-        default=1,
-        alias="mediapipeNumFaces",
-        ge=1,
-        le=4,
-        description="Number of faces to detect. Only used when detector_type='mediapipe'.",
     )
     calibration_toml_path: str | None = Field(
         default=None,

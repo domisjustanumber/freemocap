@@ -37,12 +37,7 @@ function buildPosthocConfig(state: RootState) {
         rtmPoseModelName: config.rtmPoseModelName,
         rtmPoseConfidenceThreshold: config.rtmPoseConfidenceThreshold,
         executionProvider: config.executionProvider,
-        mediapipeModelComplexity: config.mediapipeModelComplexity,
-        mediapipeDetectionConfidence: config.mediapipeDetectionConfidence,
-        mediapipePresenceConfidence: config.mediapipePresenceConfidence,
-        mediapipeTrackingConfidence: config.mediapipeTrackingConfidence,
         mediapipeNumHands: config.mediapipeNumHands,
-        mediapipeNumFaces: config.mediapipeNumFaces,
         calibrationTomlPath,
         triangulationConfig: {
             useOutlierRejection: config.triangulation.use_outlier_rejection,

@@ -3,7 +3,6 @@ import {CollapsibleSidebarSection} from "@/components/common/CollapsibleSidebarS
 import {DirectoryStatusPanel} from "@/components/common/DirectoryStatusPanel";
 import {useMocap} from "@/hooks/useMocap";
 import {useElectronIPC} from "@/services";
-import {MediapipeConfigPanel} from "@/components/control-panels/mocap-control-panel/MediapipeConfigPanel";
 import {PosthocFilterConfigPanel} from "@/components/control-panels/mocap-control-panel/PosthocFilterConfigPanel";
 import IconButton from "@/components/ui-components/IconButton";
 
@@ -351,9 +350,6 @@ export const MocapTaskTreeItem: React.FC = () => {
                             </div>
                         </div>
                     )}
-
-                    {/* MediaPipe Detector Config */}
-                    <MediapipeConfigPanel />
 
                     {/* Skeleton Filter Config */}
                     <PosthocFilterConfigPanel />

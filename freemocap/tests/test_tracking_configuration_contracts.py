@@ -22,3 +22,20 @@ def test_saved_skellytracker_1_recipes_load_and_are_not_written_again(config_typ
     assert config.detector_type == "mediapipe"
     dumped = config.model_dump(by_alias=True)
     assert not set(fields) & set(dumped) and not set(fields) & set(config.model_dump())
+
+
+RETIRED_MEDIAPIPE = ("mediapipe_model_complexity", "mediapipe_detection_confidence", "mediapipe_presence_confidence",
+                     "mediapipe_tracking_confidence", "mediapipe_num_faces")
+
+
+@pytest.mark.parametrize("config_type,fields", [
+    (CameraNodeConfig, RETIRED_MEDIAPIPE),
+    (PosthocMocapPipelineConfig, RETIRED_MEDIAPIPE + ("mediapipeModelComplexity", "mediapipeDetectionConfidence",
+                                                      "mediapipePresenceConfidence", "mediapipeTrackingConfidence",
+                                                      "mediapipeNumFaces"))])
+def test_saved_mediapipe_settings_that_holistic_ignores_load_and_are_not_written_again(config_type, fields):
+    saved = {field: "heavy" if "omplexity" in field else 1 if "um" in field else 0.5 for field in fields}
+    config = config_type.model_validate({"detector_type": "mediapipe", **saved})
+    assert config.detector_type == "mediapipe"
+    written = set(config.model_dump(by_alias=True)) | set(config.model_dump())
+    assert not {field.lower().replace("_", "") for field in fields} & {key.lower().replace("_", "") for key in written}

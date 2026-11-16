@@ -19,28 +19,6 @@ import {
 
 // ==================== Types ====================
 
-/**
- * Legacy numeric complexity levels for the old MediaPipe realtime detector config.
- * 0 = LITE (fastest), 1 = FULL (balanced), 2 = HEAVY (most accurate)
- */
-export type LegacyMediapipeModelComplexity = 0 | 1 | 2;
-
-/**
- * Mirrors skellytracker MediapipeDetectorConfig.
- * Field names use snake_case to match the backend JSON.
- */
-export interface MediapipeDetectorConfig {
-    model_complexity: LegacyMediapipeModelComplexity;
-    min_detection_confidence: number;
-    min_tracking_confidence: number;
-    confidence_threshold: number;
-    static_image_mode: boolean;
-    smooth_landmarks: boolean;
-    enable_segmentation: boolean;
-    smooth_segmentation: boolean;
-    refine_face_landmarks: boolean;
-}
-
 export interface TriangulationConfig {
     use_outlier_rejection: boolean;
     minimum_cameras_for_triangulation: number;
@@ -57,7 +35,6 @@ export interface PosthocFilterConfig {
 
 export type DetectorType = "rtmpose" | "mediapipe";
 export type RTMPoseModelName = "rtmw-x-l_256x192" | "rtmw-x-l_384x288" | "rtmw-l-m_256x192";
-export type MediapipeModelComplexity = "lite" | "full" | "heavy";
 export {EXECUTION_PROVIDERS} from '@/types/execution-provider';
 export type {ExecutionProviderName} from '@/types/execution-provider';
 
@@ -76,19 +53,13 @@ export const RTMPOSE_MODELS: { label: string; value: RTMPoseModelName }[] = [
 export interface MocapConfig {
     cameraMatching: CameraMatchingOptions;
     charucoTrackingEnabled: boolean;
-    detector: MediapipeDetectorConfig;
     triangulation: TriangulationConfig;
     posthoc_filter: PosthocFilterConfig;
     detectorType: DetectorType;
     rtmPoseModelName: RTMPoseModelName;
     rtmPoseConfidenceThreshold: number;
     executionProvider: ExecutionProviderName | null;
-    mediapipeModelComplexity: MediapipeModelComplexity;
-    mediapipeDetectionConfidence: number;
-    mediapipePresenceConfidence: number;
-    mediapipeTrackingConfidence: number;
     mediapipeNumHands: 2;
-    mediapipeNumFaces: number;
 
     bodyAlignmentMode: 'auto' | 'calibration' | 'person';
     anchorSegmentName: string;
@@ -100,51 +71,6 @@ export interface MocapConfig {
     /** Row-major rigid offset applied after posthoc alignment, with translation in mm. */
     referenceTransform: number[] | null;
     referenceTransformEnabled: boolean;
-}
-
-/** Realtime preset matching MEDIAPIPE_TRACKER_REALTIME_PRESET on the backend. */
-export const MEDIAPIPE_REALTIME_PRESET: MediapipeDetectorConfig = {
-    model_complexity: 0,
-    min_detection_confidence: 0.5,
-    min_tracking_confidence: 0.5,
-    confidence_threshold: 0.5,
-    static_image_mode: false,
-    smooth_landmarks: true,
-    enable_segmentation: false,
-    smooth_segmentation: false,
-    refine_face_landmarks: true,
-};
-
-/** Posthoc preset matching MEDIAPIPE_TRACKER_POSTHOC_PRESET on the backend. */
-export const MEDIAPIPE_POSTHOC_PRESET: MediapipeDetectorConfig = {
-    model_complexity: 2,
-    min_detection_confidence: 0.5,
-    min_tracking_confidence: 0.5,
-    confidence_threshold: 0.5,
-    static_image_mode: false,
-    smooth_landmarks: true,
-    enable_segmentation: true,
-    smooth_segmentation: true,
-    refine_face_landmarks: true,
-};
-
-export type DetectorPreset = "realtime" | "posthoc" | "custom";
-
-/** Detects which preset (if any) the current detector config matches. */
-export function detectPreset(
-    config: { model_complexity: number; enable_segmentation: boolean; smooth_segmentation: boolean }
-): DetectorPreset {
-    if (
-        config.model_complexity === 0 &&
-        !config.enable_segmentation &&
-        !config.smooth_segmentation
-    ) return "realtime";
-    if (
-        config.model_complexity === 2 &&
-        config.enable_segmentation &&
-        config.smooth_segmentation
-    ) return "posthoc";
-    return "custom";
 }
 
 export const DEFAULT_TRIANGULATION_CONFIG: TriangulationConfig = {
@@ -190,7 +116,6 @@ export interface MocapState {
 
 const DEFAULT_MOCAP_CONFIG: MocapConfig = {
     cameraMatching: {...defaultCameraMatchingOptions},
-    detector: {...MEDIAPIPE_REALTIME_PRESET},
     triangulation: {...DEFAULT_TRIANGULATION_CONFIG},
     posthoc_filter: {...DEFAULT_POSTHOC_FILTER_CONFIG},
 
@@ -199,12 +124,7 @@ const DEFAULT_MOCAP_CONFIG: MocapConfig = {
     rtmPoseModelName: "rtmw-x-l_256x192",
     rtmPoseConfidenceThreshold: 0.004,
     executionProvider: null,
-    mediapipeModelComplexity: "heavy",
-    mediapipeDetectionConfidence: 0.5,
-    mediapipePresenceConfidence: 0.5,
-    mediapipeTrackingConfidence: 0.5,
     mediapipeNumHands: 2,
-    mediapipeNumFaces: 1,
     bodyAlignmentMode: 'auto',
     anchorSegmentName: "pelvis",
     exportTallCsv: false,
@@ -224,11 +144,6 @@ const _persistedMocapConfig = migrateRemovedDetectors(exportSettingsMigration.co
 const initialMocapConfig: MocapConfig = {
     ...DEFAULT_MOCAP_CONFIG,
     ...(_persistedMocapConfig ?? {}),
-
-    detector: {
-        ...DEFAULT_MOCAP_CONFIG.detector,
-        ...(_persistedMocapConfig?.detector ?? {}),
-    },
 
     triangulation: {
         ...DEFAULT_MOCAP_CONFIG.triangulation,
@@ -320,36 +235,6 @@ export const mocapSlice = createSlice({
         /** Change the RTMPose keypoint confidence threshold. */
         mocapRtmPoseConfidenceThresholdChanged: (state, action: PayloadAction<number>) => {
             state.config.rtmPoseConfidenceThreshold = action.payload;
-        },
-
-        /** Change the MediaPipe model complexity (lite/full/heavy). */
-        mocapMediapipeComplexityChanged: (state, action: PayloadAction<MediapipeModelComplexity>) => {
-            state.config.mediapipeModelComplexity = action.payload;
-        },
-
-        /** Update a shared MediaPipe confidence value (applies to pose, hands, and face). */
-        mocapMediapipeDetectionConfidenceChanged: (state, action: PayloadAction<number>) => {
-            state.config.mediapipeDetectionConfidence = action.payload;
-        },
-        mocapMediapipePresenceConfidenceChanged: (state, action: PayloadAction<number>) => {
-            state.config.mediapipePresenceConfidence = action.payload;
-        },
-        mocapMediapipeTrackingConfidenceChanged: (state, action: PayloadAction<number>) => {
-            state.config.mediapipeTrackingConfidence = action.payload;
-        },
-
-        mocapMediapipeNumFacesChanged: (state, action: PayloadAction<number>) => {
-            state.config.mediapipeNumFaces = action.payload;
-        },
-
-        /** Replace the entire detector config (e.g. applying a preset). */
-        mocapDetectorConfigReplaced: (state, action: PayloadAction<MediapipeDetectorConfig>) => {
-            state.config.detector = action.payload;
-        },
-
-        /** Partially update individual detector fields. */
-        mocapDetectorConfigUpdated: (state, action: PayloadAction<Partial<MediapipeDetectorConfig>>) => {
-            state.config.detector = { ...state.config.detector, ...action.payload };
         },
 
         triangulationConfigUpdated: (state, action: PayloadAction<Partial<TriangulationConfig>>) => {
@@ -445,7 +330,6 @@ export const mocapSlice = createSlice({
 
 export const selectMocap = (state: RootState) => state.mocap;
 export const selectMocapConfig = (state: RootState) => state.mocap.config;
-export const selectMocapDetectorConfig = (state: RootState) => state.mocap.config.detector;
 export const selectMocapTriangulationConfig = (state: RootState) => state.mocap.config.triangulation;
 export const selectPosthocFilterConfig = (state: RootState) => state.mocap.config.posthoc_filter;
 export const selectReferenceTransform = (state: RootState) => state.mocap.config.referenceTransform;
@@ -454,12 +338,7 @@ export const selectMocapDetectorType = (state: RootState) => state.mocap.config.
 export const selectMocapRtmPoseModelName = (state: RootState) => state.mocap.config.rtmPoseModelName;
 export const selectMocapExecutionProvider = (state: RootState) => state.mocap.config.executionProvider;
 export const selectMocapRtmPoseConfidenceThreshold = (state: RootState) => state.mocap.config.rtmPoseConfidenceThreshold;
-export const selectMocapMediapipeComplexity = (state: RootState) => state.mocap.config.mediapipeModelComplexity;
-export const selectMocapMediapipeDetectionConfidence = (state: RootState) => state.mocap.config.mediapipeDetectionConfidence;
-export const selectMocapMediapipePresenceConfidence = (state: RootState) => state.mocap.config.mediapipePresenceConfidence;
-export const selectMocapMediapipeTrackingConfidence = (state: RootState) => state.mocap.config.mediapipeTrackingConfidence;
 export const selectMocapMediapipeNumHands = (state: RootState) => state.mocap.config.mediapipeNumHands;
-export const selectMocapMediapipeNumFaces = (state: RootState) => state.mocap.config.mediapipeNumFaces;
 export const selectMocapIsLoading = (state: RootState) => state.mocap.isLoading;
 export const selectMocapIsRecording = (state: RootState) => state.mocap.isRecording;
 export const selectMocapProgress = (state: RootState) => state.mocap.recordingProgress;
@@ -509,13 +388,6 @@ export const {
     mocapRtmPoseModelNameChanged,
     mocapRtmPoseConfidenceThresholdChanged,
     mocapExecutionProviderChanged,
-    mocapMediapipeComplexityChanged,
-    mocapMediapipeDetectionConfidenceChanged,
-    mocapMediapipePresenceConfidenceChanged,
-    mocapMediapipeTrackingConfidenceChanged,
-    mocapMediapipeNumFacesChanged,
-    mocapDetectorConfigReplaced,
-    mocapDetectorConfigUpdated,
     triangulationConfigUpdated,
     posthocFilterConfigUpdated,
     mocapProgressUpdated,

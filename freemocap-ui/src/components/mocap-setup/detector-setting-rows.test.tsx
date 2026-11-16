@@ -9,8 +9,7 @@ import type {DetectorType, TriangulationConfig} from '@/store/slices/mocap';
 import {EXECUTION_PROVIDERS} from '@/types/execution-provider';
 import {DETECTOR_OPTIONS} from './detector-options';
 import {
-    COMPLEXITY_INFO, CONFIDENCE_INFO, DETECTION_CONFIDENCE_INFO, DETECTOR_INFO, DetectorSettingRows, type DetectorSettingsValue,
-    EXECUTION_PROVIDER_INFO, MODEL_INFO, PRESENCE_CONFIDENCE_INFO, TRACKING_CONFIDENCE_INFO,
+    CONFIDENCE_INFO, DETECTOR_INFO, DetectorSettingRows, type DetectorSettingsValue, EXECUTION_PROVIDER_INFO, MODEL_INFO,
 } from './detector-setting-rows';
 import {OutlierRejectionRows} from './outlier-rejection-rows';
 import SkeletonAnchorSetting from './skeleton-anchor-setting';
@@ -24,7 +23,6 @@ const DETECTORS: DetectorType[] = ['rtmpose', 'mediapipe'];
 /** The realtime pipeline's detector defaults. */
 const VALUE: DetectorSettingsValue = {
     detector: 'rtmpose', model: 'rtmw-x-l_256x192', provider: null, confidence: 0.0025,
-    poseModelSize: 'lite', detectionConfidence: 0.5, presenceConfidence: 0.5, trackingConfidence: 0.5,
 };
 const CONFIG: TriangulationConfig = {
     use_outlier_rejection: true, minimum_cameras_for_triangulation: 2, maximum_cameras_to_drop: 1, target_reprojection_error: 0.02,
@@ -84,9 +82,8 @@ const textOf = (info: Info): string => renderToStaticMarkup(<>{info.text}</>);
 
 /** The posthoc explanation of each detector row. */
 const POSTHOC_INFO: Record<string, Info> = {
-    'Skeleton detector': DETECTOR_INFO, 'Execution provider': EXECUTION_PROVIDER_INFO, 'Model': MODEL_INFO, 'Pose model size': COMPLEXITY_INFO,
-    'Confidence threshold': CONFIDENCE_INFO, 'Detection confidence': DETECTION_CONFIDENCE_INFO, 'Presence confidence': PRESENCE_CONFIDENCE_INFO,
-    'Tracking confidence': TRACKING_CONFIDENCE_INFO,
+    'Skeleton detector': DETECTOR_INFO, 'Execution provider': EXECUTION_PROVIDER_INFO, 'Model': MODEL_INFO,
+    'Confidence threshold': CONFIDENCE_INFO,
 };
 /** What today's realtime Skeleton Setup dialog says about the selected detector, word for word. */
 const DETECTOR_NOTES: Partial<Record<DetectorType, string>> = {
@@ -94,23 +91,18 @@ const DETECTOR_NOTES: Partial<Record<DetectorType, string>> = {
     mediapipe: 'Body + hands + face via MediaPipe. CPU-only; runs per-camera without GPU batching.',
 };
 
-test('key rows are two rows for every detector', () => {
-    const modelRow: Record<DetectorType, string> = {rtmpose: 'Model', mediapipe: 'Pose model size'};
-    for (const detector of DETECTORS) {
-        const html = detectorRows(detector, 'key');
-        assert.equal(html.match(/class="setting-row[ "]/g)?.length, 2, `${detector}: ${html}`);
-        assert.deepEqual(labels(html), ['Skeleton detector', modelRow[detector]], detector);
-    }
+test('key rows are the detector and its model', () => {
+    // MediaPipe Holistic has no model choice in the settings.
+    const expected: Record<DetectorType, string[]> = {rtmpose: ['Skeleton detector', 'Model'], mediapipe: ['Skeleton detector']};
+    for (const detector of DETECTORS) assert.deepEqual(labels(detectorRows(detector, 'key')), expected[detector], detector);
     assert.deepEqual(optionsOf(rowLabelled(detectorRows('rtmpose', 'key'), 'Skeleton detector')), DETECTORS);
     assert.deepEqual(optionsOf(rowLabelled(detectorRows('rtmpose', 'key'), 'Model')), ['rtmw-x-l_256x192', 'rtmw-x-l_384x288', 'rtmw-l-m_256x192']);
-    assert.deepEqual(optionsOf(rowLabelled(detectorRows('mediapipe', 'key'), 'Pose model size')), ['heavy', 'full', 'lite']);
 });
 
 test('all rows follow the detector', () => {
-    const mediapipeConfidences = ['Detection confidence', 'Presence confidence', 'Tracking confidence'];
     const expected: Record<DetectorType, string[]> = {
         rtmpose: ['Skeleton detector', 'Execution provider', 'Model', 'Confidence threshold'],
-        mediapipe: ['Skeleton detector', 'Pose model size', ...mediapipeConfidences],
+        mediapipe: ['Skeleton detector'],
     };
     for (const detector of DETECTORS) assert.deepEqual(labels(detectorRows(detector, 'all')), expected[detector], detector);
 });
@@ -135,17 +127,14 @@ test('outlier rows dim with their switch', () => {
 test('each control reports its own field', () => {
     const changes: Partial<DetectorSettingsValue>[] = [];
     const all = (detector: DetectorType): ReactNode => DetectorSettingRows(detectorProps(detector, 'all', {onChange: change => changes.push(change)}));
-    const rtmw = all('rtmpose'), mediapipe = all('mediapipe');
+    const rtmw = all('rtmpose');
     handlerOf(rtmw, 'Execution provider')('cpu');
     handlerOf(rtmw, 'Execution provider')('auto');
     handlerOf(rtmw, 'Model')('rtmw-l-m_256x192');
     handlerOf(rtmw, 'Confidence threshold')(0.3);
-    handlerOf(mediapipe, 'Detection confidence')(0.6);
-    handlerOf(mediapipe, 'Presence confidence')(0.7);
-    handlerOf(mediapipe, 'Tracking confidence')(0.8);
-    handlerOf(mediapipe, 'Pose model size')('full');
+    handlerOf(all('mediapipe'), 'Skeleton detector')('rtmpose');
     assert.deepEqual(changes, [{provider: 'cpu'}, {provider: null}, {model: 'rtmw-l-m_256x192'}, {confidence: 0.3},
-        {detectionConfidence: 0.6}, {presenceConfidence: 0.7}, {trackingConfidence: 0.8}, {poseModelSize: 'full'}]);
+        {detector: 'rtmpose'}]);
 
     // The outlier rows report the whole configuration with the one field changed.
     const configs: TriangulationConfig[] = [];
@@ -194,8 +183,6 @@ test('number fields are named after their rows', () => {
     };
     for (const context of ['posthoc', 'realtime'] as const) {
         named(detectorRows('rtmpose', 'all', {context}), 'Confidence threshold', context);
-        const html = detectorRows('mediapipe', 'all', {context});
-        for (const label of ['Detection confidence', 'Presence confidence', 'Tracking confidence']) named(html, label, context);
     }
     for (const label of OUTLIER_LIMITS) named(outlierRows(CONFIG), label, 'outlier rejection');
 });

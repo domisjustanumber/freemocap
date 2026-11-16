@@ -76,8 +76,25 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
   - Part 1 progress: (i) DONE `c4c158fe`; (ii) DONE `f915bc50` (`run_ep_choice` returns key, options,
     device; `run_execution_provider` is a wrapper for `application_pipeline`; 53 passed in
     test_pipeline_runs, test_inference_service, test_execution_providers, test_dataflow_tracker_adapter).
-    Next: (iii) host probes, then (iv) to (viii). `freemocap-ui/tsconfig.node.json` has a pre-existing
-    TS deprecation error (`moduleResolution=node10`), not from this work.
+    `freemocap-ui/tsconfig.node.json` has a pre-existing TS deprecation error (`moduleResolution=node10`),
+    not from this work.
+    PART 1 DONE (2026-11-16, §0.6 items 1, 12-14): (iii) `ab15c4e7` host probes (log fields
+    `HOST_FIELDS`/`GPU_FIELDS` in `app/app.py`, printed only when the record has them; workflow prints
+    `skellytracker-eps status`); (iv) `de6be21a` `graph_execution_provider` gone; (v) `c9a58321` EP key
+    is `str | None` everywhere, `run_ep_choice` passes any key but None/"auto" to skellytracker, which
+    raises `EpRequestError` (message reaches the UI through `_record_startup(..., str(error))`); (vi)
+    `57be4131` `pipeline_runs.detector_takes_execution_provider` (cached `check_pipeline`), a pipeline
+    with no EP ignores the saved choice (no refusal; reversible if the supervisor wants one); (vii)
+    `c0f66701` `/onnx/execution_providers` → `{available: [{key, label}]}` from
+    `usable_execution_provider_rows()` (status order; still the existing `USABLE_STATES` import), UI
+    `ExecutionProviderName = string`, no table; help texts kept. Device list plan for part 2: the same
+    route gains `devices: [{key, name, vram_total_bytes}]` per EP from the part 2 names, and the EP row
+    gets a device select under it when an EP has more than one device; (viii) `74e91d12`
+    `test_no_execution_provider_knowledge.py`, allowlist = 9 part-3 tool lines (named in the test).
+    Tests: per step the touched files pass; UI tsc only the 4 `cbor-x` errors (rebuild the client
+    `dist/` with `npm run build:client` after a contract change, it was stale); UI EP options 4/4,
+    realtime-processing 34/34. Next: part 2 waits for the supervisor's message with the final
+    skellytracker commit and names; part 3 (tools, docs) after it or when told.
   - Part 1, its own commit groups with tests:
     (i) delete the dead `freemocap-ui/electron/main/services/dependency-manager.ts` and `system-scanner.ts`
     (own commit);
@@ -309,8 +326,11 @@ frames, each with `rtmpose` and with `mediapipe`.
 
 ### 0.6 User-visible changes of Phase B
 
-1. The EP menu offers Auto, CUDA, TensorRT RTX, CoreML and CPU. DirectML is gone; a saved `trt` or
-   `directml` reads as Auto (step 1, `a8d88985`).
+1. The EP menu offers Auto and the EPs that skellytracker lists as usable on this host, with its labels
+   and in its order (`c0f66701`). A saved key that the server does not list stays visible under its key.
+   A saved `trt` or `directml` no longer reads as Auto: the run start fails with skellytracker's
+   message ("The EP key 'trt' is reserved: classic TensorRT is a separate EP; it is not in v2.")
+   (`c9a58321`; was Auto since `a8d88985`).
 2. `/onnx/session_providers` names each model by its catalog key (`yolox-person@openmmlab-exporter`)
    and gives the EP key (`cuda`) in `applied_providers`, not the ORT provider name (step 1).
 3. A camera video that fails while it is read stops posthoc tracking with `CameraSourceEndedError`,
@@ -349,15 +369,26 @@ frames, each with `rtmpose` and with `mediapipe`.
       no copies under the old names (F2b).
     - **Not verifiable without a release:** which tag the updater picks, the download, install and
       restart on each OS, the update of a `.deb` install, and the AppImage saved under its new name.
-    - (item 12, host probes) The startup log and `machine_benchmarks` take the hardware from
-      skellytracker. Known losses, accepted, no fallback: the Linux log of an Intel or most AMD GPUs has
-      no model name (skellytracker has vendor and PCI ids only there), the log has no CPU frequency,
-      and the macOS log has no VRAM.
     - `freemocap-ui/package.json` says `2.0.0-alpha.25` here while `2.0.0-alpha.26` is published. The
       channel `version` comes from package.json and the asset names from the tag; the release process
       sets the version.
     - `.github/workflows/test-bucket.yml` (manual R2 test) stays: R2 still hosts the CUDA builds of
       old releases. The `upx_exclude` CUDA names in `freemocap.spec` are dead but harmless.
+12. Host probes (`ab15c4e7`): the startup log and `machine_benchmarks` take the hardware from
+    `probe_host()` and the EP states from `status()`; nvidia-smi, WMIC, lspci, system_profiler and the
+    ORT provider list are gone, and the log has no "GPU acceleration" verdict. A machine record now
+    has the `HostInfo` fields (`cpu_name`, `memory_total_bytes`, `gpus`, ...) and `execution_providers`
+    (key → state) instead of `cpu`, `memory_bytes`, `gpu`, `available_onnx_providers`; old records
+    still render. The build step prints `skellytracker-eps status`. Known losses, accepted, no
+    fallback: the Linux log of an Intel or most AMD GPUs has no model name, the log has no CPU
+    frequency, and the macOS log has no VRAM. skellytracker will add `HostInfo.cpu_max_frequency_hz`,
+    a Linux GPU name from `pci.ids` and macOS VRAM (supervisor, 2026-11-16); the log prints a field
+    only if the record has it, so the frequency needs its name added to `HOST_FIELDS` then.
+13. `graphExecutionProvider` is gone (`de6be21a`); a saved one loads and is not written again (a saved
+    `cuda` there with no `executionProvider` now means Auto).
+14. A detector whose pipeline takes no EP (MediaPipe) ignores the saved EP choice (`57be4131`). The
+    preview no longer refuses MediaPipe with an explicit `cuda`: the UI hides the EP row for MediaPipe
+    but keeps the RTMW choice, so a refusal would block a setting the user cannot see.
 
 ### 0.7 Imports of old skellytracker modules that stage 2.4 can remove
 

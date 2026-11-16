@@ -1005,74 +1005,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/freemocap/dlc/readiness": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Conversion Readiness */
-        get: operations["conversion_readiness_freemocap_dlc_readiness_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/freemocap/dlc/inspect": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Inspect Model */
-        post: operations["inspect_model_freemocap_dlc_inspect_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/freemocap/dlc/import": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Import Model */
-        post: operations["import_model_freemocap_dlc_import_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/freemocap/dlc/import/{job_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Import Status */
-        get: operations["import_status_freemocap_dlc_import__job_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/freemocap/telemetry/track": {
         parameters: {
             query?: never;
@@ -1983,16 +1915,7 @@ export interface components {
              * @default rtmpose
              * @enum {string}
              */
-            detector_type?: "rtmpose" | "mediapipe" | "rtmw_mediapipe_hands" | "rtmw_onnx_hands" | "mediapipe_hands" | "dlc";
-            /** Dlc Model Path */
-            dlc_model_path?: string | null;
-            /** Dlc Geometry Path */
-            dlc_geometry_path?: string | null;
-            /**
-             * Dlc Confidence Threshold
-             * @default 0.4
-             */
-            dlc_confidence_threshold?: number;
+            detector_type?: "rtmpose" | "mediapipe";
             /**
              * Rtmpose Model Name
              * @default rtmw-x-l_256x192
@@ -2021,12 +1944,6 @@ export interface components {
              * @default 0.5
              */
             mediapipe_tracking_confidence?: number;
-            /**
-             * Hand Count
-             * @default two
-             * @enum {string}
-             */
-            hand_count?: "one" | "two" | "unknown";
             /**
              * Mediapipe Num Hands
              * @default 2
@@ -2066,16 +1983,7 @@ export interface components {
              * @default rtmpose
              * @enum {string}
              */
-            detector_type?: "rtmpose" | "mediapipe" | "rtmw_mediapipe_hands" | "rtmw_onnx_hands" | "mediapipe_hands" | "dlc";
-            /** Dlc Model Path */
-            dlc_model_path?: string | null;
-            /** Dlc Geometry Path */
-            dlc_geometry_path?: string | null;
-            /**
-             * Dlc Confidence Threshold
-             * @default 0.4
-             */
-            dlc_confidence_threshold?: number;
+            detector_type?: "rtmpose" | "mediapipe";
             /**
              * Rtmpose Model Name
              * @default rtmw-x-l_256x192
@@ -2104,12 +2012,6 @@ export interface components {
              * @default 0.5
              */
             mediapipe_tracking_confidence?: number;
-            /**
-             * Hand Count
-             * @default two
-             * @enum {string}
-             */
-            hand_count?: "one" | "two" | "unknown";
             /**
              * Mediapipe Num Hands
              * @default 2
@@ -2436,42 +2338,6 @@ export interface components {
              *     }
              */
             keypoint_reset_policy?: components["schemas"]["KeypointResetPolicyConfig"];
-        };
-        /** DlcConversionRequest */
-        DlcConversionRequest: {
-            /**
-             * Pose Config Path
-             * @default null
-             */
-            pose_config_path?: string | null;
-            /**
-             * Checkpoint Path
-             * @default null
-             */
-            checkpoint_path?: string | null;
-            /**
-             * Project Config Path
-             * @default null
-             */
-            project_config_path?: string | null;
-            /**
-             * Image Height
-             * @default null
-             */
-            image_height?: number | null;
-            /**
-             * Image Width
-             * @default null
-             */
-            image_width?: number | null;
-        };
-        /** DlcInspectRequest */
-        DlcInspectRequest: {
-            /**
-             * Sidecar Path
-             * Format: path
-             */
-            sidecar_path: string;
         };
         /** ExportInventory */
         ExportInventory: {
@@ -3410,20 +3276,11 @@ export interface components {
             charucoBoard?: components["schemas"]["CharucoBoardDefinition-Input"];
             /**
              * Detectortype
-             * @description Tracking preset: RTMW, MediaPipe, or RTMW with MediaPipe hands.
+             * @description Tracking preset: RTMW or MediaPipe.
              * @default rtmpose
              * @enum {string}
              */
-            detectorType?: "rtmpose" | "mediapipe" | "rtmw_mediapipe_hands" | "dlc";
-            /** Dlcmodelpath */
-            dlcModelPath?: string | null;
-            /** Dlcgeometrypath */
-            dlcGeometryPath?: string | null;
-            /**
-             * Dlcconfidencethreshold
-             * @default 0.4
-             */
-            dlcConfidenceThreshold?: number;
+            detectorType?: "rtmpose" | "mediapipe";
             /**
              * Rtmposemodelname
              * @description RTMPose wholebody model variant. Only used when detector_type='rtmpose'.
@@ -3797,7 +3654,6 @@ export interface components {
              *         "charuco_tracking_enabled": true,
              *         "confidence_threshold": 0.4,
              *         "detector_type": "rtmpose",
-             *         "dlc_confidence_threshold": 0.4,
              *         "mediapipe_detection_confidence": 0.5,
              *         "mediapipe_model_complexity": "lite",
              *         "mediapipe_num_faces": 1,
@@ -6840,131 +6696,6 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
-                };
-            };
-        };
-    };
-    conversion_readiness_freemocap_dlc_readiness_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-        };
-    };
-    inspect_model_freemocap_dlc_inspect_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DlcInspectRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    import_model_freemocap_dlc_import_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DlcConversionRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    import_status_freemocap_dlc_import__job_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                job_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

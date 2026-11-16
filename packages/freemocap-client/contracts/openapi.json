@@ -2315,7 +2315,6 @@
                         "charuco_tracking_enabled": true,
                         "skeleton_tracking_enabled": true,
                         "detector_type": "rtmpose",
-                        "dlc_confidence_threshold": 0.4,
                         "rtmpose_model_name": "rtmw-x-l_256x192",
                         "rtmpose_confidence_threshold": 0.4,
                         "mediapipe_model_complexity": "lite",
@@ -2933,159 +2932,6 @@
                   },
                   "type": "array",
                   "title": "Response Get Session Providers Freemocap Onnx Session Providers Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/freemocap/dlc/readiness": {
-      "get": {
-        "tags": [
-          "DeepLabCut"
-        ],
-        "summary": "Conversion Readiness",
-        "operationId": "conversion_readiness_freemocap_dlc_readiness_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Conversion Readiness Freemocap Dlc Readiness Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/freemocap/dlc/inspect": {
-      "post": {
-        "tags": [
-          "DeepLabCut"
-        ],
-        "summary": "Inspect Model",
-        "operationId": "inspect_model_freemocap_dlc_inspect_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DlcInspectRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Inspect Model Freemocap Dlc Inspect Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/freemocap/dlc/import": {
-      "post": {
-        "tags": [
-          "DeepLabCut"
-        ],
-        "summary": "Import Model",
-        "operationId": "import_model_freemocap_dlc_import_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DlcConversionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Import Model Freemocap Dlc Import Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/freemocap/dlc/import/{job_id}": {
-      "get": {
-        "tags": [
-          "DeepLabCut"
-        ],
-        "summary": "Import Status",
-        "operationId": "import_status_freemocap_dlc_import__job_id__get",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Import Status Freemocap Dlc Import  Job Id  Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -4849,46 +4695,13 @@
             "default": true
           },
           "detector_type": {
-            "default": "rtmpose",
+            "type": "string",
             "enum": [
               "rtmpose",
-              "mediapipe",
-              "rtmw_mediapipe_hands",
-              "rtmw_onnx_hands",
-              "mediapipe_hands",
-              "dlc"
+              "mediapipe"
             ],
             "title": "Detector Type",
-            "type": "string"
-          },
-          "dlc_model_path": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dlc Model Path"
-          },
-          "dlc_geometry_path": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dlc Geometry Path"
-          },
-          "dlc_confidence_threshold": {
-            "type": "number",
-            "maximum": 1.0,
-            "minimum": 0.0,
-            "title": "Dlc Confidence Threshold",
-            "default": 0.4
+            "default": "rtmpose"
           },
           "rtmpose_model_name": {
             "type": "string",
@@ -4923,16 +4736,6 @@
             "type": "number",
             "title": "Mediapipe Tracking Confidence",
             "default": 0.5
-          },
-          "hand_count": {
-            "default": "two",
-            "enum": [
-              "one",
-              "two",
-              "unknown"
-            ],
-            "title": "Hand Count",
-            "type": "string"
           },
           "mediapipe_num_hands": {
             "type": "integer",
@@ -4995,46 +4798,13 @@
             "default": true
           },
           "detector_type": {
-            "default": "rtmpose",
+            "type": "string",
             "enum": [
               "rtmpose",
-              "mediapipe",
-              "rtmw_mediapipe_hands",
-              "rtmw_onnx_hands",
-              "mediapipe_hands",
-              "dlc"
+              "mediapipe"
             ],
             "title": "Detector Type",
-            "type": "string"
-          },
-          "dlc_model_path": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dlc Model Path"
-          },
-          "dlc_geometry_path": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dlc Geometry Path"
-          },
-          "dlc_confidence_threshold": {
-            "type": "number",
-            "maximum": 1.0,
-            "minimum": 0.0,
-            "title": "Dlc Confidence Threshold",
-            "default": 0.4
+            "default": "rtmpose"
           },
           "rtmpose_model_name": {
             "type": "string",
@@ -5069,16 +4839,6 @@
             "type": "number",
             "title": "Mediapipe Tracking Confidence",
             "default": 0.5
-          },
-          "hand_count": {
-            "default": "two",
-            "enum": [
-              "one",
-              "two",
-              "unknown"
-            ],
-            "title": "Hand Count",
-            "type": "string"
           },
           "mediapipe_num_hands": {
             "type": "integer",
@@ -5919,95 +5679,6 @@
         ],
         "title": "DetectionStageConfig",
         "description": "Declarative description of a DetectionStage and its subtree."
-      },
-      "DlcConversionRequest": {
-        "additionalProperties": false,
-        "properties": {
-          "pose_config_path": {
-            "anyOf": [
-              {
-                "format": "path",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Pose Config Path"
-          },
-          "checkpoint_path": {
-            "anyOf": [
-              {
-                "format": "path",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Checkpoint Path"
-          },
-          "project_config_path": {
-            "anyOf": [
-              {
-                "format": "path",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Project Config Path"
-          },
-          "image_height": {
-            "anyOf": [
-              {
-                "maximum": 8192,
-                "minimum": 32,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Image Height"
-          },
-          "image_width": {
-            "anyOf": [
-              {
-                "maximum": 8192,
-                "minimum": 32,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Image Width"
-          }
-        },
-        "title": "DlcConversionRequest",
-        "type": "object"
-      },
-      "DlcInspectRequest": {
-        "properties": {
-          "sidecar_path": {
-            "type": "string",
-            "format": "path",
-            "title": "Sidecar Path"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "sidecar_path"
-        ],
-        "title": "DlcInspectRequest"
       },
       "ExportInventory": {
         "properties": {
@@ -7936,42 +7607,11 @@
             "type": "string",
             "enum": [
               "rtmpose",
-              "mediapipe",
-              "rtmw_mediapipe_hands",
-              "dlc"
+              "mediapipe"
             ],
             "title": "Detectortype",
-            "description": "Tracking preset: RTMW, MediaPipe, or RTMW with MediaPipe hands.",
+            "description": "Tracking preset: RTMW or MediaPipe.",
             "default": "rtmpose"
-          },
-          "dlcModelPath": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dlcmodelpath"
-          },
-          "dlcGeometryPath": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dlcgeometrypath"
-          },
-          "dlcConfidenceThreshold": {
-            "type": "number",
-            "maximum": 1.0,
-            "minimum": 0.0,
-            "title": "Dlcconfidencethreshold",
-            "default": 0.4
           },
           "rtmPoseModelName": {
             "type": "string",
@@ -8596,7 +8236,6 @@
                   "charuco_tracking_enabled": true,
                   "confidence_threshold": 0.4,
                   "detector_type": "rtmpose",
-                  "dlc_confidence_threshold": 0.4,
                   "mediapipe_detection_confidence": 0.5,
                   "mediapipe_model_complexity": "lite",
                   "mediapipe_num_faces": 1,
@@ -10982,10 +10621,6 @@
     {
       "name": "ONNX",
       "description": "Advertised execution providers and loaded inference-session diagnostics."
-    },
-    {
-      "name": "DeepLabCut",
-      "description": "Inspect converted keypoint models and manage optional model conversion."
     },
     {
       "name": "FFmpeg",

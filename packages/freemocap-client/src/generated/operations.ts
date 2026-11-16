@@ -285,26 +285,6 @@ export const operationDefinitions = {
     "path": "/freemocap/onnx/session_providers",
     "asset": false
   },
-  "conversion_readiness_freemocap_dlc_readiness_get": {
-    "method": "GET",
-    "path": "/freemocap/dlc/readiness",
-    "asset": false
-  },
-  "inspect_model_freemocap_dlc_inspect_post": {
-    "method": "POST",
-    "path": "/freemocap/dlc/inspect",
-    "asset": false
-  },
-  "import_model_freemocap_dlc_import_post": {
-    "method": "POST",
-    "path": "/freemocap/dlc/import",
-    "asset": false
-  },
-  "import_status_freemocap_dlc_import__job_id__get": {
-    "method": "GET",
-    "path": "/freemocap/dlc/import/{job_id}",
-    "asset": false
-  },
   "track_telemetry_event_freemocap_telemetry_track_post": {
     "method": "POST",
     "path": "/freemocap/telemetry/track",

@@ -884,58 +884,6 @@
       ]
     },
     {
-      "method": "GET",
-      "path": "/freemocap/dlc/readiness",
-      "operation_id": "conversion_readiness_freemocap_dlc_readiness_get",
-      "handler": "conversion_readiness",
-      "source": "freemocap/api/http/dlc/dlc_router.py",
-      "owner": "Core integration",
-      "validation": [
-        "request path/body serialization matches declared aliases and optionality",
-        "missing converter and unsupported model errors remain explicit",
-        "CPU contract tests cover inspection and import job state"
-      ]
-    },
-    {
-      "method": "POST",
-      "path": "/freemocap/dlc/inspect",
-      "operation_id": "inspect_model_freemocap_dlc_inspect_post",
-      "handler": "inspect_model",
-      "source": "freemocap/api/http/dlc/dlc_router.py",
-      "owner": "Core integration",
-      "validation": [
-        "request path/body serialization matches declared aliases and optionality",
-        "missing converter and unsupported model errors remain explicit",
-        "CPU contract tests cover inspection and import job state"
-      ]
-    },
-    {
-      "method": "POST",
-      "path": "/freemocap/dlc/import",
-      "operation_id": "import_model_freemocap_dlc_import_post",
-      "handler": "import_model",
-      "source": "freemocap/api/http/dlc/dlc_router.py",
-      "owner": "Core integration",
-      "validation": [
-        "request path/body serialization matches declared aliases and optionality",
-        "missing converter and unsupported model errors remain explicit",
-        "CPU contract tests cover inspection and import job state"
-      ]
-    },
-    {
-      "method": "GET",
-      "path": "/freemocap/dlc/import/{job_id}",
-      "operation_id": "import_status_freemocap_dlc_import__job_id__get",
-      "handler": "import_status",
-      "source": "freemocap/api/http/dlc/dlc_router.py",
-      "owner": "Core integration",
-      "validation": [
-        "request path/body serialization matches declared aliases and optionality",
-        "missing converter and unsupported model errors remain explicit",
-        "CPU contract tests cover inspection and import job state"
-      ]
-    },
-    {
       "method": "POST",
       "path": "/freemocap/recordings/{recording_id}/processing/plan",
       "operation_id": "preview_mocap_plan_freemocap_recordings__recording_id__processing_plan_post",

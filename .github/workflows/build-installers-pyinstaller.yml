@@ -25,7 +25,7 @@ jobs:
           - os: windows-latest
             platform: windows
             arch: x64
-            label: windows-x64-cpu
+            label: windows-x64
             server-binary: freemocap_server.exe
             electron-arch: x64
 
@@ -33,7 +33,7 @@ jobs:
           - os: macos-latest
             platform: macos
             arch: arm64
-            label: macos-arm64-apple-silicon
+            label: macos-arm64
             server-binary: freemocap_server
             electron-arch: arm64
 
@@ -41,7 +41,7 @@ jobs:
           - os: ubuntu-22.04
             platform: linux
             arch: x64
-            label: linux-x64-cpu
+            label: linux-x64
             server-binary: freemocap_server
             electron-arch: x64
 
@@ -541,6 +541,8 @@ jobs:
               cp "$file" "release-assets/freemocap_${VERSION}_${label}.${ext}"
             done
           done
+          # Copies under the old names (`-cpu`, `-cuda`, `macos-arm64-apple-silicon`) would go here; none
+          # until the user decides (2026-11-16). Installs of every old name read the same latest*.yml.
 
           echo "=== GitHub-bound release assets ==="
           ls -lh release-assets/
@@ -555,12 +557,12 @@ jobs:
           bash .github/scripts/update_metadata.sh selftest
 
           # Windows: latest.yml
-          if [ -d "artifacts/update-metadata-windows-x64-cpu" ]; then
-            YML=$(find artifacts/update-metadata-windows-x64-cpu -name 'latest.yml' | head -1)
+          if [ -d "artifacts/update-metadata-windows-x64" ]; then
+            YML=$(find artifacts/update-metadata-windows-x64 -name 'latest.yml' | head -1)
             if [ -n "$YML" ]; then
-              bash .github/scripts/update_metadata.sh patch "$YML" "$VERSION" windows-x64-cpu
+              bash .github/scripts/update_metadata.sh patch "$YML" "$VERSION" windows-x64
               cp "$YML" "release-assets/latest.yml"
-              echo "Copied latest.yml for Windows (CPU)"
+              echo "Copied latest.yml for Windows"
             fi
           fi
 
@@ -575,18 +577,18 @@ jobs:
           done
           if [ -n "$MAC_YML" ]; then
             # Patch filenames to match renamed assets (Apple Silicon only)
-            bash .github/scripts/update_metadata.sh patch "$MAC_YML" "$VERSION" macos-arm64-apple-silicon
+            bash .github/scripts/update_metadata.sh patch "$MAC_YML" "$VERSION" macos-arm64
             cp "$MAC_YML" "release-assets/latest-mac.yml"
             echo "Copied latest-mac.yml for macOS"
           fi
 
           # Linux CPU: latest-linux.yml
-          if [ -d "artifacts/update-metadata-linux-x64-cpu" ]; then
-            YML=$(find artifacts/update-metadata-linux-x64-cpu -name 'latest-linux.yml' | head -1)
+          if [ -d "artifacts/update-metadata-linux-x64" ]; then
+            YML=$(find artifacts/update-metadata-linux-x64 -name 'latest-linux.yml' | head -1)
             if [ -n "$YML" ]; then
-              bash .github/scripts/update_metadata.sh patch "$YML" "$VERSION" linux-x64-cpu
+              bash .github/scripts/update_metadata.sh patch "$YML" "$VERSION" linux-x64
               cp "$YML" "release-assets/latest-linux.yml"
-              echo "Copied latest-linux.yml for Linux (CPU)"
+              echo "Copied latest-linux.yml for Linux"
             fi
           fi
 

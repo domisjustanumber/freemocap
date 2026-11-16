@@ -37,7 +37,7 @@ export function getAppInstallInstructions(
   }
 
   if (os === 'linux') {
-    const label = fileLabel(os);
+    const label = fileLabel(os, version);
     const ai = `freemocap_${version}_${label}.AppImage`;
     const deb = `freemocap_${version}_${label}.deb`;
 
@@ -70,7 +70,7 @@ export function getServerInstallInstructions(
   arch: ArchType,
   version: string,
 ): InstructionBlock[] {
-  const label = fileLabel(os);
+  const label = fileLabel(os, version);
   const zip = `freemocap_server_${version}_${label}.zip`;
   const bin = os === 'windows' ? 'freemocap_server.exe' : 'freemocap_server';
 
@@ -136,7 +136,7 @@ export function getTerminalInstallBlocks(
 ): InstructionBlock[] {
   if (os !== 'linux' && os !== 'macos') return [];
 
-  const label = fileLabel(os);
+  const label = fileLabel(os, version);
   const srvZip = `freemocap_server_${version}_${label}.zip`;
   const blocks: InstructionBlock[] = [];
 

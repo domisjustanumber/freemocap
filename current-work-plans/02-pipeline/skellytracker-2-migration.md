@@ -64,8 +64,8 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
   implement. This replaces the fixed keys of step 1 and the `trt-rtx` fix of (a): delete those
   literals. (b) the Playwright "Apply sends selected settings" `camera.skeleton_tracker_config`
   check still has to go.
-- C. Reported to the supervisor; waiting for answers to (1) `macos-arm64`, (2) no old-name copies,
-  (3) fix the sed bug in the same commit, (4) the package.json version. Facts: the updater is the
+- C. DONE `b5a5570c` (channel-file fix) and the rename commit after it (§0.6 item 11). Old-name
+  copies wait for the user. Facts: the updater is the
   GitHub provider (`freemocap-ui/electron-builder.json:105-109`), no channel, no feed URL, the same
   for every variant. Installs read `latest.yml`/`latest-linux.yml`/`latest-mac.yml` of the newest
   alpha tag and download the `url` named inside (only sha512 and size are checked). Old `-cuda`
@@ -263,8 +263,25 @@ frames, each with `rtmpose` and with `mediapipe`.
 11. One installer variant (F2): Windows x64, macOS Apple Silicon and Linux x64. The CUDA installers and
     the Cloudflare R2 hosting of the installer workflow are gone; the docs download page has no variant
     choice and no GPU detection.
-    - **Known leftover:** the asset names keep the `-cpu` suffix (`windows-x64-cpu`, `linux-x64-cpu`) so
-      that auto-update channels and old download links keep working. The user can rename them later.
+    - From the next release the files are `freemocap_<version>_windows-x64`, `_macos-arm64` and
+      `_linux-x64` (F2 revised). The docs page keeps the old names (`-cpu`,
+      `macos-arm64-apple-silicon`) for `2.0.0-alpha.26` and earlier (`downloads.ts` `fileLabel`).
+    - Auto-update: every installed app, old `-cpu` AND old `-cuda`, reads the same GitHub
+      `latest.yml` / `latest-linux.yml` / `latest-mac.yml` of the newest tag (GitHub provider, no
+      channel; the R2 `latest-linux-cuda.yml` was never read), so both kinds move to the new file
+      with no extra step.
+    - Fixed bug: the channel files of alpha.15, alpha.21 and alpha.26 named files that do not exist
+      ("Update available", then the download fails). The release job now rewrites every `url:`/`path:`
+      by extension (`.github/scripts/update_metadata.sh`) and fails when one names a missing asset.
+      Checked offline on the published alpha.26 files: they fail the check as published and pass it
+      after the rewrite.
+    - Old links keep giving their own old file (every link has the version in it). Copies under the
+      old names are not built; the user decides (the release workflow marks where a copy step goes).
+    - **Not verifiable without a release:** which tag the updater picks, the download, install and
+      restart on each OS, the update of a `.deb` install, and the AppImage saved under its new name.
+    - `freemocap-ui/package.json` says `2.0.0-alpha.25` here while `2.0.0-alpha.26` is published. The
+      channel `version` comes from package.json and the asset names from the tag; the release process
+      sets the version.
     - `.github/workflows/test-bucket.yml` (manual R2 test) stays: R2 still hosts the CUDA builds of
       old releases. The `upx_exclude` CUDA names in `freemocap.spec` are dead but harmless.
 

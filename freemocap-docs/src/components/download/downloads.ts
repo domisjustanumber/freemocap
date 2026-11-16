@@ -51,20 +51,20 @@ export function downloadUrl(file: string, version: string): string {
 // Filenames mirror the release job's naming in
 // .github/workflows/build-installers-pyinstaller.yml exactly:
 //   freemocap_<version>_<matrix.label>.<ext>
-// matrix.label is windows-x64-cpu | macos-arm64-apple-silicon | linux-x64-cpu. The "-cpu"
-// suffix is historical (installed apps auto-update by these names); every build uses CPU
-// onnxruntime and gets GPU execution providers from skellytracker's EP packs at runtime.
+// matrix.label is windows-x64 | macos-arm64 | linux-x64 (see fileLabel for older releases).
+// Every build uses CPU onnxruntime and gets GPU execution providers from skellytracker's EP
+// packs at runtime.
 // There is deliberately no macos-x64-intel or linux-arm64 entry here — CI doesn't
 // build either yet (see OS_NOTES below for why, and the linked tracking issues).
 export function buildAppDownloads(version: string): DownloadEntry[] {
   return [
-    { os: 'windows', arch: 'x64', fmt: 'exe', recommended: true, label: 'Windows Installer', file: `freemocap_${version}_windows-x64-cpu.exe`, size: '' },
+    { os: 'windows', arch: 'x64', fmt: 'exe', recommended: true, label: 'Windows Installer', file: `freemocap_${version}_${fileLabel('windows', version)}.exe`, size: '' },
 
-    { os: 'macos', arch: 'arm64', fmt: 'dmg', recommended: true,  label: 'macOS Installer (Apple Silicon)', file: `freemocap_${version}_macos-arm64-apple-silicon.dmg`, size: '' },
-    { os: 'macos', arch: 'arm64', fmt: 'zip', recommended: false, label: 'macOS Portable (Apple Silicon)',  file: `freemocap_${version}_macos-arm64-apple-silicon.zip`, size: '' },
+    { os: 'macos', arch: 'arm64', fmt: 'dmg', recommended: true,  label: 'macOS Installer (Apple Silicon)', file: `freemocap_${version}_${fileLabel('macos', version)}.dmg`, size: '' },
+    { os: 'macos', arch: 'arm64', fmt: 'zip', recommended: false, label: 'macOS Portable (Apple Silicon)',  file: `freemocap_${version}_${fileLabel('macos', version)}.zip`, size: '' },
 
-    { os: 'linux', arch: 'x64', fmt: 'AppImage', recommended: true,  label: 'Linux AppImage', file: `freemocap_${version}_linux-x64-cpu.AppImage`, size: '' },
-    { os: 'linux', arch: 'x64', fmt: 'deb',      recommended: false, label: 'Linux .deb',     file: `freemocap_${version}_linux-x64-cpu.deb`,      size: '' },
+    { os: 'linux', arch: 'x64', fmt: 'AppImage', recommended: true,  label: 'Linux AppImage', file: `freemocap_${version}_${fileLabel('linux', version)}.AppImage`, size: '' },
+    { os: 'linux', arch: 'x64', fmt: 'deb',      recommended: false, label: 'Linux .deb',     file: `freemocap_${version}_${fileLabel('linux', version)}.deb`,      size: '' },
   ];
 }
 
@@ -72,9 +72,9 @@ export function buildAppDownloads(version: string): DownloadEntry[] {
 // plus a required _internal/ support directory, so it can never be a lone file.
 export function buildServerDownloads(version: string): DownloadEntry[] {
   return [
-    { os: 'windows', arch: 'x64',   fmt: 'zip', recommended: false, label: 'Server — Windows x64',         file: `freemocap_server_${version}_windows-x64-cpu.zip`,           size: '' },
-    { os: 'macos',   arch: 'arm64', fmt: 'zip', recommended: false, label: 'Server — macOS Apple Silicon', file: `freemocap_server_${version}_macos-arm64-apple-silicon.zip`, size: '' },
-    { os: 'linux',   arch: 'x64',   fmt: 'zip', recommended: false, label: 'Server — Linux x64',           file: `freemocap_server_${version}_linux-x64-cpu.zip`,             size: '' },
+    { os: 'windows', arch: 'x64',   fmt: 'zip', recommended: false, label: 'Server — Windows x64',         file: `freemocap_server_${version}_${fileLabel('windows', version)}.zip`,           size: '' },
+    { os: 'macos',   arch: 'arm64', fmt: 'zip', recommended: false, label: 'Server — macOS Apple Silicon', file: `freemocap_server_${version}_${fileLabel('macos', version)}.zip`, size: '' },
+    { os: 'linux',   arch: 'x64',   fmt: 'zip', recommended: false, label: 'Server — Linux x64',           file: `freemocap_server_${version}_${fileLabel('linux', version)}.zip`,             size: '' },
   ];
 }
 
@@ -106,11 +106,22 @@ export function matchesExpectedPattern(assets: GitHubAsset[], version: string): 
   return matchCount >= 3;
 }
 
+// 2.0.0-alpha.26 and every earlier release name their files with the old labels.
+const LAST_OLD_LABEL_ALPHA = 26;
+
+function hasOldLabels(version: string): boolean {
+  const alpha = /^2\.0\.0-alpha\.(\d+)$/.exec(version);
+  return alpha !== null && Number(alpha[1]) <= LAST_OLD_LABEL_ALPHA;
+}
+
 // Only ever called for buildable combos (windows-x64, macos-arm64, linux-x64) —
 // callers gate unbuilt platforms (macos-x64, linux-arm64) before reaching here.
-export function fileLabel(os: OsType): string {
-  if (os === 'macos') return 'macos-arm64-apple-silicon';
-  return os === 'linux' ? 'linux-x64-cpu' : 'windows-x64-cpu';
+export function fileLabel(os: OsType, version: string): string {
+  if (hasOldLabels(version)) {
+    if (os === 'macos') return 'macos-arm64-apple-silicon';
+    return os === 'linux' ? 'linux-x64-cpu' : 'windows-x64-cpu';
+  }
+  return os === 'macos' ? 'macos-arm64' : `${os}-x64`;
 }
 
 export function formatMeta(d: DownloadEntry): string {

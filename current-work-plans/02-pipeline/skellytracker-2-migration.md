@@ -174,6 +174,23 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     `@fontsource-variable/*` and `@axe-core/playwright`; same failure without the change).
     Found: posthoc Auto is resolved to a bare key in `resolve_tracking_provider` before the run, so
     the posthoc run drops the recommendation's options and device; fix in the R1 group.
+  - R1 DONE (2026-11-16) `604b7de2`: `start_detector_run` returns `(run, record)`; record =
+    `{pipeline: export_pipeline(config, resolved=True), running_mode, execution: {selected,
+    selected_device, requested, options, device}}`, the inference client adds `models` (=
+    `PipelineRun.models` at start) as `InferenceClient.run_record`; the adapter hands it to
+    `recording_pipeline`, which writes `definition["skellytracker"]` (fresh tracking only) and
+    `execution.requested_provider` from it. `stage_settings` OBSERVATIONS = detector_type,
+    rtmpose_model_name, rtmpose_confidence_threshold, execution_provider, execution_device,
+    skellytracker, charuco fields; the "requested providers" limitation is gone (RECORDING_CONTRACT.md
+    updated). Posthoc Auto now reaches the run as None (`resolve_tracking_provider`), so the run takes
+    the recommendation with options and device; `run_execution_provider` deleted;
+    `build_recording_pipeline(execution_provider: str | None = None)` (beartype refused None).
+    Tests: `test_recording_pipeline.py` block written + recording without the block restarts; real run
+    record test in `test_pipeline_runs.py`. Fast suite: 1514 passed, the same 8 failed, 20 skipped.
+    Scratch ST clone then moved to `b8bfa7d2`: 130 RTMW edges (65 face); one test_data frame
+    (Cam1, frame 100) annotated: face lines drawn, yellow like the face points, 1 px, mostly under the
+    point dots at that face size (11 px differ from the same annotation without face edges).
+    Next: R2 (settingsVersion + faked legacy call).
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).
@@ -329,7 +346,8 @@ frames, each with `rtmpose` and with `mediapipe`.
   skellytracker 2.0** (they import the old API).
 - F4 (2026-11-16): freemocap accepts RTMW with no face lines for now, and draws none itself. The exporter
   gets a request for face edges in a fresh export; when that sidecar lands, the lines come back through
-  `canonical_edges` with no freemocap change (§0.6 item 6).
+  `canonical_edges` with no freemocap change (§0.6 item 6). DONE with skellytracker `b8bfa7d2`
+  (`rtmw-wholebody133` 0.3.0, new sidecar hash, same ONNX).
 - U1 (2026-11-16): the user moves the skellycam OpenCV pin and the skellyforge Python cap themself,
   separately. The freemocap `uv.lock` stays uncommitted until then; tests run with the two pins relaxed
   in scratch.
@@ -434,8 +452,8 @@ frames, each with `rtmpose` and with `mediapipe`.
    `body.left_hand/wrist`); the 3D names are `<group>/<point>`. The mapping YAMLs follow in step 3.
 5. The posthoc MediaPipe GPU switch (`mediapipe_disable_gpu`) is gone: the Holistic built-in has no
    GPU param.
-6. The RTMW overlay and the bundle draw no face lines: the RTMW output schema of skellytracker 2.0
-   has no face edges (the `sfn26` profile had them). MediaPipe keeps its face mesh edges.
+6. (removed 2026-11-16: with skellytracker `b8bfa7d2` the RTMW schema has 130 edges, 65 face edges,
+   and the annotation draws them; checked on one test_data frame, no freemocap change.)
 7. MediaPipe sends no hand boxes: Holistic makes no hand crops (`detector_box_stages`).
 8. The realtime setting `use_centralized_inference` is gone: skeleton inference always runs in the
    group's inference node. A saved `skeleton_tracker_config`, `charuco_tracker_config`,
@@ -479,15 +497,15 @@ frames, each with `rtmpose` and with `mediapipe`.
 13. `graphExecutionProvider` is gone from the settings (`de6be21a`). A saved one keeps its meaning
     (`59f55e9a`, §0.3 E1): with no saved `executionProvider` its value is the EP choice, and
     `executionProvider` wins when both are saved; it is not written again.
+14. A detector whose pipeline takes no EP (MediaPipe) ignores the saved EP choice (`57be4131`). The
+    preview no longer refuses MediaPipe with an explicit `cuda`: the UI hides the EP row for MediaPipe
+    but keeps the RTMW choice, so a refusal would block a setting the user cannot see.
 15. The EP menu (part 2, `d97932ff`, `f844f90c`): the help text is skellytracker's `description` of
     each EP, with its `install_hint` for an EP that is not usable here; the "GPU batched" and
     "CPU-only" texts are gone; the EP row shows when the server says the detector takes an EP. A
     "Device" row (Auto + each GPU with its name and VRAM, most VRAM first) shows when the chosen EP has
     more than one device; a new EP clears the device. Posthoc `executionDevice` and realtime
     `execution_device` reach `start_pipeline(device=...)`; Auto ignores them.
-14. A detector whose pipeline takes no EP (MediaPipe) ignores the saved EP choice (`57be4131`). The
-    preview no longer refuses MediaPipe with an explicit `cuda`: the UI hides the EP row for MediaPipe
-    but keeps the RTMW choice, so a refusal would block a setting the user cannot see.
 
 ### 0.7 Imports of old skellytracker modules that stage 2.4 can remove
 

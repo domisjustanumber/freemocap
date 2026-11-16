@@ -30,6 +30,10 @@ gate). The supervisor is the skellytracker session; the user decides the product
 | 2a: mapping package | `d97e797f` copy from ST sfn26 `2d356a6c41f831484251677050fafb2576193060`, `0bdb052b` callers | `freemocap/core/mapping/` with the OLD tracker names in its YAMLs |
 | Phase B step 1: dependencies | `296ddebb` | Python `==3.13.18`, `skellytracker[mediapipe]`, `beartype==0.23.1`; no ORT variant extras, groups, NVIDIA index, overrides or Intel Mac. **No `uv.lock`** (§0.4 U1) |
 | Phase B step 2, partial | `c8275d18` | `core/tracking/pipeline_runs.py`: detector → built-in key, RTMW size map, EP choice from `core.eps`, start of a run; not called yet |
+| Phase B step 2: run model | `c5745e7f`, `a8d88985`, `da1457c4` | one `PipelineRun` per client; per-camera ms; the boundary `observations_from_results`; v2 EP keys; V2 stop |
+| Phase B step 3: charuco | `750fc8f2` | `core/tracking/charuco_detection.py` through `create_detector`; calibration and the recording graph take a board |
+| Phase B step 4: mapping 2b | `ec9b3b5d` | the three re-keyed YAMLs; names and edges from the run schema (`detector_point_names`, `detector_connections`) |
+| Phase B step 5: old API removed | `c5be62ed`, `46e9a55d` | tracker factory, provider policy, per-camera inference, generated recipes, contract, spec, CI install |
 
 Test counts:
 
@@ -159,6 +163,14 @@ frames, each with `rtmpose` and with `mediapipe`.
    `body.left_hand/wrist`); the 3D names are `<group>/<point>`. The mapping YAMLs follow in step 3.
 5. The posthoc MediaPipe GPU switch (`mediapipe_disable_gpu`) is gone: the Holistic built-in has no
    GPU param.
+6. The RTMW overlay and the bundle draw no face lines: the RTMW output schema of skellytracker 2.0
+   has no face edges (the `sfn26` profile had them). MediaPipe keeps its face mesh edges.
+7. MediaPipe sends no hand boxes: Holistic makes no hand crops (`detector_box_stages`).
+8. The realtime setting `use_centralized_inference` is gone: skeleton inference always runs in the
+   group's inference node. A saved `skeleton_tracker_config`, `charuco_tracker_config`,
+   `tracker_config`, `pipelineImplementation` or `videoFps` loads and is not written again.
+9. A `charuco_observations_realtime.pkl` written on `sfn26` no longer loads (it pickles the old module
+   path of `CharucoBoardDefinition`); calibration detects every frame again.
 
 ## 1. Inventory
 

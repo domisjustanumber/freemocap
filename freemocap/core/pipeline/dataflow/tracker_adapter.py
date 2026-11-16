@@ -22,6 +22,7 @@ from freemocap.core.pipeline.inference_service import (
     InferenceMode, InferenceRegistration, InferenceRequest, InferenceService,
 )
 from freemocap.core.pipeline.performance_report import PerformanceReport
+from freemocap.core.tracking.charuco_detection import CHARUCO_STAGE, charuco_observation, create_charuco_detector
 
 
 @dataclass(frozen=True)
@@ -66,9 +67,11 @@ def require_every_camera(batch_cameras, run_cameras, frame_number: int) -> None:
 class SkellyTrackerAdapter:
     def __init__(self, *, inference_service: InferenceService, detector_type: str,
                  performance_report: PerformanceReport, rtmpose_model_name: str | None = None,
-                 execution_provider: str | None = None) -> None:
+                 execution_provider: str | None = None, charuco_board=None) -> None:
+        """With a `charuco_board`, each observation also gets the charuco stage of that board."""
         self.inference_service = inference_service
         self.detector_type = detector_type
+        self.charuco_board = charuco_board
         self.rtmpose_model_name = rtmpose_model_name
         self.performance_report = performance_report
         self.execution_provider = execution_provider
@@ -80,7 +83,7 @@ class SkellyTrackerAdapter:
 
         Close the iterator on early exit. Successful source outcomes arrive after
         that camera's observations have been yielded; they are not sink
-        acceptance. Source failures allow remaining cameras to continue. An opaque
+        acceptance. A source failure stops tracking at its frame (`require_every_camera`). An opaque
         inference-batch failure raises without attributing it to an individual camera
         or changing the caller's graph cancellation flag. No automatic stateful retry.
         """
@@ -94,7 +97,10 @@ class SkellyTrackerAdapter:
             shutdown_flag=client_shutdown,
         ))
         frame_count = sources.camera_sources[0].video_metadata.frame_count
+        board_detector = None
         try:
+            if self.charuco_board is not None:
+                board_detector = create_charuco_detector(self.charuco_board)
             # Registry public cleanup is all-dead, not owner-scoped. Keep reader
             # lifecycle separate from the application-owned inference service.
             source_registry = WorkerRegistry(global_kill_flag=shutdown_flag, worker_mode=WorkerMode.THREAD)
@@ -142,6 +148,10 @@ class SkellyTrackerAdapter:
                                 raise CancelledError("Graph execution cancelled during inference")
                     if shutdown_flag.value:
                         raise CancelledError("Graph execution cancelled after inference")
+                    if board_detector is not None:
+                        for camera, frame in batch_frames.items():
+                            board = charuco_observation(board_detector, frame.image_bgr, frame_number)
+                            observations[camera].stages[CHARUCO_STAGE] = board.stages[CHARUCO_STAGE]
                     # Drop adapter image references before yielding observations.
                     frame_metadata = {camera: (frame.frame_key, frame.timestamp_s)
                                       for camera, frame in batch_frames.items()}
@@ -161,3 +171,5 @@ class SkellyTrackerAdapter:
                         yield TrackedCameraFrame(key, timestamp, observation)
         finally:
             client.close()
+            if board_detector is not None:
+                board_detector.close()

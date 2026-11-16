@@ -27,7 +27,7 @@ import requests
 from skellycam.core.ipc.process_management.managed_worker import WorkerMode
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.pipeline.posthoc.posthoc_pipeline_manager import PosthocPipelineManager
 from freemocap.core.tasks.calibration.calibration_task_config import (

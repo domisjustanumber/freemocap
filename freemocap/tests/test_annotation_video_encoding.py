@@ -8,10 +8,9 @@ import av
 import numpy as np
 from skellycam.core.recorders.videos.pyav_video_writer import PyavVideoWriter
 from skellycam.core.recorders.videos.video_derivation import VideoDerivation
-from skellytracker.core import TrackerConfig
 from skellytracker.core.annotation.keypoint_annotator import KeypointAnnotator
 from skellytracker.core.data_primitives.observation import Observation
-from skellytracker.core.tracker.tracker_state import TrackerState
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC
 from freemocap.core.pipeline.posthoc.annotation_input import AnnotationInput
@@ -39,8 +38,8 @@ class AnnotationVideoEncodingTests(unittest.TestCase):
                 renderer = Mock(spec=KeypointAnnotator)
                 renderer.annotate.side_effect = lambda image, observation: image
                 try:
-                    with patch("freemocap.core.pipeline.posthoc.video_node.build_configured_tracker"), patch("freemocap.core.pipeline.posthoc.video_node._build_recording_frame_cache", return_value=None), patch("freemocap.core.pipeline.posthoc.video_node.build_observation_annotator", return_value=renderer), patch("freemocap.core.pipeline.posthoc.video_node._get_observation", return_value=(Observation(frame_number=0, image_size=(64, 64)), TrackerState())):
-                        VideoNode._run(camera_id="camera", video_path=raw, detector_config=TrackerConfig(stages=[]),
+                    with patch("freemocap.core.pipeline.posthoc.video_node.create_charuco_detector"), patch("freemocap.core.pipeline.posthoc.video_node._build_recording_frame_cache", return_value=None), patch("freemocap.core.pipeline.posthoc.video_node.build_observation_annotator", return_value=renderer), patch("freemocap.core.pipeline.posthoc.video_node._get_observation", return_value=Observation(frame_number=0, image_size=(64, 64))):
+                        VideoNode._run(camera_id="camera", video_path=raw, board=CharucoBoardDefinition.create_letter_size_5x3(),
                             ipc=ipc, video_output_pub=queues[0], video_progress_pub=queues[1],
                             shutdown_self_flag=multiprocessing.Value('b', False), recording_path=folder,
                             save_annotated_video=True, annotation_input=mode,

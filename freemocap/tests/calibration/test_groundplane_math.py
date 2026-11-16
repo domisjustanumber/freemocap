@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.tasks.calibration.shared.groundplane_math import (
     CharucoGeometryError,

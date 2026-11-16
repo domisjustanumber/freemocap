@@ -10,7 +10,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 from skellycam.core.types.type_overloads import CameraIdString
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.tasks.calibration.anipose_calibration.helpers.camera_model_solver_ops import (
     apply_extrinsics,

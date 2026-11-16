@@ -14,7 +14,7 @@ from freemocap.core.tracking.execution_providers import RequestedExecutionProvid
 from freemocap.core.tasks.triangulation.helpers.triangulation_config import TriangulationConfig
 from freemocap.core.tasks.calibration.camera_matching.matching_models import CameraMatchingConfig
 from freemocap.core.tracking.board_selection import CharucoBoardMode
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 
 

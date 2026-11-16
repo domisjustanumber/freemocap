@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from skellytracker.core import DetectionStageConfig, Tracker, TrackerConfig
-from skellytracker.core.detectors.keypoint_detectors.charuco import (
+from skellytracker.core.detectors.calibration import (
     CharucoDetectorConfig,
 )
 

@@ -4,7 +4,7 @@ from concurrent.futures import CancelledError
 from contextlib import ExitStack
 
 from skellycam.core.recorders.videos.sequential_video_reader import SequentialVideoReader
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardSelector
+from skellytracker.core.detectors.calibration import CharucoBoardSelector
 
 from freemocap.core.pipeline.dataflow.video_sources import RecordingVideoSources
 from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig

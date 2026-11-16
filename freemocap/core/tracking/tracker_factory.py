@@ -17,7 +17,7 @@ from skellytracker.core import (
     Tracker,
     TrackerConfig,
 )
-from skellytracker.core.detectors.keypoint_detectors.charuco import (
+from skellytracker.core.detectors.calibration import (
     CharucoBoardDefinition,
 )
 from skellytracker.core.sessions.mediapipe_session import (

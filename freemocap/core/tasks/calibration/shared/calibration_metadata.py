@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.tasks.calibration.calibration_task_config import CalibrationSolverMethod
 from freemocap.core.tasks.calibration.shared.calibration_transform import CalibrationTransform

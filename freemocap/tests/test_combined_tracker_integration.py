@@ -41,7 +41,7 @@ def test_core_recipe_aliases_are_tracker_implementations():
 
 
 def test_board_composition_preserves_skeleton_output_contract():
-    from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+    from skellytracker.core.detectors.calibration import CharucoBoardDefinition
     config = CameraNodeConfig().skeleton_tracker_config
     with_board = tracker_presets.with_charuco_tracker(config, CharucoBoardDefinition.create_letter_size_5x3())
     assert with_board.keypoint_assembly == config.keypoint_assembly

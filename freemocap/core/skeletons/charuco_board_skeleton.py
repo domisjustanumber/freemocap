@@ -30,7 +30,7 @@ from skellyforge.core.skeleton.pose.model_scale_fitting import (
 )
 from skellyforge.core.skeleton.pose.rest_pose import RestPose
 from skellyforge.core.skeleton.rigid_marker_skeleton import build_rigid_marker_skeleton
-from skellytracker.core.detectors.keypoint_detectors.charuco.charuco_board_definition import (
+from skellytracker.core.detectors.calibration import (
     ARUCO_MARKER_TAGS,
     CHARUCO_CORNER_TAGS,
     CHARUCO_GRID_TAGS,

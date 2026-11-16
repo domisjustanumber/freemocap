@@ -4,11 +4,7 @@ from freemocap.core.tracking.board_selection import CharucoBoardMode
 from freemocap.core.tasks.calibration.shared.groundplane_alignment import CalibrationAlignmentMethod
 
 from pydantic import BaseModel, ConfigDict, Field
-from skellytracker.core import DetectionStageConfig, TrackerConfig
-from skellytracker.core.detectors.keypoint_detectors.charuco import (
-    CharucoBoardDefinition,
-    CharucoDetectorConfig,
-)
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.tasks.triangulation.helpers.triangulation_config import TriangulationConfig
 
@@ -54,14 +50,8 @@ class PosthocCalibrationPipelineConfig(BaseModel):
         return self.alignment_method is CalibrationAlignmentMethod.CHARUCO
 
     @property
-    def detector_config(self) -> TrackerConfig:
+    def detection_board(self) -> CharucoBoardDefinition:
+        """The board that the calibration detector looks for."""
         if self.board_mode == CharucoBoardMode.AUTO:
             raise ValueError("Resolve AUTO board selection before constructing calibration detectors")
-        return TrackerConfig(
-            stages=[
-                DetectionStageConfig(
-                    name="charuco",
-                    keypoint_detectors=[CharucoDetectorConfig(board=self.charuco_board)],
-                )
-            ]
-        )
+        return self.charuco_board

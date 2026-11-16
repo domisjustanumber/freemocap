@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from skellycam.core.ipc.process_management.managed_worker import WorkerMode
 from skellytracker.core import TrackerConfig
-from skellytracker.core.detectors.keypoint_detectors.charuco import (
+from skellytracker.core.detectors.calibration import (
     CharucoBoardDefinition,
 )
 from skellytracker.core.detectors.keypoint_detectors.mediapipe.mediapipe_model_manager import (
@@ -16,10 +16,6 @@ from skellytracker.core.detectors.keypoint_detectors.mediapipe.mediapipe_model_m
 # needs "the detector we assume when none is running" reads this.
 DEFAULT_DETECTOR_TYPE: Literal["rtmpose", "mediapipe"] = "rtmpose"
 
-
-def _charuco_tracker_config_for_board(board: CharucoBoardDefinition) -> TrackerConfig:
-    from skellytracker.core.tracker.tracker_presets import charuco_tracker_config
-    return charuco_tracker_config(board)
 
 #TODO - JSM - Yee-ikes! this is awful and ugly and NEEDS FIXED
 
@@ -42,8 +38,6 @@ class CameraNodeConfig(BaseModel):
     charuco_board: CharucoBoardDefinition = Field(
         default_factory=CharucoBoardDefinition.create_letter_size_5x3
     )
-    # Always rebuilt from charuco_board by _sync_charuco_tracker_config below.
-    charuco_tracker_config: TrackerConfig | None = None
     # max_persons: we only support single-person tracking for now. Capping
     # detections to one crop per camera keeps the pose batch a fixed size
     # (N cameras), which prevents the ONNX Runtime GPU arena from growing on
@@ -73,19 +67,7 @@ class CameraNodeConfig(BaseModel):
         return self.charuco_tracking_enabled or self.skeleton_tracking_enabled
 
     @model_validator(mode="after")
-    def _sync_charuco_tracker_config(self) -> "CameraNodeConfig":
-        """Keep charuco_tracker_config's board in sync with charuco_board.
-
-        charuco_board is the field clients set; charuco_tracker_config is the
-        full skellytracker TrackerConfig that downstream code (CameraNode,
-        RealtimePipeline, posthoc video_node reprocessing) reads the board out
-        of via stages[0].keypoint_detectors[0].board.
-        """
-        expected_board = _charuco_tracker_config_for_board(self.charuco_board)
-        if self.charuco_tracker_config is not None and self.charuco_tracker_config != expected_board:
-            raise ValueError("charuco_tracker_config must match charuco_board")
-        if self.charuco_tracker_config is None:
-            self.charuco_tracker_config = expected_board
+    def _sync_skeleton_tracker_config(self) -> "CameraNodeConfig":
         from freemocap.core.tracking.tracker_factory import tracker_config_for_settings
         expected_tracker = tracker_config_for_settings(self)
         if self.skeleton_tracker_config is not None and self.skeleton_tracker_config != expected_tracker:

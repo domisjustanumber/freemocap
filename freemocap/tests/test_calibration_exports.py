@@ -4,7 +4,7 @@ from math import cos, sin
 
 import pytest
 import numpy as np
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.tasks.calibration.shared.calibration_exports import save_aligned_calibration
 from freemocap.core.tasks.calibration.shared.calibration_result import CalibrationResult

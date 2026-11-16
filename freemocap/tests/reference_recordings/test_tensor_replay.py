@@ -16,7 +16,7 @@ import unittest
 import numpy as np
 from skellycam.core.ipc.process_management.managed_worker import WorkerMode
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 from skellylogs.handlers.websocket_log_queue_handler import create_websocket_log_queue
 
 from skellyforge.core.data_tensors import SourceIdentity

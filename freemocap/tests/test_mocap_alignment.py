@@ -199,7 +199,7 @@ def test_custom_offset_requires_metric_geometry() -> None:
 
 
 def test_person_and_manual_operations_save_the_same_camera_geometry(tmp_path) -> None:
-    from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+    from skellytracker.core.detectors.calibration import CharucoBoardDefinition
     from freemocap.core.tasks.calibration.shared.calibration_result import CalibrationResult
     from freemocap.core.tasks.calibration.shared.calibration_update import CalibrationUpdateRequest
     from freemocap.core.tasks.calibration.shared.loaded_calibration import LoadedCalibration

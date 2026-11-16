@@ -39,7 +39,7 @@ from freemocap.core.tasks.calibration.anipose_calibration.helpers.freemocap_anip
 )
 from freemocap.core.tasks.calibration.shared.camera_extrinsics import CameraExtrinsics
 from freemocap.core.tasks.calibration.shared.camera_model import CameraModel  # noqa: TC001
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition  # noqa: TC002
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition  # noqa: TC002
 
 logger = logging.getLogger(__name__)
 

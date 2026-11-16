@@ -3,7 +3,7 @@ PosthocPipeline: a fire-and-forget pipeline that processes recorded video.
 
 Replaces both PosthocCalibrationProcessingPipeline and PosthocMocapProcessingPipeline.
 The pipeline is parameterized by:
-  - detector_spec: what detector to run in the video nodes
+  - board: the charuco board that the video nodes detect
   - task_fn: what processing to do in the aggregation node after collecting all frames
 
 The pipeline self-terminates when processing is complete. All processes exit
@@ -18,8 +18,7 @@ from multiprocessing.sharedctypes import Synchronized
 
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
-from skellytracker.core import TrackerConfig
-from skellytracker.core.sessions.execution_provider_name import ExecutionProviderName
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.pipeline.abcs.pipeline_abc import PipelineABC
 from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC
@@ -84,21 +83,20 @@ class PosthocPipeline(PipelineABC):
         *,
         pipeline_id: PipelineIdString,
         recording_info: RecordingInfo,
-        detector_config: TrackerConfig,
+        board: CharucoBoardDefinition,
         aggregation_task_fn: PosthocAggregationNodeTaskFn,
         pipeline_type: PosthocPipelineType,
         worker_registry: WorkerRegistry,
         global_kill_flag: Synchronized,
         save_annotated_video: bool = True,
         annotation_input: AnnotationInput = AnnotationInput.RAW,
-        execution_provider: ExecutionProviderName | None = None,
     ) -> "PosthocPipeline":
         """
         Create a posthoc pipeline.
 
         Args:
             recording_info: Where to find the recorded videos.
-            detector_config: Which detector to run on each video frame.
+            board: The charuco board that each video node detects.
             aggregation_task_fn: The processing function (with task_config pre-bound via
                      functools.partial) to call after all frames are collected.
             worker_registry: For creating managed processes.
@@ -128,8 +126,7 @@ class PosthocPipeline(PipelineABC):
                 video_nodes[camera_id] = VideoNode.create(
                     camera_id=camera_id,
                     video_path=video_helper.video_path,
-                    detector_config=detector_config,
-                    execution_provider=execution_provider,
+                    board=board,
                     worker_registry=worker_registry,
                     ipc=ipc,
                     pubsub=pubsub,

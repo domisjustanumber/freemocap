@@ -18,7 +18,7 @@ import numpy as np
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
 from skellycam.core.types.type_overloads import CameraIdString
 from skellytracker.core.data_primitives.observation import Observation
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.pipeline.posthoc.pipeline_phases import CalibrationStage
 from freemocap.core.pipeline.posthoc.task_progress_reporter import TaskProgressReporter

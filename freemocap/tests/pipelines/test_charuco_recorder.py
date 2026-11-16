@@ -13,7 +13,7 @@ import numpy as np
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
 from skellytracker.core.data_primitives.keypoints import Keypoints
 from skellytracker.core.data_primitives.observation import Observation, StageObservation
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.pipeline.realtime.charuco_recorder_node import (
     CACHE_FILENAME,

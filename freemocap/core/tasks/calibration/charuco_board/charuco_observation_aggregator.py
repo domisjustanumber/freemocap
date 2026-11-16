@@ -7,8 +7,8 @@ to anipose row dicts via the new to_anipose_camera_row helper.
 from pydantic import BaseModel, Field, ConfigDict
 from skellycam.core.types.type_overloads import CameraIdString
 from skellytracker.core.data_primitives.observation import Observation
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
-from skellytracker.core.detectors.keypoint_detectors.charuco.anipose_export import to_anipose_camera_row
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import to_anipose_camera_row
 
 CharucoObservations = dict[CameraIdString, Observation | None]
 

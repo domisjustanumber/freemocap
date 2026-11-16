@@ -14,7 +14,7 @@ from __future__ import annotations
 import cbor2
 import numpy as np
 import pytest
-from skellytracker.core.detectors.keypoint_detectors.charuco.charuco_board_definition import (
+from skellytracker.core.detectors.calibration import (
     CharucoBoardDefinition,
 )
 

@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from freemocap.core.tracking.observation_series import ObservationSeries, ObservationFrames
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 from skellycam.core.timestamps.recording_timing_reader import RecordingTiming, TimingMethod
 from freemocap.core.reconstruction.recording_timing import RecordingGroupTiming
 

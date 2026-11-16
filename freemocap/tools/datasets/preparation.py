@@ -169,7 +169,7 @@ def _run_worker(request_path: Path, phases) -> None:
     from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
     from skellycam.core.recorders.videos.recording_info import RecordingInfo
     from skellylogs.handlers.websocket_log_queue_handler import create_websocket_log_queue
-    from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+    from skellytracker.core.detectors.calibration import CharucoBoardDefinition
     from freemocap.core.pipeline.inference_service import InferenceService
     from freemocap.core.pipeline.posthoc.posthoc_pipeline_manager import PosthocPipelineManager
     from freemocap.core.tasks.calibration.calibration_task_config import PosthocCalibrationPipelineConfig

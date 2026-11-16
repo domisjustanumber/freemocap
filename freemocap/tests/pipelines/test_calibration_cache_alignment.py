@@ -23,17 +23,8 @@ from unittest.mock import MagicMock
 
 import pytest
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
-from skellytracker.core import DetectionStageConfig, TrackerConfig
 from skellytracker.core.data_primitives.observation import Observation, StageObservation
-from skellytracker.core.detectors.keypoint_detectors.charuco import (
-    CharucoBoardDefinition,
-    CharucoDetectorConfig,
-)
-from skellytracker.core.detectors.keypoint_detectors.mediapipe.body.mediapipe_pose_detector import (
-    MediapipePoseDetectorConfig,
-)
-from skellytracker.core.tracker.tracker import Tracker
-from skellytracker.core.tracker.tracker_state import TrackerState
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.pipeline.posthoc.video_node import (
     CACHE_FILENAME,
@@ -89,10 +80,8 @@ def _write_camera_csv(recording_path: Path, camera_id: str, recording_to_connect
             writer.writerow([recording_frame, connection_frame, 0.0])
 
 
-def _charuco_config(board: CharucoBoardDefinition = BOARD) -> TrackerConfig:
-    return TrackerConfig(
-        stages=[DetectionStageConfig(name="charuco", keypoint_detectors=[CharucoDetectorConfig(board=board)])]
-    )
+def _charuco_config(board: CharucoBoardDefinition = BOARD) -> CharucoBoardDefinition:
+    return board
 
 
 @pytest.fixture
@@ -114,7 +103,7 @@ class TestPosthocCacheAlignment:
         _write_camera_csv(rec_path, "cam0", {i: 100 + i for i in range(6)})
 
         cache = _build_recording_frame_cache(
-            recording_path=rec_path, camera_id="cam0", detector_config=_charuco_config(),
+            recording_path=rec_path, camera_id="cam0", board=_charuco_config(),
         )
         # Only recorded frames whose connection number was captured are hits;
         # recorded frames 1, 3, 4 are misses (→ the node will detect them).
@@ -124,18 +113,12 @@ class TestPosthocCacheAlignment:
         _write_cache(rec_path, {"cam0": {100: _obs(100), 102: _obs(102)}})
         _write_camera_csv(rec_path, "cam0", {i: 100 + i for i in range(4)})
         cache = _build_recording_frame_cache(
-            recording_path=rec_path, camera_id="cam0", detector_config=_charuco_config(),
+            recording_path=rec_path, camera_id="cam0", board=_charuco_config(),
         )
         # The cached obs carried its CONNECTION number (102). After lookup at
         # recorded frame 2 it must carry the RECORDING number so anipose rows align
         # with detected frames and across cameras.
-        out, _ = _get_observation(
-            frame_number=2,
-            image=None,
-            tracker=MagicMock(spec=Tracker),
-            state=MagicMock(spec=TrackerState),
-            cache=cache,
-        )
+        out = _get_observation(frame_number=2, image=None, detector=MagicMock(), cache=cache)
         assert out.frame_number == 2
 
     def test_per_camera_drop_patterns_do_not_cross_contaminate(self, rec_path):
@@ -149,8 +132,8 @@ class TestPosthocCacheAlignment:
         for cam in ("cam0", "cam1"):
             _write_camera_csv(rec_path, cam, {i: 100 + i for i in range(5)})
 
-        cam0 = _build_recording_frame_cache(recording_path=rec_path, camera_id="cam0", detector_config=_charuco_config())
-        cam1 = _build_recording_frame_cache(recording_path=rec_path, camera_id="cam1", detector_config=_charuco_config())
+        cam0 = _build_recording_frame_cache(recording_path=rec_path, camera_id="cam0", board=_charuco_config())
+        cam1 = _build_recording_frame_cache(recording_path=rec_path, camera_id="cam1", board=_charuco_config())
         assert set(cam0.keys()) == {0, 2, 4}
         assert set(cam1.keys()) == {0, 1, 4}
 
@@ -160,7 +143,7 @@ class TestPosthocCacheAlignment:
         _write_cache(rec_path, {"cam0": {100: _obs(100)}})
         with caplog.at_level(logging.WARNING):
             cache = _build_recording_frame_cache(
-                recording_path=rec_path, camera_id="cam0", detector_config=_charuco_config(),
+                recording_path=rec_path, camera_id="cam0", board=_charuco_config(),
             )
         assert cache is None
         assert any("timestamps csv" in r.message.lower() for r in caplog.records)
@@ -177,7 +160,7 @@ class TestPosthocCacheValidation:
         # non-existent ``square_length_mm`` and swallowed the AttributeError.)
         _write_cache(rec_path, {"cam0": {0: _obs(0), 1: _obs(1)}})
         loaded = _load_cache_by_connection_frame(
-            recording_path=rec_path, camera_id="cam0", detector_config=_charuco_config(),
+            recording_path=rec_path, camera_id="cam0", board=_charuco_config(),
         )
         assert loaded is not None
         assert set(loaded.keys()) == {0, 1}
@@ -189,7 +172,7 @@ class TestPosthocCacheValidation:
         )
         with caplog.at_level(logging.INFO):
             loaded = _load_cache_by_connection_frame(
-                recording_path=rec_path, camera_id="cam0", detector_config=wrong,
+                recording_path=rec_path, camera_id="cam0", board=wrong,
             )
         assert loaded is None
         assert any("board mismatch" in r.message.lower() for r in caplog.records), \
@@ -200,27 +183,16 @@ class TestPosthocCacheValidation:
         _write_cache(rec_path, {"cam0": [_obs(0), _obs(1)]})
         with caplog.at_level(logging.WARNING):
             loaded = _load_cache_by_connection_frame(
-                recording_path=rec_path, camera_id="cam0", detector_config=_charuco_config(),
+                recording_path=rec_path, camera_id="cam0", board=_charuco_config(),
             )
         assert loaded is None
         assert any(r.levelno >= logging.WARNING for r in caplog.records), \
             "a malformed cache must produce a visible WARNING, not a silent DEBUG no-op"
 
-    def test_non_charuco_detector_returns_none(self, rec_path):
-        _write_cache(rec_path, {"cam0": {0: _obs(0)}})
-
-        mediapipe_config = TrackerConfig(
-            stages=[DetectionStageConfig(name="body", keypoint_detectors=[MediapipePoseDetectorConfig()])]
-        )
-        loaded = _load_cache_by_connection_frame(
-            recording_path=rec_path, camera_id="cam0", detector_config=mediapipe_config,
-        )
-        assert loaded is None
-
     def test_camera_absent_from_cache_returns_none(self, rec_path):
         _write_cache(rec_path, {"cam0": {0: _obs(0)}})
         loaded = _load_cache_by_connection_frame(
-            recording_path=rec_path, camera_id="cam_other", detector_config=_charuco_config(),
+            recording_path=rec_path, camera_id="cam_other", board=_charuco_config(),
         )
         assert loaded is None
 

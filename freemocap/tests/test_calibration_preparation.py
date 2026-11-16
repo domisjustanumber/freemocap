@@ -50,7 +50,7 @@ class CalibrationPipelineTests(unittest.TestCase):
                     resolved = args["aggregation_task_fn"].keywords["task_config"]
                     self.assertEqual(resolved.charuco_board, board.model_copy(update={"square_length_mm": measured_square_length_mm}))
                     self.assertEqual(resolved.board_mode, CharucoBoardMode.EXPLICIT)
-                    self.assertEqual(args["detector_config"], resolved.detector_config)
+                    self.assertEqual(args["board"], resolved.detection_board)
                     self.assertEqual(args["pipeline_id"], self.preparation.id)
                     first_camera.read_frame_number.assert_called_once_with(frame_number=0)
                     second_camera.read_frame_number.assert_called_once_with(frame_number=0)

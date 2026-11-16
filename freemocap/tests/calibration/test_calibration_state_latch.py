@@ -18,7 +18,7 @@ from freemocap.core.tasks.calibration.shared.camera_intrinsics import CameraIntr
 from freemocap.core.tasks.calibration.shared.camera_model import CameraModel
 from freemocap.core.tasks.triangulation.triangulator import Triangulator
 from skellytracker.core.data_primitives.observation import Observation
-from skellytracker.core.detectors.keypoint_detectors.charuco.charuco_board_definition import (
+from skellytracker.core.detectors.calibration import (
     CharucoBoardDefinition,
 )
 

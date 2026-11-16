@@ -37,7 +37,7 @@ class AnnotationWorkerTests(unittest.TestCase):
         self.job = CameraAnnotationJob(recording_path=root, execution_id="first", camera_id="camera",
             video=VideoMetadata(file_path=video, width=160, height=120, fps=30., frame_count=8,
                 fourcc="mp4v", duration_seconds=8 / 30, end_frame=8),
-            tracker_config=PosthocMocapPipelineConfig(charuco_tracking_enabled=False).tracker_config,
+            detector_type="rtmpose",
             observations=observations)
 
     def read_frames(self, path):

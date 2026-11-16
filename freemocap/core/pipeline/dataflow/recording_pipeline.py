@@ -93,15 +93,13 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
         raise ValueError("Calibration changed while loading")
     shutdown_flag = shutdown_flag if shutdown_flag is not None else multiprocessing.Value("b", False)
     performance = performance if performance is not None else PerformanceReport()
-    tracker_config = config.tracker_config.model_copy(deep=True)
     bundles = (build_standard_human_bundle(detector_type=config.detector_type, anchor_segment_name=config.anchor_segment_name),)
     # AUTO remains unresolved when the application's recording-wide search found
     # no board. Keep that result in provenance without fabricating a board model
     # from the configuration's default layout or blocking body processing.
-    if config.charuco_tracking_enabled and config.board_mode == CharucoBoardMode.EXPLICIT:
-        from skellytracker.core.tracker.tracker_presets import with_charuco_tracker
-        tracker_config = with_charuco_tracker(tracker_config, config.charuco_board)
-        bundles += (build_charuco_board_bundle(board=config.charuco_board),)
+    board = config.charuco_board if config.charuco_tracking_enabled and config.board_mode == CharucoBoardMode.EXPLICIT else None
+    if board is not None:
+        bundles += (build_charuco_board_bundle(board=board),)
     model_name = config.rtmpose_model_name if config.detector_type == "rtmpose" else MEDIAPIPE_WHOLEBODY_DEFINITION.name
     tracker_source = f"keypoint_model:{model_name}"
     timing = RecordingGroupTiming(cameras={source.camera_id: source.camera_timing for source in sources.camera_sources},
@@ -154,7 +152,7 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
         try:
             adapter = SkellyTrackerAdapter(inference_service=service, detector_type=config.detector_type,
                 rtmpose_model_name=config.rtmpose_model_name, performance_report=performance,
-                execution_provider=execution_provider)
+                execution_provider=execution_provider, charuco_board=board)
             with closing(adapter.track_recording(sources=sources, execution_id="recording-graph", shutdown_flag=shutdown_flag)) as events:
                 camera_frame_count = 0
                 tracked_frames_per_camera = {source.camera_id: 0 for source in sources.camera_sources}
@@ -304,7 +302,7 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
                     raise ValueError(f"Camera did not complete: {source.camera_id}")
                 job = CameraAnnotationJob(recording_path=Path(recording.full_recording_path),
                     execution_id=execution_id, run_id=run_session.target_run_id, camera_id=source.camera_id, video=source.video_metadata,
-                    tracker_config=tracker_config, observations=(collection.frames.camera_series[source.camera_id] if isinstance(collection.frames, ObservationFrames)
+                    detector_type=config.detector_type, board=board, observations=(collection.frames.camera_series[source.camera_id] if isinstance(collection.frames, ObservationFrames)
                         else tuple(frame[source.camera_id] for frame in collection.frames)))
                 if annotation_service is not None:
                     return annotation_service.run_job(job, cancelled=lambda: bool(shutdown_flag.value))

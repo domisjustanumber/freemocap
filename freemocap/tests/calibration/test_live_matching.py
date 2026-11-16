@@ -3,7 +3,7 @@
 import time
 from pathlib import Path
 
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.tasks.calibration.camera_matching.live_matching import LiveGeometryMatcher
 from freemocap.core.tasks.calibration.shared.calibration_camera_binding import CalibrationMatchKind

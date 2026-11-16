@@ -10,7 +10,7 @@ import cv2
 import tomli_w
 from pydantic import ValidationError
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.tasks.calibration.calibration_task_config import CalibrationSolverMethod
 from freemocap.core.tasks.calibration.shared.calibration_metadata import CalibrationMetadata

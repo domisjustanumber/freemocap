@@ -1,8 +1,7 @@
 """
 VideoNode: reads frames from a video file, runs a tracker, publishes observations.
 
-Generic video processing node parameterized by TrackerConfig — the same node
-handles charuco detection, RTMPose skeleton detection, or any future tracker type.
+Calibration video node: it detects one charuco board on each frame.
 
 Annotations use raw frames by default, or an explicitly selected annotated input.
 """
@@ -29,17 +28,10 @@ from pathlib import Path
 import cv2
 from tqdm import tqdm
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
-from skellytracker.core import TrackerConfig
 from skellytracker.core.data_primitives.observation import Observation
-from skellytracker.core.detectors.keypoint_detectors.charuco import (
-    CharucoDetectorConfig,
-    CharucoBoardDefinition,
-)
-from skellytracker.core.sessions.execution_provider_name import ExecutionProviderName
-from skellytracker.core.tracker.tracker import Tracker
-from skellytracker.core.tracker.tracker_state import TrackerState
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
-from freemocap.core.tracking.tracker_factory import build_configured_tracker
+from freemocap.core.tracking.charuco_detection import CHARUCO_STAGE, charuco_observation, create_charuco_detector
 from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC
 from freemocap.core.pipeline.abcs.source_node_abc import SourceNode
 from skellycam.core.types.type_overloads import CameraIdString
@@ -55,17 +47,6 @@ from freemocap.pubsub.pubsub_topics import VideoNodeOutputTopic, VideoNodeOutput
 logger = logging.getLogger(__name__)
 
 
-def _cached_board_detector(tracker_config: TrackerConfig) -> CharucoDetectorConfig | None:
-    """A board-only cache can satisfy only one independent board detection stage."""
-    if len(tracker_config.stages) != 1:
-        return None
-    stage = tracker_config.stages[0]
-    if stage.children or stage.object_detector is not None or len(stage.keypoint_detectors) != 1:
-        return None
-    detector = stage.keypoint_detectors[0]
-    return detector if isinstance(detector, CharucoDetectorConfig) else None
-
-
 @dataclass
 class VideoNode(SourceNode):
     camera_id: CameraIdString
@@ -78,7 +59,7 @@ class VideoNode(SourceNode):
         *,
         camera_id: CameraIdString,
         video_path: Path,
-        detector_config: TrackerConfig,
+        board: CharucoBoardDefinition,
         worker_registry: WorkerRegistry,
         ipc: PipelineIPC,
         pubsub: PubSubTopicManager,
@@ -87,7 +68,6 @@ class VideoNode(SourceNode):
         save_annotated_video: bool = True,
         annotation_input: AnnotationInput = AnnotationInput.RAW,
         pipeline_id: PipelineIdString | None = None,
-        execution_provider: ExecutionProviderName | None = None,
     ) -> "VideoNode":
         _progress_queue: multiprocessing.queues.Queue = multiprocessing.Queue()
         shutdown_self_flag, worker = cls._create_worker(
@@ -100,8 +80,7 @@ class VideoNode(SourceNode):
             kwargs=dict(
                 camera_id=camera_id,
                 video_path=video_path,
-                detector_config=detector_config,
-                execution_provider=execution_provider,
+                board=board,
                 ipc=ipc,
                 video_output_pub=pubsub.get_publication_queue(
                     VideoNodeOutputTopic,
@@ -127,7 +106,7 @@ class VideoNode(SourceNode):
         *,
         camera_id: CameraIdString,
         video_path: Path,
-        detector_config: TrackerConfig,
+        board: CharucoBoardDefinition,
         ipc: PipelineIPC,
         video_output_pub: TopicPublicationQueue,
         video_progress_pub: TopicPublicationQueue,
@@ -137,7 +116,6 @@ class VideoNode(SourceNode):
         annotation_input: AnnotationInput,
         pipeline_id: PipelineIdString,
         pipeline_type: PosthocPipelineType,
-        execution_provider: ExecutionProviderName | None = None,
     ) -> None:
         node_pipeline_id = f"{pipeline_id}:{camera_id}"
         video_progress_pub.put(VideoNodeProgressMessage(
@@ -150,13 +128,12 @@ class VideoNode(SourceNode):
             recording_name=recording_path.name,
             recording_path=str(recording_path),
         ))
-        tracker = build_configured_tracker(config=detector_config, batch_size=1, execution_provider=execution_provider)
-        tracker_state = TrackerState()
+        detector = create_charuco_detector(board)
 
         cache = _build_recording_frame_cache(
             recording_path=recording_path,
             camera_id=camera_id,
-            detector_config=detector_config,
+            board=board,
         )
         if cache is not None:
             logger.info(
@@ -194,12 +171,12 @@ class VideoNode(SourceNode):
             f"PID={os.getpid()}, thread={threading.get_ident()} ({threading.current_thread().name}); "
             f"OpenCV video opened, {frame_count} frames; "
             f"observation cache entries={len(cache) if cache is not None else 0}; "
-            f"tracker={type(tracker).__module__}.{type(tracker).__name__}"
+            f"detector={type(detector).__module__}.{type(detector).__name__}"
         )
         _error_occurred = False
         try:
             if save_annotated_video:
-                annotator = build_observation_annotator(detector_config)
+                annotator = build_observation_annotator(board=board)
                 fps = video_reader.get(cv2.CAP_PROP_FPS)
                 annotation_output = AnnotationVideoOutput(AnnotationOutputRequest(
                     recording_path=recording_path, pipeline_id=pipeline_id, input_mode=annotation_input,
@@ -224,11 +201,10 @@ class VideoNode(SourceNode):
                 success, image = video_reader.read()
                 while success and not shutdown_self_flag.value and ipc.should_continue:
                     observation_started = time.perf_counter()
-                    observation, tracker_state = _get_observation(
+                    observation = _get_observation(
                         frame_number=frame_number,
                         image=image,
-                        tracker=tracker,
-                        state=tracker_state,
+                        detector=detector,
                         cache=cache,
                     )
                     if cache is not None and frame_number in cache:
@@ -315,7 +291,7 @@ class VideoNode(SourceNode):
             ))
             ipc.shutdown_pipeline()
         finally:
-            tracker.close()
+            detector.close()
             video_reader.release()
             if not _error_occurred:
                 video_progress_pub.put(VideoNodeProgressMessage(
@@ -349,13 +325,13 @@ def _build_recording_frame_cache(
     *,
     recording_path: Path,
     camera_id: CameraIdString,
-    detector_config: TrackerConfig,
+    board: CharucoBoardDefinition,
 ) -> dict[int, Observation] | None:
     """Resolve the realtime cache into a {recording_frame_number: observation} map."""
     cache_by_connection_frame = _load_cache_by_connection_frame(
         recording_path=recording_path,
         camera_id=camera_id,
-        detector_config=detector_config,
+        board=board,
     )
     if cache_by_connection_frame is None:
         return None
@@ -397,12 +373,9 @@ def _load_cache_by_connection_frame(
     *,
     recording_path: Path,
     camera_id: CameraIdString,
-    detector_config: TrackerConfig,
+    board: CharucoBoardDefinition,
 ) -> dict[int, Observation] | None:
     """Load realtime charuco observations keyed by connection frame number."""
-    board_detector = _cached_board_detector(detector_config)
-    if board_detector is None:
-        return None
 
     cache_path = recording_path / "output_data" / CACHE_FILENAME
     if not cache_path.exists():
@@ -429,7 +402,7 @@ def _load_cache_by_connection_frame(
         )
         return None
 
-    request_board = board_detector.board
+    request_board = board
     if (
         cached_board.squares_x != request_board.squares_x
         or cached_board.squares_y != request_board.squares_y
@@ -469,7 +442,7 @@ def _load_cache_by_connection_frame(
         )
         return None
 
-    stage_name = detector_config.stages[0].name
+    stage_name = CHARUCO_STAGE
     for observation in obs_by_connection_frame.values():
         if not isinstance(observation, Observation):
             raise TypeError(f"Invalid cached observation in {cache_path}")
@@ -508,15 +481,10 @@ def _get_observation(
     *,
     frame_number: int,
     image,
-    tracker: Tracker,
-    state: TrackerState,
+    detector,
     cache: dict[int, Observation] | None,
-) -> tuple[Observation, TrackerState]:
+) -> Observation:
     """Get observation for a frame — from cache if available, else detect."""
     if cache is not None and frame_number in cache:
-        observation = cache[frame_number]
-        return observation, state
-
-
-    observation, state = tracker.process_image(image, frame_number, state)
-    return observation, state
+        return cache[frame_number]
+    return charuco_observation(detector, image, frame_number)

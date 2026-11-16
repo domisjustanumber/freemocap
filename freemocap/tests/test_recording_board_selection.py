@@ -7,7 +7,7 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 import cv2
 import numpy as np
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 from freemocap.core.pipeline.dataflow.video_sources import RecordingVideoSources
 from freemocap.core.pipeline.dataflow.application_pipeline import validate_application_graph
 from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig

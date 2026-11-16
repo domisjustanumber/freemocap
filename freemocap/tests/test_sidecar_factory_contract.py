@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 from skellytracker.core import DetectionStageConfig, TrackerConfig
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoDetectorConfig
+from skellytracker.core.detectors.calibration import CharucoDetectorConfig
 from skellytracker.core.sessions.cpu_session import CpuSession, CpuSessionConfig
 from skellytracker.core.sessions.mediapipe_session import MediaPipeSession, MediaPipeSessionConfig
 from skellytracker.core.sessions.onnx_session import OnnxSession, OnnxSessionConfig

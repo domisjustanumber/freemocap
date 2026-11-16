@@ -7,6 +7,8 @@ Runs indefinitely until shutdown. Responds to pipeline config updates
 """
 from skellytracker.core.sessions.execution_provider_name import ExecutionProviderName
 from freemocap.core.tracking.capture_timing import capture_timestamp_ms
+from freemocap.core.tracking.charuco_detection import CHARUCO_STAGE, create_charuco_detector
+from freemocap.core.tracking.charuco_detection import charuco_observation as board_observation
 from freemocap.core.streaming.outputs.capture_time import camera_capture_timestamp_ns
 import logging
 import queue
@@ -57,28 +59,11 @@ def _board_was_seen(observation: Observation | None) -> bool:
     skip gate triggers exactly when the detector's output could not matter."""
     if observation is None:
         return False
-    stage = observation.stages.get("charuco")
+    stage = observation.stages.get(CHARUCO_STAGE)
     keypoints = getattr(stage, "keypoints", None)
     if keypoints is None or keypoints.xyz is None or len(keypoints.xyz) == 0:
         return False
     return int(np.isfinite(keypoints.xyz).all(axis=1).sum()) >= 3
-
-
-def _build_charuco_tracker_from_config(node_config: CameraNodeConfig):
-    """Return (Tracker, CpuSession) for charuco detection."""
-    from skellytracker.core.detectors.keypoint_detectors.charuco import (
-        CharucoDetectorConfig,
-        CharucoBoardDefinition,
-    )
-    from freemocap.core.tracking.tracker_factory import build_charuco_tracker
-
-    board_def = CharucoBoardDefinition.create_letter_size_5x3()
-    for stage in node_config.charuco_tracker_config.stages:
-        for kp_det in stage.keypoint_detectors:
-            if isinstance(kp_det, CharucoDetectorConfig):
-                board_def = kp_det.board
-                break
-    return build_charuco_tracker(board_def)
 
 
 def _build_skeleton_tracker_from_config(node_config: CameraNodeConfig, execution_provider=None):
@@ -169,9 +154,7 @@ class CameraNode(SourceNode):
             read_only=False,
         )
 
-        charuco_tracker = None
-        charuco_session = None
-        charuco_state = TrackerState()
+        charuco_detector = None
         skeleton_tracker = None
         skeleton_session = None
         skeleton_state = TrackerState()
@@ -180,8 +163,8 @@ class CameraNode(SourceNode):
         charuco_skip_until_frame_number = -1
 
         try:
-            if config.charuco_tracking_enabled and config.charuco_tracker_config is not None:
-                charuco_tracker, charuco_session = _build_charuco_tracker_from_config(config)
+            if config.charuco_tracking_enabled:
+                charuco_detector = create_charuco_detector(config.charuco_board)
 
             if (
                     config.skeleton_tracking_enabled
@@ -209,19 +192,17 @@ class CameraNode(SourceNode):
                     new_config: CameraNodeConfig = update_msg.pipeline_config.camera_node_config
                     logger.debug(f"RealtimeCameraNode [{camera_id}] received config update")
 
-                    if (new_config.charuco_tracking_enabled and new_config.charuco_tracker_config is not None
-                            and (new_config.charuco_tracker_config != config.charuco_tracker_config
+                    if (new_config.charuco_tracking_enabled
+                            and (new_config.charuco_board != config.charuco_board
                                  or new_config.charuco_tracking_enabled != config.charuco_tracking_enabled)):
-                        if charuco_tracker is not None:
-                            charuco_tracker.close()
-                        charuco_tracker, charuco_session = _build_charuco_tracker_from_config(new_config)
-                        charuco_state = TrackerState()
+                        if charuco_detector is not None:
+                            charuco_detector.close()
+                        charuco_detector = create_charuco_detector(new_config.charuco_board)
                         charuco_skip_until_frame_number = -1
                     elif not new_config.charuco_tracking_enabled:
-                        if charuco_tracker is not None:
-                            charuco_tracker.close()
-                        charuco_tracker = None
-                        charuco_session = None
+                        if charuco_detector is not None:
+                            charuco_detector.close()
+                        charuco_detector = None
 
                     if (
                             new_config.skeleton_tracking_enabled
@@ -299,12 +280,10 @@ class CameraNode(SourceNode):
                     if timer is not None:
                         timer.record("skeleton_detection", (time.perf_counter() - t0) * 1e3)
 
-                if charuco_tracker is not None:
+                if charuco_detector is not None:
                     if actual_frame_number > charuco_skip_until_frame_number:
                         t0 = time.perf_counter() if timer is not None else 0.0
-                        charuco_observation, charuco_state = charuco_tracker.process_image(
-                            image, actual_frame_number, charuco_state
-                        )
+                        charuco_observation = board_observation(charuco_detector, image, actual_frame_number)
                         if timer is not None:
                             timer.record("charuco_detection", (time.perf_counter() - t0) * 1e3)
 
@@ -342,8 +321,8 @@ class CameraNode(SourceNode):
             raise
         finally:
             try:
-                if charuco_tracker is not None:
-                    charuco_tracker.close()
+                if charuco_detector is not None:
+                    charuco_detector.close()
             finally:
                 try:
                     if skeleton_tracker is not None:

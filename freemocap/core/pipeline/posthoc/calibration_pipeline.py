@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from skellycam.core.ipc.process_management.managed_worker import ManagedWorker, WorkerMode
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardSelector, CharucoBoardSelectionError
+from skellytracker.core.detectors.calibration import CharucoBoardSelector, CharucoBoardSelectionError
 
 from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC
 from freemocap.core.pipeline.posthoc.pipeline_phases import AggregatorPhase, PosthocPipelineType
@@ -94,7 +94,7 @@ class CalibrationPipeline:
             self.pipeline = PosthocPipeline.create(
                 pipeline_id=self.id,
                 recording_info=self.recording_info,
-                detector_config=config.detector_config,
+                board=config.detection_board,
                 aggregation_task_fn=functools.partial(run_posthoc_calibration_task, task_config=config),
                 pipeline_type=self.pipeline_type,
                 worker_registry=self.worker_registry,

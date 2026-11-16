@@ -11,7 +11,7 @@ from freemocap.core.reconstruction.alignment_config import MocapAlignmentConfig
 from freemocap.core.recording.parquet_storage.parquet_reader import read_metadata
 from freemocap.system.recording_structure.recording_structure import RecordingStructure
 from freemocap.core.types.channel_kind import ChannelKind
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
 import unittest
 from dataclasses import replace

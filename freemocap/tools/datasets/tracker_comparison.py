@@ -17,7 +17,7 @@ import numpy as np
 from skellycam.core.ipc.process_management.managed_worker import WorkerMode
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 from skellytracker.core import DetectionStageConfig, TrackerConfig
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoDetectorConfig
+from skellytracker.core.detectors.calibration import CharucoDetectorConfig
 from skellytracker.core.sessions.onnx_session import OnnxSession
 
 from freemocap.core.pipeline.dataflow.tracker_adapter import SkellyTrackerAdapter, TrackedCameraFrame, recording_timestamps_ms

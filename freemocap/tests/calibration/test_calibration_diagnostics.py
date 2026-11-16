@@ -5,7 +5,7 @@ from unittest import TestCase
 from unittest.mock import patch
 
 import numpy as np
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.tasks.calibration.anipose_calibration.helpers import bundle_adjust
 from freemocap.core.tasks.calibration.shared.camera_model import CameraModel

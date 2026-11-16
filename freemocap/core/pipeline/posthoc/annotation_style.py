@@ -9,12 +9,10 @@ from skellytracker.core.annotation.keypoint_annotator import (
     StageAnnotationSchema,
 )
 
-from skellytracker.core import TrackerConfig
 from skellytracker.core.annotation.keypoint_annotator import KeypointAnnotator, KeypointAnnotatorConfig, StageKeypointAnnotator
-from skellytracker.core.detectors.keypoint_detectors.charuco.charuco_annotator import CharucoAnnotator, CharucoAnnotatorConfig
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoDetectorConfig
-from skellytracker.core.detectors.keypoint_detectors.mediapipe.body.mediapipe_pose_detector import MediapipePoseDetectorConfig
-from freemocap.core.tracking.tracker_definitions import MEDIAPIPE_WHOLEBODY_DEFINITION, RTMPOSE_WHOLEBODY_DEFINITION, tracker_definition
+from skellytracker.core.detectors.calibration import CharucoAnnotator, CharucoAnnotatorConfig, CharucoBoardDefinition
+from freemocap.core.tracking.charuco_detection import CHARUCO_STAGE
+from freemocap.core.tracking.tracker_definitions import tracker_definition
 
 # BGR (cv2 convention) equivalents of the realtime renderer's hex colors.
 _CENTER_COLOR = (0, 170, 0)       # #00AA00
@@ -132,33 +130,14 @@ def build_skeleton_stage_schema(
     )
 
 
-def build_observation_annotator(tracker_config: TrackerConfig) -> KeypointAnnotator:
-    """Compose configured stage annotations on the supplied image."""
-    stage_annotators: dict[str, StageKeypointAnnotator] = {}
-    uses_mediapipe = False
-    pending_stages = list(tracker_config.stages)
-    while pending_stages:
-        stage = pending_stages.pop()
-        pending_stages.extend(stage.children)
-        for detector in stage.keypoint_detectors:
-            uses_mediapipe |= isinstance(detector, MediapipePoseDetectorConfig)
-            if isinstance(detector, CharucoDetectorConfig):
-                if stage.name in stage_annotators:
-                    raise ValueError(f"Multiple Charuco annotation definitions for stage {stage.name}")
-                stage_annotators[stage.name] = CharucoAnnotator(
-                    config=CharucoAnnotatorConfig(), board_def=detector.board,
-                )
-
-    definition = tracker_definition(tracker_config.preset_name) if tracker_config.preset_name else (
-        MEDIAPIPE_WHOLEBODY_DEFINITION
-        if uses_mediapipe
-        else RTMPOSE_WHOLEBODY_DEFINITION
-    )
-    return KeypointAnnotator(
-        config=KeypointAnnotatorConfig(stage_schemas={
-            "body": build_skeleton_stage_schema(
-                definition.connections, definition.tracked_points,
-            ),
-        }),
-        stage_annotators=stage_annotators,
-    )
+def build_observation_annotator(*, detector_type: str | None = None,
+                                board: CharucoBoardDefinition | None = None) -> KeypointAnnotator:
+    """Draw the body stage of a detector choice and the charuco stage of a board, each when given."""
+    stage_schemas = {}
+    if detector_type is not None:
+        definition = tracker_definition(detector_type)
+        stage_schemas["body"] = build_skeleton_stage_schema(definition.connections, definition.tracked_points)
+    stage_annotators: dict[str, StageKeypointAnnotator] = {} if board is None else {
+        CHARUCO_STAGE: CharucoAnnotator(config=CharucoAnnotatorConfig(), board_def=board)}
+    return KeypointAnnotator(config=KeypointAnnotatorConfig(stage_schemas=stage_schemas),
+                             stage_annotators=stage_annotators)

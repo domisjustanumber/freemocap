@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from numpy import testing as npt
 import pytest
-from skellytracker.core.detectors.keypoint_detectors.charuco.charuco_board_definition import (
+from skellytracker.core.detectors.calibration import (
     CharucoBoardDefinition,
 )
 

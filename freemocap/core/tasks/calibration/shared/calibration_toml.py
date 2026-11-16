@@ -16,7 +16,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.tasks.calibration.shared.calibration_metadata import CalibrationMetadata
 from freemocap.core.tasks.calibration.shared.camera_extrinsics import CameraExtrinsics

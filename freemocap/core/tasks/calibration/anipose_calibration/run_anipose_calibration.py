@@ -10,7 +10,7 @@ from pathlib import Path
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
 from skellycam.core.types.type_overloads import CameraIdString
 from skellytracker.core.data_primitives.observation import Observation
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.pipeline.posthoc.video_group_helper import VideoMetadata
 from freemocap.core.tasks.calibration.anipose_calibration.helpers.anipose_calibration_helpers import (

@@ -11,7 +11,7 @@ from multiprocessing.sharedctypes import Synchronized
 
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 from skellycam.core.types.type_overloads import CameraIdString
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 from skellytracker.core.data_primitives.observation import Observation
 
 from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC

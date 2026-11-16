@@ -12,8 +12,8 @@ from uuid import uuid4
 import cv2
 from skellycam.core.ipc.process_management.managed_worker import WorkerMode
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
-from skellytracker.core import TrackerConfig
 from skellytracker.core.data_primitives.observation import Observation
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 from freemocap.core.tracking.observation_series import ObservationSeries, RecordingObservationSeries
 
 from freemocap.core.pipeline.performance_report import PerformanceReport
@@ -29,9 +29,10 @@ class CameraAnnotationJob:
     execution_id: str
     camera_id: str
     video: VideoMetadata
-    tracker_config: TrackerConfig
+    detector_type: str
     observations: tuple[Observation, ...] | ObservationSeries | RecordingObservationSeries
     run_id: int = 0
+    board: CharucoBoardDefinition | None = None
 
 
 def write_camera_annotation(job: CameraAnnotationJob, *, cancelled: Callable[[], bool],
@@ -39,7 +40,7 @@ def write_camera_annotation(job: CameraAnnotationJob, *, cancelled: Callable[[],
     """The same complete-video operation for thread and process comparisons."""
     if cancelled():
         raise CancelledError("Annotation cancelled")
-    annotator = build_observation_annotator(job.tracker_config)
+    annotator = build_observation_annotator(detector_type=job.detector_type, board=job.board)
     reader = cv2.VideoCapture(str(job.video.file_path))
     output = None
     try:

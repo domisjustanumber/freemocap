@@ -16,7 +16,7 @@ from freemocap.core.streaming.producers.box_producer import BOX_COLUMNS
 from freemocap.core.streaming.producers.producer_contexts import FrameContext, StreamContext
 from freemocap.core.skeletons.standard_human_skeleton import build_standard_human_bundle
 from freemocap.core.skeletons.charuco_board_skeleton import build_charuco_board_bundle
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
 from freemocap.pubsub.pubsub_topics import (
     AggregationNodeOutputMessage,

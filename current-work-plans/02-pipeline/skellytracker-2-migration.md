@@ -11,9 +11,123 @@ The contract:
 The first design, for `development-streaming`, is on the local branch
 `sidecar-implementation-dev-streaming`.
 
-Status: Phase A was redone on `sfn26`. No code is changed. Line numbers are for `ca0c17cc`. "ST"
-means skellytracker `sfn26` `2d356a6c`. Paths are relative to `freemocap/`, except where they
-start with `./` (the repo root).
+Status: see §0, written for the handoff to new sessions on 2026-11-16. §1 and §2 are the Phase A
+inventory and design: their line numbers are for `ca0c17cc`, and "ST" means skellytracker `sfn26`
+`2d356a6c`. Paths are relative to `freemocap/`, except where they start with `./` (the repo root).
+
+## 0. State at the handoff (2026-11-16)
+
+Phase B has started. All work is in local commits on `sidecar-implementation`; nothing is pushed.
+The skellytracker pair of Phase B is `dom/sidecar-implementation` at `abcfa9ce` (pipeline API
+gate). The supervisor is the skellytracker session; the user decides the product questions.
+
+### 0.1 Done (commit groups, oldest first)
+
+| Group | Commits | What |
+|---|---|---|
+| Phase A docs | `5322e23f`, `f2302431`, `1804a2f0`, `dcd44a6e`, `eb09c7bc`, `0f8be36c` | inventory, design, baseline, removal list, mapping design |
+| 1: removal of four detector choices | `765ac887` backend, `4f1cd681` tests, `088b3a91` UI/SDK, `49fa88e2` generated contract and SDK | `rtmw_mediapipe_hands`, `mediapipe_hands`, `rtmw_onnx_hands`, `dlc` (list: `skellytracker-2-removal-list.md`) |
+| 2a: mapping package | `d97e797f` copy from ST sfn26 `2d356a6c41f831484251677050fafb2576193060`, `0bdb052b` callers | `freemocap/core/mapping/` with the OLD tracker names in its YAMLs |
+| Phase B step 1: dependencies | `296ddebb` | Python `==3.13.18`, `skellytracker[mediapipe]`, `beartype==0.23.1`; no ORT variant extras, groups, NVIDIA index, overrides or Intel Mac. **No `uv.lock`** (§0.4 U1) |
+| Phase B step 2, partial | `c8275d18` | `core/tracking/pipeline_runs.py`: detector → built-in key, RTMW size map, EP choice from `core.eps`, start of a run; not called yet |
+
+Test counts:
+
+- **Baseline:** freemocap `ca0c17cc` with ST `2d356a6c`, Python 3.12.13 = 1572 passed, 15 failed,
+  31 skipped (`skellytracker-2-baseline-sfn26.tsv`; §4a).
+- **After groups 1 and 2a**, in the same environment: 1602 passed, 15 failed (the same 15),
+  23 skipped.
+  - The 8 `test_sidecar_factory_contract` failures pin the old session contract and go with it.
+- **On the Phase B environment** (Python 3.13.18, ST `abcfa9ce`), the current code cannot import:
+  it still uses the old API (`keypoint_detectors.charuco`, `sessions.shared_sessions`). Only
+  `test_pipeline_runs.py` runs there (4 passed). The full suite is the gate of Phase B.
+
+### 0.2 Next: Phase B steps 2 to 6 (the supervisor's order)
+
+2. **The run model.**
+   - One `PipelineRun` for each realtime camera group (`live`, one float `timestamp_ms` for each
+     camera from that camera's `(pre + post grab) / 2`, the source frame number as
+     `frame_index`) and for each posthoc recording (`video`, the recording timestamps).
+   - `rtmpose` → the RTMW built-in with the size map; `mediapipe` → the Holistic built-in.
+   - freemocap's own result type at ONE boundary function. **It waits for S2.**
+   - The 0.4 gate on RTMW points: test x and y only, because z is NaN for a 2D output.
+   - `person_roi` clipped to whole pixels (clip, then `int()`).
+   - `DETECTOR_RAN`, the colour and `object_detector_runs` from `node_ran["person"]`.
+   - The UI EP keys become `cpu`, `coreml`, `cuda`, `trt-rtx`.
+   - `InstanceKeypoints.image_size` is `(width, height)`; the old one was `(height, width)`.
+   - Map points by NAME only: the RTMW column order differs from sfn26 (§0.5).
+3. **Charuco.** Use `create_detector("charuco@skellytracker", board=...)` and the helpers of
+   `skellytracker.core.detectors.calibration`. `with_charuco_tracker` leaves the recording graph.
+4. **Mapping step 2b.** The re-keyed YAMLs replace the old-name files: `rtmw_body_to_standard_human.yaml`
+   keyed on the canonical names, `mediapipe_holistic_body_to_standard_human.yaml` keyed on the
+   Holistic `body/<name>` names, and one `hand_to_standard_human.yaml` (§6.2).
+5. **Delete what is left of the old API.**
+   - the presets, `tracker_profiles`, the sessions and `InferenceService`;
+   - `max_consecutive_misses`, and the 30 fps constants where timestamps or the run parameter
+     `fps` replace them;
+   - the field `pipeline_implementation`;
+   - `use_centralized_inference=False` and its `camera_node.py` branches;
+   - the stale hidden imports and the NVIDIA `collect_all` of `freemocap.spec`;
+   - the CI install steps that name the removed `cpu`/`cuda` groups.
+6. **The reader for old recordings**, with the clear errors (§6.3; `saved_observations.py`
+   already names a removed detector).
+
+The gate of Phase B is the freemocap suite on the Phase B environment, reported per file against
+1602/15/23, plus real end-to-end runs: one posthoc recording and the realtime path on recorded
+frames, each with `rtmpose` and with `mediapipe`.
+
+### 0.3 Decisions of the user (all 2026-11-16, through the supervisor)
+
+- Base on `upstream/sfn26` at its tip `ca0c17cc`.
+- Only `rtmpose` and `mediapipe` are migrated. The four other choices are removed; they come back
+  later from `sfn26`.
+- `rtmpose` → `yolox-rtmw-wholebody`. skellytracker made the built-in match the sfn26 box
+  behaviour:
+  - a redetect every 150 frames, and after a lost person;
+  - the One Euro box;
+  - the output `person_roi`.
+- `mediapipe` → `mediapipe-holistic-tasks`: another model, a 478-point face, no hand crops and no
+  reset.
+- freemocap owns the tracker → standard-human mappings. They are applied to 3D. One package for new
+  and old recordings.
+- Old recordings stay readable through a read-only reader.
+- Drop Intel Mac. Python 3.13.18 with the exact skellytracker pins; `beartype==0.23.1`.
+- Keep the detector-ran colour, column and metric, from `node_ran`.
+- Charuco through the public surface only: `create_detector` and `detectors.calibration`. The board
+  selector, the tag constants and `CHARUCO_BOARD_MAPPING` were ported into skellytracker.
+- No merge of development-streaming into skellytracker.
+
+### 0.4 Open questions
+
+- **S2 / V1, the result type.** Who: the user. The options:
+  - copy the four old data types (`Observation`, `StageObservation`, `Keypoints`, `BoundingBox`)
+    into freemocap and turn a pipeline result into them at one function (recommended by this
+    session and the supervisor);
+  - a new small type, which means a rewrite of 24 backend and 34 test files, with a risk to the
+    recording format.
+  `skellytracker.core.data_primitives` may go at ST stage 2.4. Step 2 waits for this answer.
+- **U1, the sibling pins.** Who moves skellycam (sfn26 pins `opencv-contrib-python==4.12.*`) to
+  `5.0.0.93`, and skellyforge (sfn26 says `requires-python <3.13`) to 3.13.18, and on which
+  branches? The freemocap `uv.lock` waits for it.
+  - Facts: skellycam's suite gives the same result on OpenCV 5.0.0.93 and on 4.12 (456 passed;
+    the one failure is the missing Rust extension). skellyforge's suite passes on 3.13.18 (931
+    passed, 1 skipped).
+- **The beartype 0.23.1 check.** The old cap came from `d057537d` ("chkkpt"), which names no
+  failing case. Run the full suite after the migration code lands and look for beartype decoration
+  errors. A failure goes to the user.
+- **The names of the pipeline API that are not confirmed:** `CallRefused`, `RunClosedError`,
+  `Frame`, `PipelineRun.models`, `check_pipeline`, `needs_execution_provider`, `annotate` and
+  `find_pipeline`. Keep each behind one import or one small function.
+
+### 0.5 Corrections found
+
+- The RTMW column order of the built-in differs from sfn26. The name set is the same, but only
+  body and feet (23 of 133) keep their position:
+  - old: body+feet, right_hand, left_hand, face;
+  - new: body, feet, face, left_hand, right_hand.
+  Map by name only, through `to_canonical`.
+- The committed `contracts/openapi.json` was already out of date with the backend at `ca0c17cc`.
+  Group 1 applied only the delta of the removal (a 3-way merge).
 
 ## 1. Inventory
 

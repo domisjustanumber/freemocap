@@ -8,21 +8,20 @@ They are intentional fixtures, not a runtime dependency on a skeleton package.
 import numpy as np
 import pytest
 
-from freemocap.core.mapping.mapping_paths import MEDIAPIPE_HAND_MAPPING, RTMPOSE_HAND_MAPPING
+from freemocap.core.mapping.mapping_paths import HAND_MAPPING, STANDARD_HUMAN_MAPPINGS
 from freemocap.core.mapping.tracker_mapping import TrackerMapping
 
 
-CASES = [(RTMPOSE_HAND_MAPPING, 'middle_finger1', 'forefinger1'),
-         (MEDIAPIPE_HAND_MAPPING, 'middle_finger_mcp', 'index_finger_mcp')]
+CASES = [(HAND_MAPPING, 'middle_finger_mcp', 'index_finger_mcp')]
 FINGERS = ('index', 'middle', 'ring', 'pinky')
 
 
 def palm(side, middle, index):
     mirror = 1 if side == 'left' else -1
     return {
-        f'{side}_wrist': np.zeros(3),
-        f'{side}_hand_{middle}': np.array([0., 0., .056489]),
-        f'{side}_hand_{index}': np.array([mirror * .006682, 0., .054667]),
+        f'body/{side}_wrist': np.zeros(3),
+        f'{side}_hand/{middle}': np.array([0., 0., .056489]),
+        f'{side}_hand/{index}': np.array([mirror * .006682, 0., .054667]),
     }
 
 
@@ -45,7 +44,7 @@ def test_cmc_reference_geometry_and_similarity_equivariance(path, middle, index,
     for name in points:
         np.testing.assert_array_equal(points[name], before[name])
     # Existing measured knuckle mapping remains direct and unchanged.
-    np.testing.assert_array_equal(result[f'{side}_index_mcp'], points[f'{side}_hand_{index}'])
+    np.testing.assert_array_equal(result[f'{side}_index_mcp'], points[f'{side}_hand/{index}'])
 
 
 @pytest.mark.parametrize('path,middle,index', CASES)
@@ -54,28 +53,25 @@ def test_missing_or_degenerate_palm_omits_only_affected_side(path, middle, index
     mapping = TrackerMapping.from_yaml(path)
     points = palm('left', middle, index) | palm('right', middle, index)
     if failure in ('wrist', 'middle', 'index'):
-        name = {'wrist': 'left_wrist', 'middle': f'left_hand_{middle}', 'index': f'left_hand_{index}'}[failure]
+        name = {'wrist': 'body/left_wrist', 'middle': f'left_hand/{middle}', 'index': f'left_hand/{index}'}[failure]
         del points[name]
     elif failure == 'parallel':
-        points[f'left_hand_{index}'] = points[f'left_hand_{middle}'] * .8
+        points[f'left_hand/{index}'] = points[f'left_hand/{middle}'] * .8
     else:
-        points[f'left_hand_{middle}'] = points['left_wrist'].copy()
+        points[f'left_hand/{middle}'] = points['body/left_wrist'].copy()
     result = mapping.apply(tracker_positions=points)
     assert all(f'left_{finger}_cmc' not in result for finger in FINGERS)
     assert all(f'right_{finger}_cmc' in result for finger in FINGERS)
 
 
-def test_detectors_agree_when_the_palm_deforms_and_quality_uses_all_inputs():
-    outputs = []
-    for path, middle, index in CASES:
-        mapping = TrackerMapping.from_yaml(path)
-        points = palm('left', middle, index)
-        points[f'left_hand_{index}'] += [.002, .01, -.008]
-        quality = {name: .9 for name in points}
-        quality[f'left_hand_{index}'] = .3
-        result = mapping.apply_with_quality(tracker_positions=points, tracker_quality=quality)
-        for finger in FINGERS:
-            assert result.quality[f'left_{finger}_cmc'] == .3
-        outputs.append(result.positions)
+def test_both_detectors_share_the_hand_mapping_and_quality_uses_all_inputs():
+    assert {paths[1] for paths in STANDARD_HUMAN_MAPPINGS.values()} == {HAND_MAPPING}
+    path, middle, index = CASES[0]
+    mapping = TrackerMapping.from_yaml(path)
+    points = palm('left', middle, index)
+    points[f'left_hand/{index}'] += [.002, .01, -.008]
+    quality = {name: .9 for name in points}
+    quality[f'left_hand/{index}'] = .3
+    result = mapping.apply_with_quality(tracker_positions=points, tracker_quality=quality)
     for finger in FINGERS:
-        np.testing.assert_allclose(outputs[0][f'left_{finger}_cmc'], outputs[1][f'left_{finger}_cmc'], atol=1e-12)
+        assert result.quality[f'left_{finger}_cmc'] == .3

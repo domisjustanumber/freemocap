@@ -1,7 +1,5 @@
 """Batch mapping must preserve scalar results and missing-observation masks."""
 
-from pathlib import Path
-
 import numpy as np
 import pytest
 
@@ -10,7 +8,7 @@ from freemocap.core.mapping.tracker_mapping import TrackerMapping
 from freemocap.core.mapping.tracker_mapping_batch import map_tracker_batch
 from freemocap.core.mapping.mapping_paths import STANDARD_HUMAN_MAPPINGS
 
-MAPPINGS = sorted(STANDARD_HUMAN_MAPPINGS["rtmpose"] + STANDARD_HUMAN_MAPPINGS["mediapipe"])
+MAPPINGS = sorted(set(STANDARD_HUMAN_MAPPINGS["rtmpose"] + STANDARD_HUMAN_MAPPINGS["mediapipe"]))
 
 
 def compare(mapping, names, values):
@@ -145,36 +143,17 @@ def test_prepared_empty_frames():
 
 @pytest.mark.parametrize("detector", ["rtmpose", "mediapipe"])
 def test_wholebody_schema_and_composed_mapping(detector):
-    from skellytracker.core.detectors.keypoint_detectors._schema_loader import (
-        load_point_names,
-    )
+    from freemocap.core.tasks.mocap.tracker_mappings import tracker_keypoint_names
 
-    import skellytracker
-
-    # The point-name schemas are skellytracker's; the mappings are freemocap's.
-    root = Path(skellytracker.__file__).parent / "core/detectors/keypoint_detectors"
+    # The point names are those of the skellytracker run; the mappings are freemocap's.
     mapping = CompositeTrackerMapping(
         tuple(TrackerMapping.from_yaml(path) for path in STANDARD_HUMAN_MAPPINGS[detector])
     )
-    if detector == "rtmpose":
-        names = tuple(
-            sorted(
-                load_point_names(root / detector / "wholebody/rtmpose_wholebody.yaml")
-            )
-        )
-    else:
-        names_set = set(load_point_names(root / detector / "body/mediapipe_body.yaml"))
-        names_set.update(
-            load_point_names(root / detector / "face/mediapipe_face_contour.yaml")
-        )
-        for side in ("left", "right"):
-            names_set.update(
-                f"{side}_hand_{name}"
-                for name in load_point_names(
-                    root / detector / "hands/mediapipe_hand.yaml"
-                )
-            )
-        names = tuple(sorted(names_set))
+    names = tracker_keypoint_names(detector)
+    # Every tracker name of the mapping is a point of the run, or a landmark that the mapping itself defines.
+    referenced = {name for part in mapping.mappings for name in part.tracker_names}
+    landmarks = {name for part in mapping.mappings for name in part.landmark_names}
+    assert referenced - landmarks <= set(names)
     values = np.random.default_rng(8).normal(size=(12, len(names), 3)) * 100
     values[1, ::3] = np.nan
     values[2] = np.nan

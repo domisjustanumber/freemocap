@@ -17,7 +17,7 @@ joints, whose mapping is an ``anatomical_offset``.
 
 Usage::
 
-    mapping = TrackerMapping.from_yaml(Path("rtmpose_body_to_standard_human_mapping.yaml"))
+    mapping = TrackerMapping.from_yaml(Path("rtmw_body_to_standard_human.yaml"))
     landmarks = mapping.apply(tracker_positions)
     # landmarks use the standard-human landmark names, ready for FABRIK/CoM/etc.
 

@@ -1,0 +1,206 @@
+# Hand → standard-human hand landmark hydration, for RTMW and for MediaPipe Holistic.
+#
+# Both detector choices give the same hand point names: the RTMW canonical names of
+# skellytracker's `to_canonical` (group left_hand/right_hand of COCO_WholeBody) are the
+# MediaPipe hand names, which Holistic gives as left_hand/<name> and right_hand/<name>.
+#
+# Keys are the standard human SIDED hand landmark names (left_*/right_*); values are the
+# tracker hand points. The wrist is NOT mapped here: it is hydrated by the body mapping
+# (body/left_wrist, body/right_wrist), the shared arm<->hand joint (its landmark is carpal_origin).
+# Thumb CMC is measured directly. The other four CMCs are estimated below with
+# anatomical offsets; individual carpal-bone landmarks remain model geometry.
+
+left_thumb_cmc: "left_hand/thumb_cmc"
+left_thumb_mcp: "left_hand/thumb_mcp"
+left_thumb_ip: "left_hand/thumb_ip"
+left_thumb_tip: "left_hand/thumb_tip"
+left_index_mcp: "left_hand/index_finger_mcp"
+left_index_pip: "left_hand/index_finger_pip"
+left_index_dip: "left_hand/index_finger_dip"
+left_index_tip: "left_hand/index_finger_tip"
+left_middle_mcp: "left_hand/middle_finger_mcp"
+left_middle_pip: "left_hand/middle_finger_pip"
+left_middle_dip: "left_hand/middle_finger_dip"
+left_middle_tip: "left_hand/middle_finger_tip"
+left_ring_mcp: "left_hand/ring_finger_mcp"
+left_ring_pip: "left_hand/ring_finger_pip"
+left_ring_dip: "left_hand/ring_finger_dip"
+left_ring_tip: "left_hand/ring_finger_tip"
+left_pinky_mcp: "left_hand/pinky_mcp"
+left_pinky_pip: "left_hand/pinky_pip"
+left_pinky_dip: "left_hand/pinky_dip"
+left_pinky_tip: "left_hand/pinky_tip"
+right_thumb_cmc: "right_hand/thumb_cmc"
+right_thumb_mcp: "right_hand/thumb_mcp"
+right_thumb_ip: "right_hand/thumb_ip"
+right_thumb_tip: "right_hand/thumb_tip"
+right_index_mcp: "right_hand/index_finger_mcp"
+right_index_pip: "right_hand/index_finger_pip"
+right_index_dip: "right_hand/index_finger_dip"
+right_index_tip: "right_hand/index_finger_tip"
+right_middle_mcp: "right_hand/middle_finger_mcp"
+right_middle_pip: "right_hand/middle_finger_pip"
+right_middle_dip: "right_hand/middle_finger_dip"
+right_middle_tip: "right_hand/middle_finger_tip"
+right_ring_mcp: "right_hand/ring_finger_mcp"
+right_ring_pip: "right_hand/ring_finger_pip"
+right_ring_dip: "right_hand/ring_finger_dip"
+right_ring_tip: "right_hand/ring_finger_tip"
+right_pinky_mcp: "right_hand/pinky_mcp"
+right_pinky_pip: "right_hand/pinky_pip"
+right_pinky_dip: "right_hand/pinky_dip"
+right_pinky_tip: "right_hand/pinky_tip"
+
+# CMC estimates in an observed palm frame, not independent measurements.
+# Longitudinal: wrist -> middle MCP; indexward: wrist -> index MCP,
+# orthogonalized against longitudinal. Reference length is wrist -> middle MCP.
+# Ratios come from standard-human rest geometry: longitudinal = .015185/.056489;
+# indexward = {.006682, 0, -.006074, -.011541}/.056489.
+# These define attachment estimates, not a rigid fit of the tracked palm.
+# Both sides use an indexward axis, so their coefficients have the same signs.
+# Missing/degenerate frame inputs omit these estimates; there is no rest fallback.
+left_index_cmc:
+  form: anatomical_offset
+  origin: [body/left_wrist]
+  frame:
+    longitudinal:
+      from: body/left_wrist
+      to: left_hand/middle_finger_mcp
+      kind: exact
+    indexward:
+      from: body/left_wrist
+      to: left_hand/index_finger_mcp
+      kind: approximate
+  offset:
+    longitudinal: 0.2688133972985891
+    indexward: 0.11828851634831558
+  reference_length:
+    from: body/left_wrist
+    to: left_hand/middle_finger_mcp
+left_middle_cmc:
+  form: anatomical_offset
+  origin: [body/left_wrist]
+  frame:
+    longitudinal:
+      from: body/left_wrist
+      to: left_hand/middle_finger_mcp
+      kind: exact
+    indexward:
+      from: body/left_wrist
+      to: left_hand/index_finger_mcp
+      kind: approximate
+  offset:
+    longitudinal: 0.2688133972985891
+    indexward: 0.0
+  reference_length:
+    from: body/left_wrist
+    to: left_hand/middle_finger_mcp
+left_ring_cmc:
+  form: anatomical_offset
+  origin: [body/left_wrist]
+  frame:
+    longitudinal:
+      from: body/left_wrist
+      to: left_hand/middle_finger_mcp
+      kind: exact
+    indexward:
+      from: body/left_wrist
+      to: left_hand/index_finger_mcp
+      kind: approximate
+  offset:
+    longitudinal: 0.2688133972985891
+    indexward: -0.10752535891943561
+  reference_length:
+    from: body/left_wrist
+    to: left_hand/middle_finger_mcp
+left_pinky_cmc:
+  form: anatomical_offset
+  origin: [body/left_wrist]
+  frame:
+    longitudinal:
+      from: body/left_wrist
+      to: left_hand/middle_finger_mcp
+      kind: exact
+    indexward:
+      from: body/left_wrist
+      to: left_hand/index_finger_mcp
+      kind: approximate
+  offset:
+    longitudinal: 0.2688133972985891
+    indexward: -0.20430526297155194
+  reference_length:
+    from: body/left_wrist
+    to: left_hand/middle_finger_mcp
+right_index_cmc:
+  form: anatomical_offset
+  origin: [body/right_wrist]
+  frame:
+    longitudinal:
+      from: body/right_wrist
+      to: right_hand/middle_finger_mcp
+      kind: exact
+    indexward:
+      from: body/right_wrist
+      to: right_hand/index_finger_mcp
+      kind: approximate
+  offset:
+    longitudinal: 0.2688133972985891
+    indexward: 0.11828851634831558
+  reference_length:
+    from: body/right_wrist
+    to: right_hand/middle_finger_mcp
+right_middle_cmc:
+  form: anatomical_offset
+  origin: [body/right_wrist]
+  frame:
+    longitudinal:
+      from: body/right_wrist
+      to: right_hand/middle_finger_mcp
+      kind: exact
+    indexward:
+      from: body/right_wrist
+      to: right_hand/index_finger_mcp
+      kind: approximate
+  offset:
+    longitudinal: 0.2688133972985891
+    indexward: 0.0
+  reference_length:
+    from: body/right_wrist
+    to: right_hand/middle_finger_mcp
+right_ring_cmc:
+  form: anatomical_offset
+  origin: [body/right_wrist]
+  frame:
+    longitudinal:
+      from: body/right_wrist
+      to: right_hand/middle_finger_mcp
+      kind: exact
+    indexward:
+      from: body/right_wrist
+      to: right_hand/index_finger_mcp
+      kind: approximate
+  offset:
+    longitudinal: 0.2688133972985891
+    indexward: -0.10752535891943561
+  reference_length:
+    from: body/right_wrist
+    to: right_hand/middle_finger_mcp
+right_pinky_cmc:
+  form: anatomical_offset
+  origin: [body/right_wrist]
+  frame:
+    longitudinal:
+      from: body/right_wrist
+      to: right_hand/middle_finger_mcp
+      kind: exact
+    indexward:
+      from: body/right_wrist
+      to: right_hand/index_finger_mcp
+      kind: approximate
+  offset:
+    longitudinal: 0.2688133972985891
+    indexward: -0.20430526297155194
+  reference_length:
+    from: body/right_wrist
+    to: right_hand/middle_finger_mcp
+

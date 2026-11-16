@@ -92,6 +92,20 @@ def test_the_rtmw_box_is_clipped_to_whole_pixels_and_an_absent_person_has_no_box
     assert stage.bounding_boxes == [] and stage.keypoints.n_valid == 0
 
 
+@pytest.mark.parametrize("detector_type", ["rtmpose", "mediapipe"])
+def test_point_names_and_connections_use_the_names_of_the_observations(detector_type):
+    names = pipeline_runs.detector_point_names(detector_type)
+    edges = pipeline_runs.detector_connections(detector_type)
+    node = pipeline_runs.RTMW_NODE if detector_type == "rtmpose" else pipeline_runs.HOLISTIC_NODE
+    assert len(edges) == len(pipeline_runs._output_schema(detector_type)[node]["edges"])  # no edge is lost
+    assert all(a in names and b in names for a, b in edges)
+    assert {"body/nose", "left_hand/wrist", "left_hand/thumb_cmc"} <= set(names)
+    if detector_type == "rtmpose":
+        # a raw RTMW hand or foot name is not a canonical name
+        assert ("body/left_ankle", "body/left_big_toe") in edges or ("body/left_big_toe", "body/left_ankle") in edges
+        assert not any(name.startswith("feet/") or name.endswith("_thumb1") for edge in edges for name in edge)
+
+
 def test_a_real_holistic_run_gives_one_body_stage_with_its_point_names():
     run, provider = pipeline_runs.start_detector_run(detector_type="mediapipe", camera_ids=["0", "1"], running_mode="live")
     from skellytracker.core.pipelines import Frame

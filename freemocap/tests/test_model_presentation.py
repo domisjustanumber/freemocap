@@ -41,7 +41,7 @@ def test_chest_mapping_matches_authored_reference_after_rigid_transform_and_scal
     from freemocap.core.mapping.prepared_tracker_mapping import PreparedTrackerMapping
     skeleton = SkeletonDefinition.from_default_yaml()
     rest = RestPose.from_default_yaml(skeleton=skeleton)
-    points = {f'{side}_{key}': rest.landmark_positions[f'{side}_{landmark}'].array
+    points = {f'body/{side}_{key}': rest.landmark_positions[f'{side}_{landmark}'].array
               for side in ('left', 'right')
               for key, landmark in [('shoulder', 'acromion'), ('hip', 'hip_socket')]}
     rotation = np.array([[0., -1., 0.], [0., 0., -1.], [1., 0., 0.]])
@@ -67,15 +67,15 @@ def test_tracker_topology_survives_recording_and_shared_composition(detector):
     from freemocap.core.recording.data_descriptors.recording_model import RecordedModel
     from freemocap.core.streaming.message_composer import compose_messages
     from freemocap.core.streaming.producers.producer_contexts import StreamContext
-    from skellytracker.core.io.tracker_profiles import tracker_profile
+    from freemocap.core.tracking.pipeline_runs import detector_connections
     bundle = build_standard_human_bundle(detector_type=detector)
     saved = RecordedModel.from_bundle(bundle)
     restored = RecordedModel.model_validate_json(saved.model_dump_json()).to_bundle()
     def wire(value):
         return compose_messages(StreamContext(skeletons=(value,))).models[0].to_cbor_message()
     assert wire(bundle) == wire(restored)
-    assert bundle.tracker_connections == tracker_profile(detector).connections
-    face_edges = [(a,b) for a,b in bundle.tracker_connections if a.startswith('face_') and b.startswith('face_')]
+    assert bundle.tracker_connections == detector_connections(detector)
+    face_edges = [(a,b) for a,b in bundle.tracker_connections if a.startswith('face/') and b.startswith('face/')]
     assert face_edges
     assert all(a in bundle.tracker_keypoint_names and b in bundle.tracker_keypoint_names for a,b in face_edges)
     legacy = saved.model_dump()

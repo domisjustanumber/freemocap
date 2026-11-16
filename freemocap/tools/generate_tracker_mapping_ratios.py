@@ -1,6 +1,6 @@
 """Regenerate anatomical_offset ratios so a tracker mapping reproduces the rest pose.
 
-The ``anatomical_offset`` entries in SkellyTracker's body mapping YAMLs claim to be
+The ``anatomical_offset`` entries in freemocap's body mapping YAMLs claim to be
 "recomputed from SkellyForge's rest positions". When the model moves on, the ratios
 go stale silently - the mapped junctions land centimetres off the geometry every
 other layer authors against. This script closes that loop: drive SkellyTracker's own
@@ -37,29 +37,29 @@ from freemocap.core.mapping.tracker_mapping import TrackerMapping
 # Tracker keypoint name -> standard-human landmark whose REST position stands in
 # for it at the synthetic T-pose. Keep in sync with the companion guard test.
 _TRACKER_STANDINS: dict[str, str] = {
-    "nose": "nose",
-    "left_eye": "left_eye",
-    "right_eye": "right_eye",
-    "left_ear": "left_ear",
-    "right_ear": "right_ear",
-    "left_shoulder": "left_acromion",
-    "right_shoulder": "right_acromion",
-    "left_elbow": "left_elbow",
-    "right_elbow": "right_elbow",
-    "left_wrist": "left_wrist",
-    "right_wrist": "right_wrist",
-    "left_hip": "left_hip_socket",
-    "right_hip": "right_hip_socket",
-    "left_knee": "left_knee",
-    "right_knee": "right_knee",
-    "left_ankle": "left_ankle",
-    "right_ankle": "right_ankle",
-    "left_big_toe": "left_toe_tip",
-    "right_big_toe": "right_toe_tip",
-    "left_foot_index": "left_toe_tip",
-    "right_foot_index": "right_toe_tip",
-    "left_heel": "left_calcaneus",
-    "right_heel": "right_calcaneus",
+    "body/nose": "nose",
+    "body/left_eye": "left_eye",
+    "body/right_eye": "right_eye",
+    "body/left_ear": "left_ear",
+    "body/right_ear": "right_ear",
+    "body/left_shoulder": "left_acromion",
+    "body/right_shoulder": "right_acromion",
+    "body/left_elbow": "left_elbow",
+    "body/right_elbow": "right_elbow",
+    "body/left_wrist": "left_wrist",
+    "body/right_wrist": "right_wrist",
+    "body/left_hip": "left_hip_socket",
+    "body/right_hip": "right_hip_socket",
+    "body/left_knee": "left_knee",
+    "body/right_knee": "right_knee",
+    "body/left_ankle": "left_ankle",
+    "body/right_ankle": "right_ankle",
+    "body/left_big_toe": "left_toe_tip",
+    "body/right_big_toe": "right_toe_tip",
+    "body/left_foot_index": "left_toe_tip",
+    "body/right_foot_index": "right_toe_tip",
+    "body/left_heel": "left_calcaneus",
+    "body/right_heel": "right_calcaneus",
 }
 
 _EPSILON = 1e-4

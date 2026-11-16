@@ -5,6 +5,7 @@ is thread-safe: its calls are serial, `close()` from another thread waits for th
 runs, and two runs can run at the same time on two threads.
 """
 from collections.abc import Mapping, Sequence
+from functools import cache
 import logging
 from typing import Any
 
@@ -71,6 +72,40 @@ def start_detector_run(*, detector_type: str, camera_ids: Sequence[str], running
     provider = run_execution_provider(execution_provider) if check_pipeline(config).needs_execution_provider else None
     run = start_pipeline(config, camera_ids=list(camera_ids), running_mode=running_mode, execution_provider=provider)
     return run, provider
+
+
+@cache
+def _output_schema(detector_type: str) -> dict[str, Any]:
+    from skellytracker.core.pipelines import check_pipeline
+    return check_pipeline(load_detector_pipeline(detector_type)).output_schema
+
+
+def detector_point_names(detector_type: str) -> tuple[str, ...]:
+    """The point names of the observations of a detector choice, as `observations_from_results` gives them."""
+    schema = _output_schema(detector_type)
+    if detector_type == "rtmpose":
+        return tuple(schema[RTMW_NODE]["canonical_names"])
+    return tuple(schema[HOLISTIC_NODE]["point_names"])
+
+
+@cache
+def detector_connections(detector_type: str) -> tuple[tuple[str, str], ...]:
+    """The edges between the points of a detector choice, in the names of `detector_point_names`."""
+    schema = _output_schema(detector_type)
+    if detector_type != "rtmpose":
+        return tuple((a, b) for a, b in schema[HOLISTIC_NODE]["edges"])
+    from skellytracker.core.pipelines import InstanceKeypoints, to_canonical
+    rtmw = schema[RTMW_NODE]
+    raw = tuple(rtmw["point_names"])
+    # shortcut: the output schema gives edges in raw point names only; a marker value finds the
+    # canonical copy of each raw point. Upgrade when skellytracker gives edges in canonical names.
+    columns = np.arange(len(raw), dtype=float)
+    marked = InstanceKeypoints(raw, np.stack([columns, columns ** 2, columns * 0], axis=-1)[None], np.ones((1, len(raw))),
+                               np.ones(1), np.ones(1, dtype=bool), np.full(1, -1))
+    canonical = to_canonical(marked, rtmw)
+    rename = {raw[int(x)]: name for name, (x, y) in zip(canonical.names, canonical.xyz[0, :, :2])
+              if float(x).is_integer() and y == x ** 2}
+    return tuple((rename[a], rename[b]) for a, b in rtmw["edges"] if a in rename and b in rename)
 
 
 def observations_from_results(results: Mapping[str, Mapping[str, Any]], output_schema: Mapping[str, Any],

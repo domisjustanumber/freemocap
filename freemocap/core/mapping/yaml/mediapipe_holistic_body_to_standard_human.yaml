@@ -1,0 +1,352 @@
+nose: body/nose
+left_eye: body/left_eye
+right_eye: body/right_eye
+left_eye_inner: body/left_eye_inner
+right_eye_inner: body/right_eye_inner
+left_eye_outer: body/left_eye_outer
+right_eye_outer: body/right_eye_outer
+left_ear: body/left_ear
+right_ear: body/right_ear
+left_acromion: body/left_shoulder
+right_acromion: body/right_shoulder
+left_shoulder: body/left_shoulder
+right_shoulder: body/right_shoulder
+left_elbow: body/left_elbow
+right_elbow: body/right_elbow
+left_wrist: body/left_wrist
+right_wrist: body/right_wrist
+left_carpal_origin: body/left_wrist
+right_carpal_origin: body/right_wrist
+left_hip_joint: body/left_hip
+right_hip_joint: body/right_hip
+left_hip_socket: body/left_hip
+right_hip_socket: body/right_hip
+left_knee: body/left_knee
+right_knee: body/right_knee
+left_ankle: body/left_ankle
+right_ankle: body/right_ankle
+left_ankle_origin: body/left_ankle
+right_ankle_origin: body/right_ankle
+left_calcaneus: body/left_heel
+right_calcaneus: body/right_heel
+left_toe_tip: body/left_foot_index
+right_toe_tip: body/right_foot_index
+head_center:
+- body/left_ear
+- body/right_ear
+pelvis_origin:
+- body/left_hip
+- body/right_hip
+neck_center:
+- body/left_shoulder
+- body/right_shoulder
+# SC offsets share one symmetric reference geometry across body trackers.
+# Ratios are projections of (SC - shoulder midpoint) onto lateral/anterior/up,
+# divided by shoulder width, using the standard-human reference pose.
+# Calibrated to SC/notch 70% and xiphoid 60% depth. Project in the
+# hip-midpoint -> shoulder-midpoint frame, including its reference-pose tilt.
+left_sternoclavicular:
+  form: anatomical_offset
+  origin:
+  - body/left_shoulder
+  - body/right_shoulder
+  frame:
+    up:
+      from:
+      - body/left_hip
+      - body/right_hip
+      to:
+      - body/left_shoulder
+      - body/right_shoulder
+      kind: exact
+    lateral:
+      from: body/left_shoulder
+      to: body/right_shoulder
+      kind: approximate
+  offset:
+    lateral: -0.062498631
+    anterior: 0.234184536150
+    up: -0.009467177190
+  reference_length:
+    from: body/left_shoulder
+    to: body/right_shoulder
+right_sternoclavicular:
+  form: anatomical_offset
+  origin:
+  - body/left_shoulder
+  - body/right_shoulder
+  frame:
+    up:
+      from:
+      - body/left_hip
+      - body/right_hip
+      to:
+      - body/left_shoulder
+      - body/right_shoulder
+      kind: exact
+    lateral:
+      from: body/left_shoulder
+      to: body/right_shoulder
+      kind: approximate
+  offset:
+    lateral: 0.062498631
+    anterior: 0.234184536150
+    up: -0.009467177190
+  reference_length:
+    from: body/left_shoulder
+    to: body/right_shoulder
+sternoclavicular_notch:
+  form: anatomical_offset
+  origin:
+  - body/left_shoulder
+  - body/right_shoulder
+  frame:
+    up:
+      from:
+      - body/left_hip
+      - body/right_hip
+      to:
+      - body/left_shoulder
+      - body/right_shoulder
+      kind: exact
+    lateral:
+      from: body/left_shoulder
+      to: body/right_shoulder
+      kind: approximate
+  offset:
+    anterior: 0.234184536150
+    up: -0.009467177190
+  reference_length:
+    from: body/left_shoulder
+    to: body/right_shoulder
+xiphoid_process:
+  form: anatomical_offset
+  origin:
+  - body/left_shoulder
+  - body/right_shoulder
+  frame:
+    up:
+      from:
+      - body/left_hip
+      - body/right_hip
+      to:
+      - body/left_shoulder
+      - body/right_shoulder
+      kind: exact
+    lateral:
+      from: body/left_shoulder
+      to: body/right_shoulder
+      kind: approximate
+  offset:
+    up: -0.496223613273
+    anterior: 0.283314074153
+  reference_length:
+    from: body/left_shoulder
+    to: body/right_shoulder
+
+craniocervical_junction:
+- body/left_ear
+- body/right_ear
+chest_center:
+# Mid-torso on the hip-center/shoulder-center line, without anatomical offsets.
+- body/left_hip
+- body/right_hip
+- body/left_shoulder
+- body/right_shoulder
+chin:
+  form: anatomical_offset
+  origin:
+  - body/nose
+  frame:
+    up:
+      from:
+      - body/left_shoulder
+      - body/right_shoulder
+      to: head_center
+      kind: exact
+    lateral:
+      from: body/left_eye
+      to: body/right_eye
+      kind: approximate
+  offset:
+    up: -1.480194
+    anterior: -0.136003
+  reference_length:
+    from: body/left_eye
+    to: body/right_eye
+left_canine_tooth_tip:
+  form: anatomical_offset
+  origin:
+  - body/nose
+  frame:
+    up:
+      from:
+      - body/left_shoulder
+      - body/right_shoulder
+      to: head_center
+      kind: exact
+    lateral:
+      from: body/left_eye
+      to: body/right_eye
+      kind: approximate
+  offset:
+    up: -0.75626
+    lateral: -0.3125
+    anterior: -0.655017
+  reference_length:
+    from: body/left_eye
+    to: body/right_eye
+right_canine_tooth_tip:
+  form: anatomical_offset
+  origin:
+  - body/nose
+  frame:
+    up:
+      from:
+      - body/left_shoulder
+      - body/right_shoulder
+      to: head_center
+      kind: exact
+    lateral:
+      from: body/left_eye
+      to: body/right_eye
+      kind: approximate
+  offset:
+    up: -0.75626
+    lateral: 0.3125
+    anterior: -0.655017
+  reference_length:
+    from: body/left_eye
+    to: body/right_eye
+left_ball:
+  form: anatomical_offset
+  origin:
+  - body/left_ankle
+  frame:
+    forward:
+      from: body/left_ankle
+      to: left_toe_tip
+      kind: exact
+    shin:
+      from: body/left_knee
+      to: body/left_ankle
+      kind: approximate
+  offset:
+    forward: 0.785162
+    shin: 0.079625
+  reference_length:
+    from: body/left_ankle
+    to: left_toe_tip
+right_ball:
+  form: anatomical_offset
+  origin:
+  - body/right_ankle
+  frame:
+    forward:
+      from: body/right_ankle
+      to: right_toe_tip
+      kind: exact
+    shin:
+      from: body/right_knee
+      to: body/right_ankle
+      kind: approximate
+  offset:
+    forward: 0.785162
+    shin: 0.079625
+  reference_length:
+    from: body/right_ankle
+    to: right_toe_tip
+sacrum_top:
+  form: anatomical_offset
+  origin:
+  - body/left_hip
+  - body/right_hip
+  frame:
+    up:
+      from:
+      - body/left_hip
+      - body/right_hip
+      to:
+      - body/left_shoulder
+      - body/right_shoulder
+      kind: exact
+    lateral:
+      from: body/left_hip
+      to: body/right_hip
+      kind: approximate
+  offset:
+    up: 0.537627
+    anterior: -0.204594
+  reference_length:
+    from: body/left_hip
+    to: body/right_hip
+left_iliac_crest:
+  form: anatomical_offset
+  origin:
+  - body/left_hip
+  frame:
+    up:
+      from:
+      - body/left_hip
+      - body/right_hip
+      to:
+      - body/left_shoulder
+      - body/right_shoulder
+      kind: exact
+    lateral:
+      from: body/left_hip
+      to: body/right_hip
+      kind: approximate
+  offset:
+    up: 0.56815
+    lateral: -0.323864
+  reference_length:
+    from: body/left_hip
+    to: body/right_hip
+right_iliac_crest:
+  form: anatomical_offset
+  origin:
+  - body/right_hip
+  frame:
+    up:
+      from:
+      - body/left_hip
+      - body/right_hip
+      to:
+      - body/left_shoulder
+      - body/right_shoulder
+      kind: exact
+    lateral:
+      from: body/left_hip
+      to: body/right_hip
+      kind: approximate
+  offset:
+    up: 0.56815
+    lateral: 0.323864
+  reference_length:
+    from: body/left_hip
+    to: body/right_hip
+pubic_symphysis:
+  form: anatomical_offset
+  origin:
+  - body/left_hip
+  - body/right_hip
+  frame:
+    up:
+      from:
+      - body/left_hip
+      - body/right_hip
+      to:
+      - body/left_shoulder
+      - body/right_shoulder
+      kind: exact
+    lateral:
+      from: body/left_hip
+      to: body/right_hip
+      kind: approximate
+  offset:
+    up: -0.053189
+    anterior: 0.341494
+  reference_length:
+    from: body/left_hip
+    to: body/right_hip

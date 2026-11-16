@@ -34,6 +34,16 @@ gate). The supervisor is the skellytracker session; the user decides the product
 | Phase B step 3: charuco | `750fc8f2` | `core/tracking/charuco_detection.py` through `create_detector`; calibration and the recording graph take a board |
 | Phase B step 4: mapping 2b | `ec9b3b5d` | the three re-keyed YAMLs; names and edges from the run schema (`detector_point_names`, `detector_connections`) |
 | Phase B step 5: old API removed | `c5be62ed`, `46e9a55d` | tracker factory, provider policy, per-camera inference, generated recipes, contract, spec, CI install |
+| Phase B step 6: old-recording reader | this commit | a restart from saved `body.<point>` (skellytracker 1) observations raises `SkellytrackerOnePointNamesError`; old 3D results stay readable through their own snapshot |
+
+Handoff state (2026-11-16, end of session): the suite on the Phase B environment, with `PYTHONPATH` set to
+this checkout, is 1503 passed, 8 failed, 21 skipped (39 deselected). 7 of the failures are the
+baseline ones. `test_observation_imports` fails only because its child runs `python -I`, which imports
+the freemocap of `phaseb\venv313` (the scratch clone at `0bdb052b`); it passes when that clone is at
+this branch's HEAD. The beartype 0.23.1 check (step 6 of the list) is covered by that run: no
+decoration error. Next: the R1 to R3 and R4 to R6 boundary commit when skellytracker sends its commit;
+the user's answers on the MediaPipe settings, the installer variants and `bench_*.py`/`experiments/`;
+then the real end-to-end runs of the gate.
 
 Test counts:
 

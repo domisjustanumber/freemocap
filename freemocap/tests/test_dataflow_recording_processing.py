@@ -56,7 +56,7 @@ class RecordingProcessingTests(unittest.TestCase):
             for index, camera in enumerate(self.cameras):
                 xy = pixels[index, frame]
                 observation = Observation(frame_number=frame, image_size=(720, 1280), stages={"body": StageObservation(
-                    name="body", keypoints=Keypoints(names=tuple(f"point{i}" for i in range(10)),
+                    name="body", keypoints=Keypoints(names=tuple(f"body/point{i}" for i in range(10)),
                         xyz=np.column_stack((xy, np.zeros(10))), visibility=np.isfinite(xy).all(axis=1).astype(float)))})
                 observations[camera.id] = observation
                 self.events.append(TrackedCameraFrame(CameraFrameKey("run", "cameras", camera.id, frame), frame / 30, observation))

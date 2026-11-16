@@ -28,6 +28,28 @@ class SavedObservations:
         return next(iter(self.frames.camera_series.values())).channel_arrays.context.sensor_group
 
 
+class SkellytrackerOnePointNamesError(ValueError):
+    """Saved 2D observations carry the point names of skellytracker 1, which the current mappings do not read."""
+
+
+def require_current_point_names(point_names, detector_type: str) -> None:
+    """Refuse a restart from saved observations that carry the skellytracker 1 point names.
+
+    Both detector choices save their points in the stage `body`. skellytracker 2.0 names them
+    `body.<group>/<point>` (for example `body.body/nose`); `sfn26` saved `body.<point>` (`body.nose`),
+    with no `/`. Those recordings' saved 3D results stay readable through their own mapping snapshot;
+    only re-triangulating their 2D points with today's mapping is refused.
+    """
+    from freemocap.core.tracking.pipeline_runs import STAGE
+    old = sorted(point for stage, _, point in (name.partition('.') for name in point_names)
+                 if stage == STAGE and '/' not in point)
+    if old:
+        raise SkellytrackerOnePointNamesError(
+            f'These saved {detector_type!r} observations use the point names of skellytracker 1 (for example '
+            f'{old[0]!r}), which the current mappings do not read, so triangulation cannot restart from them. '
+            'Run again from the observations stage; the saved 3D results of this recording stay readable.')
+
+
 def read_saved_observations(*, structure: RecordingStructure, run_id: int,
                             sensor_group: str | None) -> SavedObservations:
     with recording_write_lock(structure=structure), recording_view(structure.data_parquet_path) as view:
@@ -98,4 +120,6 @@ def read_saved_observations(*, structure: RecordingStructure, run_id: int,
         timing = RecordingGroupTiming(cameras=camera_timing, synchronized=RecordingTiming(
             timestamps_s=timeline.timestamps_s,
             method=TimingMethod(run.sources[timing_channels[0].source].definition['method'])))
-        return SavedObservations(frames=ObservationFrames(camera_series), videos=videos, config=config, timing=timing)
+        frames = ObservationFrames(camera_series)
+        require_current_point_names(frames.point_names, config.detector_type)
+        return SavedObservations(frames=frames, videos=videos, config=config, timing=timing)

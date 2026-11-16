@@ -44,10 +44,11 @@ def shared_memory_names(group):
 @pytest.mark.e2e
 @pytest.mark.slow
 def test_provider_switch_reuses_capture_and_releases_sessions(replay_reference, caplog):
-    """Exercise an actual CPU-to-CUDA selection change through running workers."""
+    """Exercise an actual CPU-to-GPU EP selection change through running workers."""
     from freemocap.core.tracking.execution_providers import usable_execution_providers
-    if 'cuda' not in usable_execution_providers():
-        pytest.skip('CPU-to-CUDA replay needs a CUDA runtime')
+    gpu = next((key for key in usable_execution_providers() if key != 'cpu'), None)
+    if gpu is None:
+        pytest.skip('CPU-to-GPU replay needs a usable GPU EP')
     calibration = find_recording_calibration(recording_folder=replay_reference.full_path)
     config = RealtimePipelineConfig(
         camera_node_config=CameraNodeConfig(worker_mode=WorkerMode.THREAD,
@@ -80,7 +81,7 @@ def test_provider_switch_reuses_capture_and_releases_sessions(replay_reference, 
                 assert all(model['applied_providers'] == ('cpu',)
                            for client in service.provider_status() for model in client['models'])
                 updated = active_pipeline.config.model_copy(deep=True)
-                updated.skeleton_inference_node_config.execution_provider = 'cuda'
+                updated.skeleton_inference_node_config.execution_provider = gpu
                 active_pipeline.update_config(updated)
 
         result = drive_realtime_lockstep(pipeline=pipeline, mock_group=group, num_frames=12,
@@ -113,7 +114,7 @@ def test_provider_switch_reuses_capture_and_releases_sessions(replay_reference, 
         assert pipeline.skeleton_inference_node is not original_inference
         statuses = service.provider_status()
         assert len(statuses) == 1 and statuses[0]['models']
-        assert all(model['requested_provider'] == 'cuda' and model['applied_providers'] == ('cuda',)
+        assert all(model['requested_provider'] == gpu and model['applied_providers'] == (gpu,)
                    for model in statuses[0]['models'])
     finally:
         try:

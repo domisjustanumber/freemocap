@@ -20,7 +20,7 @@ def owners(monkeypatch):
     service = InferenceService(worker_registry=Mock(spec=WorkerRegistry))
     registration = Mock(spec=InferenceRegistration, pipeline_id="live", shutdown_flag=SimpleNamespace(value=False))
     client = InferenceClient(registration=registration, _service=service)
-    client._active_provider = "cuda"
+    client._active_provider = "gpu-ep"
     service._clients.append(client)
     registry = TaskRegistry()
     monkeypatch.setattr(export_jobs, 'task_state', BackgroundTaskState())

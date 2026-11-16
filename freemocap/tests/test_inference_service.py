@@ -36,7 +36,7 @@ class InferenceServiceTests(unittest.TestCase):
         run.models = {"person": {"key": "yolox-person@openmmlab-exporter"}, "wholebody": {"key": "rtmw-wholebody133@openmmlab-exporter"}}
         run.process_batch.side_effect = self.infer
         self.runs.append(run)
-        return run, "cuda"
+        return run, "gpu-ep"
 
     @staticmethod
     def infer(frames):
@@ -79,7 +79,7 @@ class InferenceServiceTests(unittest.TestCase):
         report = PerformanceReport()
         client = self.service.register(InferenceRegistration(
             pipeline_id="diagnostics", mode=InferenceMode.POSTHOC, detector_type="rtmpose", camera_ids=("0", "1", "2"),
-            rtmpose_model_name="rtmw-x-l_384x288", execution_provider="cuda", shutdown_flag=multiprocessing.Value("b", False)))
+            rtmpose_model_name="rtmw-x-l_384x288", execution_provider="gpu-ep", shutdown_flag=multiprocessing.Value("b", False)))
         images = {str(i): np.zeros((8, 12, 3), dtype=np.uint8) for i in range(3)}
         for frame in range(2):
             result = client.submit(InferenceRequest(frame_number=frame, images=images, performance=report,
@@ -90,7 +90,7 @@ class InferenceServiceTests(unittest.TestCase):
         self.assertEqual(rows["inference.queue_wait"]["count"], 2)
         self.assertEqual(rows["inference.process_batch.images=3"]["count"], 2)
         self.assertEqual(self.started, [dict(detector_type="rtmpose", camera_ids=("0", "1", "2"), running_mode="video",
-                                             rtmpose_model_name="rtmw-x-l_384x288", execution_provider="cuda")])
+                                             rtmpose_model_name="rtmw-x-l_384x288", execution_provider="gpu-ep")])
         self.assertEqual(self.runs[0].process_batch.call_count, 2)
 
     def test_the_registered_confidence_threshold_reaches_the_boundary(self) -> None:
@@ -118,7 +118,7 @@ class InferenceServiceTests(unittest.TestCase):
         observed = self.service.provider_status()[0]
         self.assertEqual(observed["pipeline_id"], "observed-provider")
         self.assertEqual([(model["model_name"], model["requested_provider"], model["applied_providers"]) for model in observed["models"]],
-                         [("yolox-person@openmmlab-exporter", None, ("cuda",)), ("rtmw-wholebody133@openmmlab-exporter", None, ("cuda",))])
+                         [("yolox-person@openmmlab-exporter", None, ("gpu-ep",)), ("rtmw-wholebody133@openmmlab-exporter", None, ("gpu-ep",))])
 
     def test_each_client_has_its_own_run_and_a_retired_run_is_closed(self) -> None:
         first = self.client(name="first")

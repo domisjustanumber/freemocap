@@ -48,12 +48,12 @@ async def apply(app):
     return await app.create_or_update_realtime_pipeline(camera_configs={}, pipeline_config=RealtimePipelineConfig())
 
 
-async def test_saved_legacy_tensorrt_settings_reach_safe_provider_factory():
+async def test_a_saved_ep_key_reaches_the_pipeline_update_for_skellytracker_to_check():
     app = application()
     existing = pipeline()
     app.realtime_pipeline_manager.pipelines = {existing.id: existing}
     config = RealtimePipelineConfig()
-    config.skeleton_inference_node_config.execution_provider = 'trt'
+    config.skeleton_inference_node_config.execution_provider = 'old-ep-key'
     result = await app.create_or_update_realtime_pipeline(camera_configs={}, pipeline_config=config)
     assert result is existing
     app.camera_group_manager.create_or_update_camera_group.assert_not_awaited()

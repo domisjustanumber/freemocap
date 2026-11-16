@@ -172,6 +172,55 @@ frames, each with `rtmpose` and with `mediapipe`.
 9. A `charuco_observations_realtime.pkl` written on `sfn26` no longer loads (it pickles the old module
    path of `CharucoBoardDefinition`); calibration detects every frame again.
 
+### 0.7 Imports of old skellytracker modules that stage 2.4 can remove
+
+At `0f00f5a4`. Every other skellytracker import is the 2.0 surface (`core.pipelines`,
+`core.detectors.create_detector`, `core.detectors.calibration`, `core.eps`). `CharucoAnnotator` comes
+through `core.detectors.calibration` but is old annotation code too (`annotation_style.py`). The
+`data_primitives` imports are the result type, which waits for V1.
+
+- `skellytracker.core.annotation.keypoint_annotator`:
+  - `freemocap/core/pipeline/posthoc/annotation_style.py:16`
+  - `freemocap/core/pipeline/posthoc/annotation_style.py:7`
+- `skellytracker.core.detectors.keypoint_detectors.mediapipe.mediapipe_model_manager`:
+  - `freemocap/core/pipeline/realtime/camera_node_config.py:8`
+  - `freemocap/core/tasks/mocap/mocap_task_config.py:8`
+- `skellytracker.core.eps.records`:
+  - `freemocap/core/tracking/execution_providers.py:19`
+- `skellytracker.core.data_primitives`:
+  - `freemocap/core/pipeline/dataflow/annotation_workers.py:15`
+  - `freemocap/core/pipeline/dataflow/recording_processing.py:16`
+  - `freemocap/core/pipeline/dataflow/tracker_adapter.py:15`
+  - `freemocap/core/pipeline/inference_service.py:21`
+  - `freemocap/core/pipeline/posthoc/annotation_output.py:15`
+  - `freemocap/core/pipeline/posthoc/annotation_style.py:17`
+  - `freemocap/core/pipeline/posthoc/video_node.py:31`
+  - `freemocap/core/pipeline/realtime/camera_node.py:41`
+  - `freemocap/core/pipeline/realtime/charuco_recorder_node.py:15`
+  - `freemocap/core/pipeline/realtime/realtime_aggregator_node.py:80`
+  - `freemocap/core/pipeline/realtime/realtime_skeleton_inference_node.py:30`
+  - `freemocap/core/recording/result_processing/observation_inputs.py:27`
+  - `freemocap/core/recording/sample_encoding/observation_samples.py:19`
+  - `freemocap/core/tasks/calibration/anipose_calibration/run_anipose_calibration.py:12`
+  - `freemocap/core/tasks/calibration/camera_matching/live_matching.py:7`
+  - `freemocap/core/tasks/calibration/camera_matching/observation_sampling.py:10`
+  - `freemocap/core/tasks/calibration/camera_matching/posthoc_matching.py:8`
+  - `freemocap/core/tasks/calibration/charuco_board/charuco_observation_aggregator.py:9`
+  - `freemocap/core/tasks/calibration/posthoc_calibration_task.py:20`
+  - `freemocap/core/tasks/calibration/shared/calibration_state.py:23`
+  - `freemocap/core/tracking/charuco_detection.py:8`
+  - `freemocap/core/tracking/observation_arrays.py:11`
+  - `freemocap/core/tracking/observation_arrays.py:12`
+  - `freemocap/core/tracking/observation_buffer.py:10`
+  - `freemocap/core/tracking/observation_series.py:277`
+  - `freemocap/core/tracking/observation_series.py:278`
+  - `freemocap/core/tracking/observation_series.py:279`
+  - `freemocap/core/tracking/observation_series.py:88`
+  - `freemocap/core/tracking/observation_series.py:89`
+  - `freemocap/core/tracking/pipeline_runs.py:124`
+  - `freemocap/pubsub/pubsub_topics.py:22`
+  - tests (61 imports): `calibration/test_calibration_state_latch.py:20`; `calibration/test_observation_sampling.py:5,6`; `calibration/test_posthoc_matching.py:8,9`; `calibration/test_streaming_reference_frame.py:15`; `pipelines/test_calibration_cache_alignment.py:26`; `pipelines/test_charuco_recorder.py:14,15`; `pipelines/test_realtime_calibration_resume.py:12`; `reference_recordings/test_columnar_observation_publication.py:10,11`; `reference_recordings/test_fresh_observation_retention.py:9`; `test_annotation_video_encoding.py:12`; `test_annotation_workers.py:13,14`; `test_board_cache_scope.py:8,9`; `test_box_channel.py:28,29`; `test_box_samples.py:13,14`; `test_columnar_observation_publication.py:8,9,10`; `test_columnar_serialization.py:8,9`; `test_core_tensor_consumers.py:4,8`; `test_dataflow_recording_processing.py:11,12`; `test_dataflow_tracker_adapter.py:8,92`; `test_detector_streaming.py:15,16,17`; `test_fresh_observation_tensors.py:9,10,11`; `test_inference_service.py:10`; `test_observation_alignment.py:4,5`; `test_observation_arrays.py:6,7`; `test_observation_samples.py:9,10`; `test_pipeline_diagnostics.py:8,9`; `test_posthoc_annotation_composition.py:4,5`; `test_posthoc_observation_recording.py:26,27,28`; `test_realtime_inference_adapter.py:17`; `test_reconstruction_checkpoints.py:10,11`; `test_saved_observation_tensors.py:9`; `test_startup_stream_integration.py:19`; `test_temporal_pipeline.py:6,7`; `test_tensor_pipeline_integration.py:14`
+
 ## 1. Inventory
 
 ### 1.1 Run and session code

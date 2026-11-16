@@ -78,8 +78,22 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     (own commit);
     (ii) FIRST, with a test, Auto = `status().performance.chosen` and pass `options` and `device_key`
     to `start_pipeline(ep_options=..., device=...)`;
-    (iii) WAITS: do not touch the `app/app.py` startup probe until the supervisor's verdict per command
-    (nvidia-smi, WMIC, lspci, system_profiler, `onnxruntime.get_available_providers()`); change it once;
+    (iii) OWN COMMIT GROUP, host probes dropped (§0.3):
+      - `freemocap/app/app.py`: delete `_query_nvidia_smi`, `_query_wmic_gpus`, `_query_lspci_gpus`,
+        `_query_macos_gpus`, `_detect_gpus`, the `onnxruntime.get_available_providers()` read and the
+        "GPU acceleration" string-match verdict. One startup log call: hardware lines from
+        `skellytracker.core.system.probe_host()` (`HostInfo`: OS, arch, `memory_total_bytes`, `cpu_name`,
+        core counts, `gpus` with `name`, `vendor`, `vram_total_bytes`, `driver_version`), EP lines from
+        `skellytracker.core.eps.status()` (each `eps[i].key`, `.state`, the `performance`
+        recommendation). Print what the records give; no vendor or EP formatting rule.
+      - `freemocap/tools/machine_benchmarks.py` `machine_info()`: drop nvidia-smi, PowerShell
+        `Get-CimInstance`, `system_profiler`, `get_available_providers()`; write
+        `dataclasses.asdict(probe_host())` + EP keys and states of `status()`. `render` reads the CPU
+        name and memory from `cpu_name`/`memory_total_bytes`; old benchmark JSON must still render.
+      - `.github/workflows/build-installers-pyinstaller.yml:210`: replace the
+        `ort.get_available_providers()` print by the skellytracker EP CLI status command (check its form
+        in the scratch clone), or delete the step if it only prints.
+      - Docs `gpu-setup.mdx` and `architecture/backend-overview.mdx:85` go with part 3.
     (iv) delete the dead `graph_execution_provider` Literal (backend, contract, UI);
     (v) contract EP types become plain strings; delete the Literal key list, `EXECUTION_PROVIDERS`,
     `REMOVED_PROVIDERS` and the validator; an unknown key gives skellytracker's `EpRequestError`, show its
@@ -89,8 +103,9 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     order table; KEEP the GPU/CPU help-text places as they are until part 2 gives the description
     field, and plan a device list in the EP setting;
     (viii) a test that fails when a source file under `freemocap/` or `freemocap-ui/src/` holds an EP
-    key literal (`cuda`, `trt-rtx`, `coreml`, `directml`, `trt`) or an ORT provider name
-    (`*ExecutionProvider`); allowlist empty or justified line by line.
+    key literal (`cuda`, `trt-rtx`, `coreml`, `directml`, `trt`), an ORT provider name
+    (`*ExecutionProvider`), or names `nvidia-smi`, `wmic`, `lspci` or `system_profiler`; allowlist empty
+    or justified line by line.
     Report to the supervisor after part 1.
   - Part 2, after the supervisor's message: usable flag, install hint, GPU flag, order, description,
     devices (UI device list: key, name, VRAM), the applied EP of `/onnx/session_providers`, and the
@@ -231,8 +246,10 @@ frames, each with `rtmpose` and with `mediapipe`.
   skellytracker reports them (key, name, VRAM in the EP setting; no device knowledge in freemocap),
   and skellytracker adds a short description per EP that the UI shows. Both fields come with the
   supervisor's part 2 message.
-- Host probes (2026-11-16): drop `nvidia-smi`; drop WMIC, lspci and system_profiler too where they only
-  find what skellytracker already gives. The verdict per command comes from the supervisor.
+- Host probes (2026-11-16): "the user wants nvidia-smi dropped, and WMIC, lspci and system_profiler
+  dropped when they only find information that skellytracker gives". Verdict (supervisor, same day):
+  drop all of them; each only finds values skellytracker gives, and none feeds a decision, a route,
+  the UI, telemetry or a test.
 - F2b (2026-11-16): no copies. New releases ship without installer copies under the old `-cpu` and
   `-cuda` names; existing installs update through the channel files.
 - F2 revised (2026-11-16): the installer names drop `-cpu` (`windows-x64`, ...); old `-cpu` and
@@ -327,6 +344,10 @@ frames, each with `rtmpose` and with `mediapipe`.
       no copies under the old names (F2b).
     - **Not verifiable without a release:** which tag the updater picks, the download, install and
       restart on each OS, the update of a `.deb` install, and the AppImage saved under its new name.
+    - (item 12, host probes) The startup log and `machine_benchmarks` take the hardware from
+      skellytracker. Known losses, accepted, no fallback: the Linux log of an Intel or most AMD GPUs has
+      no model name (skellytracker has vendor and PCI ids only there), the log has no CPU frequency,
+      and the macOS log has no VRAM.
     - `freemocap-ui/package.json` says `2.0.0-alpha.25` here while `2.0.0-alpha.26` is published. The
       channel `version` comes from package.json and the asset names from the tag; the release process
       sets the version.

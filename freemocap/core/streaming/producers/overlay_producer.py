@@ -7,9 +7,6 @@ landmarks projected back into the camera) — one block per camera.
 from __future__ import annotations
 
 
-import numpy as np
-from skellytracker.core.tracker.tracker_presets import DlcTrackerMetadata  # noqa: TC002 - runtime type checking
-
 from freemocap.core.skeletons.tracked_skeleton_bundle import TrackedSkeletonBundle
 from freemocap.core.streaming.channel_helpers import assemble_channel_bytes, camera_2d_detections
 from freemocap.core.streaming.message_model import ChannelBlock, ChannelKind
@@ -18,28 +15,6 @@ from freemocap.core.streaming.producers.producer_contexts import FrameContext, S
 
 
 class OverlayProducer(ChannelProducer):
-    def fill_tracker(
-        self, frame_ctx: FrameContext, metadata: DlcTrackerMetadata,
-    ) -> list[ChannelBlock]:
-        """Publish Tracker-owned keypoints without requiring anatomical geometry."""
-        context = frame_ctx.stream_context
-        if context is None or frame_ctx.aggregator_output is None:
-            return []
-        names = metadata.keypoint_names
-        columns = ("x", "y", "visibility")
-        blocks = []
-        for camera_id in context.camera_ids:
-            detections = camera_2d_detections(
-                frame_ctx.aggregator_output, camera_id,
-                detector_type="dlc", stage_path=metadata.stage_path,
-            )
-            blocks.append(ChannelBlock(
-                kind=ChannelKind.OVERLAY_2D, names=names, columns=columns,
-                data=assemble_channel_bytes(names=names, columns=columns, positions=detections),
-                camera_id=camera_id, image_size=context.live_image_sizes.get(camera_id),
-            ))
-        return blocks
-
     def is_active(self, ctx: StreamContext) -> bool:
         return ctx.pipeline_live
 
@@ -57,17 +32,8 @@ class OverlayProducer(ChannelProducer):
         for camera_id in stream_ctx.camera_ids:
             # Each skeleton overlays ITS detector's detections, so a charuco board's
             # corners and a pose detector's joints land in separate blocks.
-            if frame_ctx.hand is None:
-                detections = camera_2d_detections(
-                    message, camera_id, detector_type=skeleton.detector_type, stage_path=skeleton.tracker_stage_path)
-                data = assemble_channel_bytes(names=kp_names, positions=detections, columns=("x", "y", "visibility"))
-            else:
-                view = frame_ctx.hand.views.get(camera_id)
-                if view is None:
-                    continue
-                points = view.keypoints
-                kp_names = points.names
-                data = np.column_stack((points.xy, points.visibility)).astype("<f4").tobytes()
+            detections = camera_2d_detections(message, camera_id, detector_type=skeleton.detector_type)
+            data = assemble_channel_bytes(names=kp_names, positions=detections, columns=("x", "y", "visibility"))
             blocks.append(ChannelBlock(
                 kind=ChannelKind.OVERLAY_2D, names=kp_names, columns=("x", "y", "visibility"),
                 data=data, camera_id=camera_id, image_size=stream_ctx.live_image_sizes.get(camera_id)))

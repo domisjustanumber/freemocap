@@ -15,4 +15,3 @@ def tracker_definition(detector_type: str) -> TrackerDefinition:
 
 RTMPOSE_WHOLEBODY_DEFINITION = tracker_definition("rtmpose")
 MEDIAPIPE_WHOLEBODY_DEFINITION = tracker_definition("mediapipe")
-COMBINED_WHOLEBODY_DEFINITION = tracker_definition("rtmw_mediapipe_hands")

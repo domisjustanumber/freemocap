@@ -47,7 +47,6 @@ from skellycam.core.types.type_overloads import (
     TopicSubscriptionQueue,
 )
 from skellyforge.core.skeleton.skeleton_definition import SkeletonDefinition
-from freemocap.core.pipeline.realtime.hand_observations import HandAssociation
 from freemocap.core.skeletons.reconstruct_skeleton import reconstruct_skeleton
 from freemocap.core.skeletons.skeleton_reconstruction import SkeletonReconstruction
 from skellyforge.core.skeleton.pose.model_scale_fitting import (
@@ -57,7 +56,6 @@ from skellyforge.core.skeleton.pose.model_scale_fitting import (
 from freemocap.core.skeletons.reconstruction_state import (
     SkeletonReconstructionState,
     streaming_model_scale_source,
-    build_reconstruction_states,
 )
 from freemocap.core.skeletons.tracked_skeleton_set import (
     TrackedSkeletonSet,
@@ -403,8 +401,6 @@ class RealtimeAggregatorNode(AggregatorNode):
         filter_config = aggregator_config.realtime_filter_config
         geometry_matcher = LiveGeometryMatcher(calibration=calibration, camera_indices=live_camera_indices)
 
-        hand_association = HandAssociation()
-        hand_states = {}
         temporal_pipeline = TemporalPipeline(filter_config)
 
         detector_type = pipeline_config.camera_node_config.detector_type
@@ -501,12 +497,6 @@ class RealtimeAggregatorNode(AggregatorNode):
                             calibration=saved,
                         ))
                         continue
-                    old_camera = pipeline_config.camera_node_config
-                    new_camera = msg.pipeline_config.camera_node_config
-                    if (old_camera.skeleton_settings != new_camera.skeleton_settings
-                            or old_camera.skeleton_tracking_enabled != new_camera.skeleton_tracking_enabled):
-                        hand_association.history.clear()
-                        hand_states.clear()
                     pipeline_config = msg.pipeline_config
                     aggregator_config = pipeline_config.aggregator_config
                     previous_filter_config = filter_config
@@ -515,7 +505,6 @@ class RealtimeAggregatorNode(AggregatorNode):
                     if calibration.set_reference_transform(reference_transform=aggregator_config.reference_transform):
                         temporal_pipeline.reset()
                         skeleton_set.reset()
-                        hand_states.clear()
                         skeleton_observability_logged.clear()
                     logger.info(
                         f"RealtimeAggregationNode [{camera_group_id}] received config update"
@@ -527,7 +516,6 @@ class RealtimeAggregatorNode(AggregatorNode):
                     ):
                         temporal_pipeline.reset()
                         skeleton_set.reset()
-                        hand_states.clear()
                         skeleton_observability_logged.clear()
                         logger.info(
                             f"RealtimeAggregationNode [{camera_group_id}] reloaded "
@@ -544,7 +532,6 @@ class RealtimeAggregatorNode(AggregatorNode):
                     detector_type = new_detector_type
 
                     if detector_type_changed or previous_filter_config.segment_scale_window_frames != filter_config.segment_scale_window_frames:
-                        hand_states.clear()
                         if detector_type_changed:
                             temporal_pipeline.reset()
                         # A different detector measures different landmarks, so which
@@ -592,7 +579,6 @@ class RealtimeAggregatorNode(AggregatorNode):
                         f"RealtimeAggregationNode [{camera_group_id}] skeleton fit reset"
                     )
                     skeleton_set.reset()
-                    hand_states.clear()
                     skeleton_observability_logged.clear()
 
                 # ---- Periodically check if calibration file changed on disk ----
@@ -612,7 +598,6 @@ class RealtimeAggregatorNode(AggregatorNode):
                         # fitter's windows was measured in the old frame's units.
                         temporal_pipeline.reset()
                         skeleton_set.reset()
-                        hand_states.clear()
                         skeleton_observability_logged.clear()
 
                 # ---- Request new frames if ready ----
@@ -852,7 +837,6 @@ class RealtimeAggregatorNode(AggregatorNode):
                 ):
                     temporal_pipeline.reset()
                     skeleton_set.reset()
-                    hand_states.clear()
                     skeleton_observability_logged.clear()
                 point_channels: list[ChannelValues] = []
                 raw_keypoints = ChannelValues.empty(component_names=SPATIAL_COMPONENTS)
@@ -862,17 +846,6 @@ class RealtimeAggregatorNode(AggregatorNode):
                 # One reconstruction per tracked skeleton, filled below. A skeleton that
                 # did not hydrate this frame is simply absent.
                 reconstructions: dict[str, SkeletonReconstruction] = {}
-                hand_observations = ()
-                if detector_type == "mediapipe_hands":
-                    hands_by_camera = {cam: output.skeleton_observation for cam, output in frame_n_outputs.items()
-                                       if isinstance(output, CameraNodeOutputMessage) and output.skeleton_observation is not None}
-                    hand_observations = hand_association.update(hands_by_camera, calibration,
-                        aggregator_config.triangulation_config, filter_config.max_reprojection_error_px,
-                        aggregator_config.triangulation_enabled, single_camera=len(camera_ids) == 1)
-
-                    retained_ids = {track_id for track_id, _ in hand_association.history.values()}
-                    hand_states = {key: value for key, value in hand_states.items() if key[0] in retained_ids}
-
                 if (
                     calibration.is_applicable() or len(camera_ids) == 1
                 ) and aggregator_config.triangulation_enabled:
@@ -883,7 +856,7 @@ class RealtimeAggregatorNode(AggregatorNode):
                         if isinstance(output, CameraNodeOutputMessage)
                         and output.skeleton_observation is not None
                     }
-                    if skeleton_observations_by_camera and detector_type != "mediapipe_hands":
+                    if skeleton_observations_by_camera:
                         t0 = time.perf_counter() if timer is not None else 0.0
                         _merge_angulation(
                             angulation=calibration.try_angulate(
@@ -946,27 +919,9 @@ class RealtimeAggregatorNode(AggregatorNode):
                     # which is which.
                     if skeleton_fitting_enabled:
                         t0 = time.perf_counter() if timer is not None else 0.0
-                        inputs = [(bundle, skeleton_set.state_for(bundle), filter_result, None)
-                                  for bundle in skeleton_set.bundles if bundle.detector_type != "mediapipe_hands"]
-                        for bundle in skeleton_set.bundles:
-                            for hand in hand_observations:
-                                if hand.model_id != bundle.model_id or hand.xyz is None:
-                                    continue
-                                key = (hand.track_id, hand.model_id)
-                                if key not in hand_states:
-                                    states = build_reconstruction_states(
-                                        bundles=(bundle,), scale_source_for=streaming_model_scale_source(
-                                            window_frames=filter_config.segment_scale_window_frames))
-                                    hand_states[key] = (states[bundle.model_id], TemporalPipeline(filter_config))
-                                state, hand_filter = hand_states[key]
-                                if hand_filter.config != filter_config:
-                                    hand_filter.configure(filter_config)
-                                points = ChannelValues(bundle.tracker_keypoint_names, hand.xyz,
-                                    np.isfinite(hand.xyz).all(axis=1), component_names=SPATIAL_COMPONENTS)
-                                result = hand_filter.process(timestamp_s=frame_time, points=points,
-                                    metric_space=calibration.is_applicable() and len(camera_ids) > 1)
-                                inputs.append((bundle, state, result, hand))
-                        for bundle, state, result, hand in inputs:
+                        inputs = [(bundle, skeleton_set.state_for(bundle), filter_result)
+                                  for bundle in skeleton_set.bundles]
+                        for bundle, state, result in inputs:
                             reconstruction = reconstruct_skeleton(
                                 bundle=bundle,
                                 state=state,
@@ -992,15 +947,14 @@ class RealtimeAggregatorNode(AggregatorNode):
                                         segment_origins=reconstruction.segment_origins,
                                     )
                                 )
-                            instance_key = bundle.model_id if hand is None else hand.tracker_id
-                            reconstructions[instance_key] = reconstruction
+                            reconstructions[bundle.model_id] = reconstruction
                         if timer is not None:
                             timer.record(
                                 "skeleton_fitting", (time.perf_counter() - t0) * 1e3
                             )
 
                         _log_reconstruction_observability(
-                            bundles=tuple(b for b in skeleton_set.bundles if b.detector_type != "mediapipe_hands"),
+                            bundles=skeleton_set.bundles,
                             reconstructions=reconstructions,
                             already_logged=skeleton_observability_logged,
                         )
@@ -1030,7 +984,6 @@ class RealtimeAggregatorNode(AggregatorNode):
                         frame_number=last_received_frame,
                         capture_timestamp_s=frame_time,
                         keypoint_status=keypoint_status,
-                        hand_observations=hand_observations,
                         raw_keypoints_arrays=raw_keypoints,
                         pipeline_id=ipc.pipeline_id,
                         pipeline_config=pipeline_config,

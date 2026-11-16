@@ -341,7 +341,7 @@ def main():
             sub.add_argument('dataset', choices=('test_data', 'sample_data'))
             sub.add_argument('--recordings-root', type=Path, default=Path.home() / 'freemocap_data/recordings')
             sub.add_argument('--output-profile', choices=('standard', 'numerical'), default='standard')
-            sub.add_argument('--tracker-preset', choices=('rtmpose', 'mediapipe', 'rtmw_mediapipe_hands'), default='rtmpose')
+            sub.add_argument('--tracker-preset', choices=('rtmpose', 'mediapipe'), default='rtmpose')
             sub.add_argument('--blender-path')
             sub.add_argument('--timeout', type=float, default=1800)
         else:

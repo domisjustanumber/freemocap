@@ -40,8 +40,7 @@ class BoxProducer(ChannelProducer):
         # A detector with no object detector (charuco, mediapipe) has its crop
         # synthesized as the whole frame, so it has no box worth a channel — drawing a
         # rectangle around the entire image on every camera tells the viewer nothing.
-        # The supported DLC sidecar contract is a full-frame estimator, without an object detector.
-        if skeleton.detector_type == "dlc" or not detector_produces_boxes(skeleton.detector_type):
+        if not detector_produces_boxes(skeleton.detector_type):
             return []
         stage_names = detector_stage_names(skeleton.detector_type)
         blocks: list[ChannelBlock] = []

@@ -14,7 +14,7 @@ from skellytracker.core.detectors.keypoint_detectors.mediapipe.mediapipe_model_m
 
 # The one definition point for the default skeleton detector. Everything that
 # needs "the detector we assume when none is running" reads this.
-DEFAULT_DETECTOR_TYPE: Literal["rtmpose", "mediapipe", "rtmw_mediapipe_hands"] = "rtmpose"
+DEFAULT_DETECTOR_TYPE: Literal["rtmpose", "mediapipe"] = "rtmpose"
 
 
 def _charuco_tracker_config_for_board(board: CharucoBoardDefinition) -> TrackerConfig:
@@ -28,11 +28,8 @@ class CameraNodeConfig(BaseModel):
     worker_mode: WorkerMode = WorkerMode.PROCESS
     charuco_tracking_enabled: bool = True
     skeleton_tracking_enabled: bool = True
-    detector_type: Literal["rtmpose", "mediapipe", "rtmw_mediapipe_hands", "rtmw_onnx_hands", "mediapipe_hands", "dlc"] = DEFAULT_DETECTOR_TYPE
-    dlc_model_path: str | None = None
-    dlc_geometry_path: str | None = None
-    dlc_confidence_threshold: float = Field(default=0.4, ge=0, le=1)
-    # RTMW settings used by both rtmpose and rtmw_mediapipe_hands.
+    detector_type: Literal["rtmpose", "mediapipe"] = DEFAULT_DETECTOR_TYPE
+    # RTMW settings (only used when detector_type="rtmpose")
     rtmpose_model_name: Literal["rtmw-x-l_256x192", "rtmw-x-l_384x288", "rtmw-l-m_256x192"] = "rtmw-x-l_256x192"
     rtmpose_confidence_threshold: float = 0.4
     # MediaPipe config (only used when detector_type="mediapipe")
@@ -40,7 +37,6 @@ class CameraNodeConfig(BaseModel):
     mediapipe_detection_confidence: float = 0.5
     mediapipe_presence_confidence: float = 0.5
     mediapipe_tracking_confidence: float = 0.5
-    hand_count: Literal["one", "two", "unknown"] = "two"
     mediapipe_num_hands: Literal[2] = 2
     mediapipe_num_faces: int = 1
     charuco_board: CharucoBoardDefinition = Field(
@@ -70,8 +66,7 @@ class CameraNodeConfig(BaseModel):
         return (self.detector_type, self.rtmpose_model_name, self.rtmpose_confidence_threshold,
                 self.mediapipe_model_complexity, self.mediapipe_detection_confidence,
                 self.mediapipe_presence_confidence, self.mediapipe_tracking_confidence,
-                self.hand_count, self.mediapipe_num_hands, self.mediapipe_num_faces, self.skeleton_tracker_config,
-                self.dlc_model_path, self.dlc_confidence_threshold, self.dlc_geometry_path)
+                self.mediapipe_num_hands, self.mediapipe_num_faces, self.skeleton_tracker_config)
 
     @property
     def tracking2d_enabled(self) -> bool:

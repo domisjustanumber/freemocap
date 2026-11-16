@@ -47,6 +47,11 @@ def read_saved_observations(*, structure: RecordingStructure, run_id: int,
         if isinstance(configuration.get('charuco_board'), dict):
             configuration['charuco_board'] = {name: value for name, value in configuration['charuco_board'].items()
                 if name in CharucoBoardDefinition.model_fields}
+        saved_detector = configuration.get('detector_type')
+        if saved_detector in ('rtmw_mediapipe_hands', 'mediapipe_hands', 'rtmw_onnx_hands', 'dlc'):
+            raise ValueError(f'These saved observations were recorded with detector {saved_detector!r}, which was '
+                             'removed in the skellytracker 2.0 migration, so they cannot be restarted with it; '
+                             'run again from the observations stage with rtmpose or mediapipe')
         config = PosthocMocapPipelineConfig.model_validate(configuration)
         camera_series = {}
         frame_numbers = None

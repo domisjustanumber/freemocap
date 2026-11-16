@@ -66,14 +66,11 @@ class PosthocMocapPipelineConfig(BaseModel):
         default_factory=CharucoBoardDefinition.create_letter_size_5x3, alias="charucoBoard",
     )
 
-    detector_type: Literal["rtmpose", "mediapipe", "rtmw_mediapipe_hands", "dlc"] = Field(
+    detector_type: Literal["rtmpose", "mediapipe"] = Field(
         default="rtmpose",
         alias="detectorType",
-        description="Tracking preset: RTMW, MediaPipe, or RTMW with MediaPipe hands.",
+        description="Tracking preset: RTMW or MediaPipe.",
     )
-    dlc_model_path: str | None = Field(default=None, alias="dlcModelPath")
-    dlc_geometry_path: str | None = Field(default=None, alias="dlcGeometryPath")
-    dlc_confidence_threshold: float = Field(default=0.4, ge=0, le=1, alias="dlcConfidenceThreshold")
     # RTMPose settings
     rtmpose_model_name: Literal["rtmw-x-l_256x192", "rtmw-x-l_384x288", "rtmw-l-m_256x192"] = Field(
         default="rtmw-x-l_256x192",
@@ -188,13 +185,6 @@ class PosthocMocapPipelineConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_stage_range(self) -> "PosthocMocapPipelineConfig":
-        if self.detector_type == "dlc":
-            if (self.stop_stage not in ("observations", "triangulation", "filtering") and not self.dlc_geometry_path) or self.export_to_blender:
-                raise ValueError("DLC model-only processing supports observations, triangulation and filtering; rigid reconstruction requires an explicit object geometry association and Blender export must be disabled")
-            if self.graph_execution_provider not in ("cpu", "cuda"):
-                raise ValueError("DLC requires graphExecutionProvider=cpu or cuda (FP32)")
-            if self.execution_provider not in (None, "cpu", "cuda"):
-                raise ValueError("DLC executionProvider must be CPU or CUDA (FP32)")
         stages = ('observations', 'triangulation', 'filtering', 'scale_fit', 'reconstruction')
         if stages.index(self.start_stage) > stages.index(self.stop_stage):
             raise ValueError('stopStage must not precede startStage')

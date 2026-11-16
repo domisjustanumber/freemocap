@@ -12,7 +12,6 @@ from typing import Any
 from freemocap.core.pipeline.realtime.camera_node_config import DEFAULT_DETECTOR_TYPE
 from freemocap.core.skeletons.tracked_skeleton_bundle import TrackedSkeletonBundle  # noqa: TC001
 from freemocap.core.streaming.message_model import CalibratedCamera  # noqa: TC001
-from skellytracker.core.tracker.tracker_presets import DlcTrackerMetadata
 
 
 @dataclass
@@ -29,7 +28,6 @@ class StreamContext:
     calibrated_cameras: tuple[CalibratedCamera, ...] = ()
     tracker_keypoint_names: tuple[str, ...] = ()
     detector_type: str = DEFAULT_DETECTOR_TYPE
-    independent_trackers: tuple[DlcTrackerMetadata, ...] = ()
     pipeline_live: bool = False
     # camera_id -> full-resolution (rotated) image size from the LIVE SkellyCam
     # config (every live camera, calibrated or not) — the overlay's scale source.
@@ -45,8 +43,6 @@ class FrameContext:
     aggregator_output: Any | None = None  # duck-typed: the concrete type pulls skellytracker/mediapipe
     image_payload: bytes | bytearray | memoryview | None = None
     stream_context: StreamContext | None = None
-    hand: Any | None = None
 
     def reconstruction_for(self, skeleton: TrackedSkeletonBundle):
-        key = skeleton.model_id if self.hand is None else self.hand.tracker_id
-        return self.aggregator_output.reconstructions.get(key) if self.aggregator_output is not None else None
+        return self.aggregator_output.reconstructions.get(skeleton.model_id) if self.aggregator_output is not None else None

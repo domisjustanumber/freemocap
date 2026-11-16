@@ -142,8 +142,7 @@ def _run_application_graph(*, request) -> None:
                 count = sources.camera_sources[0].video_metadata.frame_count
                 cameras = len(sources.camera_sources)
                 total_images = count * cameras
-                detector = {'rtmpose': 'RTMW', 'mediapipe': 'MediaPipe',
-                            'rtmw_mediapipe_hands': 'RTMW + MediaPipe hands', 'dlc': 'DeepLabCut'}[config.detector_type]
+                detector = {'rtmpose': 'RTMW', 'mediapipe': 'MediaPipe'}[config.detector_type]
                 device = f'requested provider: {provider}; applied providers are reported at session startup'
                 board_text = ' and ChArUco board points' if config.charuco_tracking_enabled else ''
                 videos = tuple(ItemProgressSnapshot(label=video_label(index),

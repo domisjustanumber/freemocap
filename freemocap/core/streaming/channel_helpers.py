@@ -54,9 +54,6 @@ def assemble_channel_bytes(*, names: tuple[str, ...], positions: Mapping,
 _OBSERVATION_BY_DETECTOR: dict[str, tuple[str, tuple[str, ...]]] = {
     "rtmpose": ("skeleton_observation", ("body",)),
     "mediapipe": ("skeleton_observation", ("body",)),
-    "mediapipe_hands": ("skeleton_observation", ("hands",)),
-    "rtmw_mediapipe_hands": ("skeleton_observation", ("body",)),
-    "rtmw_onnx_hands": ("skeleton_observation", ("body",)),
     "charuco": ("charuco_observation", ("charuco",)),
 }
 
@@ -83,7 +80,6 @@ def camera_2d_detections(
     camera_id: str,
     *,
     detector_type: str,
-    stage_path: tuple[str, ...] | None = None,
 ) -> ChannelValues:
     """One detector's per-camera 2D detections (name -> (x, y, visibility)).
 
@@ -96,8 +92,7 @@ def camera_2d_detections(
             it files its points, rather than silently overlaying nothing.
     """
     try:
-        observation_attribute, stage_names = (("skeleton_observation", ()) if stage_path is not None
-                                              else _OBSERVATION_BY_DETECTOR[detector_type])
+        observation_attribute, stage_names = _OBSERVATION_BY_DETECTOR[detector_type]
     except KeyError as error:
         raise KeyError(
             f"unknown detector type {detector_type!r} - add it to "
@@ -110,19 +105,6 @@ def camera_2d_detections(
     observation = getattr(cam_output, observation_attribute, None) if cam_output is not None else None
     if observation is None:
         return ChannelValues.empty(component_names=components)
-    if stage_path is not None:
-        stages = observation.stages
-        for name in stage_path:
-            stage = stages.get(name)
-            if stage is None:
-                return ChannelValues.empty(component_names=components)
-            stages = stage.children
-        if not stage_path or stage.keypoints is None:
-            return ChannelValues.empty(component_names=components)
-        keypoints = stage.keypoints
-        values = np.column_stack((keypoints.xyz[:, :2], keypoints.visibility))
-        return ChannelValues(tuple(keypoints.names), values,
-            np.isfinite(values[:, :2]).all(axis=-1), component_names=components)
     point_channels = []
     for stage_name in stage_names:
         stage = observation.stages.get(stage_name)

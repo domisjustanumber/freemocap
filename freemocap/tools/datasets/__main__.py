@@ -38,7 +38,7 @@ def parser() -> argparse.ArgumentParser:
             sub.add_argument('--calibration', help='fresh, existing, or a TOML path; full runs default to fresh')
             sub.add_argument('--alignment', choices=('auto', 'calibration', 'person'), help='Default: auto')
             sub.add_argument('--from', dest='start', choices=workflow.STARTS, default='observations')
-            sub.add_argument('--tracker-preset', choices=('rtmpose', 'mediapipe', 'rtmw_mediapipe_hands'),
+            sub.add_argument('--tracker-preset', choices=('rtmpose', 'mediapipe'),
                              help='Tracker preset for a fresh observations run')
             sub.add_argument('--run-id', type=int)
             sub.add_argument('--sensor-group')

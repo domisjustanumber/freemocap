@@ -20,7 +20,7 @@ from freemocap.core.skeletons.reconstruction_state import (
     SkeletonReconstructionState,
     build_reconstruction_states,
 )
-from freemocap.core.skeletons.standard_human_skeleton import build_hand_bundles, build_standard_human_bundle
+from freemocap.core.skeletons.standard_human_skeleton import build_standard_human_bundle
 from freemocap.core.skeletons.tracked_skeleton_bundle import TrackedSkeletonBundle
 
 
@@ -37,20 +37,13 @@ def build_tracked_skeletons(
         camera_node_config: what the camera nodes are configured to detect.
     """
     bundles: list[TrackedSkeletonBundle] = []
-    if (camera_node_config.skeleton_tracking_enabled and camera_node_config.detector_type == "dlc"
-            and camera_node_config.dlc_geometry_path):
-        from freemocap.core.skeletons.dlc_object_skeleton import build_dlc_object_bundle
-        bundles.append(build_dlc_object_bundle(sidecar_path=camera_node_config.dlc_model_path,
-                                              geometry_path=camera_node_config.dlc_geometry_path))
-    if camera_node_config.skeleton_tracking_enabled and camera_node_config.detector_type not in ("dlc", "mediapipe_hands"):
+    if camera_node_config.skeleton_tracking_enabled:
         bundles.append(
             build_standard_human_bundle(
                 detector_type=camera_node_config.detector_type,
                 anchor_segment_name=anchor_segment_name,
             )
         )
-    if camera_node_config.skeleton_tracking_enabled and camera_node_config.detector_type == "mediapipe_hands":
-        bundles.extend(build_hand_bundles())
     if camera_node_config.charuco_tracking_enabled:
         bundles.append(
             build_charuco_board_bundle(

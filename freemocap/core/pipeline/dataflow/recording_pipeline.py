@@ -93,11 +93,7 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
     shutdown_flag = shutdown_flag if shutdown_flag is not None else multiprocessing.Value("b", False)
     performance = performance if performance is not None else PerformanceReport()
     tracker_config = config.tracker_config.model_copy(deep=True)
-    bundles = (() if config.detector_type == "dlc" else
-               (build_standard_human_bundle(detector_type=config.detector_type, anchor_segment_name=config.anchor_segment_name),))
-    if config.detector_type == "dlc" and config.dlc_geometry_path:
-        from freemocap.core.skeletons.dlc_object_skeleton import build_dlc_object_bundle
-        bundles = (build_dlc_object_bundle(sidecar_path=config.dlc_model_path, geometry_path=config.dlc_geometry_path),)
+    bundles = (build_standard_human_bundle(detector_type=config.detector_type, anchor_segment_name=config.anchor_segment_name),)
     # AUTO remains unresolved when the application's recording-wide search found
     # no board. Keep that result in provenance without fabricating a board model
     # from the configuration's default layout or blocking body processing.
@@ -106,13 +102,6 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
         tracker_config = with_charuco_tracker(tracker_config, config.charuco_board)
         bundles += (build_charuco_board_bundle(board=config.charuco_board),)
     model_name = config.rtmpose_model_name if config.detector_type == "rtmpose" else MEDIAPIPE_WHOLEBODY_DEFINITION.name
-    if config.detector_type == "rtmw_mediapipe_hands":
-        model_name = f"{config.rtmpose_model_name}+mediapipe_hands"
-    dlc_metadata = None
-    if config.detector_type == "dlc":
-        from skellytracker.core.tracker.tracker_presets import dlc_tracker_metadata
-        dlc_metadata = dlc_tracker_metadata(sidecar_path=config.dlc_model_path)
-        model_name = f"dlc:{dlc_metadata.model_sha256}"
     tracker_source = f"keypoint_model:{model_name}"
     timing = RecordingGroupTiming(cameras={source.camera_id: source.camera_timing for source in sources.camera_sources},
                                   synchronized=sources.group_timing)
@@ -203,14 +192,12 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
 
     def align(inputs):
         science, filtered = inputs["science"], inputs["filtered"]
-        model_only = config.detector_type == "dlc"
-        alignment_config = (config.body_alignment.model_copy(update={"mode": "calibration"})
-                            if model_only else config.body_alignment)
+        alignment_config = config.body_alignment
         return align_mocap_recording(request=MocapAlignmentRequest(filtered_points=filtered.points,
             measured_support=filtered.report.gap_filling.measured_support(filtered.points),
             triangulation=science.triangulation, camera_geometry=science.camera_geometry,
-            bundle=None if model_only else bundles[0],
-            definition=None if model_only else AlignmentDefinition.from_default_human(skeleton=bundles[0].skeleton),
+            bundle=bundles[0],
+            definition=AlignmentDefinition.from_default_human(skeleton=bundles[0].skeleton),
             timestamps_seconds=np.asarray(timing.synchronized.timestamps_s),
             preserve_reference_frame=alignment_config.preserve_reference_frame(calibration_aligned=calibration.aligned),
             config=alignment_config))
@@ -228,9 +215,6 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
         collection = inputs["observations"]
         collection.require_complete()
         definition = config.model_dump(mode="json")
-        if dlc_metadata is not None:
-            from pydantic import TypeAdapter
-            definition["dlc_model"] = TypeAdapter(type(dlc_metadata)).dump_python(dlc_metadata, mode="json")
         definition["execution"] = {"requested_provider": execution_provider, "timestamp_policy": "relative_recording_group_milliseconds"}
         return ObservationRecordingRequest(recording=recording,
             group=ObservationGroup(name=sources.sensor_group, frames=collection.frames, videos=videos),
@@ -239,7 +223,7 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
                 configuration=definition),
             detector=DetectorRecordingDefinition(name="object_detector:yolox-m",
                 box_names=recording_stage_names(collection.frames), configuration=definition)
-                if config.detector_type in ("rtmpose", "rtmw_mediapipe_hands") else None,
+                if config.detector_type == "rtmpose" else None,
             models=tuple(RecordedModel.from_bundle(bundle) for bundle in bundles),
             camera_geometry=(), spatial_series=(), filtering=None, reprojection=None, reconstructions=(),
             base_run_id=config.base_run_id, run_session=run_session, cancelled=lambda: bool(shutdown_flag.value),

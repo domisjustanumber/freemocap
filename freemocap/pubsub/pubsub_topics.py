@@ -21,7 +21,6 @@ from skellycam.core.types.type_overloads import (
 )
 from skellytracker.core.data_primitives.observation import Observation
 
-from freemocap.core.pipeline.realtime.hand_observations import HandObservation
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
 from freemocap.core.tasks.calibration.shared.camera_model import CameraModel
 from freemocap.core.tasks.calibration.shared.calibration_update import CalibrationUpdateRequest
@@ -153,7 +152,6 @@ class LiveCameraCalibrationBinding:
 class AggregationNodeOutputMessage(TopicMessageABC):
     frame_number: FrameNumberInt = 0
     keypoint_status: ChannelValues | None = None
-    hand_observations: tuple[HandObservation, ...] = ()
     raw_keypoints_arrays: ChannelValues | None = None
     capture_timestamp_s: float | None = None
     pipeline_id: PipelineIdString = ""
@@ -164,8 +162,7 @@ class AggregationNodeOutputMessage(TopicMessageABC):
     # name spaces do not collide (a pose detector emits `left_knee`, a charuco detector
     # emits `CharucoCorner-0`), and each skeleton's mapping takes only what it recognizes.
     keypoints_arrays: Mapping[TrackedPointNameString, np.ndarray] = field(default_factory=dict)
-    # Singleton models use their model ID. Independent hands use their track ID
-    # so two instances of the same sided model can coexist. A session tracking a
+    # Keyed by model ID. A session tracking a
     # person and a charuco board publishes two; nothing downstream may assume one. Empty
     # for a frame where nothing hydrated at all.
     reconstructions: dict[str, SkeletonReconstruction] = field(default_factory=dict)

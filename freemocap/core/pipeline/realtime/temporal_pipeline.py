@@ -4,7 +4,6 @@ The aggregator owns this pipeline, so both inference paths use identical stages.
 Metadata dictionaries identify streams, never point values.
 """
 from copy import copy
-from dataclasses import replace
 import numpy as np
 from skellyforge.core.data_tensors.channel_values import ChannelValues
 from freemocap.core.pipeline.realtime.realtime_keypoint_filter import RealtimeKeypointFilter, FilteredKeypoints
@@ -62,19 +61,7 @@ class TemporalPipeline:
 
     def image_observation(self, *, camera_id: str, observation, timestamp_s: float, confidence_threshold: float):
         stages = observation.stages if observation is not None else {}
-        hands = stages.get("hands")
         body = stages.get("body")
-        if hands is not None:
-            result = copy(observation)
-            result.stages = stages.copy()
-            result.stages["hands"] = copy(hands)
-            active = {(camera_id, hand.track_id) for hand in hands.hands}
-            for key in tuple(self.image_filters):
-                if isinstance(key, tuple) and key[0] == camera_id and key not in active:
-                    del self.image_filters[key]
-            result.stages["hands"].hands = tuple(replace(hand, keypoints=self._image_keypoints(
-                (camera_id, hand.track_id), hand.keypoints, timestamp_s, confidence_threshold)) for hand in hands.hands)
-            return result
         if body is None or body.keypoints is None:
             image_filter = self.image_filters.get(camera_id)
             if image_filter is not None:

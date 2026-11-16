@@ -200,7 +200,13 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     key or Auto, the notice in `mocap-detector-settings.tsx` names both (and the install hint of a
     suggested EP that is not usable, ready for the open "usable = pack installed" question); a choice
     by the user while pending ends it. Realtime settings are not persisted: nothing legacy there.
-    Next: V3 (smaller face points).
+  - V3 DONE `fc827cdb` (face points radius 2 by group; §0.3 V3). G4 notice `2779a7e7`.
+  - BLOCKER, asked the supervisor (2026-11-16): RTMW scores of skellytracker exceed 1 (test_data Cam1,
+    49 of 60 frames, max 1.0138; ST `de7e18f3`); `observation_samples.py:110-111` refuses confidence
+    outside [0, 1], so a fresh posthoc RTMW run fails at save_observations
+    (`reference_recordings/test_fresh_posthoc.py`). sfn26 clipped the SIMCC peak to [0, 1]. Owner open:
+    skellytracker range, or a clip at `observations_from_results`. Changed nothing.
+    Waiting also for the skellytracker SHA of G4 (suggestion = hardware-supported key).
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).

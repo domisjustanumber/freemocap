@@ -1,6 +1,7 @@
 import {createListenerMiddleware} from '@reduxjs/toolkit';
 import {RootState} from './root-state-types';
 import {saveToStorage} from './persistence';
+import {MOCAP_SETTINGS_VERSION} from './export-settings-migration';
 
 export const persistenceListenerMiddleware = createListenerMiddleware();
 
@@ -84,7 +85,10 @@ persistenceListenerMiddleware.startListening({
         api.cancelActiveListeners();
         await api.delay(DEBOUNCE_MS);
         const mocap = (api.getState() as RootState).mocap;
-        if (!mocap.exportSettingsError) saveToStorage('mocap.config', mocap.config);
+        // A pending legacy EP key is not saved over: the file keeps it until its replacement is applied.
+        if (!mocap.exportSettingsError && mocap.executionProviderMigration?.status !== 'pending') {
+            saveToStorage('mocap.config', {...mocap.config, settingsVersion: MOCAP_SETTINGS_VERSION});
+        }
     },
 });
 

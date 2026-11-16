@@ -1,5 +1,5 @@
 import type {ExecutionProviderName} from '@/types/execution-provider';
-import {migrateExportSettings, migrateRemovedDetectors} from '@/store/export-settings-migration';
+import {migrateExportSettings, migrateRemovedDetectors, takeLegacyExecutionProvider} from '@/store/export-settings-migration';
 import {CameraMatchingOptions, defaultCameraMatchingOptions} from '@/types/camera-matching';
 import {createSelector, createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {RootState} from '../../root-state-types';
@@ -102,9 +102,18 @@ export interface MocapDirectoryInfo {
     errorMessage: string | null;
 }
 
+/**
+ * The EP key of a settings file saved before skellytracker 2. While it is pending, processing waits and nothing is
+ * saved; skellytracker's suggestion then replaces it (null = Auto) and the notice says which key was replaced by which.
+ */
+export type ExecutionProviderMigration =
+    | {saved: string; status: 'pending'}
+    | {saved: string; status: 'replaced'; replacement: string | null};
+
 export interface MocapState {
     config: MocapConfig;
     exportSettingsError: string | null;
+    executionProviderMigration: ExecutionProviderMigration | null;
     isRecording: boolean;
     recordingProgress: number;
     isLoading: boolean;
@@ -141,7 +150,8 @@ const DEFAULT_MOCAP_CONFIG: MocapConfig = {
 // ==================== Initial State ====================
 
 const exportSettingsMigration = migrateExportSettings(loadFromStorage<Record<string, unknown> | null>('mocap.config', null));
-const _persistedMocapConfig = migrateRemovedDetectors(exportSettingsMigration.config) as Partial<MocapConfig>;
+const legacyExecutionProvider = takeLegacyExecutionProvider(migrateRemovedDetectors(exportSettingsMigration.config));
+const _persistedMocapConfig = legacyExecutionProvider.config as Partial<MocapConfig>;
 
 const initialMocapConfig: MocapConfig = {
     ...DEFAULT_MOCAP_CONFIG,
@@ -161,6 +171,8 @@ const initialMocapConfig: MocapConfig = {
 const initialState: MocapState = {
     config: initialMocapConfig,
     exportSettingsError: exportSettingsMigration.error,
+    executionProviderMigration: legacyExecutionProvider.legacyKey === null ? null
+        : {saved: legacyExecutionProvider.legacyKey, status: 'pending'},
     isRecording: false,
     recordingProgress: 0,
     isLoading: false,
@@ -231,11 +243,23 @@ export const mocapSlice = createSlice({
 
         /** Change the ONNX execution provider (null = auto). */
         mocapExecutionProviderChanged: (state, action: PayloadAction<ExecutionProviderName | null>) => {
+            // A choice made now is the user's: it ends a pending legacy replacement.
+            if (state.executionProviderMigration?.status === 'pending') state.executionProviderMigration = null;
             if (state.config.executionProvider !== action.payload) state.config.executionDevice = null;
             state.config.executionProvider = action.payload;
         },
         mocapExecutionDeviceChanged: (state, action: PayloadAction<string | null>) => {
             state.config.executionDevice = action.payload;
+        },
+        legacyExecutionProviderResolved: (state, action: PayloadAction<{saved: string; suggested: string | null}>) => {
+            const migration = state.executionProviderMigration;
+            if (migration?.status !== 'pending' || migration.saved !== action.payload.saved) return;
+            state.config.executionProvider = action.payload.suggested;
+            state.config.executionDevice = null;
+            state.executionProviderMigration = {saved: migration.saved, status: 'replaced', replacement: action.payload.suggested};
+        },
+        executionProviderNoticeDismissed: (state) => {
+            if (state.executionProviderMigration?.status === 'replaced') state.executionProviderMigration = null;
         },
 
         /** Change the RTMPose keypoint confidence threshold. */
@@ -371,9 +395,12 @@ export const selectCanStartMocapRecording = createSelector(
     (effectivePath) => !!effectivePath
 );
 
+export const selectExecutionProviderMigration = (state: RootState) => state.mocap.executionProviderMigration;
+
+/** Processing waits for the replacement of a legacy EP key: no request goes out with the old key. */
 export const selectCanProcessMocapRecording = createSelector(
-    [selectMocapRecordingPath],
-    (mocapPath) => !!mocapPath
+    [selectMocapRecordingPath, selectExecutionProviderMigration],
+    (mocapPath, migration) => !!mocapPath && migration?.status !== 'pending'
 );
 
 // ==================== Actions Export ====================
@@ -396,6 +423,8 @@ export const {
     mocapRtmPoseConfidenceThresholdChanged,
     mocapExecutionProviderChanged,
     mocapExecutionDeviceChanged,
+    legacyExecutionProviderResolved,
+    executionProviderNoticeDismissed,
     triangulationConfigUpdated,
     posthocFilterConfigUpdated,
     mocapProgressUpdated,

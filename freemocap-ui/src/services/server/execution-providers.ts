@@ -30,3 +30,16 @@ export function executionProviderOptions(selected: ExecutionProviderName | null,
     return selected === null || usable.some(({key}) => key === selected)
         ? options : [...options, {label: providers.find(({key}) => key === selected)?.label ?? selected, value: selected}];
 }
+
+/** skellytracker's replacement for an EP key saved before skellytracker 2 (null = Auto). */
+export async function requestExecutionProviderSuggestion(baseUrl: string, saved: string, signal?: AbortSignal,
+    request: typeof fetch = fetch): Promise<string | null> {
+    const response = await createHttpClient({baseUrl, fetch: request}).responses
+        .get_execution_provider_suggestion_freemocap_onnx_execution_providers_suggestion_get({query: {saved}, signal});
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (data.saved !== saved || !(data.suggested === null || typeof data.suggested === 'string')) {
+        throw new Error('Invalid provider suggestion');
+    }
+    return data.suggested;
+}

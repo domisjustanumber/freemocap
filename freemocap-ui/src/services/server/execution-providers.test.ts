@@ -1,7 +1,7 @@
 // Bundle with esbuild --bundle --platform=node --format=cjs, then node --test.
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {requestExecutionProviders, executionProviderOptions} from './execution-providers';
+import {requestExecutionProviders, executionProviderOptions, requestExecutionProviderSuggestion} from './execution-providers';
 
 const CPU = {key: 'cpu', label: 'CPU', description: 'Runs on the processor.', usable: true, install_hint: null, uses_gpu: false, devices: []};
 const GPU = {key: 'gpu-ep', label: 'GPU EP', description: 'Runs on a GPU.', usable: true, install_hint: null, uses_gpu: true,
@@ -42,5 +42,21 @@ test('HTTP failures and malformed provider lists are not advertised as support',
         Response.json(answer([{key: 'cpu', label: 'CPU'}])), Response.json({providers: [CPU]}),
         Response.json(answer([{...GPU, devices: [{key: 'gpu:0'}]}]))]) {
         await assert.rejects(requestExecutionProviders('http://providers.invalid', undefined, (async () => response) as typeof fetch));
+    }
+});
+
+test('the suggestion for a legacy key is asked with the saved key and is a key or null (Auto)', async () => {
+    const calls: string[] = [];
+    for (const suggested of ['new-ep', null]) {
+        const request = (async url => {
+            calls.push(String(url));
+            return Response.json({saved: 'old-ep', suggested});
+        }) as typeof fetch;
+        assert.equal(await requestExecutionProviderSuggestion('http://server.invalid', 'old-ep', undefined, request), suggested);
+    }
+    assert.deepEqual(calls, Array(2).fill('http://server.invalid/freemocap/onnx/execution_providers/suggestion?saved=old-ep'));
+    for (const response of [new Response('', {status: 503}), Response.json({saved: 'other', suggested: null}),
+        Response.json({saved: 'old-ep', suggested: 3})]) {
+        await assert.rejects(requestExecutionProviderSuggestion('http://server.invalid', 'old-ep', undefined, (async () => response) as typeof fetch));
     }
 });

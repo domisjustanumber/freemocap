@@ -280,6 +280,11 @@ export const operationDefinitions = {
     "path": "/freemocap/onnx/execution_providers",
     "asset": false
   },
+  "get_execution_provider_suggestion_freemocap_onnx_execution_providers_suggestion_get": {
+    "method": "GET",
+    "path": "/freemocap/onnx/execution_providers/suggestion",
+    "asset": false
+  },
   "get_session_providers_freemocap_onnx_session_providers_get": {
     "method": "GET",
     "path": "/freemocap/onnx/session_providers",

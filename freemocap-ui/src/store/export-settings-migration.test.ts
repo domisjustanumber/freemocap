@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {migrateExportSettings, migrateRemovedDetectors} from './export-settings-migration';
+import {migrateExportSettings, migrateRemovedDetectors, takeLegacyExecutionProvider} from './export-settings-migration';
 
 test('historical browser settings retain formats, channels, overrides and automatic export choice', () => {
     const saved = {scientificExportFormats: ['npz'], scientificExportData: ['RAW_KEYPOINTS_3D'],
@@ -29,4 +29,14 @@ test('saved settings for a removed detector fall back to RTMW without DLC keys',
         {detectorType: 'rtmpose', exportTallCsv: true});
     assert.deepEqual(migrateRemovedDetectors({detectorType: 'rtmw_mediapipe_hands'}), {detectorType: 'rtmpose'});
     assert.deepEqual(migrateRemovedDetectors({detectorType: 'mediapipe'}), {detectorType: 'mediapipe'});
+});
+
+test('a saved config without the settings version holds back its EP key; one with it keeps the key as chosen', () => {
+    assert.deepEqual(takeLegacyExecutionProvider({detectorType: 'rtmpose', executionProvider: 'old-ep'}),
+        {config: {detectorType: 'rtmpose', executionProvider: null, executionDevice: null}, legacyKey: 'old-ep'});
+    assert.deepEqual(takeLegacyExecutionProvider({executionProvider: 'new-ep', executionDevice: 'gpu:1', settingsVersion: 1}),
+        {config: {executionProvider: 'new-ep', executionDevice: 'gpu:1'}, legacyKey: null});
+    // Auto, or no saved file, has nothing to replace.
+    assert.deepEqual(takeLegacyExecutionProvider({executionProvider: null}), {config: {executionProvider: null}, legacyKey: null});
+    assert.deepEqual(takeLegacyExecutionProvider({}), {config: {}, legacyKey: null});
 });

@@ -36,7 +36,7 @@ const GPU = {key: 'gpu-ep', label: 'GPU EP', description: 'Runs on a GPU.', usab
 /** The server's answer as the hook gives it: here only RTMW takes an EP. */
 const PROVIDERS: ExecutionProviderChoices = {
     options: executionProviderOptions(null, [CPU, GPU]), info: executionProviderInfo([CPU, GPU]),
-    takesExecutionProvider: detector => detector === 'rtmpose', devicesOf: () => [],
+    takesExecutionProvider: detector => detector === 'rtmpose', devicesOf: () => [], installHintOf: () => null,
 };
 
 /** The detector rows' props as the realtime controls pass them, for one detector. */

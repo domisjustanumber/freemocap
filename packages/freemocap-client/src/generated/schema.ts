@@ -983,6 +983,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/freemocap/onnx/execution_providers/suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Execution Provider Suggestion
+         * @description The EP key that replaces a key saved by FreeMoCap before skellytracker 2, as skellytracker suggests it on this
+         *     host; `suggested` None means Auto.
+         */
+        get: operations["get_execution_provider_suggestion_freemocap_onnx_execution_providers_suggestion_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/freemocap/onnx/session_providers": {
         parameters: {
             query?: never;
@@ -2145,6 +2166,13 @@ export interface components {
             uses_gpu: boolean;
             /** Devices */
             devices: components["schemas"]["ExecutionProviderDevice"][];
+        };
+        /** ExecutionProviderSuggestion */
+        ExecutionProviderSuggestion: {
+            /** Saved */
+            saved: string;
+            /** Suggested */
+            suggested: string | null;
         };
         /** ExportInventory */
         ExportInventory: {
@@ -6188,6 +6216,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AvailableExecutionProvidersResponse"];
+                };
+            };
+        };
+    };
+    get_execution_provider_suggestion_freemocap_onnx_execution_providers_suggestion_get: {
+        parameters: {
+            query: {
+                saved: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExecutionProviderSuggestion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

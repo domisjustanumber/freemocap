@@ -49,6 +49,19 @@ def get_available_execution_providers() -> AvailableExecutionProvidersResponse:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class ExecutionProviderSuggestion(BaseModel):
+    saved: str
+    suggested: str | None
+
+
+@onnx_router.get("/execution_providers/suggestion")
+def get_execution_provider_suggestion(saved: str) -> ExecutionProviderSuggestion:
+    """The EP key that replaces a key saved by FreeMoCap before skellytracker 2, as skellytracker suggests it on this
+    host; `suggested` None means Auto."""
+    from freemocap.core.tracking.execution_providers import suggested_execution_provider
+    return ExecutionProviderSuggestion(saved=saved, suggested=suggested_execution_provider(saved))
+
+
 @onnx_router.get("/session_providers")
 def get_session_providers() -> list[dict]:
     """For each live or posthoc run, the EP the user selected and each model node as skellytracker reports it:

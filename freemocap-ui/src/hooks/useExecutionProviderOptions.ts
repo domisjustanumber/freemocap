@@ -32,6 +32,11 @@ export function useExecutionProviderOptions(selected: ExecutionProviderName | nu
     return {
         options: executionProviderOptions(selected, catalog.providers),
         info,
+        /** skellytracker's install sentence for a listed EP that is not usable here; null otherwise. */
+        installHintOf: (provider: ExecutionProviderName | null) => {
+            const row = catalog.providers.find(({key}) => key === provider);
+            return row && !row.usable ? row.install_hint : null;
+        },
         /** The GPUs of an EP, most VRAM first, as skellytracker gives them; none for Auto or an unknown key. */
         devicesOf: (provider: ExecutionProviderName | null) => catalog.providers.find(({key}) => key === provider)?.devices ?? [],
         /** Unknown until the server answers: the row stays hidden, as no EP can be offered yet. */

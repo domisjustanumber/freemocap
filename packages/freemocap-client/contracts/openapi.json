@@ -2907,6 +2907,49 @@
         }
       }
     },
+    "/freemocap/onnx/execution_providers/suggestion": {
+      "get": {
+        "tags": [
+          "ONNX"
+        ],
+        "summary": "Get Execution Provider Suggestion",
+        "description": "The EP key that replaces a key saved by FreeMoCap before skellytracker 2, as skellytracker suggests it on this\nhost; `suggested` None means Auto.",
+        "operationId": "get_execution_provider_suggestion_freemocap_onnx_execution_providers_suggestion_get",
+        "parameters": [
+          {
+            "name": "saved",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Saved"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionProviderSuggestion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/freemocap/onnx/session_providers": {
       "get": {
         "tags": [
@@ -5375,6 +5418,31 @@
         ],
         "title": "ExecutionProviderOption",
         "type": "object"
+      },
+      "ExecutionProviderSuggestion": {
+        "properties": {
+          "saved": {
+            "type": "string",
+            "title": "Saved"
+          },
+          "suggested": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested"
+          }
+        },
+        "type": "object",
+        "required": [
+          "saved",
+          "suggested"
+        ],
+        "title": "ExecutionProviderSuggestion"
       },
       "ExportInventory": {
         "properties": {

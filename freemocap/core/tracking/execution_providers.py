@@ -10,3 +10,10 @@ def execution_provider_rows() -> list:
 def usable_execution_providers() -> list[str]:
     """The keys of the EPs that skellytracker says are usable on this host now."""
     return [row.key for row in execution_provider_rows() if row.usable]
+
+
+def suggested_execution_provider(saved_key: str) -> str | None:
+    """The EP key to use for a key saved by FreeMoCap before skellytracker 2, as skellytracker suggests it on this
+    host; None means Auto. freemocap calls it only for a legacy settings file and holds no key list."""
+    from skellytracker.core.eps import suggest_execution_provider
+    return suggest_execution_provider(saved_key)

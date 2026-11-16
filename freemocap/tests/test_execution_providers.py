@@ -150,3 +150,24 @@ def test_session_status_endpoint_reports_actual_values():
     client = response.json()[0]
     assert client['requested_provider'] is None
     assert client['models'][0]['execution_provider'] == 'gpu-ep' and client['models'][0]['device'] == ['gpu:0', 'gpu:1']
+
+
+@pytest.mark.parametrize('suggested', ['new-ep', None])
+def test_the_suggestion_route_gives_what_skellytracker_suggests_for_a_legacy_key(suggested):
+    from freemocap.api.http.onnx.onnx_router import onnx_router
+    app = FastAPI()
+    app.include_router(onnx_router, prefix='/freemocap')
+    with patch('freemocap.core.tracking.execution_providers.suggested_execution_provider', return_value=suggested) as call:
+        response = TestClient(app).get('/freemocap/onnx/execution_providers/suggestion', params={'saved': 'old-ep'})
+    assert response.status_code == 200
+    assert response.json() == {'saved': 'old-ep', 'suggested': suggested}
+    call.assert_called_once_with('old-ep')
+
+
+def test_the_suggestion_is_skellytrackers_answer_for_the_saved_key():
+    from freemocap.core.tracking.execution_providers import suggested_execution_provider
+    from skellytracker.core import eps
+    with patch.object(eps, 'suggest_execution_provider', return_value='new-ep') as call:
+        assert suggested_execution_provider('old-ep') == 'new-ep'
+    call.assert_called_once_with('old-ep')
+    assert suggested_execution_provider('not-an-ep-key') is None  # the real call: never raises for a string

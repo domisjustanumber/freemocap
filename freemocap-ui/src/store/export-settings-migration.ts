@@ -39,3 +39,19 @@ export function migrateRemovedDetectors(saved: Record<string, unknown>): Record<
     if (REMOVED_DETECTORS.includes(config.detectorType as string)) config.detectorType = 'rtmpose';
     return config;
 }
+
+/** Written with every saved mocap config. A saved config without it was written before skellytracker 2: its EP key is legacy. */
+export const MOCAP_SETTINGS_VERSION = 1;
+
+/**
+ * Holds back the EP key of a legacy saved config until skellytracker suggests its replacement (user G1-G3): the config
+ * loads with Auto meanwhile, and the key comes back as `legacyKey`. A config with the version keeps its key as chosen.
+ */
+export function takeLegacyExecutionProvider(saved: Record<string, unknown>): {
+    config: Record<string, unknown>; legacyKey: string | null;
+} {
+    const {settingsVersion, ...config} = saved;
+    const key = config.executionProvider;
+    if (settingsVersion !== undefined || typeof key !== 'string') return {config, legacyKey: null};
+    return {config: {...config, executionProvider: null, executionDevice: null}, legacyKey: key};
+}

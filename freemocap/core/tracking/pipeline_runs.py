@@ -96,21 +96,16 @@ def detector_box_stages(detector_type: str) -> tuple[tuple[str, ...], ...]:
 @cache
 def detector_connections(detector_type: str) -> tuple[tuple[str, str], ...]:
     """The edges between the points of a detector choice, in the names of `detector_point_names`."""
-    schema = _output_schema(detector_type)
-    if detector_type != "rtmpose":
-        return tuple((a, b) for a, b in schema[HOLISTIC_NODE]["edges"])
-    from skellytracker.core.pipelines import InstanceKeypoints, to_canonical
-    rtmw = schema[RTMW_NODE]
-    raw = tuple(rtmw["point_names"])
-    # shortcut: the output schema gives edges in raw point names only; a marker value finds the
-    # canonical copy of each raw point. Upgrade when skellytracker gives edges in canonical names.
-    columns = np.arange(len(raw), dtype=float)
-    marked = InstanceKeypoints(raw, np.stack([columns, columns ** 2, columns * 0], axis=-1)[None], np.ones((1, len(raw))),
-                               np.ones(1), np.ones(1, dtype=bool), np.full(1, -1))
-    canonical = to_canonical(marked, rtmw)
-    rename = {raw[int(x)]: name for name, (x, y) in zip(canonical.names, canonical.xyz[0, :, :2])
-              if float(x).is_integer() and y == x ** 2}
-    return tuple((rename[a], rename[b]) for a, b in rtmw["edges"] if a in rename and b in rename)
+    node = RTMW_NODE if detector_type == "rtmpose" else HOLISTIC_NODE
+    return tuple((a, b) for a, b in _output_schema(detector_type)[node]["canonical_edges"])
+
+
+def _person(names, xy, z, score, present) -> tuple[tuple[str, ...], np.ndarray, np.ndarray]:
+    """Row 0 as freemocap's `(P, 3)` points and `(P,)` scores; z is 0 for a 2D output; an absent row is all missing."""
+    if not present[0]:
+        return tuple(names), np.full((len(names), 3), np.nan), np.zeros(len(names))
+    depth = np.zeros(len(names)) if z is None else z[0]
+    return tuple(names), np.concatenate([xy[0], depth[:, None]], axis=1), score[0].copy()
 
 
 def observations_from_results(results: Mapping[str, Mapping[str, Any]], output_schema: Mapping[str, Any],
@@ -119,19 +114,19 @@ def observations_from_results(results: Mapping[str, Mapping[str, Any]], output_s
 
     Points are taken by name: RTMW through `to_canonical`, Holistic by its point names. An RTMW
     point with a score below `rtmw_min_score` or no x and y is missing (NaN, score 0); a kept 2D point has z 0.
+    Only row 0 (the one person) is read, and only when it is present.
     """
     # shortcut: the observation type is still skellytracker's; the user's answer to V1 sets freemocap's own.
     from skellytracker.core.data_primitives import BoundingBox, Keypoints, Observation, StageObservation
     from skellytracker.core.pipelines import to_canonical
     observations = {}
     for camera_id, result in results.items():
-        width, height = result["image_size"]
+        width, height = result["image_width"], result["image_height"]
         boxes = []
         if detector_type == "rtmpose":
             canonical = to_canonical(result[RTMW_NODE], output_schema[RTMW_NODE])
-            names, xyz, score = canonical.names, canonical.xyz[0].copy(), canonical.score[0].copy()
+            names, xyz, score = _person(canonical.names, canonical.xy, canonical.z, canonical.score, result[RTMW_NODE].present)
             missing = (score < rtmw_min_score) | ~np.isfinite(xyz[:, :2]).all(axis=1)
-            xyz[:, 2] = 0.0
             xyz[missing], score[missing] = np.nan, 0.0
             roi = result[PERSON_ROI]
             if roi.present[0]:
@@ -143,7 +138,7 @@ def observations_from_results(results: Mapping[str, Mapping[str, Any]], output_s
             detector_ran = bool(result["node_ran"][PERSON_NODE])
         else:
             value = result[HOLISTIC_NODE]
-            names, xyz, score = value.point_names, value.xyz[0].copy(), value.score[0].copy()
+            names, xyz, score = _person(value.point_names, value.xy, value.z, value.score, value.present)
             detector_ran = True  # Holistic has no person detector
         stage = StageObservation(name=STAGE, bounding_boxes=boxes, detector_ran=detector_ran,
                                  keypoints=Keypoints(names=tuple(names), xyz=xyz, visibility=score))

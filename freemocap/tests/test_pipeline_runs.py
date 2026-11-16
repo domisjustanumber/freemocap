@@ -50,11 +50,11 @@ def rtmw_schema():
 def _rtmw_result(schema, *, score, roi, present=True, person_ran=True):
     from skellytracker.core.pipelines import InstanceKeypoints, InstanceRois
     names = tuple(schema[pipeline_runs.RTMW_NODE]["point_names"])
-    xyz = np.stack([np.arange(len(names), dtype=float), np.arange(len(names), dtype=float) + 0.5, np.full(len(names), np.nan)], axis=-1)
-    keypoints = InstanceKeypoints(names, xyz[None], np.asarray(score, float)[None], np.ones(1), np.array([present]), np.array([-1]))
+    xy = np.stack([np.arange(len(names), dtype=float), np.arange(len(names), dtype=float) + 0.5], axis=-1)
+    keypoints = InstanceKeypoints(names, xy[None], np.asarray(score, float)[None], np.ones(1), np.array([present]), np.array([-1]))
     rois = InstanceRois(np.asarray([roi], float), np.array([0.8]), np.array([present]))
     return {"0": {pipeline_runs.RTMW_NODE: keypoints, pipeline_runs.PERSON_ROI: rois, "frame_index": 12,
-                  "image_size": (640, 480), "timestamp_ms": 5.0, "node_ran": {pipeline_runs.PERSON_NODE: person_ran}}}
+                  "image_width": 640, "image_height": 480, "timestamp_ms": 5.0, "node_ran": {pipeline_runs.PERSON_NODE: person_ran}}}
 
 
 def test_rtmw_points_are_taken_by_name_and_gated_at_0_4(rtmw_schema):
@@ -101,12 +101,26 @@ def test_the_rtmw_box_is_clipped_to_whole_pixels_and_an_absent_person_has_no_box
     assert stage.bounding_boxes == [] and stage.keypoints.n_valid == 0
 
 
+def test_an_absent_rtmw_row_is_all_missing_whatever_its_values():
+    names, xyz, score = pipeline_runs._person(("a", "b"), np.ones((1, 2, 2)), None, np.ones((1, 2)), np.array([False]))
+    assert names == ("a", "b") and np.isnan(xyz).all() and not score.any()
+
+
+def test_a_3d_holistic_value_keeps_its_z_and_a_2d_value_gets_z_0():
+    xy, z, score = np.ones((1, 2, 2)), np.array([[0.25, np.nan]]), np.full((1, 2), 0.7)
+    _, holistic, _ = pipeline_runs._person(("a", "b"), xy, z, score, np.array([True]))
+    np.testing.assert_array_equal(holistic, [[1.0, 1.0, 0.25], [1.0, 1.0, np.nan]])
+    _, flat, kept = pipeline_runs._person(("a", "b"), xy, None, score, np.array([True]))
+    np.testing.assert_array_equal(flat, [[1.0, 1.0, 0.0], [1.0, 1.0, 0.0]])
+    np.testing.assert_array_equal(kept, [0.7, 0.7])
+
+
 @pytest.mark.parametrize("detector_type", ["rtmpose", "mediapipe"])
 def test_point_names_and_connections_use_the_names_of_the_observations(detector_type):
     names = pipeline_runs.detector_point_names(detector_type)
     edges = pipeline_runs.detector_connections(detector_type)
     node = pipeline_runs.RTMW_NODE if detector_type == "rtmpose" else pipeline_runs.HOLISTIC_NODE
-    assert len(edges) == len(pipeline_runs._output_schema(detector_type)[node]["edges"])  # no edge is lost
+    assert len(edges) == len(pipeline_runs._output_schema(detector_type)[node]["edges"]) == {"rtmpose": 65, "mediapipe": 213}[detector_type]
     assert all(a in names and b in names for a, b in edges)
     assert {"body/nose", "left_hand/wrist", "left_hand/thumb_cmc"} <= set(names)
     if detector_type == "rtmpose":

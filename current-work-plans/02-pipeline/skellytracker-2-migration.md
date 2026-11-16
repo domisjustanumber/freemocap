@@ -404,6 +404,11 @@ frames, each with `rtmpose` and with `mediapipe`.
     "saved X replaced by Y" with the EP menu's "Not usable here." and Y's `install_hint` (one
     `NotUsableNote` for both). Auto only for None. A run before the install fails with skellytracker's
     message, as for any EP that is not usable.
+- SC (2026-11-16, supervisor; skellytracker specs/model-sidecar/post/keypoint/decode-simcc.md:51 and
+  specs/pipeline/outputs.md:31: a score is a raw value with no fixed range): freemocap's recording format
+  stores a confidence in [0, 1], so `observations_from_results` gates on the raw score, then stores
+  `np.clip(score, 0, 1)` for every detector (NaN stays NaN). If the user wants the range in the
+  skellytracker schema instead, the supervisor says so.
 - V3 (2026-11-16, user): draw the face points smaller so the face lines show between them; line colour and
   body, hand and foot point sizes unchanged; by the group of the point (`face/...`), not by detector or
   count. Done: `annotation_style.FACE_KEYPOINT_RADIUS = 2` (was the stage radius 4); the annotator draws
@@ -539,6 +544,9 @@ frames, each with `rtmpose` and with `mediapipe`.
     EP key is replaced by skellytracker's suggestion for this computer (legacy `trt`/`cuda` -> `trt-rtx`
     if usable, else `cuda` if usable; another usable key stays; else Auto) and a notice says which key
     was replaced by which. Processing waits until the server has answered.
+18. A saved confidence of 1.0 can mean "1 or more": skellytracker scores have no fixed range and the
+    recording stores them clipped to [0, 1] (the 0.4 RTMW gate reads the raw score first). A negative
+    score is stored as 0.
 17. Annotated videos draw face points with radius 2 instead of 4 (V3), so the face lines show between
     them; body, hand and foot points and all line colours are unchanged.
 

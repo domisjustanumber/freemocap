@@ -6,6 +6,7 @@ import SettingSelectInput from '@/components/common/settings-layout/setting-sele
 import ValueSelector from '@/components/ui-components/ValueSelector';
 import {type DetectorType, RTMPOSE_MODELS, type RTMPoseModelName} from '@/store/slices/mocap';
 import type {ExecutionProviderName} from '@/types/execution-provider';
+import type {ExecutionProviderChoices} from '@/hooks/useExecutionProviderOptions';
 
 export const DETECTOR_INFO = {
     title: "Skeleton detector",
@@ -14,11 +15,6 @@ export const DETECTOR_INFO = {
         <p><strong>MediaPipe</strong> — separate pose, cropped hand and face detectors.</p>
         <p><em>The detector decides which parameters below apply.</em></p>
     </>,
-};
-
-export const EXECUTION_PROVIDER_INFO = {
-    title: 'Execution provider',
-    text: 'Auto retains the pipeline default. Choices are advertised by the server runtime; session startup verifies the selected provider can load.',
 };
 
 export const MODEL_INFO = {
@@ -56,13 +52,12 @@ export const BOARD_GROUP_INFO = {
 interface Info {title: string; text: ReactNode}
 
 /**
- * What the realtime Skeleton Setup dialog said under its detector choice, word for word. The realtime rows show the
- * selected detector's note in the explanations of the rows it is about: the detector and, where the detector has one,
- * the execution provider. The posthoc explanations stay as they are.
+ * What the realtime Skeleton Setup dialog said under its detector choice. The realtime detector row shows the
+ * selected detector's note in its explanation; what runs on which hardware comes from SkellyTracker's EP sentences.
  */
-const REALTIME_DETECTOR_NOTES = {
-    rtmpose: '133 keypoints (body, hands, face) via YOLOX + RTMW. Uses GPU batched inference when available.',
-    mediapipe: 'Body + hands + face via MediaPipe. CPU-only; runs per-camera without GPU batching.',
+export const REALTIME_DETECTOR_NOTES = {
+    rtmpose: '133 keypoints (body, hands, face) via YOLOX + RTMW.',
+    mediapipe: 'Body + hands + face via MediaPipe.',
 } satisfies Partial<Record<DetectorType, string>>;
 
 /** An explanation with a note as one more paragraph after its own. */
@@ -74,7 +69,6 @@ const withDetectorNotes = (info: Info): Map<string, Info> =>
 
 // Built once, so a row's explanation is the same object on every render.
 const REALTIME_DETECTOR_INFO = withDetectorNotes(DETECTOR_INFO);
-const REALTIME_PROVIDER_INFO = withDetectorNotes(EXECUTION_PROVIDER_INFO);
 
 export interface DetectorSettingsValue {
     detector: DetectorType; model: RTMPoseModelName; provider: ExecutionProviderName | null; confidence: number;
@@ -85,8 +79,8 @@ interface DetectorSettingRowsProps {
     /** Receives only the fields a control changes. */
     onChange: (change: Partial<DetectorSettingsValue>) => void;
     detectors: readonly {label: string; value: DetectorType}[];
-    /** The execution providers to offer; the one with no value is Auto. */
-    providerOptions: readonly {label: string; value: ExecutionProviderName | null}[];
+    /** The server's execution provider choices (the one with no value is Auto), their explanation, and which detectors take one. */
+    providers: ExecutionProviderChoices;
     context: 'posthoc' | 'realtime';
     /** 'key' is the detector and, for RTMW, its model row. 'all' is every row the detector has. */
     rows: 'all' | 'key';
@@ -94,13 +88,12 @@ interface DetectorSettingRowsProps {
     inactive?: boolean;
 }
 
-export function DetectorSettingRows({value, onChange, detectors, providerOptions, context, rows, inactive = false}: DetectorSettingRowsProps) {
+export function DetectorSettingRows({value, onChange, detectors, providers, context, rows, inactive = false}: DetectorSettingRowsProps) {
     const {detector} = value;
     const all = rows === 'all';
     const rtmw = detector === 'rtmpose';
     const realtime = context === 'realtime';
     const detectorInfo = (realtime && REALTIME_DETECTOR_INFO.get(detector)) || DETECTOR_INFO;
-    const providerInfo = (realtime && REALTIME_PROVIDER_INFO.get(detector)) || EXECUTION_PROVIDER_INFO;
 
     return <>
         {/* In the posthoc section the detector reframes every row beneath it, so it leads the section. */}
@@ -108,9 +101,9 @@ export function DetectorSettingRows({value, onChange, detectors, providerOptions
             control={<SettingSelectInput label="Skeleton detector" value={detector} options={detectors}
                 onChange={(selected: DetectorType) => onChange({detector: selected})}/>}/>
 
-        {all && rtmw && <SettingRow inactive={inactive} label="Execution provider" info={providerInfo}
+        {all && providers.takesExecutionProvider(detector) && <SettingRow inactive={inactive} label="Execution provider" info={providers.info}
             control={<SettingSelectInput label="Execution provider" value={value.provider ?? 'auto'}
-                options={providerOptions.map(option => ({...option, value: option.value ?? 'auto' as const}))}
+                options={providers.options.map(option => ({...option, value: option.value ?? 'auto' as const}))}
                 onChange={(provider: ExecutionProviderName | 'auto') => onChange({provider: provider === 'auto' ? null : provider})}/>}/>}
 
         {rtmw && <SettingRow inactive={inactive} label="Model" info={MODEL_INFO}

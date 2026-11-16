@@ -1212,8 +1212,12 @@ export interface components {
     schemas: {
         /** AvailableExecutionProvidersResponse */
         AvailableExecutionProvidersResponse: {
-            /** Available */
-            available: components["schemas"]["ExecutionProviderOption"][];
+            /** Providers */
+            providers: components["schemas"]["ExecutionProviderOption"][];
+            /** Detector Takes Execution Provider */
+            detector_takes_execution_provider: {
+                [key: string]: boolean;
+            };
         };
         /**
          * BackgroundTaskSnapshot
@@ -2116,12 +2120,31 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /** ExecutionProviderDevice */
+        ExecutionProviderDevice: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string | null;
+            /** Vram Total Bytes */
+            vram_total_bytes: number | null;
+        };
         /** ExecutionProviderOption */
         ExecutionProviderOption: {
             /** Key */
             key: string;
             /** Label */
             label: string;
+            /** Description */
+            description: string;
+            /** Usable */
+            usable: boolean;
+            /** Install Hint */
+            install_hint: string | null;
+            /** Uses Gpu */
+            uses_gpu: boolean;
+            /** Devices */
+            devices: components["schemas"]["ExecutionProviderDevice"][];
         };
         /** ExportInventory */
         ExportInventory: {

@@ -8,22 +8,42 @@ logger = logging.getLogger(__name__)
 onnx_router = APIRouter(prefix="/onnx", tags=["ONNX"])
 
 
+class ExecutionProviderDevice(BaseModel):
+    key: str
+    name: str | None
+    vram_total_bytes: int | None
+
+
 class ExecutionProviderOption(BaseModel):
     key: str
     label: str
+    description: str
+    usable: bool
+    install_hint: str | None
+    uses_gpu: bool
+    devices: list[ExecutionProviderDevice]
 
 
 class AvailableExecutionProvidersResponse(BaseModel):
-    available: list[ExecutionProviderOption]
+    providers: list[ExecutionProviderOption]
+    detector_takes_execution_provider: dict[str, bool]
 
 
 @onnx_router.get("/execution_providers")
 def get_available_execution_providers() -> AvailableExecutionProvidersResponse:
-    """The key and label of each EP usable on this host, in skellytracker's order; the run checks its EP again when it starts."""
+    """Each EP of this host as skellytracker gives it, in its order, and whether each detector takes an EP.
+
+    The run checks its EP again when it starts."""
     try:
-        from freemocap.core.tracking.execution_providers import usable_execution_provider_rows
-        return AvailableExecutionProvidersResponse(available=[
-            ExecutionProviderOption(key=row.key, label=row.label) for row in usable_execution_provider_rows()])
+        from freemocap.core.tracking.execution_providers import execution_provider_rows
+        from freemocap.core.tracking.pipeline_runs import PIPELINE_KEYS, detector_takes_execution_provider
+        return AvailableExecutionProvidersResponse(
+            providers=[ExecutionProviderOption(
+                key=row.key, label=row.label, description=row.description, usable=row.usable,
+                install_hint=row.install_hint, uses_gpu=row.uses_gpu,
+                devices=[ExecutionProviderDevice(key=device.device_key, name=device.name, vram_total_bytes=device.vram_total_bytes)
+                         for device in row.devices]) for row in execution_provider_rows()],
+            detector_takes_execution_provider={detector: detector_takes_execution_provider(detector) for detector in PIPELINE_KEYS})
     except Exception as e:
         logger.exception(f"Error listing ONNX execution providers: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -31,9 +51,8 @@ def get_available_execution_providers() -> AvailableExecutionProvidersResponse:
 
 @onnx_router.get("/session_providers")
 def get_session_providers() -> list[dict]:
-    """Actual loaded providers for shared live/post-hoc sessions; empty models means pending startup.
-
-    Per-camera process sessions report the same diagnostics in their startup logs.
-    """
+    """For each live or posthoc run, the EP the user selected and each model node as skellytracker reports it:
+    key, version, sidecar_sha256, size, precision, the applied `execution_provider` and `device`. Empty models
+    means the run has not started yet, or runs no model."""
     from freemocap.app.freemocap_application import get_freemocap_app
     return get_freemocap_app().inference_service.provider_status()

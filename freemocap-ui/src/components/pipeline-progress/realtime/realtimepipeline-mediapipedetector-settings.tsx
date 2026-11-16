@@ -19,16 +19,10 @@ interface RTPSkeletonSetupProps {
 const DETECTOR_INFO = {
     title: 'Skeleton detector',
     text: <>
-        <p><strong>RTMW</strong> — 133 keypoints (body, hands, face) via YOLOX + RTMW. Uses GPU batched inference when available.</p>
-        <p><strong>MediaPipe</strong> — body, hands and face. CPU only; runs per camera without GPU batching.</p>
+        <p><strong>RTMW</strong> — 133 keypoints (body, hands, face) via YOLOX + RTMW.</p>
+        <p><strong>MediaPipe</strong> — body, hands and face.</p>
         <p><em>The detector decides which settings below apply.</em></p>
     </>,
-};
-
-const PROVIDER_INFO = {
-    title: 'Execution provider',
-    text: <p>Auto retains the pipeline default. Choices are advertised by the server runtime; session startup
-        verifies the selected provider can load.</p>,
 };
 
 const RTPSkeletonSetup: React.FC<RTPSkeletonSetupProps> = ({ open, onClose }) => {
@@ -70,11 +64,12 @@ const RTPSkeletonSetup: React.FC<RTPSkeletonSetupProps> = ({ open, onClose }) =>
                         options={DETECTOR_OPTIONS}
                         onChange={(value: DetectorType) => handleCameraNodeUpdate({ detector_type: value })}/>}/>
 
-                {detectorType === 'rtmpose' && <>
-                    <SettingRow label="Execution provider" info={PROVIDER_INFO}
+                {executionProviderOptions.takesExecutionProvider(detectorType) &&
+                    <SettingRow label="Execution provider" info={executionProviderOptions.info}
                         control={<SettingSelectInput label="Execution provider" value={executionProvider ?? 'auto'}
-                            options={executionProviderOptions.map(option => ({...option, value: option.value ?? 'auto' as const}))}
-                            onChange={(value: ExecutionProviderName | 'auto') => handleExecutionProviderChange(value === 'auto' ? null : value)}/>}/>
+                            options={executionProviderOptions.options.map(option => ({...option, value: option.value ?? 'auto' as const}))}
+                            onChange={(value: ExecutionProviderName | 'auto') => handleExecutionProviderChange(value === 'auto' ? null : value)}/>}/>}
+                {detectorType === 'rtmpose' && <>
                     <SettingRow label="Model" info={MODEL_INFO}
                         control={<SettingSelectInput label="RTMPose model" value={cameraNodeConfig.rtmpose_model_name ?? "rtmw-x-l_256x192"}
                             options={RTMPOSE_MODELS}

@@ -5,7 +5,7 @@ from pydantic import BaseModel
 class RealtimeSkeletonInferenceNodeConfig(BaseModel):
     # Upper bound on batch size. The node uses min(num_cameras, max_batch_size)
     # at runtime. Set to 1 to disable batching across cameras while keeping the
-    # single-CUDA-context win.
+    # single-model-session win.
     max_batch_size: int = 8
 
     # None: Auto, the skellytracker recommendation for this host — recommended.

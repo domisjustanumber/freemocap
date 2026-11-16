@@ -44,7 +44,7 @@ export default function RealtimeProcessingSettings({onClose}: {onClose: () => vo
                 <SettingRow label="Track person" info={{title: 'Track person', text: 'Run the selected person detector on camera images.'}} control={toggle('Track person', camera.skeleton_tracking_enabled,
                     enabled => applyOrUpdatePipelineConfig({...pipelineConfig, camera_node_config: {...camera, skeleton_tracking_enabled: enabled}}))}/>
                 <DetectorSettingRows value={value} onChange={changeDetector} detectors={DETECTOR_OPTIONS}
-                    providerOptions={providers} context="realtime" rows="all"/>
+                    providers={providers} context="realtime" rows="all"/>
                 <SettingRow label="Track Charuco board" info={{title: 'Track Charuco board', text: 'Detect the configured Charuco board alongside the person tracker.'}} control={toggle('Track Charuco board', camera.charuco_tracking_enabled,
                     enabled => applyOrUpdatePipelineConfig({...pipelineConfig, camera_node_config: {...camera, charuco_tracking_enabled: enabled}}))}/>
             </>},

@@ -39,18 +39,27 @@ def test_a_saved_graph_provider_keeps_its_meaning_and_is_not_written_again(saved
     assert not {'graphExecutionProvider', 'graph_execution_provider'} & written
 
 
-def test_provider_route_lists_the_key_and_label_of_each_usable_ep_in_skellytracker_order_without_loading_models():
+def test_provider_route_gives_each_ep_as_skellytracker_does_in_its_order_without_loading_models():
     from freemocap.api.http.onnx.onnx_router import onnx_router
     from skellytracker.core import eps
     app = FastAPI()
     app.include_router(onnx_router, prefix='/freemocap')
-    rows = (SimpleNamespace(key='other-ep', label='Other EP', state='ready'),
-            SimpleNamespace(key='gpu-ep', label='GPU EP', state='not_installed'), SimpleNamespace(key='cpu', label='CPU', state='builtin'))
+    device = SimpleNamespace(device_key='gpu:0', gpu_key='0000:01:00.0', name='Some GPU', vram_total_bytes=8 * 2**30)
+    rows = (SimpleNamespace(key='gpu-ep', label='GPU EP', description='Runs on a GPU.', usable=True, install_hint=None,
+                            uses_gpu=True, devices=(device,)),
+            SimpleNamespace(key='other-ep', label='Other EP', description='Needs a pack.', usable=False,
+                            install_hint='Run `install other-ep`.', uses_gpu=True, devices=()))
     with patch.object(eps, 'status', return_value=SimpleNamespace(eps=rows)), \
          patch('onnxruntime.InferenceSession') as construct:
         response = TestClient(app).get('/freemocap/onnx/execution_providers')
     assert response.status_code == 200
-    assert response.json() == {'available': [{'key': 'other-ep', 'label': 'Other EP'}, {'key': 'cpu', 'label': 'CPU'}]}
+    assert response.json() == {
+        'providers': [
+            {'key': 'gpu-ep', 'label': 'GPU EP', 'description': 'Runs on a GPU.', 'usable': True, 'install_hint': None,
+             'uses_gpu': True, 'devices': [{'key': 'gpu:0', 'name': 'Some GPU', 'vram_total_bytes': 8 * 2**30}]},
+            {'key': 'other-ep', 'label': 'Other EP', 'description': 'Needs a pack.', 'usable': False,
+             'install_hint': 'Run `install other-ep`.', 'uses_gpu': True, 'devices': []}],
+        'detector_takes_execution_provider': {'rtmpose': True, 'mediapipe': False}}
     construct.assert_not_called()
 
 
@@ -135,11 +144,11 @@ def test_session_status_endpoint_reports_actual_values():
     app = FastAPI()
     app.include_router(onnx_router, prefix='/freemocap')
     service = Mock()
-    service.provider_status.return_value = [{'pipeline_id': 'live', 'mode': 'realtime', 'models': [
-        {'model_name': 'rtmw-wholebody133@openmmlab-exporter', 'requested_provider': None, 'applied_providers': ('gpu-ep',)}]}]
+    service.provider_status.return_value = [{'pipeline_id': 'live', 'mode': 'realtime', 'requested_provider': None, 'models': [
+        {'node': 'wholebody', 'key': 'rtmw-wholebody133@openmmlab-exporter', 'execution_provider': 'gpu-ep', 'device': ['gpu:0', 'gpu:1']}]}]
     with patch('freemocap.app.freemocap_application.get_freemocap_app', return_value=SimpleNamespace(inference_service=service)):
         response = TestClient(app).get('/freemocap/onnx/session_providers')
     assert response.status_code == 200
-    model = response.json()[0]['models'][0]
-    assert model['requested_provider'] is None
-    assert model['applied_providers'] == ['gpu-ep']
+    client = response.json()[0]
+    assert client['requested_provider'] is None
+    assert client['models'][0]['execution_provider'] == 'gpu-ep' and client['models'][0]['device'] == ['gpu:0', 'gpu:1']

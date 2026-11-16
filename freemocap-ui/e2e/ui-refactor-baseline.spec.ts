@@ -15,7 +15,7 @@ test('Mocap modal visual sections and complete processing request', async ({page
         if (route.request().method() === 'POST' && url.includes('/processing/plan?')) {await route.abort(); return;}
         if (route.request().method() === 'POST') {requests.push(route.request().postDataJSON()); await route.fulfill({json:{success:true,task_id:'baseline-task'}}); return;}
         if (url.includes('/stages?')) {await route.fulfill({json:{selected_run_id:0,runs:[]}}); return;}
-        if (url.includes('execution_providers')) {await route.fulfill({json:{available:[{key:'cpu',label:'CPU'}]}}); return;}
+        if (url.includes('execution_providers')) {await route.fulfill({json:{providers:[{key:'cpu',label:'CPU',description:'Runs on the processor.',usable:true,install_hint:null,uses_gpu:false,devices:[]}],detector_takes_execution_provider:{rtmpose:true,mediapipe:false}}}); return;}
         await route.fulfill({json:{server_instance_id:'11111111-1111-4111-8111-111111111111',revision:0,recording_owners:[],tasks:[]}});
     });
     await page.route('http://localhost:53117/', route => route.fulfill({contentType:'text/html',body:'<main id="root"></main>'}));

@@ -78,7 +78,7 @@ def test_provider_switch_reuses_capture_and_releases_sessions(replay_reference, 
 
         def switch_provider(frame_index, active_pipeline):
             if frame_index == 6:
-                assert all(model['applied_providers'] == ('cpu',)
+                assert all(model['execution_provider'] == 'cpu'
                            for client in service.provider_status() for model in client['models'])
                 updated = active_pipeline.config.model_copy(deep=True)
                 updated.skeleton_inference_node_config.execution_provider = gpu
@@ -114,7 +114,7 @@ def test_provider_switch_reuses_capture_and_releases_sessions(replay_reference, 
         assert pipeline.skeleton_inference_node is not original_inference
         statuses = service.provider_status()
         assert len(statuses) == 1 and statuses[0]['models']
-        assert all(model['requested_provider'] == gpu and model['applied_providers'] == (gpu,)
+        assert all(statuses[0]['requested_provider'] == gpu and model['execution_provider'] == gpu
                    for model in statuses[0]['models'])
     finally:
         try:

@@ -33,7 +33,8 @@ class InferenceServiceTests(unittest.TestCase):
     def start_run(self, **kwargs):
         self.started.append(kwargs)
         run = Mock()
-        run.models = {"person": {"key": "yolox-person@openmmlab-exporter"}, "wholebody": {"key": "rtmw-wholebody133@openmmlab-exporter"}}
+        run.models = {"person": {"key": "yolox-person@openmmlab-exporter", "execution_provider": "gpu-ep", "device": "gpu:0"},
+                      "wholebody": {"key": "rtmw-wholebody133@openmmlab-exporter", "execution_provider": "gpu-ep", "device": "gpu:0"}}
         run.process_batch.side_effect = self.infer
         self.runs.append(run)
         return run, "gpu-ep"
@@ -111,14 +112,14 @@ class InferenceServiceTests(unittest.TestCase):
         self.assertEqual(self.service.provider_status(), [])
         self.assertEqual(self.service.startup_status("bad-provider")["status"], "failed")
 
-    def test_provider_status_names_each_model_and_its_ep_key(self) -> None:
+    def test_provider_status_is_the_run_record_of_each_model_with_nothing_made_up(self) -> None:
         client = self.client(name="observed-provider")
         client.submit(self.request()).result(timeout=2)
         client.submit(self.request(frame=1)).result(timeout=2)
         observed = self.service.provider_status()[0]
         self.assertEqual(observed["pipeline_id"], "observed-provider")
-        self.assertEqual([(model["model_name"], model["requested_provider"], model["applied_providers"]) for model in observed["models"]],
-                         [("yolox-person@openmmlab-exporter", None, ("gpu-ep",)), ("rtmw-wholebody133@openmmlab-exporter", None, ("gpu-ep",))])
+        self.assertIsNone(observed["requested_provider"])
+        self.assertEqual(observed["models"], [{"node": node, **model} for node, model in self.runs[0].models.items()])
 
     def test_each_client_has_its_own_run_and_a_retired_run_is_closed(self) -> None:
         first = self.client(name="first")

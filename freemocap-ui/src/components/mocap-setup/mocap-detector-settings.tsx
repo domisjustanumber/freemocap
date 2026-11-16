@@ -40,7 +40,7 @@ export default function MocapDetectorSettings() {
 
     return <>
         <DetectorSettingRows value={value} onChange={applyChange} detectors={DETECTOR_OPTIONS}
-            providerOptions={executionProviderOptions} context="posthoc" rows="all"/>
+            providers={executionProviderOptions} context="posthoc" rows="all"/>
 
         <SettingsGroupHeading text="Board" info={BOARD_GROUP_INFO}/>
         <SettingRow label="Detect and reconstruct Charuco board" info={CHARUCO_INFO}

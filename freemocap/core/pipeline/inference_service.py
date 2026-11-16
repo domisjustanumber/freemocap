@@ -153,14 +153,11 @@ class InferenceService:
     @staticmethod
     def _start_run(client: InferenceClient):
         registration = client.registration
-        run, provider = start_detector_run(
+        run, _ = start_detector_run(
             detector_type=registration.detector_type, camera_ids=registration.camera_ids,
             running_mode=RUNNING_MODES[registration.mode.value],
             rtmpose_model_name=registration.rtmpose_model_name, execution_provider=registration.execution_provider)
-        from freemocap.core.tracking.execution_providers import ModelProviderStatus
-        statuses = tuple(ModelProviderStatus(model["key"], registration.execution_provider, (provider,))
-                         for model in run.models.values()) if provider is not None else ()
-        return run, statuses
+        return run, tuple({"node": node, **model} for node, model in run.models.items())
 
     def submit(self, *, client: InferenceClient, request: InferenceRequest) -> Future[dict[str, Observation]]:
         with self._condition:
@@ -301,11 +298,11 @@ class InferenceService:
 
     def provider_status(self) -> list[dict]:
         """Read immutable startup diagnostics without touching native sessions."""
-        from dataclasses import asdict
         with self._condition:
             return [{"pipeline_id": client.registration.pipeline_id,
                      "mode": client.registration.mode.value,
-                     "models": [asdict(status) for status in client.provider_status]}
+                     "requested_provider": client.registration.execution_provider,
+                     "models": [dict(model) for model in client.provider_status]}
                     for client in self._clients if not client._closed]
 
     def close(self) -> None:

@@ -227,19 +227,19 @@ export const RealtimePipelineConfigTree: React.FC<PipelineConfigTreeProps> = ({
                         )}
                         {activeDetectorType === "rtmpose" && context === "realtime" && (
                             <p className="text-sm text-gray">
-                                133 keypoints (body, hands, face) via YOLOX + RTMPose. Uses GPU batched inference when available.
+                                133 keypoints (body, hands, face) via YOLOX + RTMPose.
                             </p>
                         )}
-                        {activeDetectorType === "rtmpose" && (
+                        {executionProviderOptions.takesExecutionProvider(activeDetectorType) && (
                             <div className="flex flex-row gap-1 items-center justify-content-space-between flex-wrap pos-rel z-10">
                                 <span className="text-sm">Execution provider</span>
                                 <NameDropdownSelector
                                     key={activeExecutionProvider ?? "auto"}
                                     DropdownclassName="z-111"
-                                    options={executionProviderOptions.map(({label}) => label)}
-                                    initialValue={executionProviderOptions.find(({value}) => value === activeExecutionProvider)?.label ?? "Auto"}
+                                    options={executionProviderOptions.options.map(({label}) => label)}
+                                    initialValue={executionProviderOptions.options.find(({value}) => value === activeExecutionProvider)?.label ?? "Auto"}
                                     onChange={(label) => handleSetExecutionProvider(
-                                        executionProviderOptions.find((option) => option.label === label)?.value ?? null
+                                        executionProviderOptions.options.find((option) => option.label === label)?.value ?? null
                                     )}
                                 />
                             </div>

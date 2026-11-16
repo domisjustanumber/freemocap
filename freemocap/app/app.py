@@ -35,14 +35,16 @@ from freemocap.system.telemetry.telemetry import initialize_telemetry, shutdown_
 logger = logging.getLogger(__name__)
 
 
-HOST_FIELDS = ("os_platform", "arch", "cpu_name", "cpu_physical_cores", "cpu_logical_cores", "memory_total_bytes")
+HOST_FIELDS = ("os_platform", "arch", "cpu_name", "cpu_physical_cores", "cpu_logical_cores", "cpu_max_frequency_hz",
+               "memory_total_bytes")
 GPU_FIELDS = ("name", "vendor", "vram_total_bytes", "driver_version")
 
 
 def _field_lines(record, fields: tuple[str, ...], indent: str) -> list[str]:
     """The fields the record has, as skellytracker gives them."""
     values = {name: getattr(record, name, None) for name in fields}
-    return [f"{indent}{name}: {f'{value / 2**30:.1f} GiB' if name.endswith('_bytes') else value}"
+    units = {"_bytes": lambda value: f"{value / 2**30:.1f} GiB", "_hz": lambda value: f"{value / 1e9:.2f} GHz"}
+    return [f"{indent}{name}: {next((form(value) for end, form in units.items() if name.endswith(end)), value)}"
             for name, value in values.items() if value is not None]
 
 

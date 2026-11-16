@@ -3380,19 +3380,27 @@
     "schemas": {
       "AvailableExecutionProvidersResponse": {
         "properties": {
-          "available": {
+          "providers": {
             "items": {
               "$ref": "#/components/schemas/ExecutionProviderOption"
             },
-            "type": "array",
-            "title": "Available"
+            "title": "Providers",
+            "type": "array"
+          },
+          "detector_takes_execution_provider": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Detector Takes Execution Provider",
+            "type": "object"
           }
         },
-        "type": "object",
         "required": [
-          "available"
+          "providers",
+          "detector_takes_execution_provider"
         ],
-        "title": "AvailableExecutionProvidersResponse"
+        "title": "AvailableExecutionProvidersResponse",
+        "type": "object"
       },
       "BackgroundTaskSnapshot": {
         "properties": {
@@ -5278,23 +5286,95 @@
         ],
         "title": "DetectedMicrophonesResponse"
       },
+      "ExecutionProviderDevice": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "vram_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vram Total Bytes"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "vram_total_bytes"
+        ],
+        "title": "ExecutionProviderDevice",
+        "type": "object"
+      },
       "ExecutionProviderOption": {
         "properties": {
           "key": {
-            "type": "string",
-            "title": "Key"
+            "title": "Key",
+            "type": "string"
           },
           "label": {
-            "type": "string",
-            "title": "Label"
+            "title": "Label",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "usable": {
+            "title": "Usable",
+            "type": "boolean"
+          },
+          "install_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Install Hint"
+          },
+          "uses_gpu": {
+            "title": "Uses Gpu",
+            "type": "boolean"
+          },
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionProviderDevice"
+            },
+            "title": "Devices",
+            "type": "array"
           }
         },
-        "type": "object",
         "required": [
           "key",
-          "label"
+          "label",
+          "description",
+          "usable",
+          "install_hint",
+          "uses_gpu",
+          "devices"
         ],
-        "title": "ExecutionProviderOption"
+        "title": "ExecutionProviderOption",
+        "type": "object"
       },
       "ExportInventory": {
         "properties": {

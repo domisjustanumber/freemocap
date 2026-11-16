@@ -70,7 +70,7 @@ def start_detector_run(*, detector_type: str, camera_ids: Sequence[str], running
                        rtmpose_model_name: str | None = None, execution_provider: str | None = None):
     """Start the run of a detector choice; return it with its EP key. Give an EP only when the pipeline needs one.
 
-    Auto passes the recommendation's EP options and device too (CUDA fp16 needs its options).
+    Auto passes the recommendation's EP options and device too (a precision such as fp16 can need its options).
     """
     from skellytracker.core.pipelines import check_pipeline, start_pipeline
     config = load_detector_pipeline(detector_type, rtmpose_model_name)

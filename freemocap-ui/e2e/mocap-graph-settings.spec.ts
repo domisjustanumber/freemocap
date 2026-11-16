@@ -7,6 +7,7 @@ test.use({channel: process.env.PLAYWRIGHT_CHANNEL});
 test('list view settings use settings styling and board dialog escapes the scrolling modal', async ({page}) => {
     page.on('pageerror', error => {throw error;});
     await page.setViewportSize({width:1280,height:720});
+    await page.route('**/freemocap/onnx/execution_providers', route => route.fulfill({json:{providers:[{key:'cpu',label:'CPU',description:'Runs on the processor.',usable:true,install_hint:null,uses_gpu:false,devices:[]}],detector_takes_execution_provider:{rtmpose:true,mediapipe:false}}}));
     await page.route('http://localhost:53117/', route => route.fulfill({contentType:'text/html',body:'<main id="root"></main>'}));
     await page.goto('http://localhost:53117/');
     const bundle = await build({
@@ -18,9 +19,11 @@ test('list view settings use settings styling and board dialog escapes the scrol
             import {MemoryRouter} from 'react-router-dom';
             import {store} from './src/store/store';
             import {calibrationLoadedFromBundle} from './src/store/slices/calibration';
+            import {wsConnectionChanged} from './src/store/slices/connection/connection-slice';
             import Section from './src/components/common/settings-layout/settings-section';
             import Summary from './src/components/mocap-setup/camera-geometry-summary';
             import Modal from './src/components/mocap-setup/mocap-setup-modal';
+            store.dispatch(wsConnectionChanged(true));  // the EP row needs the server's list
             store.dispatch(calibrationLoadedFromBundle({path:'C:/recordings/freemocap_test_data/freemocap_test_data_camera_calibration.toml', cameras:[{},{},{}],metadata:{aligned:false}}));
             createRoot(document.getElementById('root')!).render(<Provider store={store}><MemoryRouter>
                 <Modal mode="playback"/>

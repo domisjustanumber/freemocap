@@ -134,7 +134,7 @@ def run_comparison(*, recording: Path, case: str, output: Path) -> dict:
         def check_providers(service):
             evidence = service.provider_status()
             report["provider_evidence"].append(evidence)
-            if any(model["applied_providers"] != (provider,) for client in evidence for model in client["models"]):
+            if any(model["execution_provider"] != provider for client in evidence for model in client["models"]):
                 raise RuntimeError(f"Requested {provider} but obtained {evidence}")
 
         def consume(camera, frame, observation, mode, timestamp_s):

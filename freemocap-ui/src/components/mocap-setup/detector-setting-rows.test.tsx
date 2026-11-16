@@ -7,10 +7,12 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import '@/store';
 import type {DetectorType, TriangulationConfig} from '@/store/slices/mocap';
 import {executionProviderOptions} from '@/services/server/execution-providers';
+import type {ExecutionProviderChoices} from '@/hooks/useExecutionProviderOptions';
 import {DETECTOR_OPTIONS} from './detector-options';
 import {
-    CONFIDENCE_INFO, DETECTOR_INFO, DetectorSettingRows, type DetectorSettingsValue, EXECUTION_PROVIDER_INFO, MODEL_INFO,
+    CONFIDENCE_INFO, DETECTOR_INFO, DetectorSettingRows, type DetectorSettingsValue, MODEL_INFO, REALTIME_DETECTOR_NOTES,
 } from './detector-setting-rows';
+import {executionProviderInfo} from './execution-provider-info';
 import {OutlierRejectionRows} from './outlier-rejection-rows';
 import SkeletonAnchorSetting from './skeleton-anchor-setting';
 
@@ -28,10 +30,18 @@ const CONFIG: TriangulationConfig = {
     use_outlier_rejection: true, minimum_cameras_for_triangulation: 2, maximum_cameras_to_drop: 1, target_reprojection_error: 0.02,
 };
 const OUTLIER_LIMITS = ['Minimum cameras for triangulation', 'Maximum cameras to drop', 'Target reprojection error'];
+const CPU = {key: 'cpu', label: 'CPU', description: 'Runs on the processor.', usable: true, install_hint: null, uses_gpu: false, devices: []};
+const GPU = {key: 'gpu-ep', label: 'GPU EP', description: 'Runs on a GPU.', usable: false,
+    install_hint: 'Run `install gpu-ep`.', uses_gpu: true, devices: []};
+/** The server's answer as the hook gives it: here only RTMW takes an EP. */
+const PROVIDERS: ExecutionProviderChoices = {
+    options: executionProviderOptions(null, [CPU, GPU]), info: executionProviderInfo([CPU, GPU]),
+    takesExecutionProvider: detector => detector === 'rtmpose',
+};
 
 /** The detector rows' props as the realtime controls pass them, for one detector. */
 const detectorProps = (detector: DetectorType, rows: 'all' | 'key', more: Partial<DetectorRowsProps> = {}): DetectorRowsProps => ({
-    value: {...VALUE, detector}, onChange: () => {}, detectors: DETECTOR_OPTIONS, providerOptions: executionProviderOptions(null, [{key: 'cpu', label: 'CPU'}]),
+    value: {...VALUE, detector}, onChange: () => {}, detectors: DETECTOR_OPTIONS, providers: PROVIDERS,
     context: 'realtime', rows, ...more,
 });
 const detectorRows = (detector: DetectorType, rows: 'all' | 'key', more?: Partial<DetectorRowsProps>): string =>
@@ -82,14 +92,11 @@ const textOf = (info: Info): string => renderToStaticMarkup(<>{info.text}</>);
 
 /** The posthoc explanation of each detector row. */
 const POSTHOC_INFO: Record<string, Info> = {
-    'Skeleton detector': DETECTOR_INFO, 'Execution provider': EXECUTION_PROVIDER_INFO, 'Model': MODEL_INFO,
+    'Skeleton detector': DETECTOR_INFO, 'Execution provider': PROVIDERS.info, 'Model': MODEL_INFO,
     'Confidence threshold': CONFIDENCE_INFO,
 };
-/** What today's realtime Skeleton Setup dialog says about the selected detector, word for word. */
-const DETECTOR_NOTES: Partial<Record<DetectorType, string>> = {
-    rtmpose: '133 keypoints (body, hands, face) via YOLOX + RTMW. Uses GPU batched inference when available.',
-    mediapipe: 'Body + hands + face via MediaPipe. CPU-only; runs per-camera without GPU batching.',
-};
+/** What the realtime Skeleton Setup dialog says about the selected detector. */
+const DETECTOR_NOTES: Partial<Record<DetectorType, string>> = REALTIME_DETECTOR_NOTES;
 
 test('key rows are the detector and its model', () => {
     // MediaPipe Holistic has no model choice in the settings.
@@ -105,6 +112,20 @@ test('all rows follow the detector', () => {
         mediapipe: ['Skeleton detector'],
     };
     for (const detector of DETECTORS) assert.deepEqual(labels(detectorRows(detector, 'all')), expected[detector], detector);
+});
+
+test('the execution provider row follows the server, not the detector name', () => {
+    const every = {...PROVIDERS, takesExecutionProvider: () => true};
+    const none = {...PROVIDERS, takesExecutionProvider: () => false};
+    assert.ok(labels(detectorRows('mediapipe', 'all', {providers: every})).includes('Execution provider'));
+    assert.ok(!labels(detectorRows('rtmpose', 'all', {providers: none})).includes('Execution provider'));
+});
+
+test('the execution provider explanation is the sentence of each EP, with the install hint of one that is not usable', () => {
+    const text = renderToStaticMarkup(<>{PROVIDERS.info.text}</>);
+    assert.match(text, /<strong>CPU<\/strong> — Runs on the processor\./);
+    assert.match(text, /<strong>GPU EP<\/strong> — Runs on a GPU\. <em>Not usable here\. Run `install gpu-ep`\.<\/em>/);
+    assert.deepEqual(optionsOf(rowLabelled(detectorRows('rtmpose', 'all'), 'Execution provider')), ['auto', 'cpu']);
 });
 
 test('outlier rows dim with their switch', () => {
@@ -190,7 +211,7 @@ test('number fields are named after their rows', () => {
 test('realtime explanations carry the Skeleton Setup notes', () => {
     /** The note that ends a realtime row's explanation for this detector, where the dialog has one about that row. */
     const noteFor = (label: string, detector: DetectorType): string | undefined =>
-        label === 'Skeleton detector' || label === 'Execution provider' ? DETECTOR_NOTES[detector] : undefined;
+        label === 'Skeleton detector' ? DETECTOR_NOTES[detector] : undefined;
     const shown = new Set<string>();
     for (const detector of DETECTORS) {
         for (const set of ['key', 'all'] as const) {

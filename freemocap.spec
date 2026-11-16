@@ -88,6 +88,8 @@ datas.append((os.path.join(sf_path, 'definitions'), 'skellyforge/definitions'))
 
 # ── skellytracker (active trackers only; exclude v1 legacy, tests, scripts) ──
 datas.extend(collect_data_files('skellytracker', includes=['**/*.yaml']))
+# freemocap owns the tracker→standard-human mapping YAML files.
+datas.extend(collect_data_files('freemocap', includes=['core/mapping/yaml/*.yaml']))
 hiddenimports.extend([
     'skellytracker',
     'skellytracker.system',

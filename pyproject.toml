@@ -74,7 +74,7 @@ freemocap = "freemocap.__main__:run_main"
 packages = { find = { include = ["freemocap", "freemocap.*"], exclude = ["freemocap.__pycache__", "freemocap.*.__pycache__"] } }
 
 [tool.setuptools.package-data]
-freemocap = ["tests/streaming_fixtures/*.bin", "tests/fixtures/*.md", "tests/connected_recording_review.html"]
+freemocap = ["tests/streaming_fixtures/*.bin", "tests/fixtures/*.md", "tests/connected_recording_review.html", "core/mapping/yaml/*.yaml"]
 
   [tool.uv]
   package = true

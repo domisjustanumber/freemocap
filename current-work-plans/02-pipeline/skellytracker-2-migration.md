@@ -99,6 +99,20 @@ frames, each with `rtmpose` and with `mediapipe`.
 - V2 (2026-11-16): keep the stop. A camera video that fails while it is read stops posthoc tracking
   with freemocap's own error (`CameraSourceEndedError`, with the camera and the frame), because a
   `video` run takes a frame from each camera on each call (ST `V-pipeline.running-2`).
+- Result API revisions R1 to R3 (2026-11-16), changed in skellytracker; freemocap follows in
+  `pipeline_runs.observations_from_results` only, when the skellytracker commit lands:
+  - R1: a keypoints value has `xy` `(I, P, 2)` always and `z` `(I, P)` only for a `3d` output, and
+    carries `geometry`. A missing point is "xy is NaN". The `xyz` array with NaN z goes.
+  - R2: `by_track()` is deleted (freemocap does not call it).
+  - R3: the camera result gives `image_width` and `image_height`; the tuple `image_size` goes.
+- Result API revisions R4 to R6 (2026-11-16), changed in skellytracker after R1 to R3:
+  - R4: the sidecar value `keypoint.estimator_type` becomes `top_down` or `bottom_up`. No code
+    change in freemocap; the rtmw-wholebody133 sidecar hash and the built-in pipeline pins change.
+  - R5: the point names do not change. Take a point by name or by `groups`, never by a fixed column.
+    An old-to-new name table for the old-recording reader is freemocap's own data.
+  - R6: a keypoints output schema gets `canonical_edges` (the `edges` in canonical names; an edge
+    with a point that has no canonical name is left out). When it lands,
+    `pipeline_runs.detector_connections` becomes one dict read and its `shortcut:` goes.
 
 ### 0.4 Open questions
 

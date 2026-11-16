@@ -216,6 +216,30 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     The notice is `legacy-execution-provider-notice.tsx` (pure; tested); real pass with this host's
     route data: "…replaced by NVIDIA TensorRT for RTX. Not usable here. Run `skellytracker-eps install
     trt-rtx`."; the EP select keeps trt-rtx visible under its label.
+  - NEXT, after the user compacts this session (supervisor, 2026-11-16): understand both fresh-posthoc
+    failures before the gate, in this order. Sub-agents on Opus, Sonnet or Haiku (not the top model):
+    one for A, one for B/C. Report A first, alone. NOT now: offers (update-driver) for Auto, part 3,
+    other gate runs.
+    A. Baseline first: run `freemocap/tests/reference_recordings/test_fresh_posthoc.py` 3 times in the
+       baseline workspace (sfn26 `ca0c17cc`, Python 3.12, old skellytracker `2d356a6c`; old scratchpad
+       `C:/Users/Dom/AppData/Local/Temp/claude/50bfcbb691ef5f32/a6714a11-a5c0-4b24-928e-ed2882e7653d/scratchpad/baseline/`),
+       same test ids; per run: pass or the failing line. If the baseline fails the same way
+       (`calibrated_world: insufficient_evidence` or "Recording changed"), record it here with the
+       evidence and do not fix it. If it cannot run (data, environment), say exactly why.
+    B. Only if the baseline passes, `calibrated_world: insufficient_evidence`: on the SAME test_data
+       frames compare the charuco evidence old (baseline env) vs new (`create_detector(
+       "charuco@skellytracker", board=...)`): per camera the frames with a board, corners per frame,
+       max corner pixel difference; then the calibration result (reprojection error, frames used) and the
+       alignment evidence vs the threshold at `tools/datasets/validation.py:28` and the code that sets
+       `insufficient_evidence`. Find the first number that differs. No threshold change. Differing charuco
+       detections are a skellytracker question: send the numbers with path:line, no workaround.
+    C. "Recording changed after selecting the processing run": find the differing field for real, in a
+       TEST (not production code) that saves and reads back the descriptor of a real fresh run N = 10
+       times and diffs accepted vs read-back JSON field by field on a mismatch. Suspects (new in this
+       migration): a float that does not round-trip (NaN, the confidence threshold), key order or
+       tuple -> list in the `skellytracker` block (`models`, `device` str or list, `options`), a
+       timestamp or path in `export_pipeline(..., resolved=True)`, a second writer between accept and
+       save. If no repro in 10 runs, report what was ruled out; no guessed fix.
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).

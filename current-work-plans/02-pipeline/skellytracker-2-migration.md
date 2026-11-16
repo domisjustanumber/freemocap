@@ -352,6 +352,8 @@ frames, each with `rtmpose` and with `mediapipe`.
     `trt-rtx` works). Only a file with no new-format marker is legacy, so new saves carry a marker.
   - G3: no usable suggestion, or a legacy key with no successor (`directml`): the setting becomes Auto,
     with a notice.
+- S2 (2026-11-16, user): a "process again with the saved pipeline" button or route is NOT part of this
+  work; save the data only. LATER WORK: re-run a recording from its saved `skellytracker` block.
 - R1/R2 facts and plan (reported 2026-11-16, not implemented):
   - Recording: no separate settings file. The run's settings are the tracker source `definition`
     (`PosthocMocapPipelineConfig.model_dump(mode="json")` + `execution.requested_provider`,

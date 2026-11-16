@@ -36,7 +36,7 @@ def test_realtime_charuco_observations_preserve_recording_frames(
             triangulation_enabled=False, skeleton_fitting_enabled=False,
             center_of_mass_enabled=False,
         ),
-        use_centralized_inference=False, log_pipeline_times=False,
+        log_pipeline_times=False,
     )
     flag = multiprocessing.Value("b", False)
     registry = WorkerRegistry(global_kill_flag=flag, worker_mode=WorkerMode.THREAD)

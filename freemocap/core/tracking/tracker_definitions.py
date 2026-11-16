@@ -1,6 +1,7 @@
-"""Application names for Tracker-owned keypoint schemas."""
+"""Application names for the point schemas of the detector choices."""
 from pydantic import BaseModel
-from skellytracker.core.io.tracker_profiles import tracker_profile
+
+from freemocap.core.tracking.pipeline_runs import detector_connections, detector_point_names
 
 class TrackerDefinition(BaseModel):
     name: str
@@ -8,10 +9,10 @@ class TrackerDefinition(BaseModel):
     connections: tuple[tuple[str, str], ...]
 
 def tracker_definition(detector_type: str) -> TrackerDefinition:
-    profile = tracker_profile(detector_type)
     # Preserve existing recording source identifiers.
-    saved_name = {"rtmpose": "rtmpose_wholebody", "mediapipe": "mediapipe_wholebody"}.get(detector_type, profile.name)
-    return TrackerDefinition(name=saved_name, tracked_points=profile.keypoint_names, connections=profile.connections)
+    saved_name = {"rtmpose": "rtmpose_wholebody", "mediapipe": "mediapipe_wholebody"}[detector_type]
+    return TrackerDefinition(name=saved_name, tracked_points=detector_point_names(detector_type),
+                             connections=detector_connections(detector_type))
 
 RTMPOSE_WHOLEBODY_DEFINITION = tracker_definition("rtmpose")
 MEDIAPIPE_WHOLEBODY_DEFINITION = tracker_definition("mediapipe")

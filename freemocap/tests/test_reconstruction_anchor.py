@@ -24,17 +24,17 @@ def test_skull_stays_anchored_when_hip_evidence_moves_and_survives_missing_body(
     for displacement in (0., 35., -30.):
         frame = {name: point.copy() for name, point in points.items()}
         for side in ('left', 'right'):
-            frame[f'{side}_hip'] += [displacement, 0., displacement]
+            frame[f'body/{side}_hip'] += [displacement, 0., displacement]
         for anchored, results in ((bundle, skull_origins), (replace(bundle, anchor_segment_name='pelvis'), pelvis_origins)):
             result = reconstruct_skeleton(bundle=anchored, state=state_for(bundle, fit), filtered_keypoints=frame, compute_center_of_mass=False)
             results.append(result.segment_origins['skull'])
     assert_allclose(skull_origins, np.repeat([skull_origins[0]], 3, axis=0), atol=1e-9)
     assert np.linalg.norm(pelvis_origins[1] - pelvis_origins[0]) > 1.
-    head_only = {name: point for name, point in points.items() if name in ('nose', 'left_ear', 'right_ear', 'left_eye', 'right_eye')}
+    head_only = {name: point for name, point in points.items() if name in ('body/nose', 'body/left_ear', 'body/right_ear', 'body/left_eye', 'body/right_eye')}
     result = reconstruct_skeleton(bundle=bundle, state=state_for(bundle, fit), filtered_keypoints=head_only, compute_center_of_mass=False)
     assert 'skull' in result.segment_origins and 'pelvis' not in result.segment_origins
     assert not result.segment_rotations_local  # No anatomical parent pose to reference.
-    absent = reconstruct_skeleton(bundle=bundle, state=state_for(bundle, fit), filtered_keypoints={'left_wrist': points['left_wrist']}, compute_center_of_mass=False)
+    absent = reconstruct_skeleton(bundle=bundle, state=state_for(bundle, fit), filtered_keypoints={'body/left_wrist': points['body/left_wrist']}, compute_center_of_mass=False)
     assert absent.mapped_keypoints and not absent.segment_origins
 
 

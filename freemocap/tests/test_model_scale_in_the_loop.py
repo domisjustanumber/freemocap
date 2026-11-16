@@ -40,12 +40,12 @@ _PLAUSIBLE_HEIGHT_RANGE_MM = (1400.0, 2100.0)
 
 
 def _standing_keypoints() -> dict[str, np.ndarray]:
-    """A standing rtmpose-named pose in the Blender convention, in millimetres."""
+    """A standing pose with the RTMW body point names (body/<name>), in the Blender convention, in millimetres."""
 
     def p(x: float, y: float, z: float) -> np.ndarray:
         return np.array([float(x), float(y), float(z)])
 
-    return {
+    return {f"body/{name}": point for name, point in {
         "nose": p(0.0, 0.0, 1720.0),
         "left_eye": p(-30.0, 0.0, 1730.0),
         "right_eye": p(30.0, 0.0, 1730.0),
@@ -69,7 +69,7 @@ def _standing_keypoints() -> dict[str, np.ndarray]:
         "right_small_toe": p(160.0, 140.0, 20.0),
         "left_heel": p(-140.0, -40.0, 40.0),
         "right_heel": p(140.0, -40.0, 40.0),
-    }
+    }.items()}
 
 
 def _seated_keypoints() -> dict[str, np.ndarray]:

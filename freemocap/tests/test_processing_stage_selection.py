@@ -5,11 +5,9 @@ from pydantic import ValidationError
 from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
 
 
-def test_unsupported_pipeline_is_rejected():
-    with pytest.raises(ValidationError, match='pipelineImplementation'):
-        PosthocMocapPipelineConfig.model_validate({
-            'pipelineImplementation': 'unsupported', 'stopStage': 'filtering',
-        })
+def test_unsupported_finish_point_is_rejected():
+    with pytest.raises(ValidationError, match='stopStage'):
+        PosthocMocapPipelineConfig.model_validate({'stopStage': 'exports'})
 
 
 @pytest.mark.parametrize('stop', ['observations', 'triangulation', 'filtering', 'scale_fit', 'reconstruction'])

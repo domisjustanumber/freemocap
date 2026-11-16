@@ -408,8 +408,7 @@ async def process_mocap_recording(request: ProcessMocapRecordingRequest, http_re
                     raise HTTPException(status_code=400, detail=f'Saved {prerequisite} is missing; rerun that stage first')
         logger.info(
             f"Processing mocap recording with detector_type='{request.mocap_config.detector_type}', "
-            f"tracker_config stages: {[s.name for s in request.mocap_config.tracker_config.stages]}, "
-            f"keypoint_detectors: {[[d.detector_type for d in s.keypoint_detectors] for s in request.mocap_config.tracker_config.stages]}"
+            f"rtmpose_model_name='{request.mocap_config.rtmpose_model_name}'"
         )
         pipeline = await app.create_posthoc_mocap_pipeline(
             recording_info=recording_info,

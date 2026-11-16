@@ -43,7 +43,7 @@ class InferenceServiceTests(unittest.TestCase):
         return {camera: {"frame_index": frame.frame_index, "image_size": frame.image.shape[1::-1]} for camera, frame in frames.items()}
 
     @staticmethod
-    def observations(results, output_schema, detector_type):
+    def observations(results, output_schema, detector_type, rtmw_min_score=0.4):
         return {camera: Observation(frame_number=result["frame_index"], image_size=result["image_size"][::-1], stages={})
                 for camera, result in results.items()}
 
@@ -92,6 +92,16 @@ class InferenceServiceTests(unittest.TestCase):
         self.assertEqual(self.started, [dict(detector_type="rtmpose", camera_ids=("0", "1", "2"), running_mode="video",
                                              rtmpose_model_name="rtmw-x-l_384x288", execution_provider="cuda")])
         self.assertEqual(self.runs[0].process_batch.call_count, 2)
+
+    def test_the_registered_confidence_threshold_reaches_the_boundary(self) -> None:
+        seen = []
+        with patch("freemocap.core.pipeline.inference_service.observations_from_results",
+                   side_effect=lambda results, schema, detector, threshold: seen.append(threshold) or self.observations(results, schema, detector)):
+            client = self.service.register(InferenceRegistration(
+                pipeline_id="threshold", mode=InferenceMode.POSTHOC, detector_type="rtmpose", camera_ids=("same-camera",),
+                rtmpose_confidence_threshold=0.65, shutdown_flag=multiprocessing.Value("b", False)))
+            client.submit(self.request()).result(timeout=2)
+        self.assertEqual(seen, [0.65])
 
     def test_a_failed_start_runs_no_frame_and_reports_no_provider(self) -> None:
         with patch("freemocap.core.pipeline.inference_service.start_detector_run", side_effect=RuntimeError("EP did not load")):

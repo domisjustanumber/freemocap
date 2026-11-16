@@ -52,7 +52,7 @@ async def test_saved_legacy_tensorrt_settings_reach_safe_provider_factory():
     app = application()
     existing = pipeline()
     app.realtime_pipeline_manager.pipelines = {existing.id: existing}
-    config = RealtimePipelineConfig(use_centralized_inference=False)
+    config = RealtimePipelineConfig()
     config.skeleton_inference_node_config.execution_provider = 'trt'
     result = await app.create_or_update_realtime_pipeline(camera_configs={}, pipeline_config=config)
     assert result is existing

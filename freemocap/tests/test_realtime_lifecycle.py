@@ -10,7 +10,7 @@ def test_filter_adjustments_survive_calibration_recording_mode():
     from freemocap.core.tasks.mocap.realtime_filtering.realtime_filter_config import RealtimeFilterConfig
     pipeline = object.__new__(module.RealtimePipeline)
     pipeline.id = 'filter-restore'
-    pipeline.config = module.RealtimePipelineConfig(use_centralized_inference=False)
+    pipeline.config = module.RealtimePipelineConfig()
     pipeline._pre_calibration_config = pipeline.config.model_copy(deep=True)
     pipeline._pre_calibration_config.camera_node_config.skeleton_tracking_enabled = True
     pipeline.config.camera_node_config.skeleton_tracking_enabled = False
@@ -18,11 +18,16 @@ def test_filter_adjustments_survive_calibration_recording_mode():
     pipeline.config.aggregator_config.realtime_filter_config = requested
     pipeline.skeleton_inference_node = None
     pipeline.pubsub = Mock()
-    pipeline.exit_calibration_charuco_only_mode()
+    pipeline._calibration_update_pending = False
+    pipeline.inference_service, pipeline.camera_group, pipeline.worker_registry, pipeline.ipc = Mock(), Mock(), Mock(), Mock()
+    pipeline.camera_nodes = {'camera': Mock()}
+    with patch.object(module.RealtimeSkeletonInferenceNode, 'create') as create:
+        pipeline.exit_calibration_charuco_only_mode()
+    create.return_value.start.assert_called_once()
     assert pipeline.config.camera_node_config.skeleton_tracking_enabled
     assert pipeline.config.aggregator_config.realtime_filter_config == requested
     assert pipeline._pre_calibration_config is None
-    pipeline.pubsub.publish.assert_called_once()
+    pipeline.pubsub.publish.assert_called_once()  # the realtime config update
 
 
 def test_invalid_recording_timing_closes_replay_videos(tmp_path):

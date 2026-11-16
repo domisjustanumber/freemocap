@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
-from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoBoardDefinition
+from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC
 from freemocap.core.pipeline.posthoc.calibration_pipeline import CalibrationPipeline

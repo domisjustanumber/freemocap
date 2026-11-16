@@ -22,7 +22,7 @@ class TrackerAdapterTests(unittest.TestCase):
         run = Mock(models={})
         run.process_batch.side_effect = infer
         for target, replacement in (("start_detector_run", lambda **kwargs: (run, None)),
-                                    ("observations_from_results", lambda results, schema, detector: results)):
+                                    ("observations_from_results", lambda results, schema, detector, threshold: results)):
             patcher = patch(f"freemocap.core.pipeline.inference_service.{target}", side_effect=replacement)
             patcher.start()
             self.addCleanup(patcher.stop)

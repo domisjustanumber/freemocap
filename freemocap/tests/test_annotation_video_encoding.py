@@ -8,7 +8,7 @@ import av
 import numpy as np
 from skellycam.core.recorders.videos.pyav_video_writer import PyavVideoWriter
 from skellycam.core.recorders.videos.video_derivation import VideoDerivation
-from skellytracker.core.annotation.keypoint_annotator import KeypointAnnotator
+from freemocap.core.pipeline.posthoc.annotation_style import ObservationAnnotator
 from skellytracker.core.data_primitives.observation import Observation
 from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
@@ -35,7 +35,7 @@ class AnnotationVideoEncodingTests(unittest.TestCase):
                 ipc = Mock(spec=PipelineIPC)
                 ipc.should_continue = True
                 queues = [multiprocessing.Queue(), multiprocessing.Queue()]
-                renderer = Mock(spec=KeypointAnnotator)
+                renderer = Mock(spec=ObservationAnnotator)
                 renderer.annotate.side_effect = lambda image, observation: image
                 try:
                     with patch("freemocap.core.pipeline.posthoc.video_node.create_charuco_detector"), patch("freemocap.core.pipeline.posthoc.video_node._build_recording_frame_cache", return_value=None), patch("freemocap.core.pipeline.posthoc.video_node.build_observation_annotator", return_value=renderer), patch("freemocap.core.pipeline.posthoc.video_node._get_observation", return_value=Observation(frame_number=0, image_size=(64, 64))):

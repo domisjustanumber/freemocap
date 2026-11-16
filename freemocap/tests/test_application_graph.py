@@ -19,14 +19,9 @@ class ApplicationGraphTests(TestCase):
     def setUp(self):
         self.temp=TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name); self.calibration=self.root/'selected.toml'; self.calibration.write_text('test calibration')
-        self.config=PosthocMocapPipelineConfig(pipeline_implementation='typed_dataflow',
+        self.config=PosthocMocapPipelineConfig(
             charuco_tracking_enabled=False, graph_execution_provider='cpu',
             calibration_toml_path=str(self.calibration), export_to_blender=False)
-
-    def test_graph_is_the_only_implementation(self):
-        self.assertEqual(PosthocMocapPipelineConfig().pipeline_implementation,'typed_dataflow')
-        with self.assertRaises(ValueError):
-            PosthocMocapPipelineConfig(pipeline_implementation='unsupported')
 
     def test_saved_3d_starts_do_not_require_external_calibration(self):
         for start in ('filtering', 'scale_fit', 'reconstruction'):

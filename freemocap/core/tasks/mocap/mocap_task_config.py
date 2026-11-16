@@ -5,7 +5,6 @@ from freemocap.core.reconstruction.alignment_config import MocapAlignmentConfig
 from freemocap.core.reconstruction.posthoc_filtering import PosthocFilterConfig
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from skellytracker.core import TrackerConfig
 from skellytracker.core.detectors.keypoint_detectors.mediapipe.mediapipe_model_manager import (
     MediapipePoseModelComplexity,
 )
@@ -39,9 +38,6 @@ class PosthocMocapPipelineConfig(BaseModel):
         migrated['export_options'] = options
         return migrated
 
-    pipeline_implementation: Literal["typed_dataflow"] = Field(
-        default="typed_dataflow", alias="pipelineImplementation",
-        description="Typed data flow graph V1.")
     graph_execution_provider: Literal["auto", "cpu", "cuda"] = Field(
         default="auto", alias="graphExecutionProvider")
     graph_annotate: bool = Field(default=True, alias="graphAnnotate")
@@ -139,13 +135,6 @@ class PosthocMocapPipelineConfig(BaseModel):
         le=4,
         description="Number of faces to detect. Only used when detector_type='mediapipe'.",
     )
-    video_fps: float = Field(
-        default=30.0,
-        alias="videoFps",
-        gt=0.0,
-        description="Frames per second of the recorded video. Used to compute redetect_interval (redetect every 5 s). Set this from cv2.CAP_PROP_FPS before constructing the config for accurate cadence.",
-    )
-    tracker_config: TrackerConfig | None = Field(default=None)
     calibration_toml_path: str | None = Field(
         default=None,
         alias="calibrationTomlPath",
@@ -190,12 +179,3 @@ class PosthocMocapPipelineConfig(BaseModel):
             raise ValueError('stopStage must not precede startStage')
         return self
 
-    @model_validator(mode="after")
-    def _build_tracker_config_from_detector_type(self) -> "PosthocMocapPipelineConfig":
-        from freemocap.core.tracking.tracker_factory import tracker_config_for_settings
-        expected_tracker = tracker_config_for_settings(self, video_fps=self.video_fps)
-        if self.tracker_config is not None and self.tracker_config != expected_tracker:
-            raise ValueError("tracker_config must match the selected tracking preset settings")
-        if self.tracker_config is None:
-            self.tracker_config = expected_tracker
-        return self

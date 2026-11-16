@@ -2,7 +2,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from skellycam.core.ipc.process_management.managed_worker import WorkerMode
-from skellytracker.core import TrackerConfig
 from skellytracker.core.detectors.calibration import (
     CharucoBoardDefinition,
 )
@@ -38,12 +37,6 @@ class CameraNodeConfig(BaseModel):
     charuco_board: CharucoBoardDefinition = Field(
         default_factory=CharucoBoardDefinition.create_letter_size_5x3
     )
-    # max_persons: we only support single-person tracking for now. Capping
-    # detections to one crop per camera keeps the pose batch a fixed size
-    # (N cameras), which prevents the ONNX Runtime GPU arena from growing on
-    # frames with spurious detections (the cause of intermittent OOMs).
-    skeleton_tracker_config: TrackerConfig | None = None
-
     # Confidence gating threshold — keypoints below this visibility score
     # have their xy NaN-ed before publication so triangulation skips them.
     # RTMPose visibility is the raw SIMCC peak clipped to [0, 1]; 0.4 clears the
@@ -60,18 +53,16 @@ class CameraNodeConfig(BaseModel):
         return (self.detector_type, self.rtmpose_model_name, self.rtmpose_confidence_threshold,
                 self.mediapipe_model_complexity, self.mediapipe_detection_confidence,
                 self.mediapipe_presence_confidence, self.mediapipe_tracking_confidence,
-                self.mediapipe_num_hands, self.mediapipe_num_faces, self.skeleton_tracker_config)
+                self.mediapipe_num_hands, self.mediapipe_num_faces)
 
     @property
     def tracking2d_enabled(self) -> bool:
         return self.charuco_tracking_enabled or self.skeleton_tracking_enabled
 
-    @model_validator(mode="after")
-    def _sync_skeleton_tracker_config(self) -> "CameraNodeConfig":
-        from freemocap.core.tracking.tracker_factory import tracker_config_for_settings
-        expected_tracker = tracker_config_for_settings(self)
-        if self.skeleton_tracker_config is not None and self.skeleton_tracker_config != expected_tracker:
-            raise ValueError("skeleton_tracker_config must match the selected tracking preset settings")
-        if self.skeleton_tracker_config is None:
-            self.skeleton_tracker_config = expected_tracker
-        return self
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_retired_tracker_recipes(cls, value):
+        """Saved settings and older clients may still send the server-generated skellytracker 1 recipes."""
+        if isinstance(value, dict):
+            return {key: item for key, item in value.items() if key not in ("skeleton_tracker_config", "charuco_tracker_config")}
+        return value

@@ -21,7 +21,7 @@ class TrackerMatrixTests(unittest.TestCase):
                 directory = root / backend
                 (directory / "baseline_observations").mkdir(parents=True)
                 report = dict(case=f"rtmpose_{backend}", status="passed", recording="same-recording",
-                              frame_counts={"camera": 1}, tracker_config={}, temporal_input="same-timeline")
+                              frame_counts={"camera": 1}, tracker={}, temporal_input="same-timeline")
                 (directory / "report.json").write_text(json.dumps(report))
                 document = {"observation": {"stages": {"body": {
                     "detector_ran": True, "keypoints": {"names": ["a", "b"], "xyz": coordinates, "visibility": visibility},

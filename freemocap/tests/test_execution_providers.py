@@ -1,4 +1,5 @@
-"""Requested provider propagation, observed providers and failure ownership."""
+"""Requested EP propagation with the skellytracker 2.0 EP keys, and the provider routes."""
+import queue
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -7,54 +8,22 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from freemocap.core.tracking.execution_providers import (
-    PROVIDER_NAMES, advertised_providers, inspect_onnx_session, inspect_tracker_providers,
-)
+from freemocap.core.tracking.execution_providers import EXECUTION_PROVIDERS
 from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
 from freemocap.core.pipeline.realtime import realtime_pipeline as live
-from skellytracker.core.sessions.session_errors import SessionCreationError
-
-pytestmark = pytest.mark.usefixtures('simulated_providers_load')
 
 
-@pytest.mark.parametrize('provider,native', PROVIDER_NAMES.items())
-def test_explicit_provider_and_actual_session_report(provider, native, caplog):
-    config = SimpleNamespace(execution_provider=provider, models=[SimpleNamespace(name='pose')])
-    session = Mock()
-    session.get_session.return_value.get_providers.return_value = [native, 'CPUExecutionProvider']
-    with caplog.at_level('INFO'):
-        report = inspect_onnx_session(session, config)
-    assert report[0].requested_provider == provider
-    assert report[0].applied_providers == (native, 'CPUExecutionProvider')
-    assert 'applied_providers=' in caplog.text
+@pytest.mark.parametrize('provider', [None, *EXECUTION_PROVIDERS])
+def test_posthoc_api_accepts_each_v2_provider(provider):
+    config = PosthocMocapPipelineConfig(executionProvider=provider)
+    assert config.execution_provider == provider
+    assert config.model_dump(by_alias=True)['executionProvider'] == provider
 
 
-def test_automatic_fallback_is_reported_but_explicit_fallback_is_rejected():
-    session = Mock()
-    session.get_session.return_value.get_providers.return_value = ['CPUExecutionProvider']
-    config = SimpleNamespace(execution_provider=None, models=[SimpleNamespace(name='pose')])
-    assert inspect_onnx_session(session, config)[0].requested_provider is None
-    config.execution_provider = 'cuda'
-    with pytest.raises(SessionCreationError, match='did not load'):
-        inspect_onnx_session(session, config)
-
-
-def test_borrowed_nested_session_is_inspected_without_closing_it():
-    session = Mock(kind='onnx')
-    session.get_session.return_value.get_providers.return_value = ['CPUExecutionProvider']
-    child = SimpleNamespace(children=[], object_detector=None, keypoint_detectors=[SimpleNamespace(session=session)])
-    tracker = SimpleNamespace(stages=[SimpleNamespace(children=[child], object_detector=None, keypoint_detectors=[])])
-    request = SimpleNamespace(config=SimpleNamespace(backend='onnx', execution_provider='cpu', models=[SimpleNamespace(name='pose')]))
-    assert inspect_tracker_providers(tracker, [request])[0].model_name == 'pose'
-    session.close.assert_not_called()
-
-
-@pytest.mark.parametrize('provider', [None, *PROVIDER_NAMES])
-def test_posthoc_api_accepts_all_providers_for_both_implementations(provider):
-    for implementation in ('typed_dataflow',):
-        config = PosthocMocapPipelineConfig(executionProvider=provider, pipelineImplementation=implementation)
-        assert config.execution_provider == provider
-        assert config.model_dump(by_alias=True)['executionProvider'] == provider
+@pytest.mark.parametrize('saved', ['trt', 'directml'])
+def test_a_saved_v1_provider_reads_as_auto(saved):
+    assert PosthocMocapPipelineConfig(executionProvider=saved).execution_provider is None
+    assert live.RealtimePipelineConfig(skeleton_inference_node_config={'execution_provider': saved}).skeleton_inference_node_config.execution_provider is None
 
 
 def test_conflicting_saved_graph_provider_is_rejected():
@@ -64,22 +33,19 @@ def test_conflicting_saved_graph_provider_is_rejected():
         PosthocMocapPipelineConfig(executionProvider='not-a-provider')
 
 
-def test_provider_route_lists_advertised_build_support_without_loading_models():
+def test_provider_route_lists_the_usable_v2_keys_without_loading_models():
     from freemocap.api.http.onnx.onnx_router import onnx_router
+    from skellytracker.core import eps
     app = FastAPI()
     app.include_router(onnx_router, prefix='/freemocap')
-    with patch('onnxruntime.get_available_providers', return_value=['CPUExecutionProvider']), \
+    rows = (SimpleNamespace(key='cpu', state='builtin'), SimpleNamespace(key='cuda', state='not_installed'),
+            SimpleNamespace(key='trt-rtx', state='ready'))
+    with patch.object(eps, 'status', return_value=SimpleNamespace(eps=rows)), \
          patch('onnxruntime.InferenceSession') as construct:
         response = TestClient(app).get('/freemocap/onnx/execution_providers')
     assert response.status_code == 200
-    assert response.json() == {'available': ['cpu']}
+    assert response.json() == {'available': ['cpu', 'trt-rtx']}
     construct.assert_not_called()
-
-
-def test_coreml_is_not_advertised_on_windows():
-    with patch('onnxruntime.get_available_providers', return_value=['CoreMLExecutionProvider', 'CPUExecutionProvider']), \
-         patch('freemocap.core.tracking.execution_providers.sys.platform', 'win32'):
-        assert advertised_providers() == ['cpu']
 
 
 @pytest.mark.parametrize('change', ['provider', 'model', 'filter'])
@@ -117,82 +83,41 @@ def test_live_changes_rebuild_only_affected_inference(change):
     pipeline.inference_service.close.assert_not_called()
 
 
-@pytest.mark.parametrize('provider', ['cpu', 'cuda', 'coreml', 'directml'])
-def test_per_camera_factory_receives_selected_provider(provider):
-    from freemocap.core.pipeline.realtime.camera_node import _build_skeleton_tracker_from_config
-    from freemocap.core.pipeline.realtime.camera_node_config import CameraNodeConfig
-    from freemocap.core.tracking import tracker_factory
-    with patch.object(tracker_factory, 'build_configured_tracker') as create:
-        _build_skeleton_tracker_from_config(CameraNodeConfig(), provider)
-    assert create.call_args.kwargs['execution_provider'] == provider
-
-
-@pytest.mark.parametrize('available,expected', [
-    (['trt', 'cuda', 'cpu'], 'cuda'), (['coreml', 'cpu'], 'coreml'),
-    (['trt', 'cpu'], 'cpu'), (['directml', 'cpu'], 'directml'),
-])
-def test_per_camera_auto_never_builds_tensorrt(available, expected):
-    from freemocap.core.pipeline.realtime.camera_node import _build_skeleton_tracker_from_config
-    from freemocap.core.pipeline.realtime.camera_node_config import CameraNodeConfig
-    with patch('freemocap.core.tracking.execution_providers.advertised_providers', return_value=available), \
-         patch('freemocap.core.tracking.tracker_factory.build_configured_tracker') as create:
-        _build_skeleton_tracker_from_config(CameraNodeConfig())
-    assert create.call_args.kwargs['execution_provider'] == expected
-
-
-def test_per_camera_saved_tensorrt_uses_cuda():
-    from freemocap.core.pipeline.realtime.camera_node import _build_skeleton_tracker_from_config
-    from freemocap.core.pipeline.realtime.camera_node_config import CameraNodeConfig
-    with patch('freemocap.core.tracking.execution_providers.advertised_providers', return_value=['trt', 'cuda', 'cpu']), \
-         patch('freemocap.core.tracking.tracker_factory.build_configured_tracker') as create:
-        _build_skeleton_tracker_from_config(CameraNodeConfig(), 'trt')
-    assert create.call_args.kwargs['execution_provider'] == 'cuda'
-
-
-def test_failed_explicit_direct_session_is_closed():
-    from freemocap.core.tracking.tracker_factory import build_skeleton_onnx_session, OnnxSession
-    session = OnnxSession()
-    with patch.object(OnnxSession, 'create', return_value=session), \
-         patch.object(OnnxSession, 'close') as close, \
-         patch.object(OnnxSession, 'get_session') as native:
-        native.return_value.get_providers.return_value = ['CPUExecutionProvider']
-        with pytest.raises(SessionCreationError):
-            build_skeleton_onnx_session(batch_size=1, execution_provider='cuda')
-    close.assert_called_once()
-
-
-@pytest.mark.parametrize('provider', list(PROVIDER_NAMES))
+@pytest.mark.parametrize('provider', EXECUTION_PROVIDERS)
 def test_graph_receives_each_explicit_provider(provider):
     from freemocap.core.pipeline.dataflow.application_pipeline import resolve_tracking_provider
     assert resolve_tracking_provider(PosthocMocapPipelineConfig(executionProvider=provider)) == provider
 
 
-def test_graph_auto_policy_and_mediapipe_ignore_hidden_onnx_selection():
+def test_graph_auto_takes_the_skellytracker_recommendation_and_mediapipe_takes_no_ep():
     from freemocap.core.pipeline.dataflow.application_pipeline import resolve_tracking_provider
-    with patch('onnxruntime.get_available_providers', return_value=['CPUExecutionProvider']):
-        assert resolve_tracking_provider(PosthocMocapPipelineConfig()) == 'cpu'
-    with patch('onnxruntime.get_available_providers', return_value=['CUDAExecutionProvider', 'CPUExecutionProvider']):
-        assert resolve_tracking_provider(PosthocMocapPipelineConfig()) == 'cuda'
+    from skellytracker.core import eps
+    for chosen in ('cuda', 'coreml', 'cpu'):
+        with patch.object(eps, 'recommend', return_value=SimpleNamespace(chosen=SimpleNamespace(ep_key=chosen))):
+            assert resolve_tracking_provider(PosthocMocapPipelineConfig()) == chosen
     assert resolve_tracking_provider(PosthocMocapPipelineConfig(detectorType='mediapipe', executionProvider='cuda')) == 'cpu'
 
 
-def test_per_camera_startup_failure_closes_initialized_resources():
+def test_camera_node_startup_failure_closes_initialized_resources():
     import multiprocessing
     from multiprocessing.queues import Queue
     from freemocap.core.pipeline.realtime import camera_node as camera
     memory = Mock(spec=camera.CameraSharedMemoryRingBuffer)
+    memory.valid = True
     board = Mock()
     ipc = Mock(spec=camera.PipelineIPC)
-    config = camera.CameraNodeConfig(charuco_tracking_enabled=True, skeleton_tracking_enabled=True)
+    ipc.should_continue = True
+    frames = Mock(spec=Queue)
+    frames.get.side_effect = RuntimeError('frame read failed')
+    config = camera.CameraNodeConfig(charuco_tracking_enabled=True)
     with patch.object(camera.CameraSharedMemoryRingBuffer, 'recreate', return_value=memory), \
-         patch.object(camera, '_build_charuco_tracker_from_config', return_value=(board, None)), \
-         patch.object(camera, '_build_skeleton_tracker_from_config', side_effect=RuntimeError('provider failed')):
-        with pytest.raises(RuntimeError, match='provider failed'):
+         patch.object(camera, 'create_charuco_detector', return_value=board):
+        with pytest.raises(RuntimeError, match='frame read failed'):
             camera.CameraNode._run(camera_id='camera', config=config, ipc=ipc,
                 camera_shm_dto=Mock(spec=camera.SharedMemoryRingBufferDTO),
                 shutdown_self_flag=multiprocessing.Value('b', False),
-                process_frame_number_sub=Mock(spec=Queue), pipeline_config_sub=Mock(spec=Queue),
-                camera_output_pub=Mock(spec=Queue), timing_pub=Mock(spec=Queue), execution_provider='cuda')
+                process_frame_number_sub=frames, pipeline_config_sub=Mock(spec=Queue, **{'get_nowait.side_effect': queue.Empty}),
+                camera_output_pub=Mock(spec=Queue), timing_pub=Mock(spec=Queue))
     board.close.assert_called_once()
     memory.close.assert_called_once()
     ipc.shutdown_pipeline.assert_called_once()
@@ -204,37 +129,10 @@ def test_session_status_endpoint_reports_actual_values():
     app.include_router(onnx_router, prefix='/freemocap')
     service = Mock()
     service.provider_status.return_value = [{'pipeline_id': 'live', 'mode': 'realtime', 'models': [
-        {'model_name': 'pose', 'requested_provider': None, 'applied_providers': ('CUDAExecutionProvider', 'CPUExecutionProvider')}]}]
+        {'model_name': 'rtmw-wholebody133@openmmlab-exporter', 'requested_provider': None, 'applied_providers': ('cuda',)}]}]
     with patch('freemocap.app.freemocap_application.get_freemocap_app', return_value=SimpleNamespace(inference_service=service)):
         response = TestClient(app).get('/freemocap/onnx/session_providers')
     assert response.status_code == 200
     model = response.json()[0]['models'][0]
     assert model['requested_provider'] is None
-    assert model['applied_providers'] == ['CUDAExecutionProvider', 'CPUExecutionProvider']
-
-
-def test_graph_auto_uses_available_coreml_instead_of_forcing_cpu():
-    from freemocap.core.pipeline.dataflow.application_pipeline import resolve_tracking_provider
-    with patch('onnxruntime.get_available_providers', return_value=['CoreMLExecutionProvider', 'CPUExecutionProvider']), \
-         patch('skellytracker.core.sessions.ort_session_utils.sys.platform', 'darwin'):
-        assert resolve_tracking_provider(PosthocMocapPipelineConfig()) == 'coreml'
-
-
-def test_graph_auto_preserves_cuda_preference_over_tensorrt_compilation():
-    from freemocap.core.pipeline.dataflow.application_pipeline import resolve_tracking_provider
-    with patch('onnxruntime.get_available_providers',
-               return_value=['TensorrtExecutionProvider', 'CUDAExecutionProvider', 'CPUExecutionProvider']):
-        assert resolve_tracking_provider(PosthocMocapPipelineConfig()) == 'cuda'
-
-
-def test_auto_skips_cuda_that_is_installed_but_does_not_load():
-    """onnxruntime-gpu lists CUDA on machines with no NVIDIA GPU; Auto must fall to CPU."""
-    from freemocap.core.pipeline.dataflow.application_pipeline import resolve_tracking_provider
-    from freemocap.core.tracking.execution_providers import application_provider
-    listed = ['TensorrtExecutionProvider', 'CUDAExecutionProvider', 'CPUExecutionProvider']
-    with patch('onnxruntime.get_available_providers', return_value=listed), \
-         patch('skellytracker.core.sessions.ort_session_utils.provider_loads', side_effect=lambda p: p == 'cpu'):
-        assert resolve_tracking_provider(PosthocMocapPipelineConfig()) == 'cpu'
-        assert application_provider(None) == 'cpu'
-        assert application_provider('trt') == 'cpu'
-        assert application_provider('cuda') == 'cuda'  # Explicit choices stay strict.
+    assert model['applied_providers'] == ['cuda']

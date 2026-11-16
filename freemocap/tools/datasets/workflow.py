@@ -76,8 +76,9 @@ def preflight(name: str, *, recordings_root: Path, prepared_root: Path, operatio
               close_blender_after_open: bool = False) -> dict:
     require_implementation(implementation)
     if tracker_preset is not None:
-        from skellytracker.core.io.tracker_profiles import tracker_profile
-        tracker_profile(tracker_preset)
+        from freemocap.core.tracking.pipeline_runs import PIPELINE_KEYS
+        if tracker_preset not in PIPELINE_KEYS:
+            raise ValueError(f'Unknown tracker preset {tracker_preset!r}; choose one of {sorted(PIPELINE_KEYS)}')
         if start != 'observations':
             raise ValueError('Selecting a tracker preset requires restarting from observations')
     dataset = DATASETS[name]

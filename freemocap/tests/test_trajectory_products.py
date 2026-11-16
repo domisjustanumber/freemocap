@@ -31,7 +31,7 @@ def state_for(bundle, fit=None):
 def test_noisy_observations_are_preserved_and_geometry_uses_owning_pose(tracker):
     bundle = build_standard_human_bundle(detector_type=tracker)
     points = _standing_keypoints()
-    points['left_elbow'] += [13, 29, -17]
+    points['body/left_elbow'] += [13, 29, -17]
     before = {name: value.copy() for name, value in points.items()}
     mapped = bundle.landmark_mapping.apply(tracker_positions=points)
     state = state_for(bundle)
@@ -81,7 +81,7 @@ def test_noisy_observations_are_preserved_and_geometry_uses_owning_pose(tracker)
     # A frozen recording fit preserves within-segment distances as observations change.
     frozen = state_for(bundle, fit)
     for displacement in (0, 90, -45):
-        points['left_elbow'] = before['left_elbow'] + [0, displacement, 0]
+        points['body/left_elbow'] = before['body/left_elbow'] + [0, displacement, 0]
         frame = reconstruct_skeleton(bundle=bundle, state=frozen, filtered_keypoints=points, compute_center_of_mass=False)
         for segment in bundle.skeleton.segments.values():
             for a, b in combinations(segment.landmarks, 2):
@@ -97,7 +97,7 @@ def test_observations_survive_unsolved_pose_and_missing_scale_without_stale_poin
     def reconstruct(points):
         return reconstruct_skeleton(bundle=bundle, state=state, filtered_keypoints=points, compute_center_of_mass=False)
     complete = reconstruct(_standing_keypoints())
-    partial = reconstruct({'left_wrist': np.array([1., 2., 3.])})
+    partial = reconstruct({'body/left_wrist': np.array([1., 2., 3.])})
     assert partial is not None and partial.mapped_keypoints
     assert not partial.landmarks and not partial.segment_origins and not partial.segment_rotations_world
     assert reconstruct({}) is None

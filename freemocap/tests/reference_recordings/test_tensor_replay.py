@@ -76,7 +76,7 @@ class TensorReplayTests(unittest.TestCase):
             aggregator_config=RealtimeAggregatorNodeConfig(calibration_toml_path=str(calibration),
                 triangulation_enabled=True, skeleton_fitting_enabled=True,
                 center_of_mass_enabled=True, realtime_filter_config=RealtimeFilterConfig(spatial_smoothing=OneEuroConfig(enabled=False), velocity_gate_enabled=False, gap_duration_s=0.0, segment_retention_s=0.0)),
-            use_centralized_inference=True, log_pipeline_times=False,
+            log_pipeline_times=False,
         )
         flag = multiprocessing.Value("b", False)
         registry = WorkerRegistry(global_kill_flag=flag, worker_mode=WorkerMode.THREAD)

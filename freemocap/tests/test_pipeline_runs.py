@@ -79,6 +79,15 @@ def test_rtmw_points_are_taken_by_name_and_gated_at_0_4(rtmw_schema):
     assert stage.detector_ran
 
 
+def test_the_user_confidence_threshold_sets_the_rtmw_gate(rtmw_schema):
+    names = tuple(rtmw_schema[pipeline_runs.RTMW_NODE]["point_names"])
+    result = _rtmw_result(rtmw_schema, score=np.full(len(names), 0.5), roi=(100.0, 50.0, 40.0, 20.0, 0.0))
+    kept = pipeline_runs.observations_from_results(result, rtmw_schema, "rtmpose")["0"].stages[pipeline_runs.STAGE]
+    gated = pipeline_runs.observations_from_results(result, rtmw_schema, "rtmpose", rtmw_min_score=0.6)["0"].stages[pipeline_runs.STAGE]
+    assert np.isfinite(kept.keypoints.xyz_by_name("body/nose")).all()
+    assert np.isnan(gated.keypoints.xyz_by_name("body/nose")).all() and gated.keypoints.n_valid == 0
+
+
 def test_the_rtmw_box_is_clipped_to_whole_pixels_and_an_absent_person_has_no_box(rtmw_schema):
     count = len(rtmw_schema[pipeline_runs.RTMW_NODE]["point_names"])
     clipped = pipeline_runs.observations_from_results(

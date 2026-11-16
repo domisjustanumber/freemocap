@@ -38,7 +38,7 @@ from skellyforge.core.skeleton.skeleton_definition import SkeletonDefinition
 
 
 def _standing_pose() -> dict[str, np.ndarray]:
-    """A standing rtmpose-named pose in the Blender convention (+X right, +Y forward, +Z up).
+    """A standing pose with RTMW body point names (body/<name>) in the Blender convention (+X right, +Y forward, +Z up).
 
     NOT the model's T-pose — proportions differ from the reference geometry, so
     the solved world quaternions are finite near-identity values, not exact
@@ -50,38 +50,38 @@ def _standing_pose() -> dict[str, np.ndarray]:
         return np.array([float(x), float(y), float(z)])
 
     return {
-        "nose": p(0, 0, 1720),
-        "left_eye": p(-30, 0, 1730),
-        "right_eye": p(30, 0, 1730),
-        "left_ear": p(-60, 0, 1700),
-        "right_ear": p(60, 0, 1700),
-        "left_shoulder": p(-200, 0, 1450),
-        "right_shoulder": p(200, 0, 1450),
-        "left_elbow": p(-220, 0, 1150),
-        "right_elbow": p(220, 0, 1150),
-        "left_wrist": p(-230, 0, 900),
-        "right_wrist": p(230, 0, 900),
-        "left_hip": p(-120, 0, 950),
-        "right_hip": p(120, 0, 950),
-        "left_knee": p(-130, 0, 500),
-        "right_knee": p(130, 0, 500),
-        "left_ankle": p(-140, 0, 80),
-        "right_ankle": p(140, 0, 80),
-        "left_big_toe": p(-140, 150, 20),
-        "right_big_toe": p(140, 150, 20),
-        "left_small_toe": p(-160, 140, 20),
-        "right_small_toe": p(160, 140, 20),
-        "left_heel": p(-140, -40, 40),
-        "right_heel": p(140, -40, 40),
+        "body/nose": p(0, 0, 1720),
+        "body/left_eye": p(-30, 0, 1730),
+        "body/right_eye": p(30, 0, 1730),
+        "body/left_ear": p(-60, 0, 1700),
+        "body/right_ear": p(60, 0, 1700),
+        "body/left_shoulder": p(-200, 0, 1450),
+        "body/right_shoulder": p(200, 0, 1450),
+        "body/left_elbow": p(-220, 0, 1150),
+        "body/right_elbow": p(220, 0, 1150),
+        "body/left_wrist": p(-230, 0, 900),
+        "body/right_wrist": p(230, 0, 900),
+        "body/left_hip": p(-120, 0, 950),
+        "body/right_hip": p(120, 0, 950),
+        "body/left_knee": p(-130, 0, 500),
+        "body/right_knee": p(130, 0, 500),
+        "body/left_ankle": p(-140, 0, 80),
+        "body/right_ankle": p(140, 0, 80),
+        "body/left_big_toe": p(-140, 150, 20),
+        "body/right_big_toe": p(140, 150, 20),
+        "body/left_small_toe": p(-160, 140, 20),
+        "body/right_small_toe": p(160, 140, 20),
+        "body/left_heel": p(-140, -40, 40),
+        "body/right_heel": p(140, -40, 40),
     }
 
 
 def _abducted_left_arm(pose: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
     """The standing pose with the left arm abducted 90° (elbow/wrist out to −X)."""
     out = {name: pos.copy() for name, pos in pose.items()}
-    shoulder = pose["left_shoulder"]
-    out["left_elbow"] = shoulder + np.array([-300.0, 0.0, 0.0])
-    out["left_wrist"] = shoulder + np.array([-600.0, 0.0, 0.0])
+    shoulder = pose["body/left_shoulder"]
+    out["body/left_elbow"] = shoulder + np.array([-300.0, 0.0, 0.0])
+    out["body/left_wrist"] = shoulder + np.array([-600.0, 0.0, 0.0])
     return out
 
 
@@ -208,8 +208,8 @@ def test_full_loop_wire_rotations_equal_solver_and_are_finite():
     # KEYPOINTS_3D carries the tracker-named nose measurement.
     kp_channel = _channel_by_kind(restored, "KEYPOINTS_3D")
     kp_data = _channel_data(kp_channel, 4)
-    nose_idx = kp_channel["names"].index("nose")
-    np.testing.assert_allclose(kp_data[nose_idx, :3], pose["nose"], atol=1e-4)
+    nose_idx = kp_channel["names"].index("body/nose")
+    np.testing.assert_allclose(kp_data[nose_idx, :3], pose["body/nose"], atol=1e-4)
 
 
 def _segment_direction(
@@ -242,7 +242,7 @@ def test_arm_abduction_points_the_humerus_where_the_data_says_and_leaves_the_tru
         ("standing", standing_pose, standing_world),
         ("abducted", abducted_pose, bent_world),
     ):
-        observed = pose["left_elbow"] - pose["left_shoulder"]
+        observed = pose["body/left_elbow"] - pose["body/left_shoulder"]
         observed = observed / np.linalg.norm(observed)
         solved = _segment_direction(skeleton, world, "left_upper_arm")
         np.testing.assert_allclose(

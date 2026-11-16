@@ -30,7 +30,7 @@ PERSON_NODE = "person"
 PERSON_ROI = "person_roi"
 HOLISTIC_NODE = "holistic"
 RTMW_MIN_SCORE = 0.4
-"""An RTMW point with a lower score is missing, as the `sfn26` RTMW detector did."""
+"""The default of the user's RTMW confidence threshold; a point with a lower score is missing, as on `sfn26`."""
 STAGE = "body"
 """The one stage of a converted observation; its point names are the `<group>/<point>` names of the run."""
 RUNNING_MODES = {"realtime": "live", "posthoc": "video"}
@@ -88,6 +88,11 @@ def detector_point_names(detector_type: str) -> tuple[str, ...]:
     return tuple(schema[HOLISTIC_NODE]["point_names"])
 
 
+def detector_box_stages(detector_type: str) -> tuple[tuple[str, ...], ...]:
+    """The stage paths that carry a box in the observations of a detector choice: RTMW's person box; Holistic has none."""
+    return ((STAGE,),) if detector_type == "rtmpose" else ()
+
+
 @cache
 def detector_connections(detector_type: str) -> tuple[tuple[str, str], ...]:
     """The edges between the points of a detector choice, in the names of `detector_point_names`."""
@@ -109,11 +114,11 @@ def detector_connections(detector_type: str) -> tuple[tuple[str, str], ...]:
 
 
 def observations_from_results(results: Mapping[str, Mapping[str, Any]], output_schema: Mapping[str, Any],
-                              detector_type: str) -> dict:
+                              detector_type: str, rtmw_min_score: float = RTMW_MIN_SCORE) -> dict:
     """The one boundary from a pipeline result to freemocap's observation type, for each camera.
 
     Points are taken by name: RTMW through `to_canonical`, Holistic by its point names. An RTMW
-    point with a score below 0.4 or no x and y is missing (NaN, score 0); a kept 2D point has z 0.
+    point with a score below `rtmw_min_score` or no x and y is missing (NaN, score 0); a kept 2D point has z 0.
     """
     # shortcut: the observation type is still skellytracker's; the user's answer to V1 sets freemocap's own.
     from skellytracker.core.data_primitives import BoundingBox, Keypoints, Observation, StageObservation
@@ -125,7 +130,7 @@ def observations_from_results(results: Mapping[str, Mapping[str, Any]], output_s
         if detector_type == "rtmpose":
             canonical = to_canonical(result[RTMW_NODE], output_schema[RTMW_NODE])
             names, xyz, score = canonical.names, canonical.xyz[0].copy(), canonical.score[0].copy()
-            missing = (score < RTMW_MIN_SCORE) | ~np.isfinite(xyz[:, :2]).all(axis=1)
+            missing = (score < rtmw_min_score) | ~np.isfinite(xyz[:, :2]).all(axis=1)
             xyz[:, 2] = 0.0
             xyz[missing], score[missing] = np.nan, 0.0
             roi = result[PERSON_ROI]

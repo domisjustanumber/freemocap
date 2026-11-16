@@ -9,7 +9,7 @@ from freemocap.tools.datasets.tracker_comparison import NumericalComparison, ren
 class TrackerComparisonTests(unittest.TestCase):
     def test_cpu_only_runtime_does_not_pretend_to_test_cuda(self):
         from freemocap.tools.datasets.tracker_comparison import run_comparison
-        with TemporaryDirectory() as temporary, patch("onnxruntime.get_available_providers", return_value=["CPUExecutionProvider"]):
+        with TemporaryDirectory() as temporary, patch("freemocap.tools.datasets.tracker_comparison.usable_execution_providers", return_value=["cpu"]):
             report = run_comparison(recording=Path(temporary) / "absent-recording", case="rtmpose_cuda",
                                     output=Path(temporary) / "report")
         self.assertEqual(report["status"], "unsupported")

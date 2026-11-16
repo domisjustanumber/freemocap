@@ -75,8 +75,7 @@ def run_comparison(*, recording: Path, calibration: Path, output: Path, provider
         cameras = tuple(CalibrationResult.load_toml(calibration).cameras)
         if file_digest(calibration) != calibration_digest:
             raise ValueError("Calibration changed while loading")
-        config = PosthocMocapPipelineConfig(charuco_tracking_enabled=False,
-            video_fps=sources.camera_sources[0].video_metadata.fps, calibration_toml_path=str(calibration),
+        config = PosthocMocapPipelineConfig(charuco_tracking_enabled=False, calibration_toml_path=str(calibration),
             export_to_blender=False)
         report.update(frame_counts={s.camera_id: s.video_metadata.frame_count for s in sources.camera_sources},
                       calibration_sha256=calibration_digest, configuration=config.model_dump(mode="json"),
@@ -88,8 +87,8 @@ def run_comparison(*, recording: Path, calibration: Path, output: Path, provider
         service.start()
         started = perf_counter()
         try:
-            adapter = SkellyTrackerAdapter(inference_service=service, tracker_config=config.tracker_config,
-                performance_report=performance, execution_provider=provider)
+            adapter = SkellyTrackerAdapter(inference_service=service, detector_type=config.detector_type,
+                rtmpose_model_name=config.rtmpose_model_name, performance_report=performance, execution_provider=provider)
             with closing(adapter.track_recording(sources=sources, execution_id="recording-comparison", shutdown_flag=flag)) as events:
                 result = process_recording(events=events, sources=sources, execution_id="recording-comparison",
                     calibration_cameras=cameras, matching_config=config.camera_matching, triangulation_config=config.triangulation_config)

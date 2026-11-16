@@ -22,7 +22,7 @@ def compare_backend_observations(cpu_output: Path, cuda_output: Path) -> dict:
         return {"status": "not_compared", "reason": "Both same-backend comparisons must pass first"}
     if cpu["case"] != "rtmpose_cpu" or cuda["case"] != "rtmpose_cuda":
         raise ValueError("Cross-backend comparison requires RTMPose CPU and CUDA")
-    for field in ("recording", "frame_counts", "tracker_config", "temporal_input"):
+    for field in ("recording", "frame_counts", "tracker", "temporal_input"):
         if cpu.get(field) != cuda.get(field) or field not in cpu:
             raise ValueError(f"Incompatible backend comparison inputs: {field}")
     # Filenames use the report's insertion-ordered camera indices.

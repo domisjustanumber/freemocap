@@ -4,8 +4,7 @@
 
 `test_realtime_pipeline.py` replays both prepared reference recordings through
 the production realtime workers: 222 synchronized frames for test data and 1,108
-for sample data. Its 16 cases cover centralized/per-camera inference,
-explicit/latest calibration selection, and board-only/board-plus-human tracking.
+for sample data. Its 8 cases cover explicit/latest calibration selection, and board-only/board-plus-human tracking.
 Checks include source timestamps, frame identity, reconstruction, live filter
 updates, worker shutdown, and shared-memory release. Replay runs in lockstep;
 its elapsed time is not live-camera or GUI frame rate.

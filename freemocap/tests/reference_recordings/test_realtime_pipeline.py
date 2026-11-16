@@ -43,11 +43,10 @@ def shared_memory_names(group):
 
 @pytest.mark.e2e
 @pytest.mark.slow
-@pytest.mark.parametrize('centralized', [True, False], ids=['centralized', 'per-camera'])
-def test_provider_switch_reuses_capture_and_releases_sessions(replay_reference, centralized, caplog):
+def test_provider_switch_reuses_capture_and_releases_sessions(replay_reference, caplog):
     """Exercise an actual CPU-to-CUDA selection change through running workers."""
-    import onnxruntime
-    if 'CUDAExecutionProvider' not in onnxruntime.get_available_providers():
+    from freemocap.core.tracking.execution_providers import usable_execution_providers
+    if 'cuda' not in usable_execution_providers():
         pytest.skip('CPU-to-CUDA replay needs a CUDA runtime')
     calibration = find_recording_calibration(recording_folder=replay_reference.full_path)
     config = RealtimePipelineConfig(
@@ -56,7 +55,7 @@ def test_provider_switch_reuses_capture_and_releases_sessions(replay_reference, 
         aggregator_config=RealtimeAggregatorNodeConfig(calibration_toml_path=str(calibration),
             skeleton_fitting_enabled=False),
         skeleton_inference_node_config={'execution_provider': 'cpu'},
-        use_centralized_inference=centralized, log_pipeline_times=False,
+        log_pipeline_times=False,
     )
     flag = multiprocessing.Value('b', False)
     registry = WorkerRegistry(global_kill_flag=flag, worker_mode=WorkerMode.THREAD)
@@ -78,9 +77,8 @@ def test_provider_switch_reuses_capture_and_releases_sessions(replay_reference, 
 
         def switch_provider(frame_index, active_pipeline):
             if frame_index == 6:
-                if centralized:
-                    assert all(model['applied_providers'] == ('CPUExecutionProvider',)
-                               for client in service.provider_status() for model in client['models'])
+                assert all(model['applied_providers'] == ('cpu',)
+                           for client in service.provider_status() for model in client['models'])
                 updated = active_pipeline.config.model_copy(deep=True)
                 updated.skeleton_inference_node_config.execution_provider = 'cuda'
                 active_pipeline.update_config(updated)
@@ -112,12 +110,11 @@ def test_provider_switch_reuses_capture_and_releases_sessions(replay_reference, 
             if frame.frame_number in missing_frames:
                 assert all(output.raw_skeleton_observation is None
                            for output in frame.camera_node_outputs.values())
-        if centralized:
-            assert pipeline.skeleton_inference_node is not original_inference
-            statuses = service.provider_status()
-            assert len(statuses) == 1 and statuses[0]['models']
-            assert all(model['requested_provider'] == 'cuda' and 'CUDAExecutionProvider' in model['applied_providers']
-                       for model in statuses[0]['models'])
+        assert pipeline.skeleton_inference_node is not original_inference
+        statuses = service.provider_status()
+        assert len(statuses) == 1 and statuses[0]['models']
+        assert all(model['requested_provider'] == 'cuda' and model['applied_providers'] == ('cuda',)
+                   for model in statuses[0]['models'])
     finally:
         try:
             manager.shutdown()
@@ -154,8 +151,7 @@ def replay_reference(request):
 @pytest.mark.slow
 @pytest.mark.parametrize("human_enabled", [False, True], ids=["charuco", "charuco-and-human"])
 @pytest.mark.parametrize("use_default_calibration", [False, True], ids=["explicit-calibration", "latest-calibration"])
-@pytest.mark.parametrize('centralized', [True, False], ids=['centralized', 'per-camera'])
-def test_realtime_replay_preserves_frames_and_reconstructs(replay_reference, human_enabled, use_default_calibration, centralized, monkeypatch, preset="rtmpose"):
+def test_realtime_replay_preserves_frames_and_reconstructs(replay_reference, human_enabled, use_default_calibration, monkeypatch, preset="rtmpose"):
     calibration = find_recording_calibration(recording_folder=replay_reference.full_path)
     assert calibration is not None
     monkeypatch.setattr(calibration_paths, 'get_last_successful_calibration_toml_path', lambda: calibration)
@@ -169,7 +165,7 @@ def test_realtime_replay_preserves_frames_and_reconstructs(replay_reference, hum
             calibration_toml_path=None if use_default_calibration else str(calibration), triangulation_enabled=True,
             skeleton_fitting_enabled=True, center_of_mass_enabled=human_enabled, realtime_filter_config=RealtimeFilterConfig(),
         ),
-        use_centralized_inference=centralized, log_pipeline_times=False,
+        log_pipeline_times=False,
     )
     flag = multiprocessing.Value("b", False)
     registry = WorkerRegistry(global_kill_flag=flag, worker_mode=WorkerMode.THREAD)

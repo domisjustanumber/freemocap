@@ -9,7 +9,12 @@ from skellytracker.core.annotation.keypoint_annotator import (
     StageAnnotationSchema,
 )
 
-from skellytracker.core.annotation.keypoint_annotator import KeypointAnnotator, KeypointAnnotatorConfig, StageKeypointAnnotator
+from dataclasses import dataclass, replace
+
+import numpy as np
+from numpy.typing import NDArray
+from skellytracker.core.annotation.keypoint_annotator import KeypointAnnotator, KeypointAnnotatorConfig
+from skellytracker.core.data_primitives import Observation
 from skellytracker.core.detectors.calibration import CharucoAnnotator, CharucoAnnotatorConfig, CharucoBoardDefinition
 from freemocap.core.tracking.charuco_detection import CHARUCO_STAGE
 from freemocap.core.tracking.tracker_definitions import tracker_definition
@@ -130,14 +135,32 @@ def build_skeleton_stage_schema(
     )
 
 
+@dataclass(frozen=True)
+class ObservationAnnotator:
+    """Draws the body stages with `KeypointAnnotator` and the charuco stage with `CharucoAnnotator`."""
+
+    body: KeypointAnnotator | None
+    board: CharucoAnnotator | None
+
+    def annotate(self, image: NDArray[np.uint8], observation: Observation) -> NDArray[np.uint8]:
+        out = image.copy()
+        if self.body is not None:
+            # KeypointAnnotator draws every stage; the board has its own annotator.
+            stages = {name: stage for name, stage in observation.stages.items() if name != CHARUCO_STAGE or self.board is None}
+            out = self.body.annotate(out, replace(observation, stages=stages))
+        stage = observation.stages.get(CHARUCO_STAGE)
+        if self.board is not None and stage is not None and stage.keypoints is not None:
+            out = self.board.annotate(out, stage.keypoints)
+        return out
+
+
 def build_observation_annotator(*, detector_type: str | None = None,
-                                board: CharucoBoardDefinition | None = None) -> KeypointAnnotator:
+                                board: CharucoBoardDefinition | None = None) -> ObservationAnnotator:
     """Draw the body stage of a detector choice and the charuco stage of a board, each when given."""
-    stage_schemas = {}
+    body = None
     if detector_type is not None:
         definition = tracker_definition(detector_type)
-        stage_schemas["body"] = build_skeleton_stage_schema(definition.connections, definition.tracked_points)
-    stage_annotators: dict[str, StageKeypointAnnotator] = {} if board is None else {
-        CHARUCO_STAGE: CharucoAnnotator(config=CharucoAnnotatorConfig(), board_def=board)}
-    return KeypointAnnotator(config=KeypointAnnotatorConfig(stage_schemas=stage_schemas),
-                             stage_annotators=stage_annotators)
+        body = KeypointAnnotator(config=KeypointAnnotatorConfig(stage_schemas={
+            "body": build_skeleton_stage_schema(definition.connections, definition.tracked_points)}))
+    board_annotator = None if board is None else CharucoAnnotator(config=CharucoAnnotatorConfig(), board_def=board)
+    return ObservationAnnotator(body=body, board=board_annotator)

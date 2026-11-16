@@ -23,6 +23,7 @@ from freemocap.core.pipeline.inference_service import (
 )
 from freemocap.core.pipeline.performance_report import PerformanceReport
 from freemocap.core.tracking.charuco_detection import CHARUCO_STAGE, charuco_observation, create_charuco_detector
+from freemocap.core.tracking.pipeline_runs import RTMW_MIN_SCORE
 
 
 @dataclass(frozen=True)
@@ -66,11 +67,13 @@ def require_every_camera(batch_cameras, run_cameras, frame_number: int) -> None:
 class SkellyTrackerAdapter:
     def __init__(self, *, inference_service: InferenceService, detector_type: str,
                  performance_report: PerformanceReport, rtmpose_model_name: str | None = None,
-                 execution_provider: str | None = None, charuco_board=None) -> None:
+                 execution_provider: str | None = None, charuco_board=None,
+                 rtmpose_confidence_threshold: float = RTMW_MIN_SCORE) -> None:
         """With a `charuco_board`, each observation also gets the charuco stage of that board."""
         self.inference_service = inference_service
         self.detector_type = detector_type
         self.charuco_board = charuco_board
+        self.rtmpose_confidence_threshold = rtmpose_confidence_threshold
         self.rtmpose_model_name = rtmpose_model_name
         self.performance_report = performance_report
         self.execution_provider = execution_provider
@@ -93,6 +96,7 @@ class SkellyTrackerAdapter:
             pipeline_id=execution_id, mode=InferenceMode.POSTHOC,
             detector_type=self.detector_type, camera_ids=tuple(active_cameras),
             rtmpose_model_name=self.rtmpose_model_name, execution_provider=self.execution_provider,
+            rtmpose_confidence_threshold=self.rtmpose_confidence_threshold,
             shutdown_flag=client_shutdown,
         ))
         frame_count = sources.camera_sources[0].video_metadata.frame_count

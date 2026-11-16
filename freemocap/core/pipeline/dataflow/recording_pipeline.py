@@ -152,7 +152,8 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
         try:
             adapter = SkellyTrackerAdapter(inference_service=service, detector_type=config.detector_type,
                 rtmpose_model_name=config.rtmpose_model_name, performance_report=performance,
-                execution_provider=execution_provider, charuco_board=board)
+                execution_provider=execution_provider, charuco_board=board,
+                rtmpose_confidence_threshold=config.rtmpose_confidence_threshold)
             with closing(adapter.track_recording(sources=sources, execution_id="recording-graph", shutdown_flag=shutdown_flag)) as events:
                 camera_frame_count = 0
                 tracked_frames_per_camera = {source.camera_id: 0 for source in sources.camera_sources}

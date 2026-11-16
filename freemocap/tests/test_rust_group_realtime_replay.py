@@ -103,7 +103,7 @@ def test_rust_group_delivers_successive_processed_frames(reference, continuous, 
             worker_mode=WorkerMode.PROCESS if reference else WorkerMode.THREAD,
             charuco_tracking_enabled=True, skeleton_tracking_enabled=reference),
             aggregator_config=dict(triangulation_enabled=False, skeleton_fitting_enabled=False),
-            use_centralized_inference=reference, log_pipeline_times=False)
+            log_pipeline_times=False)
         pipeline = manager.create_pipeline(camera_group=capture, pipeline_config=config)
         app = FreemocapApplication.__new__(FreemocapApplication)
         app.realtime_pipeline_manager = manager

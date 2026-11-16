@@ -11,7 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 from skellycam.core.recorders.videos.pyav_video_writer import PyavVideoWriter
 from skellycam.core.recorders.videos.video_derivation import VideoDerivation
-from skellytracker.core.annotation.keypoint_annotator import KeypointAnnotator
+from freemocap.core.pipeline.posthoc.annotation_style import ObservationAnnotator
 from skellytracker.core.data_primitives.observation import Observation
 
 from freemocap.core.pipeline.posthoc.annotation_input import AnnotationInput
@@ -68,7 +68,7 @@ class AnnotationVideoOutput:
             raise
 
     def write_frame(
-        self, *, image: NDArray[np.uint8], observation: Observation, annotator: KeypointAnnotator,
+        self, *, image: NDArray[np.uint8], observation: Observation, annotator: ObservationAnnotator,
     ) -> None:
         if self.writer is None:
             raise RuntimeError("Annotation output is closed")

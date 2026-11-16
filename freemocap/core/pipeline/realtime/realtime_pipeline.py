@@ -236,19 +236,14 @@ class RealtimePipeline:
                     worker_registry=worker_registry,
                     camera_shm_dto=camera_group.shm.to_dto().camera_shm_dtos[camera_id],
                     config=pipeline_config.camera_node_config,
-                    execution_provider=pipeline_config.skeleton_inference_node_config.execution_provider,
                     ipc=ipc,
                     pubsub=pubsub,
-                    skeleton_inference_centralized=(
-                        pipeline_config.use_centralized_inference
-                    ),
                     log_pipeline_times=pipeline_config.log_pipeline_times,
                 )
                 created_nodes.append(camera_nodes[camera_id])
 
             skeleton_inference_node: RealtimeSkeletonInferenceNode | None = None
-            if (pipeline_config.use_centralized_inference
-                    and pipeline_config.camera_node_config.skeleton_tracking_enabled):
+            if pipeline_config.camera_node_config.skeleton_tracking_enabled:
                 skeleton_inference_node = RealtimeSkeletonInferenceNode.create(
                     inference_service=inference_service,
                     camera_group_id=camera_group.id,
@@ -386,8 +381,6 @@ class RealtimePipeline:
         """Keep inference subscribed while paused; create its worker before enabling it."""
         if self.calibration_update_pending:
             raise ValueError("Wait for the calibration save before changing pipeline settings.")
-        if new_config.use_centralized_inference != self.config.use_centralized_inference:
-            raise ValueError("Changing inference execution mode requires restarting the pipeline")
 
         old_detector = self.config.camera_node_config.detector_type
         new_detector = new_config.camera_node_config.detector_type
@@ -401,8 +394,7 @@ class RealtimePipeline:
             self.skeleton_inference_node = None
             node = None
 
-        if (new_config.use_centralized_inference
-                and new_config.camera_node_config.skeleton_tracking_enabled
+        if (new_config.camera_node_config.skeleton_tracking_enabled
                 and (node is None or not node.is_alive)):
             node = RealtimeSkeletonInferenceNode.create(
                 inference_service=self.inference_service,

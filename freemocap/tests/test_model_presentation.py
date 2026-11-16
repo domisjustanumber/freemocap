@@ -74,9 +74,10 @@ def test_tracker_topology_survives_recording_and_shared_composition(detector):
     def wire(value):
         return compose_messages(StreamContext(skeletons=(value,))).models[0].to_cbor_message()
     assert wire(bundle) == wire(restored)
-    assert bundle.tracker_connections == detector_connections(detector)
+    assert bundle.tracker_connections == detector_connections(detector) and bundle.tracker_connections
     face_edges = [(a,b) for a,b in bundle.tracker_connections if a.startswith('face/') and b.startswith('face/')]
-    assert face_edges
+    # The RTMW schema of skellytracker 2.0 has no face edges; Holistic has the face mesh edges.
+    assert bool(face_edges) == (detector == 'mediapipe')
     assert all(a in bundle.tracker_keypoint_names and b in bundle.tracker_keypoint_names for a,b in face_edges)
     legacy = saved.model_dump()
     legacy.pop('tracker_connections')

@@ -125,8 +125,7 @@ class WebsocketServer:
             if not self._has_matching_tracking_result(output):
                 return
             config = output.pipeline_config
-            if (config is not None and config.use_centralized_inference
-                    and config.camera_node_config.skeleton_tracking_enabled
+            if (config is not None and config.camera_node_config.skeleton_tracking_enabled
                     and not self._app.inference_service.has_result(output.pipeline_id)):
                 # A timeout can still deliver camera images before tracking is ready.
                 return
@@ -137,8 +136,7 @@ class WebsocketServer:
     def _has_matching_tracking_result(output: AggregationNodeOutputMessage) -> bool:
         """Distinguish timeout image bundles from completed inference, including no-person results."""
         config = output.pipeline_config
-        if (config is not None and config.use_centralized_inference
-                and config.camera_node_config.skeleton_tracking_enabled):
+        if (config is not None and config.camera_node_config.skeleton_tracking_enabled):
             return any(camera.skeleton_observation is not None for camera in output.camera_node_outputs.values())
         return True
 
@@ -366,7 +364,7 @@ class WebsocketServer:
             if pipeline is None:
                 continue
             config = pipeline.config
-            if (config.use_centralized_inference and config.camera_node_config.skeleton_tracking_enabled
+            if (config.camera_node_config.skeleton_tracking_enabled
                     and not self._app.inference_service.has_result(pipeline_id)):
                 return await self._await_camera_only_frame()
 

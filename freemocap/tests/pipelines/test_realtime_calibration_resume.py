@@ -111,7 +111,6 @@ def test_inference_loop_skips_paused_frames_and_resumes_without_reregistering() 
         patch.object(inference_module.CameraGroupSharedMemory, 'recreate', return_value=Mock(valid=True)),
         patch.object(inference_module.CameraSharedMemoryRingBuffer, 'recreate', return_value=Mock(spec=inference_module.CameraSharedMemoryRingBuffer)),
         patch.object(inference_module, 'InferenceRegistration'),
-        patch.object(inference_module, 'tracker_session_requests', return_value=()),
         patch.object(inference_module, '_read_frames', side_effect=read_frames) as read,
     ):
         unwrap(RealtimeSkeletonInferenceNode._run)(
@@ -123,7 +122,7 @@ def test_inference_loop_skips_paused_frames_and_resumes_without_reregistering() 
         )
     assert [call.kwargs['requested_frame_number'] for call in read.call_args_list] == [1, 3]
     assert [call.args[0].frame_number for call in client.submit.call_args_list] == [1, 3]
-    assert [call.args[0].timestamp_ms for call in client.submit.call_args_list] == [101, 301]
+    assert [call.args[0].timestamps_ms for call in client.submit.call_args_list] == [{'selected': 101.0}, {'selected': 301.0}]
     assert [outputs.get_nowait().frame_number for _ in range(3)] == [1, 2, 3]
     service.register.assert_called_once()
     client.close.assert_called_once()

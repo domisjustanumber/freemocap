@@ -20,7 +20,7 @@ from skellycam.core.ipc.process_management.managed_worker import WorkerMode
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 from skellytracker.core.data_primitives.observation import Observation
 
-from freemocap.core.tracking.pipeline_runs import RUNNING_MODES, observations_from_results, start_detector_run
+from freemocap.core.tracking.pipeline_runs import RTMW_MIN_SCORE, RUNNING_MODES, observations_from_results, start_detector_run
 
 
 class InferenceMode(StrEnum):
@@ -39,6 +39,7 @@ class InferenceRegistration:
     shutdown_flag: Synchronized
     rtmpose_model_name: str | None = None
     execution_provider: str | None = None
+    rtmpose_confidence_threshold: float = RTMW_MIN_SCORE
 
 
 @dataclass(frozen=True, slots=True)
@@ -257,7 +258,8 @@ class InferenceService:
                             camera: Frame(image, frame_index=request.frame_number, timestamp_ms=request.timestamps_ms[camera])
                             for camera, image in request.images.items()})
                         observations = observations_from_results(results, client._run.output_schema,
-                                                                 client.registration.detector_type)
+                                                                 client.registration.detector_type,
+                                                                 client.registration.rtmpose_confidence_threshold)
                     if observations.keys() != pending.request.images.keys():
                         raise ValueError("Inference results do not match the requested sources")
                     if any(observation.frame_number != pending.request.frame_number for observation in observations.values()):

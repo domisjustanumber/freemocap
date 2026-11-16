@@ -61,10 +61,10 @@ def test_every_selectable_detector_serializes_points_and_person_boxes(detector_t
         assert tuple(channel['names']) == names
         np.testing.assert_array_equal(np.frombuffer(channel['data'], dtype='<f4').reshape(-1, 3), expected)
     boxes = [channel for channel in tracker['channels'] if channel['kind'] == 'BOXES_2D']
-    assert [channel['camera_id'] for channel in boxes] == list(cameras)
-    expected_names = ['body'] if detector_type == 'rtmpose' else ['body/right_hand', 'body/left_hand']
-    expected_boxes = [[10, 20, 300, 400, 0.9, 1]] if detector_type == 'rtmpose' else [[30, 40, 80, 90, 1, 1], [np.nan] * 6]
+    # RTMW carries its person box; MediaPipe Holistic has no box (no hand crops).
+    assert [channel['camera_id'] for channel in boxes] == (list(cameras) if detector_type == 'rtmpose' else [])
+    expected_boxes = [[10, 20, 300, 400, 0.9, 1]]
     for channel in boxes:
-        assert channel['names'] == expected_names
+        assert channel['names'] == ['body']
         np.testing.assert_array_equal(np.frombuffer(channel['data'], dtype='<f4').reshape(-1, 6),
                                       np.asarray(expected_boxes, dtype='<f4'))

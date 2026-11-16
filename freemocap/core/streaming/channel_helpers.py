@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 from functools import lru_cache
-from skellytracker.core.io.tracker_profiles import tracker_profile
+from freemocap.core.tracking.pipeline_runs import detector_box_stages
 from collections.abc import Mapping  # noqa: TC003 - runtime type checking
 from skellyforge.core.data_tensors.channel_values import ChannelValues
 
@@ -63,7 +63,7 @@ def detector_crop_paths(detector_type: str) -> tuple[tuple[str, ...], ...]:
     """Tracker declares meaningful crop stages; Core connects them to the wire."""
     if detector_type not in _OBSERVATION_BY_DETECTOR:
         raise KeyError(f"unknown detector type {detector_type!r}")
-    return () if detector_type == 'charuco' else tracker_profile(detector_type).crop_stage_paths
+    return () if detector_type == 'charuco' else detector_box_stages(detector_type)
 
 
 def detector_produces_boxes(detector_type: str) -> bool:

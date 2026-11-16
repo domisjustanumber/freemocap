@@ -28,10 +28,10 @@ def tracked_hands(bundle):
     # must come from the real mapping, not from this fixture.
     for snapshot in bundle.landmark_mapping.mapping_snapshots():
         for name, source in snapshot.entries.items():
-            if isinstance(source, str) and '_hand_' in source:
+            if isinstance(source, str) and source.startswith(('left_hand/', 'right_hand/')):
                 side = name.split('_')[0]
                 wrist = bundle.rest_pose.landmark_positions[f'{side}_carpal_origin'].array
-                points[source] = points[f'{side}_wrist'] + 1700 * (bundle.rest_pose.landmark_positions[name].array - wrist)
+                points[source] = points[f'body/{side}_wrist'] + 1700 * (bundle.rest_pose.landmark_positions[name].array - wrist)
     return points
 
 
@@ -98,7 +98,7 @@ def test_missing_palm_preserves_observed_fingers_and_reentry_restores_palm(track
     bundle = build_standard_human_bundle(detector_type=tracker)
     points = tracked_hands(bundle)
     state = state_for(bundle)
-    missing = 'left_hand_forefinger1' if tracker == 'rtmpose' else 'left_hand_index_finger_mcp'
+    missing = 'left_hand/index_finger_mcp'  # one hand point name for both detectors
     for present in (True, False, True):
         frame = points if present else {n: p for n, p in points.items() if n != missing}
         result = reconstruct_skeleton(bundle=bundle, state=state, filtered_keypoints=frame, compute_center_of_mass=False)

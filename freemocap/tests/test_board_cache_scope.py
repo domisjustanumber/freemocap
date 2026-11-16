@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import numpy as np
+from skellytracker.core.data_primitives.keypoints import Keypoints
 from skellytracker.core.data_primitives.observation import Observation, StageObservation
 from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
@@ -14,11 +15,11 @@ from freemocap.core.pipeline.posthoc.video_node import CACHE_FILENAME, _get_obse
 class BoardCacheScopeTests(unittest.TestCase):
     def test_a_frame_without_a_cache_entry_is_detected(self) -> None:
         detector = Mock()
-        detector.detect.return_value = "board keypoints"
+        detector.detect.return_value = Keypoints.empty(("CharucoCorner-0",))
         result = _get_observation(frame_number=3, image=np.zeros((24, 32, 3), dtype=np.uint8), detector=detector, cache={})
         detector.detect.assert_called_once()
         self.assertEqual((result.frame_number, result.image_size), (3, (24, 32)))
-        self.assertEqual(result.stages["charuco"].keypoints, "board keypoints")
+        self.assertIs(result.stages["charuco"].keypoints, detector.detect.return_value)
 
     def test_board_only_cache_requires_matching_stage_structure(self) -> None:
         board = CharucoBoardDefinition.create_letter_size_5x3()

@@ -15,14 +15,11 @@ uv run poe test-pipelines-fast      # everything except the slow RTMPose case
 ```
 
 There is also a longer realtime exercise against `freemocap_sample_data/` (the same
-recording, not downsampled — ~1100 frames). It's capped by `--realtime-max-frames`
-(default 250, `0` = the whole clip) so it terminates early by default:
+recording, not downsampled — ~1100 frames). It replays the whole clip and needs a prepared
+reference (`FREEMOCAP_PROVENANCE_PREPARED_ROOT`, see `freemocap/tools/datasets/README.md`):
 
 ```bash
-# default 250-frame cap:
-uv run pytest freemocap/tests/pipelines/test_realtime_pipeline.py -k sample_data
-# run the entire clip:
-uv run pytest freemocap/tests/pipelines/test_realtime_pipeline.py -k sample_data --realtime-max-frames=0
+uv run pytest freemocap/tests/reference_recordings/test_realtime_pipeline.py -k sample-data
 ```
 
 What they cover:
@@ -47,7 +44,7 @@ What they cover:
   mocked — IPC, triangulation, filtering and fitting are real.
 
 The realtime assertions live in
-`freemocap/tests/pipelines/test_realtime_pipeline.py`; skeleton-level numeric
+`freemocap/tests/reference_recordings/test_realtime_pipeline.py`; skeleton-level numeric
 guards (rest-pose round trip, hydration, roll continuity) live in skellyforge's
 own test suite.
 

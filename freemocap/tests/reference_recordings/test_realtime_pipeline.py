@@ -149,9 +149,10 @@ def replay_reference(request):
 
 @pytest.mark.e2e
 @pytest.mark.slow
-@pytest.mark.parametrize("human_enabled", [False, True], ids=["charuco", "charuco-and-human"])
+@pytest.mark.parametrize("human_enabled,preset", [(False, "rtmpose"), (True, "rtmpose"), (True, "mediapipe")],
+                         ids=["charuco", "charuco-and-human-rtmpose", "charuco-and-human-mediapipe"])
 @pytest.mark.parametrize("use_default_calibration", [False, True], ids=["explicit-calibration", "latest-calibration"])
-def test_realtime_replay_preserves_frames_and_reconstructs(replay_reference, human_enabled, use_default_calibration, monkeypatch, preset="rtmpose"):
+def test_realtime_replay_preserves_frames_and_reconstructs(replay_reference, human_enabled, preset, use_default_calibration, monkeypatch):
     calibration = find_recording_calibration(recording_folder=replay_reference.full_path)
     assert calibration is not None
     monkeypatch.setattr(calibration_paths, 'get_last_successful_calibration_toml_path', lambda: calibration)

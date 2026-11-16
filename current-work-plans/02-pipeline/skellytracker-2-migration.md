@@ -438,7 +438,7 @@ Recorded on 2026-11-16, by the user through `skellytracker-ef`.
   - `mediapipe` → `mediapipe-holistic-tasks` (another model, a 478-point face, no hand crops, no
     reset).
   - The other four choices go, with the code that only they use, in the backend, the UI and the
-    SDK. The removal list is §6.
+    SDK. The removal list is `skellytracker-2-removal-list.md`.
 - Mapping: "Skellytracker must own these mappings, and there must be a pipeline node that can
   convert between mappings."
   - freemocap does NOT own the standard-human mapping.

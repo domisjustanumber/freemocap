@@ -7637,11 +7637,10 @@
               {
                 "type": "string",
                 "enum": [
-                  "trt",
-                  "cuda",
+                  "cpu",
                   "coreml",
-                  "directml",
-                  "cpu"
+                  "cuda",
+                  "trt-rtx"
                 ]
               },
               {
@@ -8339,11 +8338,10 @@
               {
                 "type": "string",
                 "enum": [
-                  "trt",
-                  "cuda",
+                  "cpu",
                   "coreml",
-                  "directml",
-                  "cpu"
+                  "cuda",
+                  "trt-rtx"
                 ]
               },
               {

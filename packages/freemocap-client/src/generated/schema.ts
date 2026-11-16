@@ -3298,7 +3298,7 @@ export interface components {
              * Executionprovider
              * @description ONNX Runtime execution provider for RTMPose. None retains the selected pipeline automatic policy; an explicit choice raises if it cannot load.
              */
-            executionProvider?: ("trt" | "cuda" | "coreml" | "directml" | "cpu") | null;
+            executionProvider?: ("cpu" | "coreml" | "cuda" | "trt-rtx") | null;
             /**
              * @description MediaPipe pose model size. Only used when detector_type='mediapipe'.
              * @default heavy
@@ -3740,7 +3740,7 @@ export interface components {
              */
             max_batch_size?: number;
             /** Execution Provider */
-            execution_provider?: ("trt" | "cuda" | "coreml" | "directml" | "cpu") | null;
+            execution_provider?: ("cpu" | "coreml" | "cuda" | "trt-rtx") | null;
             /**
              * Debug Draw Bboxes
              * @default false

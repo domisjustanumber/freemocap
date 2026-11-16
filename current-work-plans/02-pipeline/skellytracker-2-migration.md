@@ -163,6 +163,17 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     (not built; fake it in tests): saved key -> key or None; legacy trt/cuda -> trt-rtx if usable else
     cuda if usable else None; other usable key -> same; unusable or no successor -> None = Auto + notice.
     Report after each.
+  - PART 2 DONE (2026-11-16): `47d684cd` rename `CanonicalKeypoints.point_names` + edge count read
+    from the schema; `d97932ff` `PackStatus.usable` (no `USABLE_STATES`), route
+    `{providers: [{key, label, description, usable, install_hint, uses_gpu, devices}],
+    detector_takes_execution_provider}`, UI help from `description` (`execution-provider-info.tsx`),
+    `/onnx/session_providers` = `PipelineRun.models`, `cpu_max_frequency_hz`, the two comments, the
+    third detector-name check in `RealtimePipelineConfigTree.tsx`; `f844f90c` device choice. Tests:
+    touched Python files pass; UI tsc only `cbor-x`; UI 37/37 realtime-processing, 4/4 EP options. The
+    two e2e specs whose fixtures changed cannot run here (local node_modules lacks
+    `@fontsource-variable/*` and `@axe-core/playwright`; same failure without the change).
+    Found: posthoc Auto is resolved to a bare key in `resolve_tracking_provider` before the run, so
+    the posthoc run drops the recommendation's options and device; fix in the R1 group.
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).
@@ -412,8 +423,10 @@ frames, each with `rtmpose` and with `mediapipe`.
    start fails with skellytracker's message ("The EP key 'trt' is reserved: classic TensorRT is a
    separate EP; it is not in v2.") (`c9a58321`; was Auto since `a8d88985`). Part 2: a saved `trt` runs
    on its skellytracker successor `trt-rtx` when that is usable; the other cases wait for the user.
-2. `/onnx/session_providers` names each model by its catalog key (`yolox-person@openmmlab-exporter`)
-   and gives the EP key (`cuda`) in `applied_providers`, not the ORT provider name (step 1).
+2. `/onnx/session_providers` gives, per run, the user's `requested_provider` and per model node what
+   skellytracker's `PipelineRun.models` reports: `node`, `key`, `version`, `sidecar_sha256`, `size`,
+   `precision`, the applied `execution_provider` and `device` (`d97932ff`). `applied_providers` and
+   `model_name` are gone; nothing is made up.
 3. A camera video that fails while it is read stops posthoc tracking with `CameraSourceEndedError`,
    which names the camera and the frame. On `sfn26` the other cameras went on, but the save refused
    the incomplete coverage, so nothing was saved in either case. The user decided this (V2, §0.3).
@@ -460,14 +473,18 @@ frames, each with `rtmpose` and with `mediapipe`.
     ORT provider list are gone, and the log has no "GPU acceleration" verdict. A machine record now
     has the `HostInfo` fields (`cpu_name`, `memory_total_bytes`, `gpus`, ...) and `execution_providers`
     (key → state) instead of `cpu`, `memory_bytes`, `gpu`, `available_onnx_providers`; old records
-    still render. The build step prints `skellytracker-eps status`. Known losses, accepted, no
-    fallback: the Linux log of an Intel or most AMD GPUs has no model name, the log has no CPU
-    frequency, and the macOS log has no VRAM. skellytracker will add `HostInfo.cpu_max_frequency_hz`,
-    a Linux GPU name from `pci.ids` and macOS VRAM (supervisor, 2026-11-16); the log prints a field
-    only if the record has it, so the frequency needs its name added to `HOST_FIELDS` then.
+    still render. The build step prints `skellytracker-eps status`. The three losses accepted at first
+    are gone with skellytracker `c4b51dde`: the log prints `cpu_max_frequency_hz` (`d97932ff`), and the
+    Linux GPU names (`pci.ids`) and the macOS VRAM come through `GpuInfo`.
 13. `graphExecutionProvider` is gone from the settings (`de6be21a`). A saved one keeps its meaning
     (`59f55e9a`, §0.3 E1): with no saved `executionProvider` its value is the EP choice, and
     `executionProvider` wins when both are saved; it is not written again.
+15. The EP menu (part 2, `d97932ff`, `f844f90c`): the help text is skellytracker's `description` of
+    each EP, with its `install_hint` for an EP that is not usable here; the "GPU batched" and
+    "CPU-only" texts are gone; the EP row shows when the server says the detector takes an EP. A
+    "Device" row (Auto + each GPU with its name and VRAM, most VRAM first) shows when the chosen EP has
+    more than one device; a new EP clears the device. Posthoc `executionDevice` and realtime
+    `execution_device` reach `start_pipeline(device=...)`; Auto ignores them.
 14. A detector whose pipeline takes no EP (MediaPipe) ignores the saved EP choice (`57be4131`). The
     preview no longer refuses MediaPipe with an explicit `cuda`: the UI hides the EP row for MediaPipe
     but keeps the RTMW choice, so a refusal would block a setting the user cannot see.

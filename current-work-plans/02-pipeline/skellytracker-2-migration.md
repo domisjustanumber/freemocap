@@ -207,7 +207,7 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     (`reference_recordings/test_fresh_posthoc.py`). sfn26 clipped the SIMCC peak to [0, 1]. Owner open:
     skellytracker range, or a clip at `observations_from_results`. Changed nothing.
     RESOLVED `be341bba` (§0.3 SC): gate on the raw score, then `np.clip` to [0, 1].
-    test_fresh_posthoc.py after it (3 runs, ST b8bfa7d2..de7e18f3 then 1e479fa3 for none of them):
+    test_fresh_posthoc.py after it (3 runs, scratch ST clone at de7e18f3):
     run 1 failed at save_recording "Recording changed after selecting the processing run" (intermittent:
     not seen again); runs 2-3 processed and saved, then the dataset tool's check
     (`tools/datasets/validation.py:28`) failed: calibrated_world alignment `insufficient_evidence`.

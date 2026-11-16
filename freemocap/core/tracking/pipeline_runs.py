@@ -138,7 +138,7 @@ def observations_from_results(results: Mapping[str, Mapping[str, Any]], output_s
         boxes = []
         if detector_type == "rtmpose":
             canonical = to_canonical(result[RTMW_NODE], output_schema[RTMW_NODE])
-            names, xyz, score = _person(canonical.names, canonical.xy, canonical.z, canonical.score, result[RTMW_NODE].present)
+            names, xyz, score = _person(canonical.point_names, canonical.xy, canonical.z, canonical.score, result[RTMW_NODE].present)
             missing = (score < rtmw_min_score) | ~np.isfinite(xyz[:, :2]).all(axis=1)
             xyz[missing], score[missing] = np.nan, 0.0
             roi = result[PERSON_ROI]

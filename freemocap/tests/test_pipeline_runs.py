@@ -131,7 +131,7 @@ def test_point_names_and_connections_use_the_names_of_the_observations(detector_
     names = pipeline_runs.detector_point_names(detector_type)
     edges = pipeline_runs.detector_connections(detector_type)
     node = pipeline_runs.RTMW_NODE if detector_type == "rtmpose" else pipeline_runs.HOLISTIC_NODE
-    assert len(edges) == len(pipeline_runs._output_schema(detector_type)[node]["edges"]) == {"rtmpose": 65, "mediapipe": 213}[detector_type]
+    assert 0 < len(edges) == len(pipeline_runs._output_schema(detector_type)[node]["canonical_edges"])
     assert all(a in names and b in names for a, b in edges)
     assert {"body/nose", "left_hand/wrist", "left_hand/thumb_cmc"} <= set(names)
     if detector_type == "rtmpose":

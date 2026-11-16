@@ -91,6 +91,8 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     route gains `devices: [{key, name, vram_total_bytes}]` per EP from the part 2 names, and the EP row
     gets a device select under it when an EP has more than one device; (viii) `74e91d12`
     `test_no_execution_provider_knowledge.py`, allowlist = 9 part-3 tool lines (named in the test).
+    Fast suite after part 1 (Phase B env, `-m "not e2e and not slow"`): 1507 passed, 8 failed (the same
+    8 test ids as at `de80869e`), 20 skipped, 43 deselected. Then `59f55e9a` (§0.3 E1): its files pass.
     Tests: per step the touched files pass; UI tsc only the 4 `cbor-x` errors (rebuild the client
     `dist/` with `npm run build:client` after a contract change, it was stale); UI EP options 4/4,
     realtime-processing 34/34. Next: part 2 waits for the supervisor's message with the final
@@ -291,6 +293,19 @@ frames, each with `rtmpose` and with `mediapipe`.
 - U1 (2026-11-16): the user moves the skellycam OpenCV pin and the skellyforge Python cap themself,
   separately. The freemocap `uv.lock` stays uncommitted until then; tests run with the two pins relaxed
   in scratch.
+- E1 (2026-11-16, correction): a saved `graphExecutionProvider` keeps its meaning. On `sfn26` the run
+  used `execution_provider or graph_execution_provider`, so a file with only
+  `graphExecutionProvider: cuda` ran on CUDA; `de6be21a` made it Auto, a regression. Fixed in
+  `59f55e9a`: at load, when no `executionProvider` is saved and the saved `graphExecutionProvider` is not
+  `auto`, its value goes to `execution_provider`; when both are saved, `executionProvider` wins (no
+  "disagree" error); the old key is not written again. It copies a string, no EP knowledge.
+- E2 (2026-11-16, correction): a saved `trt` maps to `trt-rtx` when `trt-rtx` is usable on this host.
+  freemocap does NOT hold that mapping: skellytracker gives it through the EP API (a retired key gives
+  its successor key with its usable state; names come with the part 2 message). Until then the run start
+  fails with skellytracker's message, as now. Part 2 plan: at settings load or at run start, ask
+  skellytracker for the successor of a key that it does not list, and use the successor when it is
+  usable. OPEN, with the user: a successor that is not usable, and a retired key with no successor
+  (`directml`).
 
 ### 0.4 Open questions
 
@@ -328,9 +343,10 @@ frames, each with `rtmpose` and with `mediapipe`.
 
 1. The EP menu offers Auto and the EPs that skellytracker lists as usable on this host, with its labels
    and in its order (`c0f66701`). A saved key that the server does not list stays visible under its key.
-   A saved `trt` or `directml` no longer reads as Auto: the run start fails with skellytracker's
-   message ("The EP key 'trt' is reserved: classic TensorRT is a separate EP; it is not in v2.")
-   (`c9a58321`; was Auto since `a8d88985`).
+   **Changes in part 2 (§0.3 E2).** Now: a saved `trt` or `directml` no longer reads as Auto: the run
+   start fails with skellytracker's message ("The EP key 'trt' is reserved: classic TensorRT is a
+   separate EP; it is not in v2.") (`c9a58321`; was Auto since `a8d88985`). Part 2: a saved `trt` runs
+   on its skellytracker successor `trt-rtx` when that is usable; the other cases wait for the user.
 2. `/onnx/session_providers` names each model by its catalog key (`yolox-person@openmmlab-exporter`)
    and gives the EP key (`cuda`) in `applied_providers`, not the ORT provider name (step 1).
 3. A camera video that fails while it is read stops posthoc tracking with `CameraSourceEndedError`,
@@ -384,8 +400,9 @@ frames, each with `rtmpose` and with `mediapipe`.
     frequency, and the macOS log has no VRAM. skellytracker will add `HostInfo.cpu_max_frequency_hz`,
     a Linux GPU name from `pci.ids` and macOS VRAM (supervisor, 2026-11-16); the log prints a field
     only if the record has it, so the frequency needs its name added to `HOST_FIELDS` then.
-13. `graphExecutionProvider` is gone (`de6be21a`); a saved one loads and is not written again (a saved
-    `cuda` there with no `executionProvider` now means Auto).
+13. `graphExecutionProvider` is gone from the settings (`de6be21a`). A saved one keeps its meaning
+    (`59f55e9a`, §0.3 E1): with no saved `executionProvider` its value is the EP choice, and
+    `executionProvider` wins when both are saved; it is not written again.
 14. A detector whose pipeline takes no EP (MediaPipe) ignores the saved EP choice (`57be4131`). The
     preview no longer refuses MediaPipe with an explicit `cuda`: the UI hides the EP row for MediaPipe
     but keeps the RTMW choice, so a refusal would block a setting the user cannot see.

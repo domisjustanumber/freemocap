@@ -6,34 +6,28 @@ from unittest.mock import Mock, patch
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
 
-from freemocap.core.tracking.execution_providers import EXECUTION_PROVIDERS
 from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
 from freemocap.core.pipeline.realtime import realtime_pipeline as live
 
 
-@pytest.mark.parametrize('provider', [None, *EXECUTION_PROVIDERS])
-def test_posthoc_api_accepts_each_v2_provider(provider):
+@pytest.mark.parametrize('provider', [None, 'cpu', 'any-ep-key'])
+def test_settings_keep_any_ep_key_for_skellytracker_to_check(provider):
     config = PosthocMocapPipelineConfig(executionProvider=provider)
-    assert config.execution_provider == provider
     assert config.model_dump(by_alias=True)['executionProvider'] == provider
+    assert live.RealtimePipelineConfig(skeleton_inference_node_config={'execution_provider': provider}).skeleton_inference_node_config.execution_provider == provider
 
 
-@pytest.mark.parametrize('saved', ['trt', 'directml'])
-def test_a_saved_v1_provider_reads_as_auto(saved):
-    assert PosthocMocapPipelineConfig(executionProvider=saved).execution_provider is None
-    assert live.RealtimePipelineConfig(skeleton_inference_node_config={'execution_provider': saved}).skeleton_inference_node_config.execution_provider is None
+def test_a_key_that_skellytracker_does_not_have_fails_the_run_start_with_its_message():
+    from skellytracker.core.errors import EpRequestError
+    from freemocap.core.tracking.pipeline_runs import start_detector_run
+    with pytest.raises(EpRequestError, match="'any-ep-key' is not an EP key"):
+        start_detector_run(detector_type='rtmpose', camera_ids=['0'], running_mode='live', execution_provider='any-ep-key')
 
 
 def test_saved_graph_provider_loads_and_is_not_written_again():
-    config = PosthocMocapPipelineConfig(executionProvider='cpu', graphExecutionProvider='cuda')
+    config = PosthocMocapPipelineConfig(executionProvider='cpu', graphExecutionProvider='other-ep')
     assert config.execution_provider == 'cpu' and 'graphExecutionProvider' not in config.model_dump(by_alias=True)
-
-
-def test_unknown_provider_is_rejected():
-    with pytest.raises(ValidationError):
-        PosthocMocapPipelineConfig(executionProvider='not-a-provider')
 
 
 def test_provider_route_lists_the_usable_v2_keys_without_loading_models():
@@ -41,13 +35,13 @@ def test_provider_route_lists_the_usable_v2_keys_without_loading_models():
     from skellytracker.core import eps
     app = FastAPI()
     app.include_router(onnx_router, prefix='/freemocap')
-    rows = (SimpleNamespace(key='cpu', state='builtin'), SimpleNamespace(key='cuda', state='not_installed'),
-            SimpleNamespace(key='trt-rtx', state='ready'))
+    rows = (SimpleNamespace(key='cpu', state='builtin'), SimpleNamespace(key='gpu-ep', state='not_installed'),
+            SimpleNamespace(key='other-ep', state='ready'))
     with patch.object(eps, 'status', return_value=SimpleNamespace(eps=rows)), \
          patch('onnxruntime.InferenceSession') as construct:
         response = TestClient(app).get('/freemocap/onnx/execution_providers')
     assert response.status_code == 200
-    assert response.json() == {'available': ['cpu', 'trt-rtx']}
+    assert response.json() == {'available': ['cpu', 'other-ep']}
     construct.assert_not_called()
 
 
@@ -86,7 +80,7 @@ def test_live_changes_rebuild_only_affected_inference(change):
     pipeline.inference_service.close.assert_not_called()
 
 
-@pytest.mark.parametrize('provider', EXECUTION_PROVIDERS)
+@pytest.mark.parametrize('provider', ['cpu', 'any-ep-key'])
 def test_graph_receives_each_explicit_provider(provider):
     from freemocap.core.pipeline.dataflow.application_pipeline import resolve_tracking_provider
     assert resolve_tracking_provider(PosthocMocapPipelineConfig(executionProvider=provider)) == provider
@@ -95,10 +89,10 @@ def test_graph_receives_each_explicit_provider(provider):
 def test_graph_auto_takes_the_skellytracker_recommendation_and_mediapipe_takes_no_ep():
     from freemocap.core.pipeline.dataflow.application_pipeline import resolve_tracking_provider
     from skellytracker.core import eps
-    for chosen in ('cuda', 'coreml', 'cpu'):
+    for chosen in ('gpu-ep', 'cpu'):
         with patch.object(eps, 'recommend', return_value=SimpleNamespace(chosen=SimpleNamespace(ep_key=chosen, device_key=None), options=())):
             assert resolve_tracking_provider(PosthocMocapPipelineConfig()) == chosen
-    assert resolve_tracking_provider(PosthocMocapPipelineConfig(detectorType='mediapipe', executionProvider='cuda')) == 'cpu'
+    assert resolve_tracking_provider(PosthocMocapPipelineConfig(detectorType='mediapipe')) == 'cpu'
 
 
 def test_camera_node_startup_failure_closes_initialized_resources():
@@ -132,10 +126,10 @@ def test_session_status_endpoint_reports_actual_values():
     app.include_router(onnx_router, prefix='/freemocap')
     service = Mock()
     service.provider_status.return_value = [{'pipeline_id': 'live', 'mode': 'realtime', 'models': [
-        {'model_name': 'rtmw-wholebody133@openmmlab-exporter', 'requested_provider': None, 'applied_providers': ('cuda',)}]}]
+        {'model_name': 'rtmw-wholebody133@openmmlab-exporter', 'requested_provider': None, 'applied_providers': ('gpu-ep',)}]}]
     with patch('freemocap.app.freemocap_application.get_freemocap_app', return_value=SimpleNamespace(inference_service=service)):
         response = TestClient(app).get('/freemocap/onnx/session_providers')
     assert response.status_code == 200
     model = response.json()[0]['models'][0]
     assert model['requested_provider'] is None
-    assert model['applied_providers'] == ['cuda']
+    assert model['applied_providers'] == ['gpu-ep']

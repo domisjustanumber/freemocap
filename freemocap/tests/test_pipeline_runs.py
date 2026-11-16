@@ -16,14 +16,12 @@ def test_rtmw_size_follows_the_old_model_name():
     assert sizes[pipeline_runs.PERSON_NODE] == "m"  # the YOLOX size of the built-in stays
 
 
-def test_v2_providers_pass_and_removed_ones_fall_back_to_the_recommendation(monkeypatch):
+def test_a_key_passes_unchanged_and_auto_takes_the_recommendation(monkeypatch):
     from skellytracker.core import eps
     monkeypatch.setattr(eps, "recommend", lambda form: SimpleNamespace(chosen=SimpleNamespace(ep_key="cpu", device_key=None), options=()))
-    assert pipeline_runs.run_execution_provider("cuda") == "cuda"
-    for old in (None, "auto", "trt", "directml"):
-        assert pipeline_runs.run_execution_provider(old) == "cpu"
-    with pytest.raises(ValueError):
-        pipeline_runs.run_execution_provider("vulkan")
+    assert pipeline_runs.run_ep_choice("any-ep-key") == ("any-ep-key", None, None)
+    for auto in (None, "auto"):
+        assert pipeline_runs.run_execution_provider(auto) == "cpu"
 
 
 @pytest.mark.parametrize(("detector_type", "needs_ep", "expected"), [("rtmpose", True, "cpu"), ("mediapipe", False, None)])
@@ -45,7 +43,6 @@ def test_auto_passes_the_options_and_device_of_the_recommendation_to_the_run(mon
     from skellytracker.core import eps
     recommendation = SimpleNamespace(chosen=SimpleNamespace(ep_key="gpu-ep", device_key="gpu:0"), options=(("prefer_nhwc", "1"),))
     monkeypatch.setattr(eps, "recommend", lambda form: recommendation if form == "performance" else None)
-    monkeypatch.setattr(pipeline_runs, "EXECUTION_PROVIDERS", ())
     started = {}
     monkeypatch.setattr(pipeline_runs, "load_detector_pipeline", lambda *args: "config")
     monkeypatch.setattr(pipelines, "check_pipeline", lambda config: SimpleNamespace(needs_execution_provider=True))

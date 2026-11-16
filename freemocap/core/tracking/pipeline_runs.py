@@ -11,7 +11,6 @@ from typing import Any
 
 import numpy as np
 
-from freemocap.core.tracking.execution_providers import EXECUTION_PROVIDERS, REMOVED_PROVIDERS
 
 logger = logging.getLogger(__name__)
 
@@ -49,16 +48,13 @@ def load_detector_pipeline(detector_type: str, rtmpose_model_name: str | None = 
 
 
 def run_ep_choice(requested: str | None) -> tuple[str, dict[str, str] | None, str | None]:
-    """The EP key, EP options and device of a run: the user's key, or skellytracker's performance recommendation.
+    """The EP key, EP options and device of a run: the user's key, or for Auto skellytracker's performance recommendation.
 
-    An old saved choice that v2 does not have (`trt`, `directml`) is treated as Auto, as
-    freemocap already did for `trt`.
+    skellytracker checks the user's key when the run starts and raises `EpRequestError` for a key it does not have.
     """
     from skellytracker.core import eps
-    if requested in EXECUTION_PROVIDERS:
+    if requested not in (None, "auto"):
         return requested, None, None
-    if requested not in (None, "auto", *REMOVED_PROVIDERS):
-        raise ValueError(f"Unknown execution provider {requested!r}; choose one of {EXECUTION_PROVIDERS}")
     recommendation = eps.recommend("performance")
     chosen = recommendation.chosen
     logger.info("Execution provider %s (device %s) chosen for requested %s", chosen.ep_key, chosen.device_key, requested or "auto")

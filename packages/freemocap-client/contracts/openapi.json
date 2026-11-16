@@ -6927,20 +6927,14 @@
           "executionProvider": {
             "anyOf": [
               {
-                "type": "string",
-                "enum": [
-                  "cpu",
-                  "coreml",
-                  "cuda",
-                  "trt-rtx"
-                ]
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Executionprovider",
-            "description": "ONNX Runtime execution provider for RTMPose. None retains the selected pipeline automatic policy; an explicit choice raises if it cannot load."
+            "description": "A skellytracker EP key for RTMPose. None is Auto, the skellytracker recommendation; skellytracker refuses a key it does not have, or one that cannot start, when the run starts."
           },
           "mediapipeNumHands": {
             "type": "integer",
@@ -7559,13 +7553,7 @@
           "execution_provider": {
             "anyOf": [
               {
-                "type": "string",
-                "enum": [
-                  "cpu",
-                  "coreml",
-                  "cuda",
-                  "trt-rtx"
-                ]
+                "type": "string"
               },
               {
                 "type": "null"

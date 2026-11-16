@@ -2850,9 +2850,9 @@ export interface components {
             rtmPoseConfidenceThreshold?: number;
             /**
              * Executionprovider
-             * @description ONNX Runtime execution provider for RTMPose. None retains the selected pipeline automatic policy; an explicit choice raises if it cannot load.
+             * @description A skellytracker EP key for RTMPose. None is Auto, the skellytracker recommendation; skellytracker refuses a key it does not have, or one that cannot start, when the run starts.
              */
-            executionProvider?: ("cpu" | "coreml" | "cuda" | "trt-rtx") | null;
+            executionProvider?: string | null;
             /**
              * Mediapipenumhands
              * @description Two-sided human presets detect one hand per side; the count is fixed at two.
@@ -3243,7 +3243,7 @@ export interface components {
              */
             max_batch_size?: number;
             /** Execution Provider */
-            execution_provider?: ("cpu" | "coreml" | "cuda" | "trt-rtx") | null;
+            execution_provider?: string | null;
             /**
              * Debug Draw Bboxes
              * @default false

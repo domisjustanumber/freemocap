@@ -5,7 +5,6 @@ from freemocap.core.reconstruction.alignment_config import MocapAlignmentConfig
 from freemocap.core.reconstruction.posthoc_filtering import PosthocFilterConfig
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from freemocap.core.tracking.execution_providers import RequestedExecutionProvider
 
 from freemocap.core.tasks.triangulation.helpers.triangulation_config import TriangulationConfig
 from freemocap.core.tasks.calibration.camera_matching.matching_models import CameraMatchingConfig
@@ -79,10 +78,10 @@ class PosthocMocapPipelineConfig(BaseModel):
             "~96% of visible keypoints. Only used when detector_type='rtmpose'."
         ),
     )
-    execution_provider: RequestedExecutionProvider = Field(
+    execution_provider: str | None = Field(
         default=None,
         alias="executionProvider",
-        description="ONNX Runtime execution provider for RTMPose. None retains the selected pipeline automatic policy; an explicit choice raises if it cannot load.",
+        description="A skellytracker EP key for RTMPose. None is Auto, the skellytracker recommendation; skellytracker refuses a key it does not have, or one that cannot start, when the run starts.",
     )
     # MediaPipe Holistic takes no model size, confidences or face count (user F1, 2026-11-16).
     mediapipe_num_hands: Literal[2] = Field(

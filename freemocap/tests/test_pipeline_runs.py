@@ -18,7 +18,7 @@ def test_rtmw_size_follows_the_old_model_name():
 
 def test_v2_providers_pass_and_removed_ones_fall_back_to_the_recommendation(monkeypatch):
     from skellytracker.core import eps
-    monkeypatch.setattr(eps, "recommend", lambda form: SimpleNamespace(chosen=SimpleNamespace(ep_key="cpu")))
+    monkeypatch.setattr(eps, "recommend", lambda form: SimpleNamespace(chosen=SimpleNamespace(ep_key="cpu", device_key=None), options=()))
     assert pipeline_runs.run_execution_provider("cuda") == "cuda"
     for old in (None, "auto", "trt", "directml"):
         assert pipeline_runs.run_execution_provider(old) == "cpu"
@@ -33,11 +33,25 @@ def test_an_ep_is_given_only_when_the_pipeline_needs_one(monkeypatch, detector_t
     monkeypatch.setattr(pipeline_runs, "load_detector_pipeline", lambda *args: "config")
     monkeypatch.setattr(pipelines, "check_pipeline", lambda config: SimpleNamespace(needs_execution_provider=needs_ep))
     monkeypatch.setattr(pipelines, "start_pipeline", lambda config, **kwargs: started.update(kwargs) or "run")
-    monkeypatch.setattr(pipeline_runs, "run_execution_provider", lambda requested: "cpu")
+    monkeypatch.setattr(pipeline_runs, "run_ep_choice", lambda requested: ("cpu", None, None))
     run = pipeline_runs.start_detector_run(detector_type=detector_type, camera_ids=["0", "1"], running_mode="live")
     assert run == ("run", expected)
-    assert started["execution_provider"] == expected
+    assert started["execution_provider"] == expected and started["ep_options"] is None and started["device"] is None
     assert started["camera_ids"] == ["0", "1"] and started["running_mode"] == "live"
+
+
+def test_auto_passes_the_options_and_device_of_the_recommendation_to_the_run(monkeypatch):
+    import skellytracker.core.pipelines as pipelines
+    from skellytracker.core import eps
+    recommendation = SimpleNamespace(chosen=SimpleNamespace(ep_key="gpu-ep", device_key="gpu:0"), options=(("prefer_nhwc", "1"),))
+    monkeypatch.setattr(eps, "recommend", lambda form: recommendation if form == "performance" else None)
+    monkeypatch.setattr(pipeline_runs, "EXECUTION_PROVIDERS", ())
+    started = {}
+    monkeypatch.setattr(pipeline_runs, "load_detector_pipeline", lambda *args: "config")
+    monkeypatch.setattr(pipelines, "check_pipeline", lambda config: SimpleNamespace(needs_execution_provider=True))
+    monkeypatch.setattr(pipelines, "start_pipeline", lambda config, **kwargs: started.update(kwargs) or "run")
+    assert pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0"], running_mode="live") == ("run", "gpu-ep")
+    assert (started["execution_provider"], started["ep_options"], started["device"]) == ("gpu-ep", {"prefer_nhwc": "1"}, "gpu:0")
 
 
 @pytest.fixture(scope="module")

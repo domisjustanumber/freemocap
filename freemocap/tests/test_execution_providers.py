@@ -93,7 +93,7 @@ def test_graph_auto_takes_the_skellytracker_recommendation_and_mediapipe_takes_n
     from freemocap.core.pipeline.dataflow.application_pipeline import resolve_tracking_provider
     from skellytracker.core import eps
     for chosen in ('cuda', 'coreml', 'cpu'):
-        with patch.object(eps, 'recommend', return_value=SimpleNamespace(chosen=SimpleNamespace(ep_key=chosen))):
+        with patch.object(eps, 'recommend', return_value=SimpleNamespace(chosen=SimpleNamespace(ep_key=chosen, device_key=None), options=())):
             assert resolve_tracking_provider(PosthocMocapPipelineConfig()) == chosen
     assert resolve_tracking_provider(PosthocMocapPipelineConfig(detectorType='mediapipe', executionProvider='cuda')) == 'cpu'
 

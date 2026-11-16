@@ -48,33 +48,43 @@ def load_detector_pipeline(detector_type: str, rtmpose_model_name: str | None = 
     return config
 
 
-def run_execution_provider(requested: str | None) -> str:
-    """The EP key of a run: the user's choice, or the skellytracker recommendation.
+def run_ep_choice(requested: str | None) -> tuple[str, dict[str, str] | None, str | None]:
+    """The EP key, EP options and device of a run: the user's key, or skellytracker's performance recommendation.
 
     An old saved choice that v2 does not have (`trt`, `directml`) is treated as Auto, as
     freemocap already did for `trt`.
     """
     from skellytracker.core import eps
     if requested in EXECUTION_PROVIDERS:
-        return requested
+        return requested, None, None
     if requested not in (None, "auto", *REMOVED_PROVIDERS):
         raise ValueError(f"Unknown execution provider {requested!r}; choose one of {EXECUTION_PROVIDERS}")
-    chosen = eps.recommend("performance").chosen.ep_key
-    logger.info("Execution provider %s chosen for requested %s", chosen, requested or "auto")
-    return chosen
+    recommendation = eps.recommend("performance")
+    chosen = recommendation.chosen
+    logger.info("Execution provider %s (device %s) chosen for requested %s", chosen.ep_key, chosen.device_key, requested or "auto")
+    return chosen.ep_key, dict(recommendation.options) or None, chosen.device_key
+
+
+def run_execution_provider(requested: str | None) -> str:
+    """The EP key of a run (see `run_ep_choice`)."""
+    return run_ep_choice(requested)[0]
 
 
 def start_detector_run(*, detector_type: str, camera_ids: Sequence[str], running_mode: str,
                        rtmpose_model_name: str | None = None, execution_provider: str | None = None):
-    """Start the run of a detector choice; return it with its EP key. Give an EP only when the pipeline needs one."""
+    """Start the run of a detector choice; return it with its EP key. Give an EP only when the pipeline needs one.
+
+    Auto passes the recommendation's EP options and device too (CUDA fp16 needs its options).
+    """
     from skellytracker.core.pipelines import check_pipeline, start_pipeline
     config = load_detector_pipeline(detector_type, rtmpose_model_name)
-    provider = run_execution_provider(execution_provider) if check_pipeline(config).needs_execution_provider else None
-    run = start_pipeline(config, camera_ids=list(camera_ids), running_mode=running_mode, execution_provider=provider)
+    provider, options, device = (run_ep_choice(execution_provider) if check_pipeline(config).needs_execution_provider
+                                 else (None, None, None))
+    run = start_pipeline(config, camera_ids=list(camera_ids), running_mode=running_mode, execution_provider=provider,
+                         ep_options=options, device=device)
     return run, provider
 
 
-@cache
 def _output_schema(detector_type: str) -> dict[str, Any]:
     from skellytracker.core.pipelines import check_pipeline
     return check_pipeline(load_detector_pipeline(detector_type)).output_schema

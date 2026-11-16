@@ -439,8 +439,23 @@ Recorded on 2026-11-16, by the user through `skellytracker-ef`.
     reset).
   - The other four choices go, with the code that only they use, in the backend, the UI and the
     SDK. The removal list is §6.
-- Still open with the user: who owns the standard-human mapping (freemocap, or a skellytracker
-  mapping API). Design nothing on it yet.
+- Mapping: "Skellytracker must own these mappings, and there must be a pipeline node that can
+  convert between mappings."
+  - freemocap does NOT own the standard-human mapping.
+  - Do not copy the `sfn26` mapping classes into freemocap for new recordings.
+  - A spec draft for a mapping node is waiting for the user. Design nothing on it yet.
+  - The old-recording reader (Q10) stays.
+  - The fact sent for the draft: on `sfn26`, freemocap applies the mapping only to triangulated 3D
+    points. The call sites are:
+    - `posthoc_reconstruction.py:170,179,222,231`;
+    - `reconstruction_state.py:151-158` (from `reconstruct_skeleton.py:17,24` and the realtime
+      aggregator `:970`);
+    - `alignment_evidence.py:77-80` (`apply_with_quality`, with a quality from reprojection: the
+      second-best camera score, `mocap_alignment.py:66-82`).
+    - No call site maps the 2D points of a camera.
+- Gate, 2026-11-16: the calibration surface is pushed on skellytracker `ae2d75b5`
+  (`skellytracker.core.detectors.create_detector` and `skellytracker.core.detectors.calibration`).
+  The pipeline API stage has started.
 
 ### Features this migration removes
 

@@ -20,9 +20,8 @@ abandoned consumers. Per-camera startup failures now close
 their shared-memory attachment as well as initialized trackers.
 
 Post-hoc `executionProvider` selects the ONNX provider for both pipeline
-implementations. The graph-only UI selector was removed. Older API requests
-using `graphExecutionProvider` remain accepted; conflicting explicit choices
-raise validation errors. Hidden ONNX settings do not select a MediaPipe device.
+implementations. The graph-only UI selector and `graphExecutionProvider` were
+removed; older requests that name it still load and ignore it. Hidden ONNX settings do not select a MediaPipe device.
 
 Automatic defaults are unchanged: graph RTMW processing chooses CUDA when
 advertised, otherwise CPU; graph MediaPipe uses CPU. Live and older post-hoc

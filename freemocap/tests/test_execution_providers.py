@@ -26,9 +26,12 @@ def test_a_saved_v1_provider_reads_as_auto(saved):
     assert live.RealtimePipelineConfig(skeleton_inference_node_config={'execution_provider': saved}).skeleton_inference_node_config.execution_provider is None
 
 
-def test_conflicting_saved_graph_provider_is_rejected():
-    with pytest.raises(ValidationError, match='disagree'):
-        PosthocMocapPipelineConfig(executionProvider='cpu', graphExecutionProvider='cuda')
+def test_saved_graph_provider_loads_and_is_not_written_again():
+    config = PosthocMocapPipelineConfig(executionProvider='cpu', graphExecutionProvider='cuda')
+    assert config.execution_provider == 'cpu' and 'graphExecutionProvider' not in config.model_dump(by_alias=True)
+
+
+def test_unknown_provider_is_rejected():
     with pytest.raises(ValidationError):
         PosthocMocapPipelineConfig(executionProvider='not-a-provider')
 

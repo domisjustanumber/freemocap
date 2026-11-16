@@ -20,7 +20,7 @@ class ApplicationGraphTests(TestCase):
         self.temp=TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name); self.calibration=self.root/'selected.toml'; self.calibration.write_text('test calibration')
         self.config=PosthocMocapPipelineConfig(
-            charuco_tracking_enabled=False, graph_execution_provider='cpu',
+            charuco_tracking_enabled=False, execution_provider='cpu',
             calibration_toml_path=str(self.calibration), export_to_blender=False)
 
     def test_saved_3d_starts_do_not_require_external_calibration(self):

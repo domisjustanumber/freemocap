@@ -120,12 +120,8 @@ Global 3 record describes the implemented changes:
 - Per-camera live inference in `camera_node.py` calls
   `build_skeleton_onnx_session` without a provider argument. Its selection is
   automatic; controls must reach this path too.
-- Graph post-hoc processing already exposes `graph_execution_provider` through
-  `PosthocMocapPipelineConfig`, `application_pipeline.py`, the setup modal's
-  `graphExecutionProvider` state and `services/recording/posthoc-processing.ts`.
-  Its automatic selection chooses CUDA/CPU, while centralized live `None`
-  delegates to Tracker's automatic policy. Do not assume these policies are
-  already identical.
+- Graph post-hoc processing takes `execution_provider` from
+  `PosthocMocapPipelineConfig`; `None` is Auto, the skellytracker recommendation.
 - Live settings travel through `api/http/realtime/realtime_router.py` (`/apply`),
   the UI realtime store and `RealtimePipelineConfigTree.tsx`. Reconcile API,
   stored settings, UI selection and actual applied session settings together.

@@ -154,7 +154,7 @@ def test_created_pipeline_exposes_all_waiting_operations_before_worker_start(tmp
 
 
 def test_preview_rejects_unsupported_provider_and_missing_source_run(tmp_path):
-    config = PosthocMocapPipelineConfig(detector_type='mediapipe',graph_execution_provider='cuda',
+    config = PosthocMocapPipelineConfig(detector_type='mediapipe',execution_provider='cuda',
         stop_stage='observations',export_to_blender=False)
     result = preview_processing_plan(recording_path=tmp_path,config=config)
     assert result.plan is None

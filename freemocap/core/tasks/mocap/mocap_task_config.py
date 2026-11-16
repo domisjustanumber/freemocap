@@ -35,8 +35,6 @@ class PosthocMocapPipelineConfig(BaseModel):
         migrated['export_options'] = options
         return migrated
 
-    graph_execution_provider: Literal["auto", "cpu", "cuda"] = Field(
-        default="auto", alias="graphExecutionProvider")
     graph_annotate: bool = Field(default=True, alias="graphAnnotate")
 
     start_stage: Literal['observations', 'triangulation', 'filtering', 'scale_fit', 'reconstruction'] = Field(
@@ -86,13 +84,6 @@ class PosthocMocapPipelineConfig(BaseModel):
         alias="executionProvider",
         description="ONNX Runtime execution provider for RTMPose. None retains the selected pipeline automatic policy; an explicit choice raises if it cannot load.",
     )
-    @model_validator(mode="after")
-    def validate_provider_selection(self):
-        if (self.execution_provider is not None and self.graph_execution_provider != "auto"
-                and self.execution_provider != self.graph_execution_provider):
-            raise ValueError("executionProvider and graphExecutionProvider disagree; use executionProvider")
-        return self
-
     # MediaPipe Holistic takes no model size, confidences or face count (user F1, 2026-11-16).
     mediapipe_num_hands: Literal[2] = Field(
         default=2,

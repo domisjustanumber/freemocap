@@ -46,19 +46,18 @@ def describe_active_operation(name: str) -> str:
 def validate_application_graph(*, config: PosthocMocapPipelineConfig) -> None:
     if config.start_stage in ('observations', 'triangulation') and config.stop_stage != 'observations' and (not config.calibration_toml_path or not Path(config.calibration_toml_path).is_file()):
         raise ValueError('Typed data flow graph V1 requires an existing camera calibration file')
-    if config.start_stage == 'observations' and config.detector_type == 'mediapipe' and config.graph_execution_provider == 'cuda':
+    if config.start_stage == 'observations' and config.detector_type == 'mediapipe' and config.execution_provider not in (None, 'cpu'):
         raise ValueError('The installed MediaPipe adapter supports CPU only; choose automatic or CPU')
 
 
-def resolve_tracking_provider(config: PosthocMocapPipelineConfig) -> str:
+def resolve_tracking_provider(config: PosthocMocapPipelineConfig) -> str | None:
     """The user's EP key, or for Auto the skellytracker recommendation. MediaPipe takes no EP."""
     if config.detector_type == 'mediapipe':
         return 'cpu'
-    provider = config.execution_provider or config.graph_execution_provider
-    if provider == 'auto' and config.start_stage == 'observations':
-        from freemocap.core.tracking.pipeline_runs import run_execution_provider
-        return run_execution_provider(provider)
-    return provider
+    if config.start_stage != 'observations':
+        return config.execution_provider
+    from freemocap.core.tracking.pipeline_runs import run_execution_provider
+    return run_execution_provider(config.execution_provider)
 
 
 def run_application_graph(*, request) -> None:

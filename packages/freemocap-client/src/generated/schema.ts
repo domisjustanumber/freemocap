@@ -2787,12 +2787,6 @@ export interface components {
              */
             anchorSegmentName?: string;
             /**
-             * Graphexecutionprovider
-             * @default auto
-             * @enum {string}
-             */
-            graphExecutionProvider?: "auto" | "cpu" | "cuda";
-            /**
              * Graphannotate
              * @default true
              */

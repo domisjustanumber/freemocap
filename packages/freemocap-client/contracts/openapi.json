@@ -6818,16 +6818,6 @@
             "title": "Anchorsegmentname",
             "default": "pelvis"
           },
-          "graphExecutionProvider": {
-            "type": "string",
-            "enum": [
-              "auto",
-              "cpu",
-              "cuda"
-            ],
-            "title": "Graphexecutionprovider",
-            "default": "auto"
-          },
           "graphAnnotate": {
             "type": "boolean",
             "title": "Graphannotate",

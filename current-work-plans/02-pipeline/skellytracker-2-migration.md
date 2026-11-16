@@ -439,14 +439,11 @@ Recorded on 2026-11-16, by the user through `skellytracker-ef`.
     reset).
   - The other four choices go, with the code that only they use, in the backend, the UI and the
     SDK. The removal list is `skellytracker-2-removal-list.md`.
-- Mapping: "Skellytracker must own these mappings, and there must be a pipeline node that can
-  convert between mappings."
-  - freemocap does NOT own the standard-human mapping.
-  - Do not copy the `sfn26` mapping classes into freemocap for new recordings.
-  - A spec draft for a mapping node is waiting for the user. Design nothing on it yet.
-  - The old-recording reader (Q10) stays.
-  - The fact sent for the draft: on `sfn26`, freemocap applies the mapping only to triangulated 3D
-    points. The call sites are:
+- Mapping, the second decision (2026-11-16, after the 3D fact): "in that case - freemocap owns the
+  mappings." There is no mapping node and no mapping API in skellytracker 2.0.0. The design is in
+  §6. The first decision, "Skellytracker must own these mappings", is withdrawn.
+  - The fact that changed the decision: on `sfn26`, freemocap applies the mapping only to
+    triangulated 3D points. The call sites are:
     - `posthoc_reconstruction.py:170,179,222,231`;
     - `reconstruction_state.py:151-158` (from `reconstruct_skeleton.py:17,24` and the realtime
       aggregator `:970`);
@@ -543,6 +540,104 @@ The answers:
 
 - **Not run:** the e2e and slow tests (57), the UI tests and the tests in `packages/`. The
   `packages/freemocap-stream` tests do not collect in this environment, but CI does not run them.
+
+## 6. Mapping package (freemocap owns the mappings)
+
+One package, `freemocap/core/mapping/`, serves the new recordings and the reader of old
+recordings. The mapping stays applied to the triangulated 3D points, at the call sites of §3. The
+code is copied from skellytracker `sfn26` `2d356a6c`. The commit that adds it names that commit.
+
+### 6.1 Files copied
+
+The ST paths are under `skellytracker/core/io/` and `skellytracker/tests/`.
+
+| freemocap file | Source (ST) | Change |
+|---|---|---|
+| `core/mapping/tracker_mapping.py` | `core/io/tracker_mapping.py` (781 lines: `TrackerMapping` with the offsets and the quality propagation, `TrackerMappingSnapshot`, `MappedLandmarkEvidence`, passthrough) | imports only |
+| `core/mapping/canonical_mapping_expansion.py` | `core/io/canonical_mapping_expansion.py` (53 lines; `tracker_mapping.py` imports it) | none |
+| `core/mapping/composite_tracker_mapping.py` | `core/io/composite_tracker_mapping.py` (57 lines) | imports only |
+| `core/mapping/prepared_tracker_mapping.py` | `core/io/prepared_tracker_mapping.py` (357 lines) | imports only |
+| `core/mapping/tracker_mapping_batch.py` (+ `.md`) | `core/io/tracker_mapping_batch.py` (23 lines; `prepared_tracker_mapping.py` imports it) | none |
+| `core/mapping/mapping_paths.py` | `core/io/mapping_paths.py` | new paths: only the three YAMLs of §6.2 |
+| `tests/mapping/` | `tests/test_hand_cmc_mapping.py`, `test_mapping_quality.py`, `test_passthrough_mapping.py`, `test_shoulder_mapping.py`, `test_tracker_mapping_batch.py`, `test_mapping_paths.py`, `shoulder_mapping_notes.md` | imports and paths; the YAML tests get the new keys |
+
+- The code has no assumption about the name separator. Its only name check is the optional
+  `prefix` (`tracker_mapping.py:245`), so `<group>/<point>` names need no change.
+- Not copied:
+  - `tracker_profiles.py`. It holds the profile selection and the `mediapipe_hands` rewrite;
+    freemocap's `tasks/mocap/tracker_mappings.py` picks the YAMLs itself.
+  - the `*_to_canonical_mapping.yaml` files and `rtmpose_body17_to_canonical_mapping.yaml`;
+  - each mapping of the four removed choices.
+- The ratio tool `tools/generate_tracker_mapping_ratios.py` is already in freemocap. Only its
+  import changes (`:35`).
+
+### 6.2 YAML files rewritten for the new point names
+
+The ST paths are under `skellytracker/core/detectors/keypoint_detectors/`. The values (the tracker
+side) change. The keys (the standard-human landmarks) and the offsets and ratios do not change.
+
+| freemocap file | Source (ST) | Source names | Example |
+|---|---|---|---|
+| `core/mapping/yaml/rtmw_body_to_standard_human.yaml` | `rtmpose/body/rtmpose_body_to_standard_human_mapping.yaml` | the canonical names of `to_canonical` (ST `core/model_zoo/landmark_schemas/COCO_WholeBody.yaml`, `canonical_mapping`, region `body`) | `left_acromion: left_shoulder` → `left_acromion: body/left_shoulder`; `head_center: [left_ear, right_ear]` → `[body/left_ear, body/right_ear]` |
+| `core/mapping/yaml/mediapipe_holistic_body_to_standard_human.yaml` | `mediapipe/body/mediapipe_body_to_standard_human_mapping.yaml` | `mediapipe-holistic-tasks` group `body`: `body/<name of mediapipe_body.yaml>` | `left_eye_inner: left_eye_inner` → `left_eye_inner: body/left_eye_inner` |
+| `core/mapping/yaml/hand_to_standard_human.yaml` | `rtmpose/hand/rtmpose_hand_to_standard_human_mapping.yaml` and `mediapipe/hands/mediapipe_hand_to_standard_human_mapping.yaml` | `left_hand/<name>`, `right_hand/<name>` | RTMW `left_thumb_cmc: "left_hand_thumb1"` and MediaPipe `left_thumb_cmc: "left_hand_thumb_cmc"` → both `left_thumb_cmc: left_hand/thumb_cmc` |
+
+- One hand file serves both choices:
+  - The two source files differ only in their comments and their source names. Checked: the
+    `diff` is empty after the source names are normalised.
+  - The canonical hand names of RTMW (`left_hand/wrist`, `thumb_cmc`, `index_finger_mcp`, ...,
+    `pinky_tip`) are the MediaPipe hand names.
+  - So both become the same text. The `anatomical_offset` CMC entries keep their numbers, for
+    example `left_index_cmc` with origin `[left_wrist]` → `[body/left_wrist]` and `to:
+    left_hand_forefinger1` → `left_hand/index_finger_mcp`.
+- MediaPipe:
+  - The body file keeps the MediaPipe pose names (for example `left_foot_index`, the eye inner and
+    outer points).
+  - No mapping uses the face points (0 references to `face_` in the body file), so the
+    478-point face of Holistic needs no mapping.
+  - These keys stay `<group>/<point>` names of the node until a later skellytracker stage
+    registers the MediaPipe schemas.
+- The bundle's `tracker_keypoint_names` become the point names that freemocap triangulates: the
+  `canonical_names` (RTMW) or the output `point_names` (Holistic).
+- Charuco needs no YAML. freemocap builds the passthrough mapping in
+  `core/skeletons/charuco_board_skeleton.py:106-107` as
+  `TrackerMapping(entries={}, known_tracker_keypoints=set(board.all_point_names),
+  passthrough_keypoints_as_landmarks=True)`, from its own copy. The charuco names stay
+  `CharucoCorner-{i}` and `ArucoMarkerCorner-{id}-{j}`.
+
+### 6.3 Old and new snapshots in the reader
+
+- `RecordedModel.mappings` (`core/recording/data_descriptors/recording_model.py:19-31`) holds
+  `TrackerMappingSnapshot` values as plain pydantic data: `entries`, `prefix`,
+  `known_tracker_keypoints` and `passthrough`. It holds no module path. `to_bundle` (`:104-123`)
+  makes `CompositeTrackerMapping(item.restore() for item in self.mappings)` again.
+- Each recording carries its own mapping:
+  - An old snapshot has old source names (`left_shoulder`, `left_hand_thumb1`). Its restored
+    mapping applies to the old 3D channels of that recording, which also have the old flat names
+    (the stage prefix was stripped).
+  - A new snapshot has the new names (`body/left_shoulder`, `left_hand/thumb_cmc`), and applies to
+    the new channels.
+  - So old and new snapshots coexist with no version field and no name translation. The only rule
+    is that a snapshot and the channels it maps come from the same recording.
+- Because of that, the copy must keep the four snapshot fields, their types and their order. The
+  `RecordedModel` serializer keeps historical fingerprints (`recording_model.py:33-...`). A change
+  of the snapshot form changes the fingerprints of old recordings.
+- The reader needs no old YAML. The 2D observation channels of an old recording keep their
+  `<stage>.<point>` names (`observation_series.py:41`), and only the reader parses them.
+
+### 6.4 Callers that move to `freemocap.core.mapping`
+
+- `core/skeletons/charuco_board_skeleton.py:39-40,106-107`;
+- `core/skeletons/reconstruction_state.py:23`;
+- `core/reconstruction/posthoc_reconstruction.py:163,215`;
+- `core/skeletons/tracked_skeleton_bundle.py:27`;
+- `core/recording/data_descriptors/recording_model.py:9-10`;
+- `core/tasks/mocap/tracker_mappings.py:3-17` (the YAMLs come from `freemocap.core.mapping.mapping_paths`);
+- `core/skeletons/standard_human_skeleton.py:18,43,58-59`;
+- `tools/generate_tracker_mapping_ratios.py:35`;
+- the tests `test_tracker_mapping_authoring.py:12,18-19` (it reads the ST YAML paths),
+  `test_alignment_evidence.py:9`, `test_model_presentation.py:41` and
+  `test_model_scale_in_the_loop.py:19`.
 
 ## 5. Sharing, lifetime and threads (input to the 1.10 investigation)
 

@@ -25,9 +25,18 @@ def test_a_key_that_skellytracker_does_not_have_fails_the_run_start_with_its_mes
         start_detector_run(detector_type='rtmpose', camera_ids=['0'], running_mode='live', execution_provider='any-ep-key')
 
 
-def test_saved_graph_provider_loads_and_is_not_written_again():
-    config = PosthocMocapPipelineConfig(executionProvider='cpu', graphExecutionProvider='other-ep')
-    assert config.execution_provider == 'cpu' and 'graphExecutionProvider' not in config.model_dump(by_alias=True)
+@pytest.mark.parametrize('saved,expected', [
+    ({'graphExecutionProvider': 'other-ep'}, 'other-ep'),
+    ({'graph_execution_provider': 'other-ep'}, 'other-ep'),
+    ({'graphExecutionProvider': 'auto'}, None),
+    ({'executionProvider': 'cpu', 'graphExecutionProvider': 'other-ep'}, 'cpu'),
+    ({'executionProvider': None, 'graphExecutionProvider': 'other-ep'}, None),
+])
+def test_a_saved_graph_provider_keeps_its_meaning_and_is_not_written_again(saved, expected):
+    config = PosthocMocapPipelineConfig.model_validate(saved)
+    assert config.execution_provider == expected
+    written = set(config.model_dump(by_alias=True)) | set(config.model_dump())
+    assert not {'graphExecutionProvider', 'graph_execution_provider'} & written
 
 
 def test_provider_route_lists_the_key_and_label_of_each_usable_ep_in_skellytracker_order_without_loading_models():

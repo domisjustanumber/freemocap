@@ -34,6 +34,20 @@ class PosthocMocapPipelineConfig(BaseModel):
         migrated['export_options'] = options
         return migrated
 
+    @model_validator(mode='before')
+    @classmethod
+    def migrate_graph_execution_provider(cls, value):
+        """A saved retired `graphExecutionProvider` keeps its meaning when no `executionProvider` is saved,
+        as `execution_provider or graph_execution_provider` gave it; it is not written again."""
+        if not isinstance(value, dict):
+            return value
+        names = ('graphExecutionProvider', 'graph_execution_provider')
+        saved = next((value[name] for name in names if name in value), None)
+        migrated = {key: item for key, item in value.items() if key not in names}
+        if saved not in (None, 'auto') and not {'executionProvider', 'execution_provider'} & value.keys():
+            migrated['execution_provider'] = saved
+        return migrated
+
     graph_annotate: bool = Field(default=True, alias="graphAnnotate")
 
     start_stage: Literal['observations', 'triangulation', 'filtering', 'scale_fit', 'reconstruction'] = Field(

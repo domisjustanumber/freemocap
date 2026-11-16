@@ -492,6 +492,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Check out the release scripts
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
@@ -546,13 +551,14 @@ jobs:
 
           # Copy latest.yml files from update-metadata artifacts and patch
           # the file references to match the renamed release asset names.
+          # An installed app downloads the file its channel file names (only sha512 and size are checked).
+          bash .github/scripts/update_metadata.sh selftest
 
           # Windows: latest.yml
           if [ -d "artifacts/update-metadata-windows-x64-cpu" ]; then
             YML=$(find artifacts/update-metadata-windows-x64-cpu -name 'latest.yml' | head -1)
             if [ -n "$YML" ]; then
-              # Replace the original artifact filename with the renamed one
-              sed -i "s|freemocap_.*_installer\.exe|freemocap_${VERSION}_windows-x64-cpu.exe|g" "$YML"
+              bash .github/scripts/update_metadata.sh patch "$YML" "$VERSION" windows-x64-cpu
               cp "$YML" "release-assets/latest.yml"
               echo "Copied latest.yml for Windows (CPU)"
             fi
@@ -569,7 +575,7 @@ jobs:
           done
           if [ -n "$MAC_YML" ]; then
             # Patch filenames to match renamed assets (Apple Silicon only)
-            sed -i "s|freemocap_.*_installer\.zip|freemocap_${VERSION}_macos-arm64-apple-silicon.zip|g" "$MAC_YML"
+            bash .github/scripts/update_metadata.sh patch "$MAC_YML" "$VERSION" macos-arm64-apple-silicon
             cp "$MAC_YML" "release-assets/latest-mac.yml"
             echo "Copied latest-mac.yml for macOS"
           fi
@@ -578,7 +584,7 @@ jobs:
           if [ -d "artifacts/update-metadata-linux-x64-cpu" ]; then
             YML=$(find artifacts/update-metadata-linux-x64-cpu -name 'latest-linux.yml' | head -1)
             if [ -n "$YML" ]; then
-              sed -i "s|freemocap_.*\.AppImage|freemocap_${VERSION}_linux-x64-cpu.AppImage|g" "$YML"
+              bash .github/scripts/update_metadata.sh patch "$YML" "$VERSION" linux-x64-cpu
               cp "$YML" "release-assets/latest-linux.yml"
               echo "Copied latest-linux.yml for Linux (CPU)"
             fi
@@ -586,6 +592,8 @@ jobs:
 
           echo "=== Final release assets ==="
           ls -lh release-assets/
+          # Fail before the upload if a channel file names a file that is not a release asset.
+          bash .github/scripts/update_metadata.sh check release-assets
 
       # ── Size guard ──
       # GitHub caps release assets at 2 GiB. Measure every file about to be uploaded and

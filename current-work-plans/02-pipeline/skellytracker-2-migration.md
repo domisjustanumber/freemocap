@@ -68,7 +68,8 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
   `EpRecommendation.options` and `device_key` (`pipeline_runs.py:62`).
   ANSWERS (supervisor, 2026-11-16): skellytracker fills gaps 1 (usable flag), 2 (install hint),
   4 (GPU flag), 5 (stated order of `EpStatus.eps`) and 3 (per model node: applied EP, device,
-  precision); names come in a later message, code against them only then. Gaps 6 and 7 are dropped.
+  precision); names come in a later message, code against them only then. Gaps 6 (devices) and 7
+  (description) are NOT dropped (§0.3): skellytracker fills them too, in part 2.
   Until then: no new import of `USABLE_STATES` from `eps.records`, no call of private `install_hint()`.
   `/onnx/session_providers` stays untouched until gap 3; the made-up `applied_providers` at
   `inference_service.py:161` **waits for gap 3**.
@@ -77,21 +78,23 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     (own commit);
     (ii) FIRST, with a test, Auto = `status().performance.chosen` and pass `options` and `device_key`
     to `start_pipeline(ep_options=..., device=...)`;
-    (iii) `app/app.py` startup GPU probe (nvidia-smi, WMIC, lspci, system_profiler,
-    `onnxruntime.get_available_providers()`) → `status().host`;
+    (iii) WAITS: do not touch the `app/app.py` startup probe until the supervisor's verdict per command
+    (nvidia-smi, WMIC, lspci, system_profiler, `onnxruntime.get_available_providers()`); change it once;
     (iv) delete the dead `graph_execution_provider` Literal (backend, contract, UI);
     (v) contract EP types become plain strings; delete the Literal key list, `EXECUTION_PROVIDERS`,
     `REMOVED_PROVIDERS` and the validator; an unknown key gives skellytracker's `EpRequestError`, show its
     message;
     (vi) the mediapipe rule uses `check_pipeline(...).needs_execution_provider`;
     (vii) the UI gets keys and labels from the backend route at run time: no union type, label table or
-    order table; drop the GPU/CPU help texts;
+    order table; KEEP the GPU/CPU help-text places as they are until part 2 gives the description
+    field, and plan a device list in the EP setting;
     (viii) a test that fails when a source file under `freemocap/` or `freemocap-ui/src/` holds an EP
     key literal (`cuda`, `trt-rtx`, `coreml`, `directml`, `trt`) or an ORT provider name
     (`*ExecutionProvider`); allowlist empty or justified line by line.
     Report to the supervisor after part 1.
-  - Part 2, after the supervisor's message: usable flag, install hint, GPU flag, order, the applied EP of
-    `/onnx/session_providers`.
+  - Part 2, after the supervisor's message: usable flag, install hint, GPU flag, order, description,
+    devices (UI device list: key, name, VRAM), the applied EP of `/onnx/session_providers`, and the
+    `app/app.py` probe per the verdict.
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).
@@ -224,6 +227,12 @@ frames, each with `rtmpose` and with `mediapipe`.
   GPU or platform test, or precision rule in freemocap code, UI or contract enums; the source is
   `skellytracker.core.eps` (`status()`, `recommend(form)`, `run_devices`, `check_start`); Auto = the
   `performance` recommendation; the contract type is a string. Replaces the fixed keys of step 1.
+- EP devices and descriptions (2026-11-16): gaps 6 and 7 are NOT dropped. The UI shows the devices as
+  skellytracker reports them (key, name, VRAM in the EP setting; no device knowledge in freemocap),
+  and skellytracker adds a short description per EP that the UI shows. Both fields come with the
+  supervisor's part 2 message.
+- Host probes (2026-11-16): drop `nvidia-smi`; drop WMIC, lspci and system_profiler too where they only
+  find what skellytracker already gives. The verdict per command comes from the supervisor.
 - F2b (2026-11-16): no copies. New releases ship without installer copies under the old `-cpu` and
   `-cuda` names; existing installs update through the channel files.
 - F2 revised (2026-11-16): the installer names drop `-cpu` (`windows-x64`, ...); old `-cpu` and

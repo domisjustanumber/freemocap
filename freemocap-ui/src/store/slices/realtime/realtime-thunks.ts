@@ -8,7 +8,7 @@ import {PipelineApplyResponse, RealtimePipelineConfig} from "@/store/slices/real
 import {selectCalibrationConfig, selectLoadedCalibration} from "@/store/slices/calibration/calibration-slice";
 import {loadRealtimeCalibrationDefault} from '@/store/slices/calibration/calibration-thunks';
 import {getDetailedErrorMessage} from '@/store/slices/thunk-helpers';
-import {realtimeExecutionSettings} from './realtime-settings';
+import {realtimePipelineSettings} from './realtime-settings';
 import {checkStartupStopped} from '@/services/server/startup-stopped';
 
 export const applyRealtimePipeline = createAsyncThunk<
@@ -18,12 +18,11 @@ export const applyRealtimePipeline = createAsyncThunk<
 >(
     'realtime/apply',
     async (realtimeConfig, {getState, dispatch}) => {
-        const isDlc = realtimeConfig.camera_node_config.detector_type === 'dlc';
-        if ((!isDlc || realtimeConfig.aggregator_config.triangulation_enabled) && getState().calibration.loadRequestId) throw new Error('Wait for the selected calibration to finish loading.');
+        if (getState().calibration.loadRequestId) throw new Error('Wait for the selected calibration to finish loading.');
         // Null is the product's default-calibration selection. The backend also
         // resolves null independently; load it here to keep the displayed file
         // and board definition in agreement before submitting the live config.
-        if (!isDlc && !selectLoadedCalibration(getState())) {
+        if (!selectLoadedCalibration(getState())) {
             const selection = await dispatch(loadRealtimeCalibrationDefault());
             if (loadRealtimeCalibrationDefault.rejected.match(selection) && !selectLoadedCalibration(getState())) {
                 throw new Error(selection.payload ?? selection.error.message ?? 'Could not load the most recent calibration.');
@@ -41,7 +40,7 @@ export const applyRealtimePipeline = createAsyncThunk<
         const realtimeEnabledIds = Object.keys(selectRealtimeEnabledCameraConfigs(getState()));
         const realtimeCameraIds = realtimeEnabledIds.length > 0 ? realtimeEnabledIds : null;
         const calibrationConfig = selectCalibrationConfig(getState());
-        if ((!isDlc || realtimeConfig.aggregator_config.triangulation_enabled) && getState().calibration.loadRequestId) throw new Error('Wait for the selected calibration to finish loading.');
+        if (getState().calibration.loadRequestId) throw new Error('Wait for the selected calibration to finish loading.');
         const selectedCalibration = selectLoadedCalibration(getState());
         const calibrationTomlPath = selectedCalibration?.path ?? null;
         // Automatic calibration may detect a different board than the editable
@@ -55,7 +54,7 @@ export const applyRealtimePipeline = createAsyncThunk<
             aruco_dictionary_enum: savedBoard.aruco_dictionary_enum,
         } : calibrationConfig.charucoBoard;
 
-        const configWithBoard = realtimeExecutionSettings({
+        const configWithBoard = realtimePipelineSettings({
             ...realtimeConfig,
             camera_node_config: {
                 ...realtimeConfig.camera_node_config,
@@ -65,7 +64,7 @@ export const applyRealtimePipeline = createAsyncThunk<
                 ...realtimeConfig.aggregator_config,
                 calibration_toml_path: calibrationTomlPath,
             },
-        }, getState().mocap.config.dlcExecutionProvider ?? 'cpu');
+        });
 
         const response = await serverClient().responses.pipeline_apply_endpoint_freemocap_realtime_apply_post({headers: {'Content-Type': 'application/json'}, body: {
                 realtimeConfig: configWithBoard,

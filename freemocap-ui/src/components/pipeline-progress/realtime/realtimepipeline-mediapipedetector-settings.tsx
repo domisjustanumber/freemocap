@@ -1,5 +1,3 @@
-import {HAND_COUNT_INFO, HandCountInput} from '@/components/mocap-setup/hand-count-input';
-import {DlcModelSettings} from '@/components/mocap-setup/dlc-model-settings';
 import React, {useCallback} from 'react';
 import TrackerSettingsDialog from '@/components/mocap-setup/tracker-settings-dialog';
 import ValueSelector from '@/components/ui-components/ValueSelector';
@@ -16,9 +14,9 @@ import {
 } from '@/components/mocap-setup/detector-setting-rows';
 import { useRealtimePipelineSync } from '@/hooks/useRealtimePipelineSync';
 import { useExecutionProviderOptions } from '@/hooks/useExecutionProviderOptions';
-import { ExecutionProviderName, MediapipeModelComplexity, RTMPOSE_MODELS, RTMPoseModelName } from '@/store/slices/mocap';
-import { CameraNodeConfig, RealtimeDetectorType } from '@/store/slices/realtime/realtime-types';
-import { REALTIME_DETECTOR_OPTIONS } from '@/components/mocap-setup/detector-options';
+import { DetectorType, ExecutionProviderName, MediapipeModelComplexity, RTMPOSE_MODELS, RTMPoseModelName } from '@/store/slices/mocap';
+import { CameraNodeConfig } from '@/store/slices/realtime/realtime-types';
+import { DETECTOR_OPTIONS } from '@/components/mocap-setup/detector-options';
 import './realtime-settings.css';
 
 interface RTPSkeletonSetupProps {
@@ -31,40 +29,21 @@ const DETECTOR_INFO = {
     text: <>
         <p><strong>RTMW</strong> — 133 keypoints (body, hands, face) via YOLOX + RTMW. Uses GPU batched inference when available.</p>
         <p><strong>MediaPipe</strong> — body, hands and face. CPU only; runs per camera without GPU batching.</p>
-        <p><strong>RTMW + MediaPipe hands</strong> — RTMW body and face with cropped MediaPipe hands.</p>
-        <p><strong>Hands only (MediaPipe)</strong> — tracks up to two hands on CPU.</p>
-        <p><strong>DLC</strong> — a DeepLabCut model, prepared and selected below.</p>
-        <p><strong>RTMW + ONNX hands (experimental)</strong> — RTMW body and face with ONNX palm and hand models.
-            Compare hand quality with the MediaPipe hands option.</p>
         <p><em>The detector decides which settings below apply.</em></p>
     </>,
 };
 
-const PROVIDER_NOTE: Partial<Record<RealtimeDetectorType, string>> = {
-    rtmw_mediapipe_hands: 'The execution provider applies to RTMW; MediaPipe hands run on CPU.',
-    rtmw_onnx_hands: 'RTMW and the ONNX hand models run on CUDA; CPU is also supported.',
-};
-
-const providerInfo = (detector: RealtimeDetectorType) => ({
+const PROVIDER_INFO = {
     title: 'Execution provider',
-    text: <>
-        <p>Auto retains the pipeline default. Choices are advertised by the server runtime; session startup
-            verifies the selected provider can load.</p>
-        {PROVIDER_NOTE[detector] && <p><em>{PROVIDER_NOTE[detector]}</em></p>}
-    </>,
-});
-
-const RTMW_DETECTORS: readonly RealtimeDetectorType[] = ['rtmpose', 'rtmw_mediapipe_hands', 'rtmw_onnx_hands'];
-const MEDIAPIPE_DETECTORS: readonly RealtimeDetectorType[] = ['mediapipe_hands', 'mediapipe', 'rtmw_mediapipe_hands', 'rtmw_onnx_hands'];
+    text: <p>Auto retains the pipeline default. Choices are advertised by the server runtime; session startup
+        verifies the selected provider can load.</p>,
+};
 
 const RTPSkeletonSetup: React.FC<RTPSkeletonSetupProps> = ({ open, onClose }) => {
     const { pipelineConfig, cameraNodeConfig, applyOrUpdatePipelineConfig } = useRealtimePipelineSync();
 
     const executionProvider = pipelineConfig.skeleton_inference_node_config?.execution_provider ?? null;
-    const availableProviderOptions = useExecutionProviderOptions(executionProvider);
-    const executionProviderOptions = cameraNodeConfig.detector_type === 'rtmw_onnx_hands'
-        ? availableProviderOptions.filter(({value}) => value === 'cpu' || value === 'cuda')
-        : availableProviderOptions;
+    const executionProviderOptions = useExecutionProviderOptions(executionProvider);
 
     const handleExecutionProviderChange = useCallback(
         (provider: ExecutionProviderName | null) => {
@@ -76,16 +55,13 @@ const RTPSkeletonSetup: React.FC<RTPSkeletonSetupProps> = ({ open, onClose }) =>
         [applyOrUpdatePipelineConfig, pipelineConfig]
     );
 
-    const detectorType: RealtimeDetectorType = cameraNodeConfig.detector_type ?? "rtmpose";
+    const detectorType: DetectorType = cameraNodeConfig.detector_type ?? "rtmpose";
 
     const handleCameraNodeUpdate = useCallback(
         (updates: Partial<CameraNodeConfig>) => {
             applyOrUpdatePipelineConfig({
                 ...pipelineConfig,
                 camera_node_config: { ...cameraNodeConfig, ...updates },
-                skeleton_inference_node_config: updates.detector_type === 'rtmw_onnx_hands'
-                    ? {...pipelineConfig.skeleton_inference_node_config, execution_provider: 'cuda'}
-                    : pipelineConfig.skeleton_inference_node_config,
             });
         },
         [applyOrUpdatePipelineConfig, pipelineConfig, cameraNodeConfig]
@@ -99,11 +75,11 @@ const RTPSkeletonSetup: React.FC<RTPSkeletonSetupProps> = ({ open, onClose }) =>
                 {/* The detector reframes every row beneath it, so it leads. */}
                 <SettingRow promoted label="Skeleton detector" info={DETECTOR_INFO}
                     control={<SettingSelectInput label="Skeleton detector" value={detectorType}
-                        options={REALTIME_DETECTOR_OPTIONS}
-                        onChange={(value: RealtimeDetectorType) => handleCameraNodeUpdate({ detector_type: value })}/>}/>
+                        options={DETECTOR_OPTIONS}
+                        onChange={(value: DetectorType) => handleCameraNodeUpdate({ detector_type: value })}/>}/>
 
-                {RTMW_DETECTORS.includes(detectorType) && <>
-                    <SettingRow label="Execution provider" info={providerInfo(detectorType)}
+                {detectorType === 'rtmpose' && <>
+                    <SettingRow label="Execution provider" info={PROVIDER_INFO}
                         control={<SettingSelectInput label="Execution provider" value={executionProvider ?? 'auto'}
                             options={executionProviderOptions.map(option => ({...option, value: option.value ?? 'auto' as const}))}
                             onChange={(value: ExecutionProviderName | 'auto') => handleExecutionProviderChange(value === 'auto' ? null : value)}/>}/>
@@ -117,14 +93,11 @@ const RTPSkeletonSetup: React.FC<RTPSkeletonSetupProps> = ({ open, onClose }) =>
                             onChange={(v) => handleCameraNodeUpdate({ rtmpose_confidence_threshold: v })}/>}/>
                 </>}
 
-                {detectorType === 'mediapipe_hands' && <SettingRow label="Hand count" info={HAND_COUNT_INFO}
-                    control={<HandCountInput value={cameraNodeConfig.hand_count}
-                        onChange={hand_count => handleCameraNodeUpdate({hand_count})}/>}/>}
-                {MEDIAPIPE_DETECTORS.includes(detectorType) && <>
-                    {detectorType === 'mediapipe' && <SettingRow label="Pose model size" info={COMPLEXITY_INFO}
+                {detectorType === 'mediapipe' && <>
+                    <SettingRow label="Pose model size" info={COMPLEXITY_INFO}
                         control={<SettingSelectInput label="Pose model size" value={cameraNodeConfig.mediapipe_model_complexity ?? "lite"}
                             options={MEDIAPIPE_COMPLEXITIES}
-                            onChange={(value: MediapipeModelComplexity) => handleCameraNodeUpdate({ mediapipe_model_complexity: value })}/>}/>}
+                            onChange={(value: MediapipeModelComplexity) => handleCameraNodeUpdate({ mediapipe_model_complexity: value })}/>}/>
                     <SettingRow label="Detection confidence" info={DETECTION_CONFIDENCE_INFO}
                         control={<ValueSelector ariaLabel="Detection confidence" value={cameraNodeConfig.mediapipe_detection_confidence ?? 0.5}
                             min={0} max={1} step={0.05} unit=""
@@ -133,14 +106,12 @@ const RTPSkeletonSetup: React.FC<RTPSkeletonSetupProps> = ({ open, onClose }) =>
                         control={<ValueSelector ariaLabel="Presence confidence" value={cameraNodeConfig.mediapipe_presence_confidence ?? 0.5}
                             min={0} max={1} step={0.05} unit=""
                             onChange={(v) => handleCameraNodeUpdate({ mediapipe_presence_confidence: v })}/>}/>
-                    {detectorType !== 'rtmw_onnx_hands' && <SettingRow label="Tracking confidence" info={TRACKING_CONFIDENCE_INFO}
+                    <SettingRow label="Tracking confidence" info={TRACKING_CONFIDENCE_INFO}
                         control={<ValueSelector ariaLabel="Tracking confidence" value={cameraNodeConfig.mediapipe_tracking_confidence ?? 0.5}
                             min={0} max={1} step={0.05} unit=""
-                            onChange={(v) => handleCameraNodeUpdate({ mediapipe_tracking_confidence: v })}/>}/>}
+                            onChange={(v) => handleCameraNodeUpdate({ mediapipe_tracking_confidence: v })}/>}/>
                 </>}
             </div>
-
-            {detectorType === "dlc" && <DlcModelSettings context="realtime" embedded/>}
         </TrackerSettingsDialog>
     );
 };

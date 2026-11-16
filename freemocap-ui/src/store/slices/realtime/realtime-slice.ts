@@ -3,7 +3,7 @@ import {defaultRealtimePipelineConfig, PipelineState, RealtimePipelineConfig} fr
 import {applyRealtimePipeline, closePipeline, fetchTemporalConfig, applyTemporalConfig} from "@/store/slices/realtime/realtime-thunks";
 import {serverStateReceived, serverDisconnected} from "@/store/slices/connection/connection-slice";
 import {matchesSavedManualOffset, saveCalibrationTransform} from '@/store/slices/calibration/calibration-save';
-import {realtimePipelineSettings, acceptedRealtimeSettings} from './realtime-settings';
+import {realtimePipelineSettings} from './realtime-settings';
 import {isStartupStopped} from '@/services/server/startup-stopped';
 
 const initialState: PipelineState = {
@@ -94,7 +94,7 @@ export const realtimeSlice = createSlice({
                 state.applyPending = false;
                 state.cameraGroupId = action.payload.camera_group_id;
                 state.pipelineId = action.payload.pipeline_id;
-                state.pipelineConfig = acceptedRealtimeSettings(action.payload.resolved_config, action.meta.arg);
+                state.pipelineConfig = realtimePipelineSettings(action.payload.resolved_config);
                 state.isConnected = true;
                 state.isLoading = false;
                 state.error = null;

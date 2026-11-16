@@ -2,12 +2,12 @@
 // Switches follow the pipeline like posthoc stages. A switch counts only while everything it needs counts, so
 // switching a stage off switches off and locks what follows it. Every switch keeps its own setting, so switching
 // the stage back on brings what follows back as it was.
-import type {RealtimeDetectorType, RealtimePipelineConfig} from '@/store/slices/realtime/realtime-types';
+import type {RealtimePipelineConfig} from '@/store/slices/realtime/realtime-types';
 import type {TemporalConfig} from '@/types/temporal-config';
 
 /** The switches as they are set, with what decides whether each one can count. */
 export interface RealtimeSwitchInput {
-    person: boolean; charuco: boolean; detector: RealtimeDetectorType; dlcGeometry: boolean; filtersLoaded: boolean;
+    person: boolean; charuco: boolean; filtersLoaded: boolean;
     triangulation: boolean; reconstruction: boolean; filterTrajectories: boolean; fillGaps: boolean;
     outputs: {vmc: boolean; lsl: boolean};
 }
@@ -21,21 +21,16 @@ export interface RealtimeSwitchState {
 
 /** Works out what runs, in pipeline order. The input is left as it is: it is what comes back. */
 export function realtimeSwitchState(input: RealtimeSwitchInput): RealtimeSwitchState {
-    const dlc = input.detector === 'dlc';
-    // DLC tracks no board.
-    const charuco = input.charuco && !dlc;
-    const tracking = input.person || charuco;
+    const tracking = input.person || input.charuco;
     const triangulation = input.triangulation && tracking;
     // Gap filling and filtering passes keypoints through when it is off, so nothing after it waits for it.
     const canFilter = triangulation && input.filtersLoaded;
-    // With DLC, reconstruction also needs a geometry file: the rule of realtimeExecutionSettings.
-    const canReconstruct = triangulation && (!dlc || input.dlcGeometry);
-    const reconstruction = input.reconstruction && canReconstruct;
+    const reconstruction = input.reconstruction && triangulation;
     return {
-        person: input.person, charuco, tracking, triangulation,
+        person: input.person, charuco: input.charuco, tracking, triangulation,
         filterTrajectories: input.filterTrajectories && canFilter, fillGaps: input.fillGaps && canFilter, reconstruction,
         outputs: {vmc: input.outputs.vmc && reconstruction, lsl: input.outputs.lsl && triangulation},
-        can: {charuco: !dlc, triangulation: tracking, filtering: canFilter, reconstruction: canReconstruct,
+        can: {charuco: true, triangulation: tracking, filtering: canFilter, reconstruction: triangulation,
             vmc: reconstruction, lsl: triangulation},
     };
 }
@@ -46,7 +41,6 @@ export function switchInputFrom(config: RealtimePipelineConfig, temporal: Tempor
     const camera = config.camera_node_config, aggregator = config.aggregator_config;
     return {
         person: camera.skeleton_tracking_enabled, charuco: camera.charuco_tracking_enabled,
-        detector: camera.detector_type ?? 'rtmpose', dlcGeometry: Boolean(camera.dlc_geometry_path),
         filtersLoaded: temporal !== undefined,
         triangulation: aggregator.triangulation_enabled, reconstruction: aggregator.skeleton_fitting_enabled,
         filterTrajectories: temporal?.spatial_smoothing.enabled ?? false, fillGaps: (temporal?.gap_duration_s ?? 0) > 0,

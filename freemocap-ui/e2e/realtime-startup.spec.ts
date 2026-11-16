@@ -67,7 +67,7 @@ test('Apply sends selected settings without replaying generated tracker recipes'
                 skeleton_tracker_config: {stages: []}, charuco_tracker_config: {stages: []},
             }}}});
     });
-    for (const detector of ['rtmw_mediapipe_hands', 'mediapipe', 'rtmpose']) {
+    for (const detector of ['mediapipe', 'rtmpose']) {
         const result = await page.evaluate(detector => (window as any).applyConfig(detector), detector);
         expect(result.type).toBe('realtime/apply/fulfilled');
         const settings = request.realtimeConfig.camera_node_config;
@@ -110,7 +110,7 @@ test('validation failures show field paths and messages in the actual error bann
         {type: 'missing', loc: ['body', 'realtimeConfig', 'camera_node_config', 'skeleton_tracker_config', 'stages', 0, 'children', 0, 'object_detector', 'center_keypoint_names'], msg: 'Field required'},
         {type: 'extra_forbidden', loc: ['body', 'realtimeConfig', 'camera_node_config', 'skeleton_tracker_config', 'stages', 0, 'bbox_smoothing', 'alpha'], msg: 'Extra inputs are not permitted'},
     ]}}));
-    await page.evaluate(() => (window as any).applyConfig('rtmw_mediapipe_hands'));
+    await page.evaluate(() => (window as any).applyConfig('mediapipe'));
     const banner = page.locator('.operation-error-banner');
     await expect(banner).toContainText('HTTP 422');
     await expect(banner).toContainText('center_keypoint_names: Field required');

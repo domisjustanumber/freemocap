@@ -10,25 +10,17 @@ export interface CharucoBoardConfigForPipeline {
     aruco_dictionary_enum?: number;
 }
 
-export type RealtimeDetectorType = DetectorType | 'rtmw_onnx_hands' | 'mediapipe_hands';
-
-export type HandCount = 'one' | 'two' | 'unknown';
-
 export interface CameraNodeConfig {
     charuco_tracking_enabled: boolean;
     skeleton_tracking_enabled: boolean;
     charuco_board?: CharucoBoardConfigForPipeline;
-    detector_type?: RealtimeDetectorType;
-    dlc_model_path?: string | null;
-    dlc_geometry_path?: string | null;
-    dlc_confidence_threshold?: number;
+    detector_type?: DetectorType;
     rtmpose_model_name?: RTMPoseModelName;
     rtmpose_confidence_threshold?: number;
     mediapipe_model_complexity?: MediapipeModelComplexity;
     mediapipe_detection_confidence?: number;
     mediapipe_presence_confidence?: number;
     mediapipe_tracking_confidence?: number;
-    hand_count?: HandCount;
     mediapipe_num_hands?: 2;
     mediapipe_num_faces?: number;
 }

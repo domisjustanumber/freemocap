@@ -3,7 +3,6 @@ import {createPortal} from 'react-dom';
 import ModalWindowControls from '@/components/ui-components/ModalWindowControls';
 import ButtonSm from '@/components/ui-components/ButtonSm';
 import '@/styles/mocap-settings.css';
-import './dlc-model-settings.css';
 import './tracker-settings-dialog.css';
 
 export default function TrackerSettingsDialog({title, onClose, children}: {title: string; onClose: () => void; children: ReactNode}) {

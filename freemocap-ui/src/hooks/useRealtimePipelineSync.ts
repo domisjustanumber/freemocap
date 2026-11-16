@@ -32,7 +32,7 @@ export function useRealtimePipelineSync() {
     /** Applies a new pipeline config live if connected, otherwise updates local config only. */
     const applyOrUpdatePipelineConfig = useCallback(
         (newConfig: RealtimePipelineConfig) => {
-            if (isConnected && (newConfig.camera_node_config.detector_type !== 'dlc' || newConfig.camera_node_config.dlc_model_path)) {
+            if (isConnected) {
                 dispatch(applyRealtimePipeline(newConfig));
             } else {
                 dispatch(pipelineConfigUpdated(newConfig));
@@ -45,7 +45,7 @@ export function useRealtimePipelineSync() {
     const triggerRealtimeApply = useCallback(() => {
         if (isConnected) {
             const config = store.getState().realtime.pipelineConfig;
-            if (config.camera_node_config.detector_type !== 'dlc' || config.camera_node_config.dlc_model_path) dispatch(applyRealtimePipeline(config));
+            dispatch(applyRealtimePipeline(config));
         }
     }, [dispatch, isConnected]);
 

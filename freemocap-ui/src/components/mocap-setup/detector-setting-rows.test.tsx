@@ -5,11 +5,9 @@ import {Children, isValidElement, type ReactElement, type ReactNode} from 'react
 import {renderToStaticMarkup} from 'react-dom/server';
 // The store import follows the application entry order: the detector rows take their model list from the mocap slice.
 import '@/store';
-import {HAND_COUNT_INFO} from './hand-count-input';
-import type {TriangulationConfig} from '@/store/slices/mocap';
-import type {RealtimeDetectorType} from '@/store/slices/realtime/realtime-types';
+import type {DetectorType, TriangulationConfig} from '@/store/slices/mocap';
 import {EXECUTION_PROVIDERS} from '@/types/execution-provider';
-import {DETECTOR_OPTIONS, REALTIME_DETECTOR_OPTIONS} from './detector-options';
+import {DETECTOR_OPTIONS} from './detector-options';
 import {
     COMPLEXITY_INFO, CONFIDENCE_INFO, DETECTION_CONFIDENCE_INFO, DETECTOR_INFO, DetectorSettingRows, type DetectorSettingsValue,
     EXECUTION_PROVIDER_INFO, MODEL_INFO, PRESENCE_CONFIDENCE_INFO, TRACKING_CONFIDENCE_INFO,
@@ -22,7 +20,7 @@ type Handler = (value: string | number | boolean) => void;
 interface Info {title: string; text: ReactNode}
 interface RowProps {label?: ReactNode; info?: Info; control?: ReactElement<{onChange?: Handler; onToggle?: Handler}>; children?: ReactNode}
 
-const DETECTORS: RealtimeDetectorType[] = ['rtmpose', 'mediapipe', 'rtmw_mediapipe_hands', 'dlc', 'mediapipe_hands', 'rtmw_onnx_hands'];
+const DETECTORS: DetectorType[] = ['rtmpose', 'mediapipe'];
 /** The realtime pipeline's detector defaults. */
 const VALUE: DetectorSettingsValue = {
     detector: 'rtmpose', model: 'rtmw-x-l_256x192', provider: null, confidence: 0.0025,
@@ -34,11 +32,11 @@ const CONFIG: TriangulationConfig = {
 const OUTLIER_LIMITS = ['Minimum cameras for triangulation', 'Maximum cameras to drop', 'Target reprojection error'];
 
 /** The detector rows' props as the realtime controls pass them, for one detector. */
-const detectorProps = (detector: RealtimeDetectorType, rows: 'all' | 'key', more: Partial<DetectorRowsProps> = {}): DetectorRowsProps => ({
-    value: {...VALUE, detector}, onChange: () => {}, detectors: REALTIME_DETECTOR_OPTIONS, providerOptions: EXECUTION_PROVIDERS,
-    dlcControl: <button>Configure DLC</button>, context: 'realtime', rows, ...more,
+const detectorProps = (detector: DetectorType, rows: 'all' | 'key', more: Partial<DetectorRowsProps> = {}): DetectorRowsProps => ({
+    value: {...VALUE, detector}, onChange: () => {}, detectors: DETECTOR_OPTIONS, providerOptions: EXECUTION_PROVIDERS,
+    context: 'realtime', rows, ...more,
 });
-const detectorRows = (detector: RealtimeDetectorType, rows: 'all' | 'key', more?: Partial<DetectorRowsProps>): string =>
+const detectorRows = (detector: DetectorType, rows: 'all' | 'key', more?: Partial<DetectorRowsProps>): string =>
     renderToStaticMarkup(<DetectorSettingRows {...detectorProps(detector, rows, more)}/>);
 const outlierRows = (config: TriangulationConfig, inactive?: boolean): string =>
     renderToStaticMarkup(<OutlierRejectionRows config={config} onChange={() => {}} inactive={inactive}/>);
@@ -86,25 +84,18 @@ const textOf = (info: Info): string => renderToStaticMarkup(<>{info.text}</>);
 
 /** The posthoc explanation of each detector row. */
 const POSTHOC_INFO: Record<string, Info> = {
-    'Hand count': HAND_COUNT_INFO, 'Skeleton detector': DETECTOR_INFO, 'Execution provider': EXECUTION_PROVIDER_INFO, 'Model': MODEL_INFO, 'Pose model size': COMPLEXITY_INFO,
+    'Skeleton detector': DETECTOR_INFO, 'Execution provider': EXECUTION_PROVIDER_INFO, 'Model': MODEL_INFO, 'Pose model size': COMPLEXITY_INFO,
     'Confidence threshold': CONFIDENCE_INFO, 'Detection confidence': DETECTION_CONFIDENCE_INFO, 'Presence confidence': PRESENCE_CONFIDENCE_INFO,
     'Tracking confidence': TRACKING_CONFIDENCE_INFO,
 };
 /** What today's realtime Skeleton Setup dialog says about the selected detector, word for word. */
-const DETECTOR_NOTES: Partial<Record<RealtimeDetectorType, string>> = {
-    mediapipe_hands: 'Tracks up to two hands with MediaPipe on CPU, with 21 keypoints per hand.',
+const DETECTOR_NOTES: Partial<Record<DetectorType, string>> = {
     rtmpose: '133 keypoints (body, hands, face) via YOLOX + RTMW. Uses GPU batched inference when available.',
     mediapipe: 'Body + hands + face via MediaPipe. CPU-only; runs per-camera without GPU batching.',
-    rtmw_mediapipe_hands: 'RTMW body and face with cropped MediaPipe hands. The execution provider applies to RTMW; MediaPipe hands run on CPU.',
-    rtmw_onnx_hands: 'Experimental RTMW body and face with ONNX palm and hand models. Uses CUDA; CPU is also supported. Compare hand quality with the MediaPipe hands option.',
 };
-/** And what it says above the confidences of the two presets that add hand detectors to RTMW. */
-const HANDS_NOTE = 'The confidence settings below apply to the hands.';
 
 test('key rows are two rows for every detector', () => {
-    const modelRow: Record<RealtimeDetectorType, string> = {
-        mediapipe_hands: 'Hand count', rtmpose: 'Model', mediapipe: 'Pose model size', rtmw_mediapipe_hands: 'Model', dlc: 'DLC model', rtmw_onnx_hands: 'Model',
-    };
+    const modelRow: Record<DetectorType, string> = {rtmpose: 'Model', mediapipe: 'Pose model size'};
     for (const detector of DETECTORS) {
         const html = detectorRows(detector, 'key');
         assert.equal(html.match(/class="setting-row[ "]/g)?.length, 2, `${detector}: ${html}`);
@@ -117,44 +108,11 @@ test('key rows are two rows for every detector', () => {
 
 test('all rows follow the detector', () => {
     const mediapipeConfidences = ['Detection confidence', 'Presence confidence', 'Tracking confidence'];
-    const expected: Record<RealtimeDetectorType, string[]> = {
+    const expected: Record<DetectorType, string[]> = {
         rtmpose: ['Skeleton detector', 'Execution provider', 'Model', 'Confidence threshold'],
-        mediapipe_hands: ['Skeleton detector', 'Hand count', ...mediapipeConfidences],
         mediapipe: ['Skeleton detector', 'Pose model size', ...mediapipeConfidences],
-        rtmw_mediapipe_hands: ['Skeleton detector', 'Execution provider', 'Model', 'Confidence threshold', ...mediapipeConfidences],
-        dlc: ['Skeleton detector', 'DLC model'],
-        // The ONNX hand detector takes no tracking confidence.
-        rtmw_onnx_hands: ['Skeleton detector', 'Execution provider', 'Model', 'Confidence threshold', 'Detection confidence', 'Presence confidence'],
     };
     for (const detector of DETECTORS) assert.deepEqual(labels(detectorRows(detector, 'all')), expected[detector], detector);
-});
-
-test('onnx hands offers only CUDA and CPU', () => {
-    const providers = (detector: RealtimeDetectorType): string[] => optionsOf(rowLabelled(detectorRows(detector, 'all'), 'Execution provider'));
-    assert.deepEqual(providers('rtmw_onnx_hands'), ['cuda', 'cpu']);
-    // The other RTMW detectors offer every provider the caller passes; Auto stands for no provider.
-    assert.deepEqual(providers('rtmpose'), ['auto', 'cuda', 'coreml', 'directml', 'cpu']);
-    assert.deepEqual(providers('rtmw_mediapipe_hands'), ['auto', 'cuda', 'coreml', 'directml', 'cpu']);
-
-    // Selecting the detector moves the provider onto CUDA, which it offers.
-    const changes: Partial<DetectorSettingsValue>[] = [];
-    const select = handlerOf(DetectorSettingRows(detectorProps('rtmpose', 'key', {onChange: change => changes.push(change)})), 'Skeleton detector');
-    select('mediapipe_hands');
-    handlerOf(DetectorSettingRows(detectorProps('mediapipe_hands', 'all', {onChange: change => changes.push(change)})), 'Hand count')('unknown');
-    select('rtmw_mediapipe_hands');
-    select('rtmw_onnx_hands');
-    assert.deepEqual(changes, [{detector: 'mediapipe_hands'}, {handCount: 'unknown'}, {detector: 'rtmw_mediapipe_hands'}, {detector: 'rtmw_onnx_hands', provider: 'cuda'}]);
-});
-
-test('the DLC row holds the given control', () => {
-    for (const rows of ['key', 'all'] as const) {
-        const html = detectorRows('dlc', rows);
-        assert.ok(rowLabelled(html, 'DLC model').includes('<div class="setting-row-control"><button>Configure DLC</button></div>'), html);
-        assert.equal(html.split('Configure DLC').length - 1, 1, html);
-    }
-    for (const detector of DETECTORS.filter(other => other !== 'dlc')) {
-        assert.ok(!detectorRows(detector, 'all').includes('Configure DLC'), detector);
-    }
 });
 
 test('outlier rows dim with their switch', () => {
@@ -176,16 +134,16 @@ test('outlier rows dim with their switch', () => {
 
 test('each control reports its own field', () => {
     const changes: Partial<DetectorSettingsValue>[] = [];
-    const all = (detector: RealtimeDetectorType): ReactNode => DetectorSettingRows(detectorProps(detector, 'all', {onChange: change => changes.push(change)}));
-    const hybrid = all('rtmw_mediapipe_hands');
-    handlerOf(hybrid, 'Execution provider')('cpu');
-    handlerOf(hybrid, 'Execution provider')('auto');
-    handlerOf(hybrid, 'Model')('rtmw-l-m_256x192');
-    handlerOf(hybrid, 'Confidence threshold')(0.3);
-    handlerOf(hybrid, 'Detection confidence')(0.6);
-    handlerOf(hybrid, 'Presence confidence')(0.7);
-    handlerOf(hybrid, 'Tracking confidence')(0.8);
-    handlerOf(all('mediapipe'), 'Pose model size')('full');
+    const all = (detector: DetectorType): ReactNode => DetectorSettingRows(detectorProps(detector, 'all', {onChange: change => changes.push(change)}));
+    const rtmw = all('rtmpose'), mediapipe = all('mediapipe');
+    handlerOf(rtmw, 'Execution provider')('cpu');
+    handlerOf(rtmw, 'Execution provider')('auto');
+    handlerOf(rtmw, 'Model')('rtmw-l-m_256x192');
+    handlerOf(rtmw, 'Confidence threshold')(0.3);
+    handlerOf(mediapipe, 'Detection confidence')(0.6);
+    handlerOf(mediapipe, 'Presence confidence')(0.7);
+    handlerOf(mediapipe, 'Tracking confidence')(0.8);
+    handlerOf(mediapipe, 'Pose model size')('full');
     assert.deepEqual(changes, [{provider: 'cpu'}, {provider: null}, {model: 'rtmw-l-m_256x192'}, {confidence: 0.3},
         {detectionConfidence: 0.6}, {presenceConfidence: 0.7}, {trackingConfidence: 0.8}, {poseModelSize: 'full'}]);
 
@@ -208,8 +166,7 @@ test('posthoc keeps its promoted detector row and its confidence step', () => {
     assert.equal(posthoc.split('setting-row-promoted').length - 1, 1, posthoc);
     assert.ok(rowLabelled(posthoc, 'Confidence threshold').includes(' step="0.001" '), posthoc);
     assert.ok(rowLabelled(realtime, 'Confidence threshold').includes(' step="0.0005" '), realtime);
-    // Posthoc offers its own detectors: the experimental ONNX hands preset is realtime only.
-    assert.deepEqual(optionsOf(rowLabelled(posthoc, 'Skeleton detector')), ['rtmpose', 'mediapipe', 'rtmw_mediapipe_hands', 'dlc']);
+    assert.deepEqual(optionsOf(rowLabelled(posthoc, 'Skeleton detector')), ['rtmpose', 'mediapipe']);
 });
 
 test('inactive dims every row', () => {
@@ -236,23 +193,22 @@ test('number fields are named after their rows', () => {
         assert.deepEqual(names(row, 'button'), [label, `Decrease ${label}`, `Increase ${label}`], `${where}: ${row}`);
     };
     for (const context of ['posthoc', 'realtime'] as const) {
-        const html = detectorRows('rtmw_mediapipe_hands', 'all', {context});
-        for (const label of ['Confidence threshold', 'Detection confidence', 'Presence confidence', 'Tracking confidence']) named(html, label, context);
+        named(detectorRows('rtmpose', 'all', {context}), 'Confidence threshold', context);
+        const html = detectorRows('mediapipe', 'all', {context});
+        for (const label of ['Detection confidence', 'Presence confidence', 'Tracking confidence']) named(html, label, context);
     }
     for (const label of OUTLIER_LIMITS) named(outlierRows(CONFIG), label, 'outlier rejection');
 });
 
 test('realtime explanations carry the Skeleton Setup notes', () => {
-    const hybrids: RealtimeDetectorType[] = ['rtmw_mediapipe_hands', 'rtmw_onnx_hands'];
     /** The note that ends a realtime row's explanation for this detector, where the dialog has one about that row. */
-    const noteFor = (label: string, detector: RealtimeDetectorType): string | undefined =>
-        label === 'Skeleton detector' || label === 'Execution provider' ? DETECTOR_NOTES[detector]
-            : label.endsWith(' confidence') && hybrids.includes(detector) ? HANDS_NOTE : undefined;
+    const noteFor = (label: string, detector: DetectorType): string | undefined =>
+        label === 'Skeleton detector' || label === 'Execution provider' ? DETECTOR_NOTES[detector] : undefined;
     const shown = new Set<string>();
     for (const detector of DETECTORS) {
         for (const set of ['key', 'all'] as const) {
             const rows = DetectorSettingRows(detectorProps(detector, set));
-            for (const label of labels(detectorRows(detector, set)).filter(other => other !== 'DLC model')) {
+            for (const label of labels(detectorRows(detector, set))) {
                 const info = infoOf(rows, label), posthoc = POSTHOC_INFO[label], note = noteFor(label, detector);
                 assert.equal(info.title, posthoc.title, `${detector} ${set} ${label}`);
                 if (note === undefined) {
@@ -266,21 +222,15 @@ test('realtime explanations carry the Skeleton Setup notes', () => {
             }
         }
     }
-    // Each of the dialog's five notes has a row: none is left behind with the dialog.
-    assert.deepEqual([...shown].sort(), [...Object.values(DETECTOR_NOTES), HANDS_NOTE].sort());
-
-    // The DLC model row says the same in both windows.
-    const dlc = infoOf(DetectorSettingRows(detectorProps('dlc', 'all')), 'DLC model');
-    assert.equal(dlc.title, 'DLC model');
-    assert.equal(textOf(dlc), '<p>The exported DeepLabCut model to run on every camera frame.</p>');
-    assert.equal(infoOf(DetectorSettingRows(detectorProps('dlc', 'all', {context: 'posthoc', detectors: DETECTOR_OPTIONS})), 'DLC model'), dlc);
+    // Each of the dialog's notes has a row: none is left behind with the dialog.
+    assert.deepEqual([...shown].sort(), Object.values(DETECTOR_NOTES).sort());
 });
 
 test('posthoc explanations are unchanged', () => {
     for (const {value: detector} of DETECTOR_OPTIONS) {
         const posthoc = {context: 'posthoc', detectors: DETECTOR_OPTIONS} as const;
         const rows = DetectorSettingRows(detectorProps(detector, 'all', posthoc));
-        const shown = labels(detectorRows(detector, 'all', posthoc)).filter(label => label !== 'DLC model');
+        const shown = labels(detectorRows(detector, 'all', posthoc));
         assert.ok(shown.length > 0, detector);
         // The very objects posthoc had before the rows were shared.
         for (const label of shown) assert.equal(infoOf(rows, label), POSTHOC_INFO[label], `${detector} ${label}`);

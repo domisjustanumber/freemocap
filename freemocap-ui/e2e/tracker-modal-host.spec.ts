@@ -64,7 +64,7 @@ test('streaming toolbar opens a centered tracker dialog and restores the actual 
     expect(box.x+box.width/2).toBeCloseTo(960);
     expect(box.y+box.height/2).toBeCloseTo(540);
     await expect(dialog.getByRole('button',{name:'Close Real-time processing settings',exact:true})).toBeVisible();
-    await dialog.getByRole('combobox',{name:'Skeleton detector',exact:true}).selectOption('dlc');
+    await dialog.getByRole('combobox',{name:'Skeleton detector',exact:true}).selectOption('mediapipe');
     await page.screenshot({path:info.outputPath('tracker-host-centered.png'),fullPage:true});
     await dialog.getByRole('button',{name:'Maximize',exact:true}).click();
     await expect(dialog).toHaveCSS('width','1904px');

@@ -1,4 +1,3 @@
-import {DlcModelSettings} from '@/components/mocap-setup/dlc-model-settings';
 import {useExecutionProviderOptions} from "@/hooks/useExecutionProviderOptions";
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
 import {mocapCharucoTrackingChanged} from '@/store/slices/mocap';
@@ -45,8 +44,6 @@ export default function MocapDetectorSettings() {
     };
     /** Each field the rows report goes to its own setting in the store. */
     const applyChange = (change: Partial<DetectorSettingsValue>) => {
-        // Posthoc offers DETECTOR_OPTIONS only, so the realtime-only ONNX hands preset never arrives here.
-        if (change.detector === 'rtmw_onnx_hands' || change.detector === 'mediapipe_hands') return;
         if (change.detector !== undefined) setDetectorType(change.detector);
         if (change.provider !== undefined) setExecutionProvider(change.provider);
         if (change.model !== undefined) setRtmPoseModelName(change.model);
@@ -59,12 +56,11 @@ export default function MocapDetectorSettings() {
 
     return <>
         <DetectorSettingRows value={value} onChange={applyChange} detectors={DETECTOR_OPTIONS}
-            providerOptions={executionProviderOptions} dlcControl={<DlcModelSettings context="posthoc"/>}
-            context="posthoc" rows="all"/>
+            providerOptions={executionProviderOptions} context="posthoc" rows="all"/>
 
-        {detector !== "dlc" && <><SettingsGroupHeading text="Board" info={BOARD_GROUP_INFO}/>
+        <SettingsGroupHeading text="Board" info={BOARD_GROUP_INFO}/>
         <SettingRow label="Detect and reconstruct Charuco board" info={CHARUCO_INFO}
             control={<SettingToggleSwitch label="Detect and reconstruct Charuco board" isToggled={detectBoard}
-                onToggle={enabled => dispatch(mocapCharucoTrackingChanged(enabled))}/>}/></>}
+                onToggle={enabled => dispatch(mocapCharucoTrackingChanged(enabled))}/>}/>
     </>;
 }

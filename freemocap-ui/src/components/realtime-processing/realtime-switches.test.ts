@@ -12,7 +12,7 @@ import {
 
 /** Every switch on, with nothing in its way. */
 const ON: RealtimeSwitchInput = {
-    person: true, charuco: true, detector: 'rtmpose', dlcGeometry: false, filtersLoaded: true,
+    person: true, charuco: true, filtersLoaded: true,
     triangulation: true, reconstruction: true, filterTrajectories: true, fillGaps: true,
     outputs: {vmc: true, lsl: true},
 };
@@ -53,18 +53,6 @@ test('the board alone feeds triangulation', () => {
     const state = realtimeSwitchState({...ON, person: false, charuco: true});
     assert.equal(state.can.triangulation, true);
     assert.equal(state.triangulation, true);
-});
-
-test('DLC has no board and needs a geometry file to reconstruct', () => {
-    const state = realtimeSwitchState({...ON, detector: 'dlc', charuco: true, dlcGeometry: false});
-    assert.equal(state.charuco, false);
-    assert.equal(state.can.charuco, false);
-    assert.equal(state.can.reconstruction, false);
-    assert.equal(state.reconstruction, false);
-    assert.equal(state.outputs.vmc, false);
-    assert.equal(realtimeSwitchState({...ON, detector: 'dlc', charuco: true, dlcGeometry: true}).reconstruction, true);
-    // A board DLC cannot track feeds nothing: on its own it leaves triangulation locked.
-    assert.equal(realtimeSwitchState({...ON, detector: 'dlc', person: false, charuco: true, dlcGeometry: true}).can.triangulation, false);
 });
 
 test('filters lock until their settings load', () => {
@@ -131,7 +119,7 @@ test('running outputs are adopted', () => {
     assert.equal(adoptWish([{id: 'a', status: 'failed'}]), false);
 });
 
-/** The default pipeline: every stage on, RTMPose, no DLC geometry file. */
+/** The default pipeline: every stage on, RTMPose. */
 const CONFIG = defaultRealtimePipelineConfig;
 const WANTED = {vmc: false, lsl: true};
 const camera = (change: Partial<CameraNodeConfig>): RealtimePipelineConfig =>
@@ -145,17 +133,12 @@ test('switches read their own config fields', () => {
     assert.deepEqual(all, {...ON, outputs: WANTED});
     assert.deepEqual(switchInputFrom(camera({skeleton_tracking_enabled: false}), TEMPORAL, WANTED), {...all, person: false});
     assert.deepEqual(switchInputFrom(camera({charuco_tracking_enabled: false}), TEMPORAL, WANTED), {...all, charuco: false});
-    assert.deepEqual(switchInputFrom(camera({detector_type: 'dlc'}), TEMPORAL, WANTED), {...all, detector: 'dlc'});
-    assert.deepEqual(switchInputFrom(camera({dlc_geometry_path: 'C:/models/geometry.json'}), TEMPORAL, WANTED), {...all, dlcGeometry: true});
-    assert.deepEqual(switchInputFrom(camera({dlc_geometry_path: null}), TEMPORAL, WANTED), all);
     assert.deepEqual(switchInputFrom(aggregator({triangulation_enabled: false}), TEMPORAL, WANTED), {...all, triangulation: false});
     assert.deepEqual(switchInputFrom(aggregator({skeleton_fitting_enabled: false}), TEMPORAL, WANTED), {...all, reconstruction: false});
     assert.deepEqual(
         switchInputFrom(CONFIG, {...TEMPORAL, spatial_smoothing: {...TEMPORAL.spatial_smoothing, enabled: false}}, WANTED),
         {...all, filterTrajectories: false});
     assert.deepEqual(switchInputFrom(CONFIG, {...TEMPORAL, gap_duration_s: 0}, WANTED), {...all, fillGaps: false});
-    // A config that names no detector runs the default one.
-    assert.equal(switchInputFrom(camera({detector_type: undefined}), TEMPORAL, WANTED).detector, 'rtmpose');
 });
 
 test('filter switches read off until their settings load', () => {

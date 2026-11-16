@@ -4,7 +4,7 @@ import {resolve} from 'node:path';
 
 test.use({channel: process.env.PLAYWRIGHT_CHANNEL || undefined});
 
-test('Skeleton Setup selects the hybrid through the real realtime store', async ({page}) => {
+test('Skeleton Setup switches detectors through the real realtime store', async ({page}) => {
     page.on('pageerror', error => {throw error;});
     // Every request is intercepted; this test cannot contact the user's server.
     await page.route('**/*', route => route.fulfill({contentType: 'text/html',
@@ -30,17 +30,6 @@ test('Skeleton Setup selects the hybrid through the real realtime store', async 
     }
     await expect(page.getByText('Skeleton Setup', {exact: true})).toBeVisible();
     const detector = page.getByRole('combobox', {name: 'Skeleton detector', exact: true});
-    await detector.selectOption('rtmw_mediapipe_hands');
-    await expect.poll(() => page.evaluate(() =>
-        (window as any).readPipelineConfig().camera_node_config.detector_type))
-        .toBe('rtmw_mediapipe_hands');
-    await expect(page.getByText('Execution provider', {exact: true})).toBeVisible();
-    await expect(page.getByText('Detection confidence', {exact: true})).toBeVisible();
-    await expect(page.getByText('Pose model size', {exact: true})).toHaveCount(0);
-    // Rows carry no prose: the provider note is in the row's info, pinned open by its button.
-    await page.getByRole('button', {name: 'Execution provider', exact: true}).click();
-    await expect(page.getByText('The execution provider applies to RTMW', {exact: false})).toBeVisible();
-
     await detector.selectOption('mediapipe');
     await expect(page.getByText('Pose model size', {exact: true})).toBeVisible();
     await expect(page.getByText('Execution provider', {exact: true})).toHaveCount(0);
@@ -51,4 +40,5 @@ test('Skeleton Setup selects the hybrid through the real realtime store', async 
     await expect.poll(() => page.evaluate(() =>
         (window as any).readPipelineConfig().camera_node_config.detector_type)).toBe('rtmpose');
     await expect(page.getByText('Detection confidence', {exact: true})).toHaveCount(0);
+    await expect(page.getByText('Execution provider', {exact: true})).toBeVisible();
 });

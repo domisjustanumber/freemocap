@@ -99,7 +99,7 @@
 }
 
 /* Skeleton Setup rows in the tracker settings window. The window is wide for
-   the DLC form; a narrower column keeps each label near its control. */
+   other forms; a narrower column keeps each label near its control. */
 .realtime-skeleton-setup {
   width: 100%;
   max-width: 760px;

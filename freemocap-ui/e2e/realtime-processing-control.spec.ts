@@ -33,12 +33,15 @@ test('processing control remains usable after failure, edited settings, reconnec
         import {useRealtimePipelineSync} from './src/hooks/useRealtimePipelineSync';
         import {pipelineConfigUpdated} from './src/store/slices/realtime/realtime-slice';
         import {serverDisconnected,wsConnectionChanged,serverStateReceived} from './src/store/slices/connection/connection-slice';
+        import {calibrationLoadedFromBundle} from './src/store/slices/calibration';
+        import {calibrationFixture} from './e2e/fixtures/calibration';
+        // A loaded calibration lets each apply skip the calibration request, which this page does not answer.
+        store.dispatch(calibrationLoadedFromBundle(calibrationFixture('C:/calibration.toml')));
         let pid=1;
         window.observe = alive => store.dispatch(serverStateReceived({server_pid:pid,state:{camera_groups:{},
             realtime_pipelines:alive?[{id:'pipeline',camera_group_id:'group',camera_ids:[],alive:true}]:[]}}));
         window.reconnect = () => {store.dispatch(serverDisconnected());pid++;store.dispatch(wsConnectionChanged(true));window.observe(false);};
         window.edit = enabled => {const config=structuredClone(store.getState().realtime.pipelineConfig);
-            config.camera_node_config.detector_type='dlc';config.aggregator_config.triangulation_enabled=false;
             config.camera_node_config.skeleton_tracking_enabled=enabled;store.dispatch(pipelineConfigUpdated(config));};
         window.reconnect();window.edit(false);
         function App(){const state=useRealtimePipelineSync();return <><OperationErrorBanner/>

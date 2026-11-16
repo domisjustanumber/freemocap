@@ -1,6 +1,5 @@
 import {serverClient, recordingRequest} from '@/services/server/sdk';
 import {recordingProcessingUrl} from '@/services/recording/posthoc-processing';
-import {dlcPosthocExecutionSettings} from './dlc-execution-settings';
 import {createAsyncThunk} from "@reduxjs/toolkit";
 import type {RootState} from "@/store";
 import {selectMocapRecordingPath} from "./mocap-slice";
@@ -14,7 +13,7 @@ import type {StageSelection} from '@/services/recording/posthoc-processing';
 function buildPosthocConfig(state: RootState) {
     const { config } = state.mocap;
     const blender = state.blender;
-    if ((config.detectorType !== 'dlc' || config.dlcTriangulationEnabled) && state.calibration.loadRequestId) throw new Error('Wait for the selected calibration to finish loading.');
+    if (state.calibration.loadRequestId) throw new Error('Wait for the selected calibration to finish loading.');
     const calibrationTomlPath = selectLoadedCalibration(state)?.path ?? null;
     return {
         bodyAlignment: {
@@ -35,8 +34,6 @@ function buildPosthocConfig(state: RootState) {
         boardMode: state.calibration.config.boardMode,
         charucoBoard: state.calibration.config.charucoBoard,
         detectorType: config.detectorType,
-        dlcModelPath: config.dlcModelPath,
-        dlcConfidenceThreshold: config.dlcConfidenceThreshold,
         rtmPoseModelName: config.rtmPoseModelName,
         rtmPoseConfidenceThreshold: config.rtmPoseConfidenceThreshold,
         executionProvider: config.executionProvider,
@@ -66,7 +63,6 @@ function buildPosthocConfig(state: RootState) {
         blenderExportConfig: blender.exportConfig,
         blenderExePath: blender.blenderExePath ?? blender.detectedBlenderExePath,
         autoOpenBlendFile: blender.autoOpenBlendFile,
-        ...dlcPosthocExecutionSettings(config.detectorType, config.dlcExecutionProvider, config.dlcTriangulationEnabled, config.dlcGeometryPath),
     };
 }
 
@@ -307,9 +303,7 @@ export const getSyncResult = createAsyncThunk<
 
 /** The mocap processing configuration sent by Process and by the plan preview: one source for both. */
 export function mocapProcessingConfig(state: RootState, selection: StageSelection | void) {
-    return {...buildPosthocConfig(state), ...selection,
-        ...dlcPosthocExecutionSettings(state.mocap.config.detectorType, state.mocap.config.dlcExecutionProvider,
-            state.mocap.config.dlcTriangulationEnabled, state.mocap.config.dlcGeometryPath)};
+    return {...buildPosthocConfig(state), ...selection};
 }
 
 export const processMocapRecording = createAsyncThunk<

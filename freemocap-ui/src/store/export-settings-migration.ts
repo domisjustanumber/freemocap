@@ -30,3 +30,12 @@ export function migrateExportSettings(saved: Record<string, unknown> | null): {
     for (const name of Object.values(aliases)) delete config[name];
     return {config, error: `Saved export settings conflict (${conflicts.join(', ')}). Reset export settings to continue.`};
 }
+
+/** Saved settings for a removed detector choice fall back to RTMW. */
+const REMOVED_DETECTORS = ['rtmw_mediapipe_hands', 'mediapipe_hands', 'rtmw_onnx_hands', 'dlc'];
+
+export function migrateRemovedDetectors(saved: Record<string, unknown>): Record<string, unknown> {
+    const config = Object.fromEntries(Object.entries(saved).filter(([key]) => !key.startsWith('dlc')));
+    if (REMOVED_DETECTORS.includes(config.detectorType as string)) config.detectorType = 'rtmpose';
+    return config;
+}

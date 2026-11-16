@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {migrateExportSettings} from './export-settings-migration';
+import {migrateExportSettings, migrateRemovedDetectors} from './export-settings-migration';
 
 test('historical browser settings retain formats, channels, overrides and automatic export choice', () => {
     const saved = {scientificExportFormats: ['npz'], scientificExportData: ['RAW_KEYPOINTS_3D'],
@@ -22,4 +22,11 @@ test('conflicting settings produce an explicit error and preserve unrelated pref
     assert.deepEqual(result.config, {detectorType: 'rtmpose'});
     assert.deepEqual(migrateExportSettings({scientificExportFormats: ['npy'], exportFormats: ['npy']}),
         {config: {exportFormats: ['npy']}, error: null});
+});
+
+test('saved settings for a removed detector fall back to RTMW without DLC keys', () => {
+    assert.deepEqual(migrateRemovedDetectors({detectorType: 'dlc', dlcModelPath: 'a.yaml', dlcTriangulationEnabled: true, exportTallCsv: true}),
+        {detectorType: 'rtmpose', exportTallCsv: true});
+    assert.deepEqual(migrateRemovedDetectors({detectorType: 'rtmw_mediapipe_hands'}), {detectorType: 'rtmpose'});
+    assert.deepEqual(migrateRemovedDetectors({detectorType: 'mediapipe'}), {detectorType: 'mediapipe'});
 });

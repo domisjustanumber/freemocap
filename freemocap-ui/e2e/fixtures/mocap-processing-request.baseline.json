@@ -29,8 +29,6 @@
       "square_length_mm": 54
     },
     "detectorType": "rtmpose",
-    "dlcModelPath": null,
-    "dlcConfidenceThreshold": 0.4,
     "rtmPoseModelName": "rtmw-x-l_256x192",
     "rtmPoseConfidenceThreshold": 0.004,
     "executionProvider": null,

@@ -7,7 +7,7 @@ const bundle = new URL('../dist/browser/freemocap-client.js', import.meta.url);
 const source = readFileSync(bundle, 'utf8');
 
 test('the browser bundle is one module with nothing left to resolve',()=>{
- // Statements only: operation paths such as "/freemocap/dlc/import" also end in import".
+ // Statements only: operation paths such as "/freemocap/mocap/recording/import" also end in import".
  assert.doesNotMatch(source, /(?:^|[;}\n])\s*import\s*(?:[\w$*{}\s,]+from\s*)?["']/);
  assert.doesNotMatch(source, /\bimport\s*\(/);
  assert.doesNotMatch(source, /\brequire\s*\(/);

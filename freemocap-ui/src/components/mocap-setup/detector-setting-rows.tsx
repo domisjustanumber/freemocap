@@ -1,12 +1,10 @@
 // The skeleton detector's setting rows, shared by the posthoc Mocap processing window and the realtime processing
-// controls. Everything arrives through props: the caller owns the store, the server's provider list and the DLC dialog.
-import {HAND_COUNT_INFO, HandCountInput} from '@/components/mocap-setup/hand-count-input';
+// controls. Everything arrives through props: the caller owns the store and the server's provider list.
 import type {ReactNode} from 'react';
 import SettingRow from '@/components/common/settings-layout/setting-row';
 import SettingSelectInput from '@/components/common/settings-layout/setting-select-input';
 import ValueSelector from '@/components/ui-components/ValueSelector';
-import {type MediapipeModelComplexity, RTMPOSE_MODELS, type RTMPoseModelName} from '@/store/slices/mocap';
-import type {HandCount, RealtimeDetectorType} from '@/store/slices/realtime/realtime-types';
+import {type DetectorType, type MediapipeModelComplexity, RTMPOSE_MODELS, type RTMPoseModelName} from '@/store/slices/mocap';
 import type {ExecutionProviderName} from '@/types/execution-provider';
 
 export const MEDIAPIPE_COMPLEXITIES: { label: string; value: MediapipeModelComplexity }[] = [
@@ -20,7 +18,6 @@ export const DETECTOR_INFO = {
     text: <>
         <p><strong>RTMW</strong> — body, hand and face keypoints from the wholebody model, following YOLOX person detection.</p>
         <p><strong>MediaPipe</strong> — separate pose, cropped hand and face detectors.</p>
-        <p><strong>RTMW + MediaPipe hands</strong> — RTMW body and face with separately cropped MediaPipe hands. The confidence settings below apply to those hands.</p>
         <p><em>The detector decides which parameters below apply.</em></p>
     </>,
 };
@@ -46,11 +43,6 @@ export const COMPLEXITY_INFO = {
     </>,
 };
 
-const DLC_MODEL_INFO = {
-    title: 'DLC model',
-    text: <p>The exported DeepLabCut model to run on every camera frame.</p>,
-};
-
 export const CONFIDENCE_INFO = {
     title: "Confidence threshold",
     text: <>
@@ -62,7 +54,7 @@ export const CONFIDENCE_INFO = {
 export const DETECTION_CONFIDENCE_INFO = {
     title: "Detection confidence",
     text: <>
-        <p>The detection confidence required by the selected MediaPipe detectors; for the combined preset this applies to hand detection.</p>
+        <p>The detection confidence required by the selected MediaPipe detectors.</p>
         <p><em>Raise it if it locks onto things that are not people; lower it if it fails to pick up a person who is partly out of frame.</em></p>
     </>,
 };
@@ -107,14 +99,9 @@ interface Info {title: string; text: ReactNode}
  * the execution provider. The posthoc explanations stay as they are.
  */
 const REALTIME_DETECTOR_NOTES = {
-    mediapipe_hands: 'Tracks up to two hands with MediaPipe on CPU, with 21 keypoints per hand.',
     rtmpose: '133 keypoints (body, hands, face) via YOLOX + RTMW. Uses GPU batched inference when available.',
     mediapipe: 'Body + hands + face via MediaPipe. CPU-only; runs per-camera without GPU batching.',
-    rtmw_mediapipe_hands: 'RTMW body and face with cropped MediaPipe hands. The execution provider applies to RTMW; MediaPipe hands run on CPU.',
-    rtmw_onnx_hands: 'Experimental RTMW body and face with ONNX palm and hand models. Uses CUDA; CPU is also supported. Compare hand quality with the MediaPipe hands option.',
-} satisfies Partial<Record<RealtimeDetectorType, string>>;
-/** And what it said above the confidences of the two presets that add hand detectors to RTMW. */
-const REALTIME_HANDS_NOTE = 'The confidence settings below apply to the hands.';
+} satisfies Partial<Record<DetectorType, string>>;
 
 /** An explanation with a note as one more paragraph after its own. */
 const withNote = (info: Info, note: string): Info =>
@@ -126,15 +113,9 @@ const withDetectorNotes = (info: Info): Map<string, Info> =>
 // Built once, so a row's explanation is the same object on every render.
 const REALTIME_DETECTOR_INFO = withDetectorNotes(DETECTOR_INFO);
 const REALTIME_PROVIDER_INFO = withDetectorNotes(EXECUTION_PROVIDER_INFO);
-const REALTIME_HANDS_INFO = {
-    detection: withNote(DETECTION_CONFIDENCE_INFO, REALTIME_HANDS_NOTE),
-    presence: withNote(PRESENCE_CONFIDENCE_INFO, REALTIME_HANDS_NOTE),
-    tracking: withNote(TRACKING_CONFIDENCE_INFO, REALTIME_HANDS_NOTE),
-};
 
 export interface DetectorSettingsValue {
-    detector: RealtimeDetectorType; model: RTMPoseModelName; provider: ExecutionProviderName | null; confidence: number;
-    handCount?: HandCount;
+    detector: DetectorType; model: RTMPoseModelName; provider: ExecutionProviderName | null; confidence: number;
     poseModelSize: MediapipeModelComplexity; detectionConfidence: number; presenceConfidence: number; trackingConfidence: number;
 }
 
@@ -142,11 +123,9 @@ interface DetectorSettingRowsProps {
     value: DetectorSettingsValue;
     /** Receives only the fields a control changes. */
     onChange: (change: Partial<DetectorSettingsValue>) => void;
-    detectors: readonly {label: string; value: RealtimeDetectorType}[];
+    detectors: readonly {label: string; value: DetectorType}[];
     /** The execution providers to offer; the one with no value is Auto. */
     providerOptions: readonly {label: string; value: ExecutionProviderName | null}[];
-    /** The control of the "DLC model" row: the caller's way into the DLC settings. */
-    dlcControl: ReactNode;
     context: 'posthoc' | 'realtime';
     /** 'key' is the detector and its model row: two rows whatever the detector. 'all' is every row the detector has. */
     rows: 'all' | 'key';
@@ -154,31 +133,24 @@ interface DetectorSettingRowsProps {
     inactive?: boolean;
 }
 
-export function DetectorSettingRows({value, onChange, detectors, providerOptions, dlcControl, context, rows, inactive = false}: DetectorSettingRowsProps) {
+export function DetectorSettingRows({value, onChange, detectors, providerOptions, context, rows, inactive = false}: DetectorSettingRowsProps) {
     const {detector} = value;
     const all = rows === 'all';
-    const rtmw = detector === 'rtmpose' || detector === 'rtmw_mediapipe_hands' || detector === 'rtmw_onnx_hands';
-    // MediaPipe's confidences; the two hybrid presets take them for their hand detectors.
-    const mediapipe = detector === 'mediapipe_hands' || detector === 'mediapipe' || detector === 'rtmw_mediapipe_hands' || detector === 'rtmw_onnx_hands';
-    // The ONNX hand models run on CUDA or CPU only, so selecting their preset also selects CUDA.
-    const providers = detector === 'rtmw_onnx_hands'
-        ? providerOptions.filter(option => option.value === 'cuda' || option.value === 'cpu') : providerOptions;
+    const rtmw = detector === 'rtmpose';
+    const mediapipe = detector === 'mediapipe';
     const realtime = context === 'realtime';
     const detectorInfo = (realtime && REALTIME_DETECTOR_INFO.get(detector)) || DETECTOR_INFO;
     const providerInfo = (realtime && REALTIME_PROVIDER_INFO.get(detector)) || EXECUTION_PROVIDER_INFO;
-    // The presets that add hand detectors to RTMW pass these confidences to the hands, and realtime says so.
-    const handsNote = realtime && rtmw && mediapipe;
 
     return <>
         {/* In the posthoc section the detector reframes every row beneath it, so it leads the section. */}
         <SettingRow promoted={context === 'posthoc'} inactive={inactive} label="Skeleton detector" info={detectorInfo}
             control={<SettingSelectInput label="Skeleton detector" value={detector} options={detectors}
-                onChange={(selected: RealtimeDetectorType) =>
-                    onChange(selected === 'rtmw_onnx_hands' ? {detector: selected, provider: 'cuda'} : {detector: selected})}/>}/>
+                onChange={(selected: DetectorType) => onChange({detector: selected})}/>}/>
 
         {all && rtmw && <SettingRow inactive={inactive} label="Execution provider" info={providerInfo}
             control={<SettingSelectInput label="Execution provider" value={value.provider ?? 'auto'}
-                options={providers.map(option => ({...option, value: option.value ?? 'auto' as const}))}
+                options={providerOptions.map(option => ({...option, value: option.value ?? 'auto' as const}))}
                 onChange={(provider: ExecutionProviderName | 'auto') => onChange({provider: provider === 'auto' ? null : provider})}/>}/>}
 
         {/* Every detector has one model row, so the key rows are two rows whatever the detector. */}
@@ -188,28 +160,24 @@ export function DetectorSettingRows({value, onChange, detectors, providerOptions
         {detector === 'mediapipe' && <SettingRow inactive={inactive} label="Pose model size" info={COMPLEXITY_INFO}
             control={<SettingSelectInput label="Pose model size" value={value.poseModelSize}
                 options={MEDIAPIPE_COMPLEXITIES} onChange={(poseModelSize: MediapipeModelComplexity) => onChange({poseModelSize})}/>}/>}
-        {detector === 'dlc' && <SettingRow inactive={inactive} label="DLC model" info={DLC_MODEL_INFO} control={dlcControl}/>}
 
         {all && rtmw && <SettingRow inactive={inactive} label="Confidence threshold" info={CONFIDENCE_INFO}
             control={<ValueSelector ariaLabel="Confidence threshold" value={value.confidence} min={0} max={1}
                 step={realtime ? 0.0005 : 0.001} unit="" onChange={confidence => onChange({confidence})}/>}/>}
 
-        {detector === 'mediapipe_hands' && <SettingRow label="Hand count" inactive={inactive} info={HAND_COUNT_INFO}
-            control={<HandCountInput value={value.handCount} onChange={handCount => onChange({handCount})}/>}/>}
         {all && mediapipe && <>
             <SettingRow inactive={inactive} label="Detection confidence"
-                info={handsNote ? REALTIME_HANDS_INFO.detection : DETECTION_CONFIDENCE_INFO}
+                info={DETECTION_CONFIDENCE_INFO}
                 control={<ValueSelector ariaLabel="Detection confidence" value={value.detectionConfidence} min={0} max={1} step={0.05}
                     unit="" onChange={detectionConfidence => onChange({detectionConfidence})}/>}/>
             <SettingRow inactive={inactive} label="Presence confidence"
-                info={handsNote ? REALTIME_HANDS_INFO.presence : PRESENCE_CONFIDENCE_INFO}
+                info={PRESENCE_CONFIDENCE_INFO}
                 control={<ValueSelector ariaLabel="Presence confidence" value={value.presenceConfidence} min={0} max={1} step={0.05}
                     unit="" onChange={presenceConfidence => onChange({presenceConfidence})}/>}/>
-            {/* The ONNX hand detector takes no tracking confidence. */}
-            {detector !== 'rtmw_onnx_hands' && <SettingRow inactive={inactive} label="Tracking confidence"
-                info={handsNote ? REALTIME_HANDS_INFO.tracking : TRACKING_CONFIDENCE_INFO}
+            <SettingRow inactive={inactive} label="Tracking confidence"
+                info={TRACKING_CONFIDENCE_INFO}
                 control={<ValueSelector ariaLabel="Tracking confidence" value={value.trackingConfidence} min={0} max={1} step={0.05}
-                    unit="" onChange={trackingConfidence => onChange({trackingConfidence})}/>}/>}
+                    unit="" onChange={trackingConfidence => onChange({trackingConfidence})}/>}/>
         </>}
     </>;
 }

@@ -9,8 +9,6 @@
 import type {ModelConnectionGroup} from './message-contract.js';
 
 export interface PointsFrame {
-    /** Instance namespace for independently tracked hands in the merged viewport. */
-    trackerId?: string;
     sampleStatus?: Uint8Array;
     statusLabels?: readonly string[];
     names: readonly string[];
@@ -67,7 +65,6 @@ export enum OverlayLayer {
 export interface OverlayFrame {
     /** Identity of the detector observation; absent for reconstructed overlays. */
     trackerId?: string;
-    handedness?: 'left' | 'right';
     /** Identity within modelId for reconstructed overlays; not inferred for detectors. */
     instanceId?: number;
     /** Detector-owned image keypoint connections; no reconstructed model required. */

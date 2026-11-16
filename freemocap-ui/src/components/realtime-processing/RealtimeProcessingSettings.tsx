@@ -2,8 +2,7 @@ import {useState} from 'react';
 import {useRealtimePipelineSync} from '@/hooks/useRealtimePipelineSync';
 import {useExecutionProviderOptions} from '@/hooks/useExecutionProviderOptions';
 import {DetectorSettingRows, type DetectorSettingsValue} from '@/components/mocap-setup/detector-setting-rows';
-import {REALTIME_DETECTOR_OPTIONS} from '@/components/mocap-setup/detector-options';
-import {DlcModelSettings} from '@/components/mocap-setup/dlc-model-settings';
+import {DETECTOR_OPTIONS} from '@/components/mocap-setup/detector-options';
 import TrackerSettingsDialog from '@/components/mocap-setup/tracker-settings-dialog';
 import ProcessingOutline from '@/components/mocap-setup/processing-outline';
 import StageSection from '@/components/mocap-setup/stage-section';
@@ -27,7 +26,6 @@ export default function RealtimeProcessingSettings({onClose}: {onClose: () => vo
     const value: DetectorSettingsValue = {
         detector: camera.detector_type ?? 'rtmpose', model: camera.rtmpose_model_name ?? 'rtmw-x-l_256x192',
         provider, confidence: camera.rtmpose_confidence_threshold ?? 0.0025,
-        handCount: camera.hand_count,
         poseModelSize: camera.mediapipe_model_complexity ?? 'lite',
         detectionConfidence: camera.mediapipe_detection_confidence ?? 0.5,
         presenceConfidence: camera.mediapipe_presence_confidence ?? 0.5,
@@ -36,7 +34,6 @@ export default function RealtimeProcessingSettings({onClose}: {onClose: () => vo
     const changeDetector = (change: Partial<DetectorSettingsValue>) => applyOrUpdatePipelineConfig({
         ...pipelineConfig,
         camera_node_config: {...camera,
-            hand_count: change.handCount ?? camera.hand_count,
             detector_type: change.detector ?? camera.detector_type,
             rtmpose_model_name: change.model ?? camera.rtmpose_model_name,
             rtmpose_confidence_threshold: change.confidence ?? camera.rtmpose_confidence_threshold,
@@ -54,8 +51,8 @@ export default function RealtimeProcessingSettings({onClose}: {onClose: () => vo
             content: <>
                 <SettingRow label="Track person" info={{title: 'Track person', text: 'Run the selected person detector on camera images.'}} control={toggle('Track person', camera.skeleton_tracking_enabled,
                     enabled => applyOrUpdatePipelineConfig({...pipelineConfig, camera_node_config: {...camera, skeleton_tracking_enabled: enabled}}))}/>
-                <DetectorSettingRows value={value} onChange={changeDetector} detectors={REALTIME_DETECTOR_OPTIONS}
-                    providerOptions={providers} dlcControl={<DlcModelSettings context="realtime"/>} context="realtime" rows="all"/>
+                <DetectorSettingRows value={value} onChange={changeDetector} detectors={DETECTOR_OPTIONS}
+                    providerOptions={providers} context="realtime" rows="all"/>
                 <SettingRow label="Track Charuco board" info={{title: 'Track Charuco board', text: 'Detect the configured Charuco board alongside the person tracker.'}} control={toggle('Track Charuco board', camera.charuco_tracking_enabled,
                     enabled => applyOrUpdatePipelineConfig({...pipelineConfig, camera_node_config: {...camera, charuco_tracking_enabled: enabled}}))}/>
             </>},

@@ -116,17 +116,13 @@ function mergeTrackerKeypoints(frame: FrameMessage, previous: PointSourcesFrame 
     for (const tracker of frame.trackers) {
         const channel = channelByKind(tracker.channels, KEYPOINTS_3D);
         if (channel?.names) {
-            const view = pointView(channel, channel.names);
-            if (tracker.handedness) view.trackerId = tracker.tracker_id;
-            sources.push(view);
+            sources.push(pointView(channel, channel.names));
         }
     }
     if (!sources.some(source => source.names.length)) return null;
     const sameLayout = previous && sources.length === previous.sources.length &&
-        sources.every((source, index) => source.trackerId === previous.sources[index].trackerId
-            && snapshotEqual(source.names, previous.sources[index].names));
-    const names = sameLayout ? previous.names : sources.flatMap(source =>
-        source.trackerId ? source.names.map(name => `${source.trackerId}.${name}`) : [...source.names]);
+        sources.every((source, index) => snapshotEqual(source.names, previous.sources[index].names));
+    const names = sameLayout ? previous.names : sources.flatMap(source => [...source.names]);
     return {names, sources};
 }
 
@@ -263,7 +259,6 @@ export class FrameResolver {
                         cameraId: c.camera_id,
                         layer: OverlayLayer.DETECTIONS,
                         trackerId: tracker.tracker_id,
-                        handedness: tracker.handedness,
                         frameNumber: frame.frame_number,
                         names: c.names,
                         columns: c.columns,

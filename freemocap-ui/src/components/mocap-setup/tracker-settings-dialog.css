@@ -1,4 +1,4 @@
-/* The tracker settings window (Skeleton Setup, DLC tracker). It owns its whole
+/* The tracker settings window (Skeleton Setup). It owns its whole
    surface: it used to borrow the Mocap processing window's classes, and lost its
    background, border and footer when that window was rebuilt. */
 

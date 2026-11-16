@@ -1,5 +1,5 @@
 import type {ExecutionProviderName} from '@/types/execution-provider';
-import {migrateExportSettings} from '@/store/export-settings-migration';
+import {migrateExportSettings, migrateRemovedDetectors} from '@/store/export-settings-migration';
 import {CameraMatchingOptions, defaultCameraMatchingOptions} from '@/types/camera-matching';
 import {createSelector, createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {RootState} from '../../root-state-types';
@@ -55,7 +55,7 @@ export interface PosthocFilterConfig {
     order: number;
 }
 
-export type DetectorType = "rtmpose" | "mediapipe" | "rtmw_mediapipe_hands" | "dlc";
+export type DetectorType = "rtmpose" | "mediapipe";
 export type RTMPoseModelName = "rtmw-x-l_256x192" | "rtmw-x-l_384x288" | "rtmw-l-m_256x192";
 export type MediapipeModelComplexity = "lite" | "full" | "heavy";
 export {EXECUTION_PROVIDERS} from '@/types/execution-provider';
@@ -80,11 +80,6 @@ export interface MocapConfig {
     triangulation: TriangulationConfig;
     posthoc_filter: PosthocFilterConfig;
     detectorType: DetectorType;
-    dlcModelPath: string | null;
-    dlcGeometryPath: string | null;
-    dlcConfidenceThreshold: number;
-    dlcExecutionProvider: "cpu" | "cuda";
-    dlcTriangulationEnabled: boolean;
     rtmPoseModelName: RTMPoseModelName;
     rtmPoseConfidenceThreshold: number;
     executionProvider: ExecutionProviderName | null;
@@ -201,11 +196,6 @@ const DEFAULT_MOCAP_CONFIG: MocapConfig = {
 
     charucoTrackingEnabled: true,
     detectorType: "rtmpose",
-    dlcModelPath: null,
-    dlcGeometryPath: null,
-    dlcConfidenceThreshold: 0.4,
-    dlcExecutionProvider: "cpu",
-    dlcTriangulationEnabled: false,
     rtmPoseModelName: "rtmw-x-l_256x192",
     rtmPoseConfidenceThreshold: 0.004,
     executionProvider: null,
@@ -229,7 +219,7 @@ const DEFAULT_MOCAP_CONFIG: MocapConfig = {
 // ==================== Initial State ====================
 
 const exportSettingsMigration = migrateExportSettings(loadFromStorage<Record<string, unknown> | null>('mocap.config', null));
-const _persistedMocapConfig = exportSettingsMigration.config as Partial<MocapConfig>;
+const _persistedMocapConfig = migrateRemovedDetectors(exportSettingsMigration.config) as Partial<MocapConfig>;
 
 const initialMocapConfig: MocapConfig = {
     ...DEFAULT_MOCAP_CONFIG,
@@ -311,9 +301,6 @@ export const mocapSlice = createSlice({
         },
         mocapCharucoTrackingChanged: (state, action: PayloadAction<boolean>) => {
             state.config.charucoTrackingEnabled = action.payload;
-        },
-        mocapDlcSettingsChanged: (state, action: PayloadAction<Partial<Pick<MocapConfig, 'dlcModelPath' | 'dlcGeometryPath' | 'dlcConfidenceThreshold' | 'dlcExecutionProvider' | 'dlcTriangulationEnabled'>>>) => {
-            Object.assign(state.config, action.payload);
         },
         /** Switch between rtmpose and mediapipe detector backends. */
         mocapDetectorTypeChanged: (state, action: PayloadAction<DetectorType>) => {
@@ -519,7 +506,6 @@ export const {
     cameraMatchingUpdated,
     mocapCharucoTrackingChanged,
     mocapDetectorTypeChanged,
-    mocapDlcSettingsChanged,
     mocapRtmPoseModelNameChanged,
     mocapRtmPoseConfidenceThresholdChanged,
     mocapExecutionProviderChanged,

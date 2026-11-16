@@ -76,9 +76,8 @@ export function useProcessingSections(mode: 'recording' | 'playback'): Processin
     const {mocapRecordingPath, isLoading, isRecording} = useMocap();
     const recordingName = mocapRecordingPath?.split(/[\\/]/).filter(Boolean).pop() ?? '';
     const model = RTMPOSE_MODELS.find(entry => entry.value === config.rtmPoseModelName);
-    const detector = config.detectorType === 'dlc' ? 'DLC'
-        : config.detectorType === 'mediapipe' ? `MediaPipe · ${config.mediapipeModelComplexity}`
-            : [config.detectorType === 'rtmw_mediapipe_hands' ? 'RTMW + MediaPipe hands' : 'RTMW', model?.label].filter(Boolean).join(' · ');
+    const detector = config.detectorType === 'mediapipe' ? `MediaPipe · ${config.mediapipeModelComplexity}`
+        : ['RTMW', model?.label].filter(Boolean).join(' · ');
     const stage = (id: ResumeStage, number: number, summary: ReactNode, content: ReactNode | null): ProcessingSection =>
         ({id, number, title: STAGE_TITLES[id], stage: id, summary, content});
     return [

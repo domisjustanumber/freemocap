@@ -76,8 +76,8 @@ def test_tracker_topology_survives_recording_and_shared_composition(detector):
     assert wire(bundle) == wire(restored)
     assert bundle.tracker_connections == detector_connections(detector) and bundle.tracker_connections
     face_edges = [(a,b) for a,b in bundle.tracker_connections if a.startswith('face/') and b.startswith('face/')]
-    # The RTMW schema of skellytracker 2.0 has no face edges; Holistic has the face mesh edges.
-    assert bool(face_edges) == (detector == 'mediapipe')
+    # Both schemas have face edges (RTMW since skellytracker b8bfa7d2, Holistic its face mesh); they reach the bundle.
+    assert face_edges
     assert all(a in bundle.tracker_keypoint_names and b in bundle.tracker_keypoint_names for a,b in face_edges)
     legacy = saved.model_dump()
     legacy.pop('tracker_connections')

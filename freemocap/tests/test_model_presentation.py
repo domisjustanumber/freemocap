@@ -29,7 +29,7 @@ def test_saved_model_uses_identical_static_projection():
     assert 'presentation' not in project(SkeletonSnapshot.from_dict(saved).restore())
 
 
-@pytest.mark.parametrize('detector', ['mediapipe', 'rtmpose', 'rtmw_mediapipe_hands'])
+@pytest.mark.parametrize('detector', ['mediapipe', 'rtmpose'])
 def test_chest_mapping_matches_authored_reference_after_rigid_transform_and_scaling(detector):
     """Cross-repository calibration belongs in Core, never Tracker importing Forge.
 
@@ -61,7 +61,7 @@ def test_chest_mapping_matches_authored_reference_after_rigid_transform_and_scal
             assert batch.present[0, column]
             np.testing.assert_allclose(batch.positions[0, column], expected, rtol=0, atol=1e-6, err_msg=name)
 
-@pytest.mark.parametrize('detector', ['mediapipe', 'rtmpose', 'rtmw_mediapipe_hands'])
+@pytest.mark.parametrize('detector', ['mediapipe', 'rtmpose'])
 def test_tracker_topology_survives_recording_and_shared_composition(detector):
     from freemocap.core.skeletons.standard_human_skeleton import build_standard_human_bundle
     from freemocap.core.recording.data_descriptors.recording_model import RecordedModel

@@ -131,6 +131,19 @@ def test_saved_matching_triangulation_and_integrity_without_tracker_materializat
                     tracker_definition=tracker)
 
 
+def test_removed_detector_restart_names_the_saved_type(saved_predictions, tmp_path):
+    original, _, config, tracker, timing = saved_predictions
+    removed = tracker.model_copy(update={'configuration': {**tracker.configuration, 'detector_type': 'dlc'}})
+    publish_posthoc_observations(ObservationRecordingRequest(
+        recording=RecordingInfo(recording_name='removed', recording_directory=str(tmp_path)),
+        group=ObservationGroup(name='saved-cameras', frames=original.frames, videos=original.videos),
+        tracker=removed, models=(), reconstructions=(), spatial_series=(), filtering=None,
+        reprojection=None, camera_geometry=(), resolved_timing=timing))
+    structure = RecordingStructure(base_directory=tmp_path, recording_name='removed')
+    with pytest.raises(ValueError, match="'dlc'.*removed in the skellytracker 2.0 migration"):
+        read_saved_observations(structure=structure, run_id=0, sensor_group=config.sensor_group)
+
+
 def test_annotation_adapts_only_requested_frame(saved_predictions):
     _, structure, config, _, _ = saved_predictions
     saved = read_saved_observations(structure=structure, run_id=0, sensor_group=config.sensor_group)

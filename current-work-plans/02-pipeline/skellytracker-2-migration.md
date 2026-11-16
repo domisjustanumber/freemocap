@@ -65,7 +65,38 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
   no install hint per EP (`install_hint` private), no applied EP per model of a run
   (`PipelineRun.models` has no used_ep; freemocap makes it up in `inference_service.py:161`), no GPU
   flag per EP, no documented order of `EpStatus.eps`, no devices in `status()`. Also: Auto drops
-  `EpRecommendation.options` and `device_key` (`pipeline_runs.py:62`). Wait for the answer. EP rule (§0.3): inventory every EP key / ORT provider name (path:line) with a sub-agent; report
+  `EpRecommendation.options` and `device_key` (`pipeline_runs.py:62`).
+  ANSWERS (supervisor, 2026-11-16): skellytracker fills gaps 1 (usable flag), 2 (install hint),
+  4 (GPU flag), 5 (stated order of `EpStatus.eps`) and 3 (per model node: applied EP, device,
+  precision); names come in a later message, code against them only then. Gaps 6 and 7 are dropped.
+  Until then: no new import of `USABLE_STATES` from `eps.records`, no call of private `install_hint()`.
+  `/onnx/session_providers` stays untouched until gap 3; the made-up `applied_providers` at
+  `inference_service.py:161` **waits for gap 3**.
+  - Part 1, now, its own commit groups with tests:
+    (i) delete the dead `freemocap-ui/electron/main/services/dependency-manager.ts` and `system-scanner.ts`
+    (own commit);
+    (ii) FIRST, with a test, Auto = `status().performance.chosen` and pass `options` and `device_key`
+    to `start_pipeline(ep_options=..., device=...)`;
+    (iii) `app/app.py` startup GPU probe (nvidia-smi, WMIC, lspci, system_profiler,
+    `onnxruntime.get_available_providers()`) → `status().host`;
+    (iv) delete the dead `graph_execution_provider` Literal (backend, contract, UI);
+    (v) contract EP types become plain strings; delete the Literal key list, `EXECUTION_PROVIDERS`,
+    `REMOVED_PROVIDERS` and the validator; an unknown key gives skellytracker's `EpRequestError`, show its
+    message;
+    (vi) the mediapipe rule uses `check_pipeline(...).needs_execution_provider`;
+    (vii) the UI gets keys and labels from the backend route at run time: no union type, label table or
+    order table; drop the GPU/CPU help texts;
+    (viii) a test that fails when a source file under `freemocap/` or `freemocap-ui/src/` holds an EP
+    key literal (`cuda`, `trt-rtx`, `coreml`, `directml`, `trt`) or an ORT provider name
+    (`*ExecutionProvider`); allowlist empty or justified line by line.
+    Report to the supervisor after part 1.
+  - Part 2, after the supervisor's message: usable flag, install hint, GPU flag, order, the applied EP of
+    `/onnx/session_providers`.
+  - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
+    keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
+    or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).
+  - Then the gate runs, once.
+  EP rule (§0.3): inventory every EP key / ORT provider name (path:line) with a sub-agent; report
   the count and each UI need that `skellytracker.core.eps` does not give (do not work around); then
   implement. This replaces the fixed keys of step 1 and the `trt-rtx` fix of (a): delete those
   literals. (b) the Playwright "Apply sends selected settings" `camera.skeleton_tracker_config`

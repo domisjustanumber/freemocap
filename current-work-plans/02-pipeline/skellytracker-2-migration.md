@@ -190,7 +190,17 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     Scratch ST clone then moved to `b8bfa7d2`: 130 RTMW edges (65 face); one test_data frame
     (Cam1, frame 100) annotated: face lines drawn, yellow like the face points, 1 px, mostly under the
     point dots at that face size (11 px differ from the same annotation without face edges).
-    Next: R2 (settingsVersion + faked legacy call).
+  - R2 DONE (2026-11-16) `288deb48`, scratch ST clone at `de7e18f3`: `MOCAP_SETTINGS_VERSION = 1`
+    written into `freemocap:mocap.config` on every save (`persistence-listener.ts`); at load
+    `takeLegacyExecutionProvider` holds back the EP key of a config without it
+    (`mocap.executionProviderMigration` pending, config Auto meanwhile); while pending nothing is saved
+    and `selectCanProcessMocapRecording` is false; `legacy-execution-provider-listener.ts` asks
+    `GET /onnx/execution_providers/suggestion?saved=` on connect/reconnect, which calls
+    `skellytracker.core.eps.suggest_execution_provider`; `legacyExecutionProviderResolved` applies the
+    key or Auto, the notice in `mocap-detector-settings.tsx` names both (and the install hint of a
+    suggested EP that is not usable, ready for the open "usable = pack installed" question); a choice
+    by the user while pending ends it. Realtime settings are not persisted: nothing legacy there.
+    Next: V3 (smaller face points).
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).
@@ -381,6 +391,9 @@ frames, each with `rtmpose` and with `mediapipe`.
     `trt-rtx` works). Only a file with no new-format marker is legacy, so new saves carry a marker.
   - G3: no usable suggestion, or a legacy key with no successor (`directml`): the setting becomes Auto,
     with a notice.
+  - Built in `288deb48` against `suggest_execution_provider` (ST `de7e18f3`). OPEN with the user: "usable"
+    = pack installed, so on an RTX machine without the pack a saved `trt`/`cuda` becomes Auto; the notice
+    can already carry the install hint of a suggested EP.
 - S2 (2026-11-16, user): a "process again with the saved pipeline" button or route is NOT part of this
   work; save the data only. LATER WORK: re-run a recording from its saved `skellytracker` block.
 - R1/R2 facts and plan (reported 2026-11-16, not implemented):
@@ -506,6 +519,10 @@ frames, each with `rtmpose` and with `mediapipe`.
     "Device" row (Auto + each GPU with its name and VRAM, most VRAM first) shows when the chosen EP has
     more than one device; a new EP clears the device. Posthoc `executionDevice` and realtime
     `execution_device` reach `start_pipeline(device=...)`; Auto ignores them.
+16. Saved mocap settings carry `settingsVersion: 1` (`288deb48`). A config saved before it is legacy: its
+    EP key is replaced by skellytracker's suggestion for this computer (legacy `trt`/`cuda` -> `trt-rtx`
+    if usable, else `cuda` if usable; another usable key stays; else Auto) and a notice says which key
+    was replaced by which. Processing waits until the server has answered.
 
 ### 0.7 Imports of old skellytracker modules that stage 2.4 can remove
 

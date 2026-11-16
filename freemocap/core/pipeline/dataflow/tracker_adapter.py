@@ -78,6 +78,8 @@ class SkellyTrackerAdapter:
         self.performance_report = performance_report
         self.execution_provider = execution_provider
         self.execution_device = execution_device
+        self.run_record: dict | None = None
+        """The record of the last tracked recording's run (`InferenceClient.run_record`)."""
 
     def track_recording(self, *, sources: RecordingVideoSources, execution_id: str,
                         shutdown_flag: Synchronized, queued_frames_per_camera: int = 2,
@@ -174,6 +176,7 @@ class SkellyTrackerAdapter:
                         key, timestamp = frame_metadata[camera]
                         yield TrackedCameraFrame(key, timestamp, observation)
         finally:
+            self.run_record = client.run_record
             client.close()
             if board_detector is not None:
                 board_detector.close()

@@ -47,7 +47,5 @@ def observation_provenance(*, request: "ObservationRecordingRequest", run: "RunD
         result[stage] = context.record(
             settings=stage_settings(stage, request.tracker.configuration, filtering=request.filtering),
             defaults=stage_settings(stage, request.provenance_defaults) if request.provenance_defaults is not None else None,
-            inputs=inputs, sources=sources,
-            limitations=('Tracker settings describe requested execution providers; actual runtime fallback is not exposed by this adapter.',)
-                if stage == ProcessingStage.OBSERVATIONS else ())
+            inputs=inputs, sources=sources, limitations=())
     return result

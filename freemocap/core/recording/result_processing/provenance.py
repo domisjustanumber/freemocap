@@ -73,8 +73,9 @@ class ProvenanceContext:
 def stage_settings(stage: ProcessingStage, config: dict, *, filtering=None) -> dict:
     """Stage-owned options only; UI/export choices never become numerical settings."""
     if stage == ProcessingStage.OBSERVATIONS:
-        return {key: config[key] for key in ("detector_type", "tracker_config", "charuco_tracking_enabled",
-            "board_mode", "charuco_board") if key in config}
+        return {key: config[key] for key in ("detector_type", "rtmpose_model_name", "rtmpose_confidence_threshold",
+            "execution_provider", "execution_device", "skellytracker", "charuco_tracking_enabled", "board_mode",
+            "charuco_board") if key in config}
     if stage == ProcessingStage.TIMING:
         return {"video_fps": config["video_fps"]} if "video_fps" in config else {}
     if stage == ProcessingStage.TRIANGULATION:

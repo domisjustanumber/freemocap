@@ -21,7 +21,7 @@ class TrackerAdapterTests(unittest.TestCase):
         """`infer(frames)` stands in for the run; its results are already observations."""
         run = Mock(models={})
         run.process_batch.side_effect = infer
-        for target, replacement in (("start_detector_run", lambda **kwargs: (run, None)),
+        for target, replacement in (("start_detector_run", lambda **kwargs: (run, {"execution": {"requested": None}})),
                                     ("observations_from_results", lambda results, schema, detector, threshold: results)):
             patcher = patch(f"freemocap.core.pipeline.inference_service.{target}", side_effect=replacement)
             patcher.start()

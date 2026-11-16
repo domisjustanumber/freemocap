@@ -104,12 +104,10 @@ def test_graph_receives_each_explicit_provider(provider):
     assert resolve_tracking_provider(PosthocMocapPipelineConfig(executionProvider=provider)) == provider
 
 
-def test_graph_auto_takes_the_skellytracker_recommendation_and_mediapipe_takes_no_ep():
+def test_graph_auto_is_left_to_the_run_and_mediapipe_takes_no_ep():
+    """Auto reaches the run as None, so the run takes the recommendation with its options and device."""
     from freemocap.core.pipeline.dataflow.application_pipeline import resolve_tracking_provider
-    from skellytracker.core import eps
-    for chosen in ('gpu-ep', 'cpu'):
-        with patch.object(eps, 'recommend', return_value=SimpleNamespace(chosen=SimpleNamespace(ep_key=chosen, device_key=None), options=())):
-            assert resolve_tracking_provider(PosthocMocapPipelineConfig()) == chosen
+    assert resolve_tracking_provider(PosthocMocapPipelineConfig()) is None
     for saved in (None, 'any-ep-key'):  # the saved choice of the hidden EP setting
         assert resolve_tracking_provider(PosthocMocapPipelineConfig(detectorType='mediapipe', executionProvider=saved)) is None
 

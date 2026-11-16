@@ -55,7 +55,7 @@ from freemocap.system.recording_structure.recording_structure import RecordingSt
 
 
 def build_recording_pipeline(*, sources: RecordingVideoSources, recording: RecordingInfo,
-    config: PosthocMocapPipelineConfig, run_session: RunSaveSession | None = None, execution_provider: str = "cpu", annotate: bool = False,
+    config: PosthocMocapPipelineConfig, run_session: RunSaveSession | None = None, execution_provider: str | None = None, annotate: bool = False,
     shutdown_flag=None, performance: PerformanceReport | None = None,
     observation_loader: Callable[[], ObservationCollection] | None = None,
     annotation_service: RecordingAnnotationWorkers | None = None,
@@ -139,6 +139,8 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
             return {"result": result}
         handlers[name] = invoke
 
+    run_record: dict = {}
+
     def load_and_track(_):
         if observation_loader is not None:
             return observation_loader()
@@ -168,6 +170,7 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
                                 progress("load_and_track", "tracking", camera_frame_count / total_camera_frames)
                 if tracking_progress is not None:
                     tracking_progress(dict(tracked_frames_per_camera))
+            run_record.update(adapter.run_record or {})  # set when the tracking generator closed
         finally:
             service.close()
             registry.remove_dead()
@@ -212,7 +215,10 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
         collection = inputs["observations"]
         collection.require_complete()
         definition = config.model_dump(mode="json")
-        definition["execution"] = {"requested_provider": execution_provider, "timestamp_policy": "relative_recording_group_milliseconds"}
+        requested = run_record["execution"]["requested"] if run_record else execution_provider
+        definition["execution"] = {"requested_provider": requested, "timestamp_policy": "relative_recording_group_milliseconds"}
+        if run_record:  # how the observations were made, as skellytracker gives it; absent in older recordings
+            definition["skellytracker"] = run_record
         return ObservationRecordingRequest(recording=recording,
             group=ObservationGroup(name=sources.sensor_group, frames=collection.frames, videos=videos),
             tracker=TrackerRecordingDefinition(name=tracker_source,

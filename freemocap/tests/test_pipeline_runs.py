@@ -21,7 +21,7 @@ def test_a_key_passes_unchanged_and_auto_takes_the_recommendation(monkeypatch):
     monkeypatch.setattr(eps, "recommend", lambda form: SimpleNamespace(chosen=SimpleNamespace(ep_key="cpu", device_key=None), options=()))
     assert pipeline_runs.run_ep_choice("any-ep-key") == ("any-ep-key", None, None)
     for auto in (None, "auto"):
-        assert pipeline_runs.run_execution_provider(auto) == "cpu"
+        assert pipeline_runs.run_ep_choice(auto)[0] == "cpu"
 
 
 @pytest.mark.parametrize(("detector_type", "needs_ep", "expected"), [("rtmpose", True, "cpu"), ("mediapipe", False, None)])
@@ -30,10 +30,11 @@ def test_an_ep_is_given_only_when_the_pipeline_needs_one(monkeypatch, detector_t
     started = {}
     monkeypatch.setattr(pipeline_runs, "load_detector_pipeline", lambda *args: "config")
     monkeypatch.setattr(pipelines, "check_pipeline", lambda config: SimpleNamespace(needs_execution_provider=needs_ep))
+    monkeypatch.setattr(pipelines, "export_pipeline", lambda config, resolved: {})
     monkeypatch.setattr(pipelines, "start_pipeline", lambda config, **kwargs: started.update(kwargs) or "run")
     monkeypatch.setattr(pipeline_runs, "run_ep_choice", lambda requested, device=None: ("cpu", None, None))
-    run = pipeline_runs.start_detector_run(detector_type=detector_type, camera_ids=["0", "1"], running_mode="live")
-    assert run == ("run", expected)
+    run, record = pipeline_runs.start_detector_run(detector_type=detector_type, camera_ids=["0", "1"], running_mode="live")
+    assert run == "run" and record["execution"]["requested"] == expected
     assert started["execution_provider"] == expected and started["ep_options"] is None and started["device"] is None
     assert started["camera_ids"] == ["0", "1"] and started["running_mode"] == "live"
 
@@ -47,7 +48,10 @@ def test_auto_passes_the_options_and_device_of_the_recommendation_to_the_run(mon
     monkeypatch.setattr(pipeline_runs, "load_detector_pipeline", lambda *args: "config")
     monkeypatch.setattr(pipelines, "check_pipeline", lambda config: SimpleNamespace(needs_execution_provider=True))
     monkeypatch.setattr(pipelines, "start_pipeline", lambda config, **kwargs: started.update(kwargs) or "run")
-    assert pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0"], running_mode="live") == ("run", "gpu-ep")
+    monkeypatch.setattr(pipelines, "export_pipeline", lambda config, resolved: {"exported": config, "resolved": resolved})
+    run, record = pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0"], running_mode="live")
+    assert run == "run" and record["execution"] == {"selected": None, "selected_device": None, "requested": "gpu-ep",
+                                                    "options": {"prefer_nhwc": "1"}, "device": "gpu:0"}
     assert (started["execution_provider"], started["ep_options"], started["device"]) == ("gpu-ep", {"prefer_nhwc": "1"}, "gpu:0")
 
 
@@ -141,12 +145,12 @@ def test_point_names_and_connections_use_the_names_of_the_observations(detector_
 
 
 def test_a_real_holistic_run_gives_one_body_stage_with_its_point_names():
-    run, provider = pipeline_runs.start_detector_run(detector_type="mediapipe", camera_ids=["0", "1"], running_mode="live")
+    run, record = pipeline_runs.start_detector_run(detector_type="mediapipe", camera_ids=["0", "1"], running_mode="live")
     from skellytracker.core.pipelines import Frame
     with run:
         results = run.process_batch({"1": Frame(np.zeros((48, 64, 3), np.uint8), frame_index=3, timestamp_ms=10.0)})
         observations = pipeline_runs.observations_from_results(results, run.output_schema, "mediapipe")
-    assert provider is None and set(observations) == {"1"}
+    assert record["execution"]["requested"] is None and set(observations) == {"1"}
     stage = observations["1"].stages[pipeline_runs.STAGE]
     assert stage.keypoints.names[:2] == ("body/nose", "body/left_eye_inner") and len(stage.keypoints.names) == 553
     assert stage.bounding_boxes == [] and stage.detector_ran
@@ -165,6 +169,7 @@ def test_the_users_device_of_an_explicit_ep_reaches_the_run_and_auto_ignores_it(
     monkeypatch.setattr(eps, "recommend", lambda form: recommendation)
     monkeypatch.setattr(pipeline_runs, "load_detector_pipeline", lambda *args: "config")
     monkeypatch.setattr(pipelines, "check_pipeline", lambda config: SimpleNamespace(needs_execution_provider=True))
+    monkeypatch.setattr(pipelines, "export_pipeline", lambda config, resolved: {})
     started = {}
     monkeypatch.setattr(pipelines, "start_pipeline", lambda config, **kwargs: started.update(kwargs) or "run")
     pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0"], running_mode="live",
@@ -172,3 +177,17 @@ def test_the_users_device_of_an_explicit_ep_reaches_the_run_and_auto_ignores_it(
     assert (started["execution_provider"], started["device"]) == ("gpu-ep", "gpu:1")
     pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0"], running_mode="live", execution_device="gpu:1")
     assert (started["execution_provider"], started["device"]) == ("gpu-ep", "gpu:0")
+
+
+def test_the_record_of_a_real_run_is_the_exported_pipeline_and_the_ep_choice_as_data():
+    import json
+    run, record = pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0"], running_mode="video",
+                                                   rtmpose_model_name="rtmw-l-m_256x192", execution_provider="cpu")
+    with run:
+        models = run.models
+    assert json.loads(json.dumps(record)) == record  # JSON types only, as a recording keeps it
+    assert record["pipeline"]["pipeline_id"] and record["running_mode"] == "video"
+    nodes = {node["id"]: node for node in record["pipeline"]["nodes"]}
+    assert all(nodes[node]["params"]["sidecar_sha256"] == model["sidecar_sha256"] for node, model in models.items())
+    assert nodes[pipeline_runs.RTMW_NODE]["params"]["size"] == pipeline_runs.RTMW_SIZES["rtmw-l-m_256x192"]
+    assert record["execution"] == {"selected": "cpu", "selected_device": None, "requested": "cpu", "options": None, "device": None}

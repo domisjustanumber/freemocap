@@ -37,7 +37,7 @@ class InferenceServiceTests(unittest.TestCase):
                       "wholebody": {"key": "rtmw-wholebody133@openmmlab-exporter", "execution_provider": "gpu-ep", "device": "gpu:0"}}
         run.process_batch.side_effect = self.infer
         self.runs.append(run)
-        return run, "gpu-ep"
+        return run, {"execution": {"selected": kwargs.get("execution_provider"), "requested": "gpu-ep"}}
 
     @staticmethod
     def infer(frames):
@@ -122,6 +122,7 @@ class InferenceServiceTests(unittest.TestCase):
         self.assertEqual(observed["pipeline_id"], "observed-provider")
         self.assertIsNone(observed["requested_provider"])
         self.assertEqual(observed["models"], [{"node": node, **model} for node, model in self.runs[0].models.items()])
+        self.assertEqual(client.run_record, {"execution": {"selected": None, "requested": "gpu-ep"}, "models": self.runs[0].models})
 
     def test_each_client_has_its_own_run_and_a_retired_run_is_closed(self) -> None:
         first = self.client(name="first")

@@ -63,25 +63,25 @@ def run_ep_choice(requested: str | None, device: str | None = None) -> tuple[str
     return chosen.ep_key, dict(recommendation.options) or None, chosen.device_key
 
 
-def run_execution_provider(requested: str | None) -> str:
-    """The EP key of a run (see `run_ep_choice`)."""
-    return run_ep_choice(requested)[0]
-
-
 def start_detector_run(*, detector_type: str, camera_ids: Sequence[str], running_mode: str,
                        rtmpose_model_name: str | None = None, execution_provider: str | None = None,
                        execution_device: str | None = None):
-    """Start the run of a detector choice; return it with its EP key. Give an EP only when the pipeline needs one.
+    """Start the run of a detector choice; return it with its record. Give an EP only when the pipeline needs one.
 
     Auto passes the recommendation's EP options and device too (a precision such as fp16 can need its options).
+    The record is what a recording keeps of the run, as skellytracker gives it: the pipeline config as
+    `export_pipeline` writes it, the running mode, and the EP the user selected with what the run was asked for.
     """
-    from skellytracker.core.pipelines import check_pipeline, start_pipeline
+    from skellytracker.core.pipelines import check_pipeline, export_pipeline, start_pipeline
     config = load_detector_pipeline(detector_type, rtmpose_model_name)
     provider, options, device = (run_ep_choice(execution_provider, execution_device) if check_pipeline(config).needs_execution_provider
                                  else (None, None, None))
     run = start_pipeline(config, camera_ids=list(camera_ids), running_mode=running_mode, execution_provider=provider,
                          ep_options=options, device=device)
-    return run, provider
+    record = {"pipeline": export_pipeline(config, resolved=True), "running_mode": running_mode,
+              "execution": {"selected": execution_provider, "selected_device": execution_device,
+                            "requested": provider, "options": options, "device": device}}
+    return run, record
 
 
 @cache

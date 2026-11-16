@@ -162,8 +162,11 @@ Current coverage includes observations, timing, triangulation, filtering, scale,
 reconstruction and biomechanics. Numerical restarts bind the base run
 and descriptor fingerprint. Input fingerprints identify saved inputs;
 they do not yet provide a complete raw-video/model-weight dependency manifest.
-Tracker provider settings describe the request: actual runtime provider fallback
-is not exposed by the current adapter and is recorded as a limitation. Defaults
+The tracker source's `skellytracker` block records how a fresh tracking run was
+made, as SkellyTracker gives it: the exported pipeline config, the running mode,
+the EP the user selected and what the run asked for, and per model its key,
+version, sidecar hash, size, precision and applied EP and device. Recordings
+made before it have no block, which means unknown. Defaults
 are execution-time application defaults, not proof of a user's choices. Complete
 calibration-operation provenance and application-level run retention remain work
 to do. The original tracker request remains available in the tracker source.

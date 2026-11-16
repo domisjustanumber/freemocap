@@ -140,6 +140,44 @@ class RecordingPipelineTests(unittest.TestCase):
         saved_again = read_metadata(path=RecordingStructure(base_directory=source.root.parent, recording_name=source.root.name).data_parquet_path)
         self.assertEqual(assignment, saved_again.runs[0].processing[source.sources.sensor_group]["camera_assignment"])
 
+    def test_a_fresh_tracking_run_saves_the_skellytracker_block_in_the_tracker_source(self):
+        from unittest.mock import patch
+        record = {"pipeline": {"pipeline_id": "some-pipeline", "nodes": []}, "running_mode": "video",
+                  "execution": {"selected": None, "selected_device": None, "requested": "some-ep", "options": None, "device": None},
+                  "models": {"wholebody": {"key": "some-model", "execution_provider": "some-ep", "device": None}}}
+        events = self.fixture.events + self.fixture.outcomes
+
+        class Adapter:
+            def __init__(self, **kwargs):
+                self.run_record = None
+
+            def track_recording(self, *, execution_id, **kwargs):
+                for event in events:  # the fixture's events, under the execution of this tracking
+                    yield (replace(event, execution_id=execution_id) if hasattr(event, 'execution_id')
+                           else replace(event, frame_key=replace(event.frame_key, execution=execution_id)))
+                self.run_record = record
+
+        with patch('freemocap.core.pipeline.dataflow.recording_pipeline.SkellyTrackerAdapter', Adapter):
+            source = self.fixture
+            config = PosthocMocapPipelineConfig(export_to_blender=False, stop_stage='triangulation', charuco_tracking_enabled=False,
+                calibration_toml_path=str(self.calibration), body_alignment=MocapAlignmentConfig(mode="calibration"))
+            graph, handlers = build_recording_pipeline(sources=source.sources,
+                recording=RecordingInfo(recording_name=source.root.name, recording_directory=str(source.root.parent)),
+                config=config, execution_provider=None)
+            result = execute_recording_graph(graph=graph, handlers=handlers)
+        self.assertTrue(result.complete, result.failures)
+        definition = result.outputs['observation_request']['result'].tracker.configuration
+        self.assertEqual(definition['skellytracker'], record)
+        self.assertEqual(definition['execution']['requested_provider'], 'some-ep')
+        metadata = read_metadata(path=RecordingStructure(base_directory=source.root.parent, recording_name=source.root.name).data_parquet_path)
+        saved = next(item for name, item in metadata.runs[0].sources.items() if name.startswith('keypoint_model:'))
+        self.assertEqual(saved.definition['skellytracker'], record)
+        from freemocap.core.recording.data_descriptors.stage_provenance import stage_provenance
+        from freemocap.core.pipeline.posthoc.processing_request import ProcessingStage
+        observations = stage_provenance(metadata.runs[0].processing, source.sources.sensor_group).stages[ProcessingStage.OBSERVATIONS]
+        self.assertEqual(observations.effective_settings['skellytracker'], record)
+        self.assertEqual(observations.limitations, ())
+
     def test_saved_tracking_restarts_triangulation_without_video_or_detector_access(self):
         from freemocap.core.pipeline.dataflow.saved_observation_source import load_saved_observation_source
         from unittest.mock import patch
@@ -147,6 +185,10 @@ class RecordingPipelineTests(unittest.TestCase):
         original = execute_recording_graph(graph=graph, handlers=handlers)
         self.assertTrue(original.complete, original.failures)
         expected = original.outputs['match_and_triangulate']['result'].triangulation.reconstruction.points_3d.copy()
+        # This recording has no skellytracker block, as every recording saved before it: it must still restart.
+        metadata = read_metadata(path=RecordingStructure(base_directory=self.fixture.root.parent,
+            recording_name=self.fixture.root.name).data_parquet_path)
+        self.assertFalse(any('skellytracker' in source.definition for source in metadata.runs[0].sources.values()))
         video_folder = self.fixture.root / 'synchronized_videos'
         video_folder.mkdir()
         for camera in self.fixture.sources.camera_sources:

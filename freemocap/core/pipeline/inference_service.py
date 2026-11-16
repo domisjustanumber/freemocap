@@ -75,6 +75,8 @@ class InferenceClient:
     _closed: bool = False
     failure: Exception | None = None
     provider_status: tuple = ()
+    run_record: dict | None = None
+    """The `start_detector_run` record of the client's run, with each model as the run reports it; None before it starts."""
     _startup_ready: bool = False
 
     def submit(self, request: InferenceRequest) -> Future[dict[str, Observation]]:
@@ -154,12 +156,13 @@ class InferenceService:
     @staticmethod
     def _start_run(client: InferenceClient):
         registration = client.registration
-        run, _ = start_detector_run(
+        run, record = start_detector_run(
             detector_type=registration.detector_type, camera_ids=registration.camera_ids,
             running_mode=RUNNING_MODES[registration.mode.value],
             rtmpose_model_name=registration.rtmpose_model_name, execution_provider=registration.execution_provider,
             execution_device=registration.execution_device)
-        return run, tuple({"node": node, **model} for node, model in run.models.items())
+        models = {node: dict(model) for node, model in run.models.items()}
+        return run, tuple({"node": node, **model} for node, model in models.items()), {**record, "models": models}
 
     def submit(self, *, client: InferenceClient, request: InferenceRequest) -> Future[dict[str, Observation]]:
         with self._condition:
@@ -247,9 +250,10 @@ class InferenceService:
                     if client._run is None:
                         self._record_startup(client, "loading_models", "Loading tracking models")
                         with performance.measure("inference.session_setup") if performance is not None else nullcontext():
-                            client._run, statuses = self._start_run(client)
+                            client._run, statuses, record = self._start_run(client)
                             with self._condition:
                                 client.provider_status = statuses
+                                client.run_record = record
                             self._record_startup(client, "waiting_for_first_result", "Processing the first camera frame")
                     request = pending.request
                     with performance.measure(f"inference.process_batch.images={len(request.images)}") if performance is not None else nullcontext():

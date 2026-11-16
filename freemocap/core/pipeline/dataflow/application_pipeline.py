@@ -49,16 +49,15 @@ def validate_application_graph(*, config: PosthocMocapPipelineConfig) -> None:
 
 
 def resolve_tracking_provider(config: PosthocMocapPipelineConfig) -> str | None:
-    """The user's EP key, or for Auto the skellytracker recommendation; None for a pipeline that takes no EP.
+    """The user's EP key, None for Auto (the run takes the skellytracker recommendation with its options and
+    device when it starts), and None for a pipeline that takes no EP.
 
     A pipeline that takes no EP ignores the saved EP choice: the UI hides that setting for it.
     """
     if config.start_stage != 'observations':
         return config.execution_provider
-    from freemocap.core.tracking.pipeline_runs import detector_takes_execution_provider, run_execution_provider
-    if not detector_takes_execution_provider(config.detector_type):
-        return None
-    return run_execution_provider(config.execution_provider)
+    from freemocap.core.tracking.pipeline_runs import detector_takes_execution_provider
+    return config.execution_provider if detector_takes_execution_provider(config.detector_type) else None
 
 
 def run_application_graph(*, request) -> None:
@@ -138,7 +137,7 @@ def _run_application_graph(*, request) -> None:
                 cameras = len(sources.camera_sources)
                 total_images = count * cameras
                 detector = {'rtmpose': 'RTMW', 'mediapipe': 'MediaPipe'}[config.detector_type]
-                device = f'requested provider: {provider}; applied providers are reported at session startup'
+                device = f'requested provider: {provider or "Auto"}; applied providers are reported at session startup'
                 board_text = ' and ChArUco board points' if config.charuco_tracking_enabled else ''
                 videos = tuple(ItemProgressSnapshot(label=video_label(index),
                     completed=tracked_frames_per_camera[source.camera_id],

@@ -143,6 +143,26 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     with the part 2 message). Confirmed: 57be4131 (ignore the EP choice for a pipeline with no EP).
     Done early (part 3 docs, allowed): `gpu-setup.mdx` "How GPU Detection Works" and
     `backend-overview.mdx:85` no longer name nvidia-smi; the rest of those pages stays for part 3.
+  - PART 2 MESSAGE (supervisor, 2026-11-16): ST local `c4b51dde` (one more commit follows: RTMW sidecar
+    with face edges, `source.version` 0.3.0, new hash, RTMW `canonical_edges` 130: read counts from the
+    schema, never pin 65). Names: renames without alias `CallRefused`->`CallRefusedError`,
+    `SetParamsRefused`->`SetParamsRefusedError`, `find_pipeline`->`get_pipeline`,
+    `CanonicalKeypoints.names`->`.point_names`. `PackStatus` (`eps/records.py:197`): `usable`,
+    `install_hint` (sentence or None), `uses_gpu`, `description` (one sentence), `devices`
+    (`RunDevice`: device key, name, `vram_total_bytes`; most VRAM first). `EpStatus.eps` order = catalog
+    preference order, show as given (Auto = `status().performance`). `PipelineRun.models[node]` = key,
+    version, sidecar_sha256, size, precision, execution_provider (applied), device (key, list or None).
+    OOM in a call: `VRAMExhaustionError`, run closed, later calls `RunClosedError`; show message, new run.
+    `HostInfo.cpu_max_frequency_hz`; Linux GPU names and macOS VRAM now in `GpuInfo` (§0.6 item 12
+    losses gone). Work order: part 2 (drop `USABLE_STATES`; route gives key, label, description, usable,
+    install_hint, uses_gpu, devices; UI help from `description`, delete `EXECUTION_PROVIDER_INFO` and the
+    "GPU batched"/"CPU-only" texts, show `install_hint` when not usable; device select when >1 device;
+    `/onnx/session_providers` from `PipelineRun.models`; "takes an EP" flag per detector; two comments),
+    then R1 block (accepted + `stage_settings` fix + test of a recording without the block; no re-run UI),
+    then R2 (accepted; `settingsVersion: 1`; run button waits for the suggestion). Legacy call contract
+    (not built; fake it in tests): saved key -> key or None; legacy trt/cuda -> trt-rtx if usable else
+    cuda if usable else None; other usable key -> same; unusable or no successor -> None = Auto + notice.
+    Report after each.
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).

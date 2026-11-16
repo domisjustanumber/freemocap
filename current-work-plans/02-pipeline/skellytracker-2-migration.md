@@ -391,9 +391,13 @@ frames, each with `rtmpose` and with `mediapipe`.
     `trt-rtx` works). Only a file with no new-format marker is legacy, so new saves carry a marker.
   - G3: no usable suggestion, or a legacy key with no successor (`directml`): the setting becomes Auto,
     with a notice.
-  - Built in `288deb48` against `suggest_execution_provider` (ST `de7e18f3`). OPEN with the user: "usable"
-    = pack installed, so on an RTX machine without the pack a saved `trt`/`cuda` becomes Auto; the notice
-    can already carry the install hint of a suggested EP.
+  - Built in `288deb48` against `suggest_execution_provider` (ST `de7e18f3`).
+  - G4 (2026-11-16, user): for a legacy `trt`/`cuda` the suggestion names the EP the HARDWARE supports,
+    also when its pack is not installed (skellytracker changes the call; return type stays `str | None`).
+    A suggested key that the EP list shows with `usable` false loads as that key; the notice says
+    "saved X replaced by Y" with the EP menu's "Not usable here." and Y's `install_hint` (one
+    `NotUsableNote` for both). Auto only for None. A run before the install fails with skellytracker's
+    message, as for any EP that is not usable.
 - S2 (2026-11-16, user): a "process again with the saved pipeline" button or route is NOT part of this
   work; save the data only. LATER WORK: re-run a recording from its saved `skellytracker` block.
 - R1/R2 facts and plan (reported 2026-11-16, not implemented):

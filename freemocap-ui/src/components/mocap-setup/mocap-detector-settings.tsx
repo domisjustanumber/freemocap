@@ -7,6 +7,7 @@ import SettingsGroupHeading from '@/components/common/settings-layout/settings-g
 import SettingToggleSwitch from '@/components/common/settings-layout/setting-toggle-switch';
 import {useMocap} from '@/hooks/useMocap';
 import {DETECTOR_OPTIONS} from './detector-options';
+import {NotUsableNote} from './execution-provider-info';
 import {BOARD_GROUP_INFO, CHARUCO_INFO, DetectorSettingRows, type DetectorSettingsValue} from './detector-setting-rows';
 
 export default function MocapDetectorSettings() {
@@ -45,6 +46,7 @@ export default function MocapDetectorSettings() {
     };
 
     const labelOf = (key: string | null) => executionProviderOptions.options.find(({value}) => value === key)?.label ?? key ?? 'Auto';
+    const replacement = migration?.status === 'replaced' ? executionProviderOptions.providerOf(migration.replacement) : undefined;
     return <>
         {migration?.status === 'pending' && <p className="settings-note" role="status">
             Checking the execution provider <strong>{migration.saved}</strong> saved by an earlier FreeMoCap version;
@@ -53,7 +55,7 @@ export default function MocapDetectorSettings() {
             <span>The execution provider <strong>{migration.saved}</strong> saved by an earlier FreeMoCap version was
                 replaced by <strong>{labelOf(migration.replacement)}</strong>
                 {migration.replacement === null ? ': SkellyTracker has no usable replacement on this computer' : ''}.
-                {executionProviderOptions.installHintOf(migration.replacement) && <> {executionProviderOptions.installHintOf(migration.replacement)}</>}</span>
+                {replacement && !replacement.usable && <> <NotUsableNote provider={replacement}/></>}</span>
             <ButtonSm text="Dismiss" className="setting-action-button" onClick={() => dispatch(executionProviderNoticeDismissed())}/>
         </div>}
         <DetectorSettingRows value={value} onChange={applyChange} detectors={DETECTOR_OPTIONS}

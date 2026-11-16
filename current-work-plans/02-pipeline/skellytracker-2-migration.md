@@ -96,6 +96,9 @@ frames, each with `rtmpose` and with `mediapipe`.
 - Charuco through the public surface only: `create_detector` and `detectors.calibration`. The board
   selector, the tag constants and `CHARUCO_BOARD_MAPPING` were ported into skellytracker.
 - No merge of development-streaming into skellytracker.
+- V2 (2026-11-16): keep the stop. A camera video that fails while it is read stops posthoc tracking
+  with freemocap's own error (`CameraSourceEndedError`, with the camera and the frame), because a
+  `video` run takes a frame from each camera on each call (ST `V-pipeline.running-2`).
 
 ### 0.4 Open questions
 
@@ -137,7 +140,7 @@ frames, each with `rtmpose` and with `mediapipe`.
    and gives the EP key (`cuda`) in `applied_providers`, not the ORT provider name (step 1).
 3. A camera video that fails while it is read stops posthoc tracking with `CameraSourceEndedError`,
    which names the camera and the frame. On `sfn26` the other cameras went on, but the save refused
-   the incomplete coverage, so nothing was saved in either case. Open as V2 with the user.
+   the incomplete coverage, so nothing was saved in either case. The user decided this (V2, §0.3).
 4. New 2D point names are `body.<group>/<point>` (for example `body.body/nose`,
    `body.left_hand/wrist`); the 3D names are `<group>/<point>`. The mapping YAMLs follow in step 3.
 5. The posthoc MediaPipe GPU switch (`mediapipe_disable_gpu`) is gone: the Holistic built-in has no

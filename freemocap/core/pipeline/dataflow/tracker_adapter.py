@@ -54,8 +54,7 @@ class CameraSourceEndedError(RuntimeError):
 def require_every_camera(batch_cameras, run_cameras, frame_number: int) -> None:
     """A `video` run takes a frame from each of its cameras on each call (skellytracker V-pipeline.running-2).
 
-    shortcut: one failed camera stops the recording; if the user accepts V2 (a call may leave out an
-    ended camera), drop this check.
+    So one failed camera stops tracking of the recording (the user's decision V2, 2026-11-16).
     """
     missing = [camera for camera in run_cameras if camera not in batch_cameras]
     if missing:

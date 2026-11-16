@@ -5,10 +5,9 @@ from threading import Event, Lock
 import unittest
 from unittest.mock import Mock, patch
 
-import pytest
 from skellytracker.core.data_primitives.observation import Observation
 
-from freemocap.core.pipeline.dataflow.tracker_adapter import CameraSourceEndedError, SkellyTrackerAdapter, TrackedCameraFrame
+from freemocap.core.pipeline.dataflow.tracker_adapter import SkellyTrackerAdapter, TrackedCameraFrame
 from freemocap.core.pipeline.dataflow.video_sources import VideoSourceFinished
 from freemocap.core.pipeline.inference_service import InferenceService
 from freemocap.core.pipeline.performance_report import PerformanceReport
@@ -131,15 +130,6 @@ class TrackerAdapterTests(unittest.TestCase):
                 events.append(event)
         counts = Counter(event.frame_key.camera for event in events if isinstance(event, TrackedCameraFrame))
         self.assertEqual(counts, {"camera0.avi": 2, "camera1.avi": 2, "camera2.avi": 2})
-        self.assertFalse(self.shutdown.value)
-
-    @pytest.mark.xfail(reason="waits for V2", strict=True, raises=CameraSourceEndedError)
-    def test_source_failure_keeps_healthy_camera_tracking(self):
-        adapter = self.make_adapter(self.infer)
-        with self.failing_reader():
-            events = list(self.stream(adapter))
-        counts = Counter(event.frame_key.camera for event in events if isinstance(event, TrackedCameraFrame))
-        self.assertEqual(counts, {"camera0.avi": 8, "camera1.avi": 2, "camera2.avi": 8})
         self.assertFalse(self.shutdown.value)
 
     def test_inference_failure_does_not_cancel_graph_or_retry(self):

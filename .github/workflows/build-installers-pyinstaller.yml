@@ -7,19 +7,13 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      variant:
-        description: 'Build variant'
-        type: choice
-        options: [cpu, cuda, both]
-        default: both
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ═══════════════════════════════════════════════════════
-  # BUILD — runs on all platform/arch/variant combos
+  # BUILD — runs on every platform/arch combo
   # ═══════════════════════════════════════════════════════
   build:
     runs-on: ${{ matrix.os }}
@@ -31,51 +25,25 @@ jobs:
           - os: windows-latest
             platform: windows
             arch: x64
-            variant: cpu
             label: windows-x64-cpu
             server-binary: freemocap_server.exe
             electron-arch: x64
-            install-gpu: false
 
-          - os: windows-latest
-            platform: windows
-            arch: x64
-            variant: cuda
-            label: windows-x64-cuda
-            server-binary: freemocap_server.exe
-            electron-arch: x64
-            install-gpu: true
-
-          # ── macOS Apple Silicon (CPU only — macOS has no NVIDIA CUDA; the CPU
-          #    onnxruntime backend is the only variant, so there is no separate GPU build) ──
+          # ── macOS Apple Silicon ──
           - os: macos-latest
             platform: macos
             arch: arm64
-            variant: cpu
             label: macos-arm64-apple-silicon
             server-binary: freemocap_server
             electron-arch: arm64
-            install-gpu: false
 
-          # ── Linux x64 CPU (fits on GitHub Releases) ──
+          # ── Linux x64 ──
           - os: ubuntu-22.04
             platform: linux
             arch: x64
-            variant: cpu
             label: linux-x64-cpu
             server-binary: freemocap_server
             electron-arch: x64
-            install-gpu: false
-
-          # ── Linux x64 CUDA (goes to R2 — too large for GitHub) ──
-          - os: ubuntu-22.04
-            platform: linux
-            arch: x64
-            variant: cuda
-            label: linux-x64-cuda
-            server-binary: freemocap_server
-            electron-arch: x64
-            install-gpu: true
 
           # NOTE: Linux ARM64 is intentionally NOT built. mediapipe==0.10.33 (a hard
           # dependency of skellytracker) publishes no aarch64-linux wheel, so the
@@ -202,8 +170,8 @@ jobs:
         run: uv venv
 
       # ── Dependency install ──
-      # One install for each variant: skellytracker 2.0 depends on the CPU onnxruntime, and its GPU
-      # EPs come from its EP packs, so there are no cpu/cuda dependency groups any more.
+      # One build for every user: skellytracker 2.0 depends on the CPU onnxruntime, and GPU
+      # execution providers come from its EP packs at runtime, so no NVIDIA stack is bundled.
       - name: Install dependencies
         run: uv sync --no-default-groups
 
@@ -236,13 +204,7 @@ jobs:
           sed 's/SKELLYPINGS_SECRET:.*/SKELLYPINGS_SECRET: str = "***"/' freemocap/build_info.py
 
       # ── PyInstaller build ──
-      # FREEMOCAP_BUILD_VARIANT tells freemocap.spec whether to bundle the NVIDIA CUDA
-      # runtime. Only x64 Windows/Linux GPU builds install those packages; macOS (even
-      # the "gpu" matrix row uses CPU onnxruntime) and every CPU build must be 'cpu' so
-      # the spec skips NVIDIA collection instead of swallowing a "package not found".
       - name: Build with PyInstaller
-        env:
-          FREEMOCAP_BUILD_VARIANT: ${{ (matrix.install-gpu && matrix.platform != 'macos') && 'cuda' || 'cpu' }}
         run: |
           uv pip install pyinstaller
           uv run --no-sync python -c "import onnxruntime as ort; print('ONNX Runtime:', ort.__version__); print('Providers:', ort.get_available_providers())"
@@ -447,65 +409,6 @@ jobs:
           timestamp-digest: SHA256
 
 
-      # ── R2 upload for CUDA (oversized) builds ──
-      # CUDA builds bundle NVIDIA runtime libraries (~1.5 GB) and exceed
-      # GitHub's 2 GB file size limit. They go to Cloudflare R2 instead.
-      - name: Upload CUDA builds to Cloudflare R2
-        if: matrix.variant == 'cuda'
-        shell: bash
-        env:
-          # R2 credentials live in ORGANIZATION secrets named CLOUDFLARE_R2_*. The aws CLI
-          # authenticates from the AWS_* names (not R2_*), so map them here. The bucket name
-          # is public (it's in the r2.dev download URL), so it's a literal, not a secret.
-          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-          R2_ENDPOINT: ${{ secrets.CLOUDFLARE_R2_S3_ENDPOINT }}
-          R2_BUCKET: freemocap-releases
-        run: |
-          # Fail loudly (per the repo's no-fallbacks rule): a green build that silently
-          # skipped this upload is exactly how GPU builds went missing after alpha.11.
-          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$R2_ENDPOINT" ]; then
-            echo "::error::R2 credentials missing — cannot upload the CUDA build."
-            echo "::error::Expected org secrets: CLOUDFLARE_R2_ACCESS_KEY_ID / CLOUDFLARE_R2_SECRET_ACCESS_KEY / CLOUDFLARE_R2_S3_ENDPOINT"
-            exit 1
-          fi
-
-          echo "=== Uploading CUDA builds to Cloudflare R2 ==="
-          pip install awscli
-
-          VERSION="${GITHUB_REF#refs/tags/v}"
-          if [ -z "$VERSION" ] || [ "$VERSION" = "$GITHUB_REF" ]; then
-            # Not a tag push — use run number as version placeholder
-            VERSION="dev-${{ github.run_number }}"
-          fi
-
-          # All CUDA app installers go to R2.
-          # Windows .exe files are uploaded here only after code signing has completed. 
-          #macOS is CPU-only, so this step never runs there.)
-          for file in freemocap-ui/release/*/*.AppImage freemocap-ui/release/*/*.deb freemocap-ui/release/*/*.exe; do
-            [ -f "$file" ] || continue
-            ext="${file##*.}"
-            aws s3 cp "$file" \
-              "s3://${R2_BUCKET}/releases/v${VERSION}/freemocap_${VERSION}_${{ matrix.label }}.${ext}" \
-              --endpoint-url "${R2_ENDPOINT}" \
-              --no-progress
-            echo "R2: freemocap_${VERSION}_${{ matrix.label }}.${ext}"
-          done
-
-          # Upload auto-update metadata for the CUDA variant
-          for yml in freemocap-ui/release/*/latest-linux.yml; do
-            [ -f "$yml" ] || continue
-            aws s3 cp "$yml" \
-              "s3://${R2_BUCKET}/releases/v${VERSION}/latest-linux-${{ matrix.variant }}.yml" \
-              --endpoint-url "${R2_ENDPOINT}" \
-              --no-progress
-            echo "R2: latest-linux-${{ matrix.variant }}.yml"
-          done
-
-          echo "=== R2 upload complete ==="
-
-
       # ── Upload final installer artifacts (uses label for human-readable names) ──
       - name: Upload installer artifacts (Windows)
         if: matrix.platform == 'windows'
@@ -579,11 +482,8 @@ jobs:
   # RELEASE — only runs on tag pushes (e.g. v2.0.0)
   #
   # Downloads all build artifacts and renames them with
-  # human-readable platform/arch/variant labels for the
+  # human-readable platform/arch labels for the
   # GitHub Release page.
-  #
-  # CPU variants → GitHub Releases (fit under 2 GB limit)
-  # CUDA variants → Cloudflare R2 (uploaded during build)
   # ═══════════════════════════════════════════════════════
   release:
     needs: build
@@ -601,40 +501,12 @@ jobs:
         run: find artifacts -type f | sort
 
       - name: Prepare release assets
-        env:
-          # R2 credentials live in ORGANIZATION secrets named CLOUDFLARE_R2_*. The aws CLI
-          # authenticates from the AWS_* names (not R2_*), so map them here. The bucket name
-          # is public (it's in the r2.dev download URL), so it's a literal, not a secret.
-          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-          R2_ENDPOINT: ${{ secrets.CLOUDFLARE_R2_S3_ENDPOINT }}
-          R2_BUCKET: freemocap-releases
         run: |
           mkdir -p release-assets
 
           # Extract version from tag (e.g. refs/tags/v2.0.0 → 2.0.0)
           VERSION="${GITHUB_REF#refs/tags/v}"
           echo "VERSION=$VERSION"
-
-          # ── ROUTING RULE (single source of truth; mirrored by isR2Hosted() in
-          #    freemocap-docs/src/components/download/downloads.ts) ──
-          # CUDA builds bundle the ~1.5-2 GB NVIDIA CUDA stack and exceed GitHub's 2 GB
-          # per-asset limit, so EVERY CUDA asset (app installer AND server zip) is hosted
-          # on Cloudflare R2. CPU/macOS builds go to the GitHub Release.
-          # CUDA *app installers* were already pushed to R2 by the build job; CUDA *server
-          # zips* are built and pushed here (on this Linux runner, where `zip` is reliable
-          # for >2 GB archives). The size guard below enforces that nothing left in
-          # release-assets/ (i.e. GitHub-bound) exceeds the limit.
-          # Fail loudly (per the repo's no-fallbacks rule): the Linux CUDA server bundle
-          # only exists on R2, so missing credentials must break the release, not skip it.
-          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$R2_ENDPOINT" ]; then
-            echo "::error::R2 credentials missing — cannot upload the CUDA server bundle."
-            echo "::error::Expected org secrets: CLOUDFLARE_R2_ACCESS_KEY_ID / CLOUDFLARE_R2_SECRET_ACCESS_KEY / CLOUDFLARE_R2_S3_ENDPOINT"
-            exit 1
-          fi
-          pip install --quiet awscli
-          R2_READY=1
 
           # ── Server bundles (onedir launcher + _internal/ → single .zip) ──
           for dir in artifacts/server-*; do
@@ -645,34 +517,13 @@ jobs:
               continue
             fi
             asset="freemocap_server_${VERSION}_${label}.zip"
-            ( cd "$dir" && zip -qr "$OLDPWD/${asset}" . )
-            case "$label" in
-              *-cuda)   # all CUDA server bundles go to R2
-                if [ "$R2_READY" = 1 ]; then
-                  aws s3 cp "${asset}" "s3://${R2_BUCKET}/releases/v${VERSION}/${asset}" \
-                    --endpoint-url "${R2_ENDPOINT}" --no-progress
-                  echo "R2: ${asset}"
-                else
-                  echo "::warning::Skipping CUDA server bundle ${asset} (no R2 credentials)"
-                fi
-                rm -f "${asset}"
-                ;;
-              *)
-                mv "${asset}" "release-assets/${asset}"
-                echo "GitHub: ${asset}"
-                ;;
-            esac
+            ( cd "$dir" && zip -qr "$OLDPWD/release-assets/${asset}" . )
+            echo "GitHub: ${asset}"
           done
 
-          # ── App installers —all CUDA installers go to R2 (uploaded by the build job);
-          #    everything else → GitHub. ──
+          # ── App installers ──
           for dir in artifacts/installer-*; do
             label=$(basename "$dir" | sed 's/^installer-//')
-
-            # Linux and Windows CUDA installer lives on R2 (uploaded during the build job) — skip here.
-            case "$label" in
-              *-cuda) continue ;;
-            esac
 
             find "$dir" -type f \( \
               -name '*.exe' -o \
@@ -685,29 +536,6 @@ jobs:
               cp "$file" "release-assets/freemocap_${VERSION}_${label}.${ext}"
             done
           done
-
-          # ── Collect R2 download links for the release notes ──
-          # All CUDA builds live on R2 and must be linked in the release notes. 
-          # or they will be invisible on the Releases page. Keys mirror the
-          # R2 uploads (installer from the build job, server zip from this job) under
-          # releases/v<ver>/. Must stay in sync with isR2Hosted() in the docs' downloads.ts.
-          R2_PUBLIC_BASE="https://pub-0a275a10417e425c94e48de393793129.r2.dev/releases/v${VERSION}"
-          : > r2-links.md
-          for dir in artifacts/installer-*-cuda; do
-            [ -d "$dir" ] || continue
-            label=$(basename "$dir" | sed 's/^installer-//')
-            find "$dir" -type f \( -name '*.AppImage' -o -name '*.deb' -o -name '*.exe' \) | while read -r f; do
-              name="freemocap_${VERSION}_${label}.${f##*.}"
-              echo "- [\`${name}\`](${R2_PUBLIC_BASE}/${name})" >> r2-links.md
-            done
-          done
-          for dir in artifacts/server-*-cuda; do
-            [ -d "$dir" ] || continue
-            label=$(basename "$dir" | sed 's/^server-//')
-            name="freemocap_server_${VERSION}_${label}.zip"
-            echo "- [\`${name}\`](${R2_PUBLIC_BASE}/${name})" >> r2-links.md
-          done
-          echo "=== R2 CUDA links ==="; cat r2-links.md || true
 
           echo "=== GitHub-bound release assets ==="
           ls -lh release-assets/
@@ -759,13 +587,9 @@ jobs:
           echo "=== Final release assets ==="
           ls -lh release-assets/
 
-      # ── Size guard — the "double check" on our R2/GitHub routing ──
-      # GitHub caps release assets at 2 GiB. Everything oversized is supposed to be
-      # routed to R2 (all CUDA builds). This verifies that by measuring every file left
-      # in release-assets/ (i.e. everything about to be uploaded to GitHub) and failing
-      # loudly if any is over the limit — instead of a cryptic mid-upload failure. If this
-      # trips, route that build to R2: add it to the CUDA path here AND to isR2Hosted()
-      # in freemocap-docs/src/components/download/downloads.ts so the download link matches.
+      # ── Size guard ──
+      # GitHub caps release assets at 2 GiB. Measure every file about to be uploaded and
+      # fail loudly if any is over the limit, instead of a cryptic mid-upload failure.
       - name: Guard against oversized GitHub assets
         run: |
           MAX=$((2 * 1000 * 1000 * 1000))   # 2 GB — conservative margin under GitHub's 2 GiB cap
@@ -777,7 +601,6 @@ jobs:
             echo "  $((size / 1000000)) MB  $(basename "$f")"
             if [ "$size" -gt "$MAX" ]; then
               echo "::error::$(basename "$f") is $((size / 1000000)) MB — over GitHub's 2 GB asset limit."
-              echo "::error::Route this build to R2 (CUDA path in 'Prepare release assets' + isR2Hosted() in downloads.ts)."
               over=1
             fi
           done
@@ -804,13 +627,8 @@ jobs:
               --title "$TAG"
           fi
 
-          # ── Append the download guide + R2 (GPU/CUDA) links to the notes ──
-          # GPU builds are on Cloudflare R2 (too big for GitHub) so they must be linked
-          # here; everyone also gets a pointer to the "which build?" picker.
+          # ── Append the download guide to the notes ──
           EXTRA=$'\n\n''---'$'\n''**Not sure which build to download?** See the download guide: https://docs.freemocap.org/freemocap/download'
-          if [ -s r2-links.md ]; then
-            EXTRA="${EXTRA}"$'\n\n''## GPU (CUDA) builds — hosted on Cloudflare R2'$'\n''(Too large for GitHub'"'"'s 2 GB asset limit.)'$'\n\n'"$(cat r2-links.md)"
-          fi
           BODY="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body 2>/dev/null || echo '')"
           case "$BODY" in
             *"docs.freemocap.org/freemocap/download"*) echo "Notes already contain the download guide/links" ;;

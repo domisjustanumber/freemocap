@@ -34,8 +34,7 @@ pyinstaller freemocap.spec
 **What gets bundled:**
 - `freemocap/__main__.py` as the entry point
 - OpenCV, scipy, pandas, mediapipe
-- ONNX Runtime (GPU + CPU)
-- NVIDIA CUDA libraries (cublas, cuda_runtime, cudnn)
+- ONNX Runtime (CPU build; GPU execution providers come from skellytracker's EP packs at runtime, so no NVIDIA libraries are bundled)
 - Skelly ecosystem packages (skellycam, skellytracker, skellyforge)
 - RTMLib, onnx
 

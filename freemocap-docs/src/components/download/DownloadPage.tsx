@@ -1,16 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
-import type { OsType, ArchType, VariantType } from './downloads';
+import type { OsType, ArchType } from './downloads';
 import {
   DEFAULT_VERSION,
   buildAppDownloads,
   buildServerDownloads,
   enrichDownloadsWithAssets,
-  enrichDownloadsWithR2Sizes,
   matchesExpectedPattern,
   stripVersionPrefix,
-  hasVariant,
-  isR2Hosted,
-  downloadUrl,
   OS_NOTES,
 } from './downloads';
 import {
@@ -18,13 +14,10 @@ import {
   getServerInstallInstructions,
 } from './installInstructions';
 import { useSystemDetection } from './hooks/useSystemDetection';
-import { useGpuDetection } from './hooks/useGpuDetection';
 import { useReleaseVersions } from './hooks/useReleaseVersions';
-import { useR2FileSizes } from './hooks/useR2FileSizes';
 
 import Header from './components/Header';
 import SystemDetector from './components/SystemDetector';
-import VariantDetector from './components/VariantDetector';
 import SystemHelpSection from './components/SystemHelpSection';
 import VersionSelector from './components/VersionSelector';
 import DownloadSection from './components/DownloadSection';
@@ -37,7 +30,6 @@ import styles from './DownloadPage.module.css';
 
 export default function DownloadPage() {
   const detected = useSystemDetection();
-  const detectedGpu = useGpuDetection();
   const { releases, isLoading: releasesLoading } = useReleaseVersions();
 
   // Selected system (seeded from detection, overridable via pills)
@@ -58,23 +50,6 @@ export default function DownloadPage() {
     setSelectedArch(arch);
     setHasManuallySelected(true);
   };
-
-  // Selected GPU/CPU variant (seeded from detection, overridable via pills)
-  const [selectedVariant, setSelectedVariant] = useState<VariantType>('cpu');
-  const [hasManuallySelectedVariant, setHasManuallySelectedVariant] = useState(false);
-
-  useEffect(() => {
-    if (!hasManuallySelectedVariant && detectedGpu.detected) {
-      setSelectedVariant(detectedGpu.variant);
-    }
-  }, [detectedGpu.detected, detectedGpu.variant, hasManuallySelectedVariant]);
-
-  const handleSelectVariant = (v: VariantType) => {
-    setSelectedVariant(v);
-    setHasManuallySelectedVariant(true);
-  };
-
-  const showVariantPicker = selectedOs !== 'unknown' && hasVariant(selectedOs, selectedArch);
 
   // Selected version (defaults to latest release or hardcoded)
   const [selectedTag, setSelectedTag] = useState<string>(`v${DEFAULT_VERSION}`);
@@ -105,16 +80,6 @@ export default function DownloadPage() {
     return !matchesExpectedPattern(selectedRelease.assets, version);
   }, [selectedRelease, version]);
 
-  // R2-hosted files (currently just Linux CUDA) have no GitHub asset to read a size
-  // from — fetch their real size via HEAD request instead of guessing.
-  const r2Urls = useMemo(() => {
-    const all = [...buildAppDownloads(version), ...buildServerDownloads(version)];
-    return all
-      .filter(d => isR2Hosted(d.os, d.variant))
-      .map(d => downloadUrl(d.file, d.os, version, d.variant));
-  }, [version]);
-  const r2Sizes = useR2FileSizes(r2Urls);
-
   // Build download entries for the selected version
   const { appDownloads, serverDownloads } = useMemo(() => {
     let app = buildAppDownloads(version);
@@ -125,23 +90,17 @@ export default function DownloadPage() {
       server = enrichDownloadsWithAssets(server, selectedRelease.assets);
     }
 
-    app = enrichDownloadsWithR2Sizes(app, version, r2Sizes);
-    server = enrichDownloadsWithR2Sizes(server, version, r2Sizes);
-
     return { appDownloads: app, serverDownloads: server };
-  }, [version, selectedRelease, r2Sizes]);
+  }, [version, selectedRelease]);
 
   // Sort into recommended / alternate / other
   const { recApp, altApp, otherApp, recServer, otherServer } = useMemo(() => {
-    const matchesVariant = (d: { variant?: VariantType }) =>
-      !d.variant || d.variant === selectedVariant;
-
     const rA: typeof appDownloads = [];
     const aA: typeof appDownloads = [];
     const oA: typeof appDownloads = [];
 
     for (const d of appDownloads) {
-      if (d.os === selectedOs && d.arch === selectedArch && matchesVariant(d)) {
+      if (d.os === selectedOs && d.arch === selectedArch) {
         (d.recommended ? rA : aA).push(d);
       } else {
         oA.push(d);
@@ -151,7 +110,7 @@ export default function DownloadPage() {
     const rS: typeof serverDownloads = [];
     const oS: typeof serverDownloads = [];
     for (const d of serverDownloads) {
-      if (d.os === selectedOs && d.arch === selectedArch && matchesVariant(d)) {
+      if (d.os === selectedOs && d.arch === selectedArch) {
         rS.push(d);
       } else {
         oS.push(d);
@@ -159,7 +118,7 @@ export default function DownloadPage() {
     }
 
     return { recApp: rA, altApp: aA, otherApp: oA, recServer: rS, otherServer: oS };
-  }, [appDownloads, serverDownloads, selectedOs, selectedArch, selectedVariant]);
+  }, [appDownloads, serverDownloads, selectedOs, selectedArch]);
 
   // A manually-known system (not "unknown") with nothing built for it yet —
   // e.g. macOS Intel, Linux ARM64. Install instructions and terminal one-liners
@@ -169,14 +128,13 @@ export default function DownloadPage() {
     selectedOs !== 'unknown' && recApp.length === 0 && altApp.length === 0 && recServer.length === 0;
 
   const osForInstructions = selectedOs === 'unknown' ? undefined : selectedOs;
-  const variantForInstructions = showVariantPicker ? selectedVariant : undefined;
   const appInstructions =
     osForInstructions && !isUnavailablePlatform
-      ? getAppInstallInstructions(osForInstructions, selectedArch, variantForInstructions, version)
+      ? getAppInstallInstructions(osForInstructions, selectedArch, version)
       : [];
   const serverInstructions =
     osForInstructions && !isUnavailablePlatform
-      ? getServerInstallInstructions(osForInstructions, selectedArch, variantForInstructions, version)
+      ? getServerInstallInstructions(osForInstructions, selectedArch, version)
       : [];
 
   // Filter OS notes for the selected system
@@ -197,14 +155,6 @@ export default function DownloadPage() {
           arch={selectedArch}
           onSelectSystem={handleSelectSystem}
         />
-
-        {showVariantPicker && (
-          <VariantDetector
-            variant={selectedVariant}
-            detected={detectedGpu.detected}
-            onSelectVariant={handleSelectVariant}
-          />
-        )}
 
         <SystemHelpSection />
 
@@ -255,7 +205,6 @@ export default function DownloadPage() {
               <TerminalInstallSection
                 os={selectedOs}
                 arch={selectedArch}
-                variant={variantForInstructions}
                 version={version}
               />
             )}

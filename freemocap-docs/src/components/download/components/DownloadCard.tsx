@@ -38,7 +38,7 @@ export default function DownloadCard({ download, variant, version }: DownloadCar
 
   return (
     <a
-      href={downloadUrl(download.file, download.os, version, download.variant)}
+      href={downloadUrl(download.file, version)}
       className={cardClasses.join(' ')}
     >
       <div className={styles.dlInfo}>

@@ -21,8 +21,7 @@ retention, compatibility, and reproducible validation.
    - Windows: `.venv/bin/activate`
    - Mac/Linux: `source .venv/bin/activate`
 6. Install dependencies
-  - `uv sync` — installs skellytracker with TensorRT and CUDA on Windows/Linux, or CPU-only on macOS, automatically
-  - No supported GPU on Windows/Linux? Force the CPU-only build instead: `uv sync --no-default-groups --group cpu`
+  - `uv sync` — one install for every system: skellytracker with the CPU ONNX Runtime; GPU execution providers (CUDA, TensorRT RTX, CoreML) come from skellytracker's EP packs at runtime
 ### React GUI
 0. Install Node.js
    - https://nodejs.org/en/download/
@@ -111,14 +110,8 @@ https://user-images.githubusercontent.com/15314521/192062522-2a8d9305-f181-4869-
 #### 0. Create a a Python 3.9 through 3.11 environment (python3.11 recommended)¶
 #### 1. Install software via [pip](https://pypi.org/project/freemocap/#description):
 
-`freemocap` requires the `cuda` or `cpu` extra to be specified — plain `pip install freemocap` will install without its tracker. Pick one:
-
 ```
-pip install freemocap[cuda]   # Windows/Linux with an NVIDIA GPU
-```
-
-```
-pip install freemocap[cpu]    # macOS, or Windows/Linux without a supported GPU
+pip install freemocap
 ```
 
 #### 2. Launch the GUI by entering the command:
@@ -171,8 +164,9 @@ uv venv
 uv sync
 ```
 
-This installs `skellytracker` with CUDA on Windows/Linux and CPU-only on macOS.
-The default is declared in `pyproject.toml` and locked in `uv.lock`.
+This installs `skellytracker` with the CPU ONNX Runtime on every system; GPU
+execution providers come from skellytracker's EP packs at runtime.
+The dependencies are declared in `pyproject.toml` and locked in `uv.lock`.
 Auto and older saved TensorRT selections use CUDA when available, with the
 existing platform fallback otherwise. Explicit CPU selections remain CPU.
 There is no background TensorRT preparation or automatic provider switching.
@@ -185,13 +179,6 @@ WebSocket progress subscription, with no recurring HTTP status polling.
 Camera images stream as soon as capture produces them. The same stream adds
 matched processing results when available; a processing delay or failure returns
 to raw preview, clearing old overlays without restarting capture.
-
-If you're on Windows/Linux without a
-supported GPU, force the CPU-only build instead:
-
-```bash
-uv sync --no-default-groups --group cpu
-```
 
 6) Launch the Python server
 

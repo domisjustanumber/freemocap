@@ -76,7 +76,7 @@ This prevents a single OOM event from killing the entire pipeline.
 ## Troubleshooting
 
 **"ONNX Runtime not finding CUDA"**
-→ Ensure CUDA toolkit and cuDNN are installed and on `PATH`. The bundled PyInstaller executable includes CUDA DLLs.
+→ Ensure CUDA toolkit and cuDNN are installed and on `PATH`. The bundled release does not include CUDA DLLs; GPU execution providers come from skellytracker's EP packs at runtime.
 
 **"TensorRT compilation hangs"**
 → First run compiles TRT engines (1-3 min). Subsequent runs use cached engines. If it hangs indefinitely, switch to CUDA provider.
@@ -84,4 +84,4 @@ This prevents a single OOM event from killing the entire pipeline.
 **"GPU OOM with many cameras"**
 → Reduce camera resolution, switch to centralized GPU mode, or use a GPU with more VRAM.
 
-<Tip shortInfo="GPU setup is automated in the bundled release — the PyInstaller spec includes CUDA DLLs. Manual GPU setup is only needed for development installs from source." />
+<Tip shortInfo="There is one release build for every system. It ships the CPU ONNX Runtime; GPU execution providers come from skellytracker's EP packs at runtime." />

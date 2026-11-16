@@ -1,4 +1,4 @@
-import type { OsType, ArchType, VariantType } from './downloads';
+import type { OsType, ArchType } from './downloads';
 import { downloadUrl, fileLabel } from './downloads';
 
 export interface CodeLine {
@@ -15,7 +15,6 @@ export interface InstructionBlock {
 export function getAppInstallInstructions(
   os: OsType,
   arch: ArchType,
-  variant: VariantType | undefined,
   version: string,
 ): InstructionBlock[] {
   if (os === 'windows') {
@@ -38,7 +37,7 @@ export function getAppInstallInstructions(
   }
 
   if (os === 'linux') {
-    const label = fileLabel(os, arch, variant);
+    const label = fileLabel(os);
     const ai = `freemocap_${version}_${label}.AppImage`;
     const deb = `freemocap_${version}_${label}.deb`;
 
@@ -69,10 +68,9 @@ export function getAppInstallInstructions(
 export function getServerInstallInstructions(
   os: OsType,
   arch: ArchType,
-  variant: VariantType | undefined,
   version: string,
 ): InstructionBlock[] {
-  const label = fileLabel(os, arch, variant);
+  const label = fileLabel(os);
   const zip = `freemocap_server_${version}_${label}.zip`;
   const bin = os === 'windows' ? 'freemocap_server.exe' : 'freemocap_server';
 
@@ -134,12 +132,11 @@ export function getServerInstallInstructions(
 export function getTerminalInstallBlocks(
   os: OsType,
   arch: ArchType,
-  variant: VariantType | undefined,
   version: string,
 ): InstructionBlock[] {
   if (os !== 'linux' && os !== 'macos') return [];
 
-  const label = fileLabel(os, arch, variant);
+  const label = fileLabel(os);
   const srvZip = `freemocap_server_${version}_${label}.zip`;
   const blocks: InstructionBlock[] = [];
 
@@ -150,7 +147,7 @@ export function getTerminalInstallBlocks(
     blocks.push({
       codeLines: [
         { type: 'comment', content: '# App Installer — AppImage (any distro, no root)' },
-        { type: 'prompt', content: `curl -fSL -o freemocap.AppImage "${downloadUrl(ai, os, version, variant)}"`, promptChar: '$' },
+        { type: 'prompt', content: `curl -fSL -o freemocap.AppImage "${downloadUrl(ai, version)}"`, promptChar: '$' },
         { type: 'prompt', content: 'chmod +x freemocap.AppImage', promptChar: '$' },
         { type: 'prompt', content: './freemocap.AppImage', promptChar: '$' },
       ],
@@ -158,14 +155,14 @@ export function getTerminalInstallBlocks(
     blocks.push({
       codeLines: [
         { type: 'comment', content: '# App Installer — .deb (Debian/Ubuntu)' },
-        { type: 'prompt', content: `curl -fSL -o freemocap.deb "${downloadUrl(deb, os, version, variant)}"`, promptChar: '$' },
+        { type: 'prompt', content: `curl -fSL -o freemocap.deb "${downloadUrl(deb, version)}"`, promptChar: '$' },
         { type: 'prompt', content: 'sudo apt install ./freemocap.deb', promptChar: '$' },
       ],
     });
     blocks.push({
       codeLines: [
         { type: 'comment', content: '# Backend Server (headless / remote capture)' },
-        { type: 'prompt', content: `curl -fSL -o freemocap_server.zip "${downloadUrl(srvZip, os, version, variant)}"`, promptChar: '$' },
+        { type: 'prompt', content: `curl -fSL -o freemocap_server.zip "${downloadUrl(srvZip, version)}"`, promptChar: '$' },
         { type: 'prompt', content: 'unzip freemocap_server.zip -d freemocap_server && cd freemocap_server', promptChar: '$' },
         { type: 'prompt', content: 'chmod +x freemocap_server', promptChar: '$' },
         { type: 'prompt', content: './freemocap_server', promptChar: '$' },
@@ -179,14 +176,14 @@ export function getTerminalInstallBlocks(
     blocks.push({
       codeLines: [
         { type: 'comment', content: '# App Installer' },
-        { type: 'prompt', content: `curl -fSL -o freemocap.dmg "${downloadUrl(dmg, os, version, variant)}"`, promptChar: '$' },
+        { type: 'prompt', content: `curl -fSL -o freemocap.dmg "${downloadUrl(dmg, version)}"`, promptChar: '$' },
         { type: 'prompt', content: 'open freemocap.dmg', promptChar: '$' },
       ],
     });
     blocks.push({
       codeLines: [
         { type: 'comment', content: '# Backend Server' },
-        { type: 'prompt', content: `curl -fSL -o freemocap_server.zip "${downloadUrl(srvZip, os, version, variant)}"`, promptChar: '$' },
+        { type: 'prompt', content: `curl -fSL -o freemocap_server.zip "${downloadUrl(srvZip, version)}"`, promptChar: '$' },
         { type: 'prompt', content: 'unzip freemocap_server.zip -d freemocap_server && cd freemocap_server', promptChar: '$' },
         { type: 'prompt', content: 'chmod +x freemocap_server && xattr -cr freemocap_server', promptChar: '$' },
         { type: 'prompt', content: './freemocap_server', promptChar: '$' },

@@ -27,7 +27,9 @@ def test_live_and_posthoc_use_tracker_recipes_and_profiles(preset):
     profile = tracker_profile(preset)
     assert tracker_keypoint_names(preset) == tuple(sorted(profile.keypoint_names))
     mapping = load_standard_human_mapping(preset)
-    assert mapping.mapping_snapshots() == profile.load_mapping().mapping_snapshots()
+    # freemocap's copy of the mapping still equals skellytracker's until the pipeline switch.
+    fields = lambda snapshots: [(s.entries, s.prefix, s.known_tracker_keypoints, s.passthrough) for s in snapshots]
+    assert fields(mapping.mapping_snapshots()) == fields(profile.load_mapping().mapping_snapshots())
     bundle = build_standard_human_bundle(detector_type=preset)
     assert bundle.tracker_keypoint_names == tracker_keypoint_names(preset)
 

@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from skellyforge.core.biomechanics.alignment_definition import AlignmentDefinition
 from skellyforge.core.biomechanics.body_alignment import BodyAlignmentConfig, estimate_body_alignment
-from skellytracker.core.io.tracker_mapping import TrackerMapping
+from freemocap.core.mapping.tracker_mapping import TrackerMapping
 
 from freemocap.core.reconstruction.alignment_evidence import AlignmentEvidence, AlignmentEvidenceRequest
 from freemocap.core.skeletons.standard_human_skeleton import build_standard_human_bundle

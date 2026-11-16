@@ -38,7 +38,7 @@ def test_chest_mapping_matches_authored_reference_after_rigid_transform_and_scal
     This checks the reference calibration, not zero fitting residual in every pose.
     """
     from freemocap.core.tasks.mocap.tracker_mappings import load_standard_human_mapping
-    from skellytracker.core.io.prepared_tracker_mapping import PreparedTrackerMapping
+    from freemocap.core.mapping.prepared_tracker_mapping import PreparedTrackerMapping
     skeleton = SkeletonDefinition.from_default_yaml()
     rest = RestPose.from_default_yaml(skeleton=skeleton)
     points = {f'{side}_{key}': rest.landmark_positions[f'{side}_{landmark}'].array

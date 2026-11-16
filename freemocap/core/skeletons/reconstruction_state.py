@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 import numpy as np
-from skellytracker.core.io.prepared_tracker_mapping import PreparedTrackerMapping
+from freemocap.core.mapping.prepared_tracker_mapping import PreparedTrackerMapping
 from skellyforge.core.skeleton.pose.model_scale_fitting import (
     ModelScaleFit,
     InsufficientScaleEvidence,

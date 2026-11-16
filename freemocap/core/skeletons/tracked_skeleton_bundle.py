@@ -24,7 +24,7 @@ import numpy as np
 from skellyforge.core.biomechanics.center_of_mass import CenterOfMassDefinitions
 from skellyforge.core.skeleton.pose.rest_pose import RestPose
 from skellyforge.core.skeleton.skeleton_definition import SkeletonDefinition
-from skellytracker.core.io.tracker_mapping import MappedLandmarkEvidence, TrackerMappingSnapshot
+from freemocap.core.mapping.tracker_mapping import MappedLandmarkEvidence, TrackerMappingSnapshot
 from freemocap.core.skeletons.rigid_object_geometry import RigidObjectGeometry
 
 

@@ -1,17 +1,14 @@
-"""Application-facing access to Tracker-owned schemas and mapping selection."""
-from pathlib import Path
+"""Application-facing access to Tracker-owned schemas and freemocap-owned mappings."""
 from skellytracker.core.io.tracker_profiles import tracker_profile
-from skellytracker.core.io.composite_tracker_mapping import CompositeTrackerMapping
 
-def body_mapping_yaml_path(detector_type: str) -> Path:
-    return tracker_profile(detector_type).mapping_paths[0]
+from freemocap.core.mapping.composite_tracker_mapping import CompositeTrackerMapping
+from freemocap.core.mapping.mapping_paths import STANDARD_HUMAN_MAPPINGS
+from freemocap.core.mapping.tracker_mapping import TrackerMapping
 
-def hand_mapping_yaml_path(detector_type: str) -> Path:
-    return tracker_profile(detector_type).mapping_paths[1]
 
 def tracker_keypoint_names(detector_type: str) -> tuple[str, ...]:
     """Publish Tracker's declared keypoints in Core's established sorted channel order."""
     return tuple(sorted(tracker_profile(detector_type).keypoint_names))
 
 def load_standard_human_mapping(detector_type: str) -> CompositeTrackerMapping:
-    return tracker_profile(detector_type).load_mapping()
+    return CompositeTrackerMapping(tuple(TrackerMapping.from_yaml(path) for path in STANDARD_HUMAN_MAPPINGS[detector_type]))

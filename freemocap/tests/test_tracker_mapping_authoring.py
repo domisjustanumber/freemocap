@@ -1,22 +1,20 @@
 """Cross-project mapping authoring belongs to Core and leaves authored data untouched."""
 from copy import deepcopy
-from pathlib import Path
 
 import numpy as np
 import pytest
-import skellytracker
 import yaml
 
 from skellyforge.core.skeleton.pose.rest_pose import RestPose
 from skellyforge.core.skeleton.skeleton_definition import SkeletonDefinition
-from skellytracker.core.io.tracker_mapping import TrackerMapping
+from freemocap.core.mapping.mapping_paths import STANDARD_HUMAN_MAPPINGS
+from freemocap.core.mapping.tracker_mapping import TrackerMapping
 from freemocap.tools import generate_tracker_mapping_ratios as authoring
 
 
 @pytest.fixture(params=['rtmpose', 'mediapipe'])
 def mapping_path(request):
-    return (Path(skellytracker.__file__).resolve().parent / 'core/detectors/keypoint_detectors'
-            / request.param / 'body' / f'{request.param}_body_to_standard_human_mapping.yaml')
+    return STANDARD_HUMAN_MAPPINGS[request.param][0]
 
 
 def test_authoring_solves_perturbed_offsets_using_the_actual_tracker_and_forge(mapping_path):

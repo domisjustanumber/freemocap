@@ -160,7 +160,7 @@ def fit_skeletons_for_recording(request: RecordingReconstructionInput) -> dict[s
     }
     t0 = time.perf_counter()
     # Map and recover the recording arrays without per-frame dictionaries.
-    from skellytracker.core.io.prepared_tracker_mapping import PreparedTrackerMapping
+    from freemocap.core.mapping.prepared_tracker_mapping import PreparedTrackerMapping
     from skellyforge.core.skeleton.pose.hydration_batch import LandmarkPoseGeometry
     from skellyforge.core.skeleton.pose.model_scale_fitting import (
         fit_model_scale_arrays, scale_voting_segment_names,
@@ -212,7 +212,7 @@ def reconstruct_skeletons_with_fits(
         scale_source_for=lambda bundle: FrozenModelScale(fit=fits[bundle.model_id].fit),
     )
     t0 = time.perf_counter()
-    from skellytracker.core.io.prepared_tracker_mapping import PreparedTrackerMapping
+    from freemocap.core.mapping.prepared_tracker_mapping import PreparedTrackerMapping
     from skellyforge.core.skeleton.pose.hydration_batch import LandmarkPoseGeometry
     from skellyforge.core.data_tensors import AxisDefinition, CompanionTensor, DataTensor
     empty_frames = ~np.isfinite(request.keypoints_3d).all(axis=-1).any(axis=-1)

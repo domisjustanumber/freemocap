@@ -36,8 +36,7 @@ from skellytracker.core.detectors.keypoint_detectors.charuco.charuco_board_defin
     CHARUCO_GRID_TAGS,
     CharucoBoardDefinition,
 )
-from skellytracker.core.io.mapping_paths import CHARUCO_BOARD_MAPPING
-from skellytracker.core.io.tracker_mapping import TrackerMapping
+from freemocap.core.mapping.tracker_mapping import TrackerMapping
 
 from freemocap.core.skeletons.tracked_skeleton_bundle import TrackedSkeletonBundle
 
@@ -103,8 +102,10 @@ def build_charuco_board_bundle(*, board: CharucoBoardDefinition) -> TrackedSkele
         # applying a continuity convention would invent state over a measurement.
         derived_quantities=frozenset(),
     )
-    mapping = TrackerMapping.from_yaml(
-        CHARUCO_BOARD_MAPPING, known_tracker_keypoints=set(board.all_point_names)
+    # A board has no anatomy: every tracked corner IS a landmark of the same name.
+    mapping = TrackerMapping(
+        entries={}, known_tracker_keypoints=set(board.all_point_names),
+        passthrough_keypoints_as_landmarks=True,
     )
     return TrackedSkeletonBundle(
         model_id=CHARUCO_BOARD_MODEL_ID,

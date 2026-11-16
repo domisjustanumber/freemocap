@@ -32,7 +32,7 @@ import yaml
 
 from skellyforge.core.skeleton.pose.rest_pose import RestPose
 from skellyforge.core.skeleton.skeleton_definition import SkeletonDefinition
-from skellytracker.core.io.tracker_mapping import TrackerMapping
+from freemocap.core.mapping.tracker_mapping import TrackerMapping
 
 # Tracker keypoint name -> standard-human landmark whose REST position stands in
 # for it at the synthetic T-pose. Keep in sync with the companion guard test.

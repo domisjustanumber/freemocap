@@ -6,8 +6,8 @@ from skellyforge.core.skeleton.skeleton_snapshot import (
     SkeletonSnapshot,
     RestPoseSnapshot,
 )
-from skellytracker.core.io.tracker_mapping import TrackerMappingSnapshot
-from skellytracker.core.io.composite_tracker_mapping import CompositeTrackerMapping
+from freemocap.core.mapping.tracker_mapping import TrackerMappingSnapshot
+from freemocap.core.mapping.composite_tracker_mapping import CompositeTrackerMapping
 
 from freemocap.core.skeletons.tracked_skeleton_bundle import TrackedSkeletonBundle
 from freemocap.core.skeletons.rigid_object_geometry import RigidObjectGeometry

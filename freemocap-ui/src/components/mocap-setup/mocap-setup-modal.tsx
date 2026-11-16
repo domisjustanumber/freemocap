@@ -37,7 +37,7 @@ const MocapSetupModal: React.FC<MocapSetupModalProps> = ({onClose, mode = "playb
     const stageSelection = useAppSelector(selectStageSelection);
     const stageRows = useAppSelector(selectStageRows);
     const stageChoice = useAppSelector(selectStageChoice);
-    const processSelection = useMemo(() => stageSelection ? {...stageSelection, pipelineImplementation: 'typed_dataflow' as const} : null, [stageSelection]);
+    const processSelection = stageSelection ?? null;
     const sections = useProcessingSections(mode);
     const [view, setView] = useState<'list' | 'graph'>('graph');
     const graphView = playback && view === 'graph';

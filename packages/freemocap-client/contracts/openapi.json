@@ -3399,153 +3399,6 @@
         ],
         "title": "AvailableExecutionProvidersResponse"
       },
-      "BBoxAreaCollapseConfig": {
-        "properties": {
-          "kind": {
-            "type": "string",
-            "const": "bbox_area_collapse",
-            "title": "Kind",
-            "default": "bbox_area_collapse"
-          },
-          "min_area_ratio": {
-            "type": "number",
-            "title": "Min Area Ratio",
-            "default": 0.25
-          },
-          "expansion_ratio": {
-            "type": "number",
-            "title": "Expansion Ratio",
-            "default": 0.05
-          },
-          "min_visibility": {
-            "type": "number",
-            "title": "Min Visibility",
-            "default": 0.0
-          }
-        },
-        "type": "object",
-        "title": "BBoxAreaCollapseConfig",
-        "description": "Redetect when the keypoint-derived bbox has shrunk drastically vs the last known bbox.\n\nCatches cases where the person has left the frame or the track has switched.\nUses the same keypoint-to-bbox logic as keypoint_bbox_expansion."
-      },
-      "BBoxPolicyConfig": {
-        "properties": {
-          "redetect_interval": {
-            "type": "integer",
-            "title": "Redetect Interval",
-            "default": 1
-          },
-          "fitness_checks": {
-            "items": {
-              "oneOf": [
-                {
-                  "$ref": "#/components/schemas/MinKeypointVisibilityConfig"
-                },
-                {
-                  "$ref": "#/components/schemas/KeypointsWithinBBoxRatioConfig"
-                },
-                {
-                  "$ref": "#/components/schemas/MaxFramesWithoutRedetectConfig"
-                },
-                {
-                  "$ref": "#/components/schemas/BBoxAreaCollapseConfig"
-                }
-              ],
-              "discriminator": {
-                "propertyName": "kind",
-                "mapping": {
-                  "bbox_area_collapse": "#/components/schemas/BBoxAreaCollapseConfig",
-                  "keypoints_within_bbox_ratio": "#/components/schemas/KeypointsWithinBBoxRatioConfig",
-                  "max_frames_without_redetect": "#/components/schemas/MaxFramesWithoutRedetectConfig",
-                  "min_keypoint_visibility": "#/components/schemas/MinKeypointVisibilityConfig"
-                }
-              }
-            },
-            "type": "array",
-            "title": "Fitness Checks",
-            "default": []
-          },
-          "keypoint_bbox_expansion": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Keypoint Bbox Expansion"
-          },
-          "keypoint_bbox_min_visibility": {
-            "type": "number",
-            "title": "Keypoint Bbox Min Visibility",
-            "default": 0.0
-          },
-          "min_shrink_ratio_per_frame": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Min Shrink Ratio Per Frame",
-            "default": 0.999
-          },
-          "min_detected_bbox_ratio": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Min Detected Bbox Ratio",
-            "default": 0.5
-          },
-          "min_bbox_size_px": {
-            "type": "number",
-            "title": "Min Bbox Size Px",
-            "default": 80.0
-          }
-        },
-        "type": "object",
-        "title": "BBoxPolicyConfig",
-        "description": "Controls when the ObjectDetector re-runs and how to fill the bbox when it doesn't.\n\nWhen the detector is skipped, the bbox for the current frame can either be\nre-derived from the previous frame's keypoints (if keypoint_bbox_expansion is\nset) or simply reused from the last detection (the default)."
-      },
-      "BBoxSmoothingConfig": {
-        "properties": {
-          "min_cutoff": {
-            "type": "number",
-            "exclusiveMinimum": 0.0,
-            "title": "Min Cutoff",
-            "default": 3.0
-          },
-          "beta": {
-            "type": "number",
-            "minimum": 0.0,
-            "title": "Beta",
-            "default": 0.02
-          },
-          "d_cutoff": {
-            "type": "number",
-            "exclusiveMinimum": 0.0,
-            "title": "D Cutoff",
-            "default": 1.0
-          },
-          "reset_after_seconds": {
-            "type": "number",
-            "exclusiveMinimum": 0.0,
-            "title": "Reset After Seconds",
-            "default": 0.5
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "BBoxSmoothingConfig",
-        "description": "Crop-corner filtering in pixels and elapsed seconds."
-      },
       "BackgroundTaskSnapshot": {
         "properties": {
           "task_id": {
@@ -4751,26 +4604,6 @@
           "charuco_board": {
             "$ref": "#/components/schemas/CharucoBoardDefinition-Input"
           },
-          "charuco_tracker_config": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TrackerConfig-Input"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "skeleton_tracker_config": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TrackerConfig-Input"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "confidence_threshold": {
             "type": "number",
             "title": "Confidence Threshold",
@@ -4853,26 +4686,6 @@
           },
           "charuco_board": {
             "$ref": "#/components/schemas/CharucoBoardDefinition-Output"
-          },
-          "charuco_tracker_config": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TrackerConfig-Output"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "skeleton_tracker_config": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TrackerConfig-Output"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "confidence_threshold": {
             "type": "number",
@@ -5518,168 +5331,6 @@
         ],
         "title": "DetectedMicrophonesResponse"
       },
-      "DetectionStageConfig-Input": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "object_detector": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ObjectDetectorConfig"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "keypoint_detectors": {
-            "items": {
-              "$ref": "#/components/schemas/KeypointDetectorConfig"
-            },
-            "type": "array",
-            "title": "Keypoint Detectors",
-            "default": []
-          },
-          "children": {
-            "items": {
-              "$ref": "#/components/schemas/DetectionStageConfig-Input"
-            },
-            "type": "array",
-            "title": "Children",
-            "default": []
-          },
-          "bbox_policy": {
-            "$ref": "#/components/schemas/BBoxPolicyConfig",
-            "default": {
-              "redetect_interval": 1,
-              "fitness_checks": [],
-              "keypoint_bbox_min_visibility": 0.0,
-              "min_shrink_ratio_per_frame": 0.999,
-              "min_detected_bbox_ratio": 0.5,
-              "min_bbox_size_px": 80.0
-            }
-          },
-          "bbox_smoothing": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BBoxSmoothingConfig"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "keypoint_smoothing": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/KeypointSmoothingConfig"
-              },
-              {
-                "$ref": "#/components/schemas/KalmanKeypointSmoothingConfig"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Keypoint Smoothing"
-          },
-          "keypoint_reset_policy": {
-            "$ref": "#/components/schemas/KeypointResetPolicyConfig",
-            "default": {
-              "backoff_multiplier": 2.0
-            }
-          }
-        },
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "title": "DetectionStageConfig",
-        "description": "Declarative description of a DetectionStage and its subtree."
-      },
-      "DetectionStageConfig-Output": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "object_detector": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ObjectDetectorConfig"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "keypoint_detectors": {
-            "items": {
-              "$ref": "#/components/schemas/KeypointDetectorConfig"
-            },
-            "type": "array",
-            "title": "Keypoint Detectors",
-            "default": []
-          },
-          "children": {
-            "items": {
-              "$ref": "#/components/schemas/DetectionStageConfig-Output"
-            },
-            "type": "array",
-            "title": "Children",
-            "default": []
-          },
-          "bbox_policy": {
-            "$ref": "#/components/schemas/BBoxPolicyConfig",
-            "default": {
-              "redetect_interval": 1,
-              "fitness_checks": [],
-              "keypoint_bbox_min_visibility": 0.0,
-              "min_shrink_ratio_per_frame": 0.999,
-              "min_detected_bbox_ratio": 0.5,
-              "min_bbox_size_px": 80.0
-            }
-          },
-          "bbox_smoothing": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BBoxSmoothingConfig"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "keypoint_smoothing": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/KeypointSmoothingConfig"
-              },
-              {
-                "$ref": "#/components/schemas/KalmanKeypointSmoothingConfig"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Keypoint Smoothing"
-          },
-          "keypoint_reset_policy": {
-            "$ref": "#/components/schemas/KeypointResetPolicyConfig",
-            "default": {
-              "backoff_multiplier": 2.0
-            }
-          }
-        },
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "title": "DetectionStageConfig",
-        "description": "Declarative description of a DetectionStage and its subtree."
-      },
       "ExportInventory": {
         "properties": {
           "revision": {
@@ -6321,233 +5972,6 @@
         "title": "InstallAddonResponse"
       },
       "JsonValue": {},
-      "KalmanKeypointSmoothingConfig": {
-        "properties": {
-          "kind": {
-            "type": "string",
-            "const": "kalman",
-            "title": "Kind",
-            "default": "kalman"
-          },
-          "process_noise_pos": {
-            "type": "number",
-            "title": "Process Noise Pos",
-            "default": 1.0
-          },
-          "process_noise_vel": {
-            "type": "number",
-            "title": "Process Noise Vel",
-            "default": 0.1
-          },
-          "measurement_noise": {
-            "type": "number",
-            "title": "Measurement Noise",
-            "default": 10.0
-          },
-          "max_gap_frames": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Gap Frames"
-          },
-          "max_velocity": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Velocity"
-          }
-        },
-        "type": "object",
-        "title": "KalmanKeypointSmoothingConfig",
-        "description": "Kalman filter (constant-velocity model) for keypoint temporal smoothing.\n\nModels each keypoint's x and y axes independently as [position, velocity]\nstate vectors. The prediction step extrapolates using the estimated velocity,\nso occluded keypoints track the expected trajectory rather than freezing at\nthe last position.\n\nprocess_noise_pos:  Q entry for position (pixels\u00b2 per frame). Higher = trust\n                    measurements more, less smoothing.\nprocess_noise_vel:  Q entry for velocity ((pixels/frame)\u00b2 per frame). Higher =\n                    velocity adapts faster to changes in motion.\nmeasurement_noise:  R (pixels\u00b2). Higher = trust measurements less, more smoothing.\n\nmax_gap_frames and max_velocity work identically to KeypointSmoothingConfig."
-      },
-      "KeypointAssemblyConfig": {
-        "properties": {
-          "target_stage": {
-            "type": "string",
-            "title": "Target Stage"
-          },
-          "sources": {
-            "items": {
-              "$ref": "#/components/schemas/KeypointSourceConfig"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Sources"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "target_stage",
-          "sources"
-        ],
-        "title": "KeypointAssemblyConfig"
-      },
-      "KeypointDetectorConfig": {
-        "properties": {
-          "detector_type": {
-            "type": "string",
-            "title": "Detector Type"
-          },
-          "session_backend": {
-            "type": "string",
-            "title": "Session Backend"
-          }
-        },
-        "type": "object",
-        "required": [
-          "detector_type",
-          "session_backend"
-        ],
-        "title": "KeypointDetectorConfig",
-        "description": "Base config for KeypointDetector implementations.\n\nSubclasses set detector_type to a Literal value and add model-specific fields.\nsession_backend must match a key in the sessions dict passed to create()."
-      },
-      "KeypointResetPolicyConfig": {
-        "properties": {
-          "max_consecutive_misses": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Consecutive Misses"
-          },
-          "backoff_multiplier": {
-            "type": "number",
-            "title": "Backoff Multiplier",
-            "default": 2.0
-          },
-          "max_backoff_misses": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Backoff Misses"
-          }
-        },
-        "type": "object",
-        "title": "KeypointResetPolicyConfig",
-        "description": "Resets a keypoint detector's internal temporal state after consecutive misses.\n\nSome keypoint detectors (e.g. MediaPipe's VIDEO-mode PoseLandmarker) maintain\nan internal track-then-detect pipeline: after tracking is lost, the detector\ncan get stuck silently returning empty results even when the subject is\nclearly visible, because re-detection is not automatically retried. Calling\ndetector.reset_temporal_state() discards the stale state and forces a fresh\nfull detection on the next frame.\n\nA \"miss\" is a frame where the detector returns zero valid keypoints, checked\nbefore any confidence/visibility filtering \u2014 a detector that found the person\nbut with low-visibility limbs does not count as a miss.\n\nSet max_consecutive_misses to None to disable (the default \u2014 no behavior\nchange for detectors that don't need this, e.g. stateless ONNX detectors).\n\nIf the subject is genuinely out of frame (not just a stuck tracker), a bare\nthreshold re-fires every max_consecutive_misses frames forever, since a\nsuccessful reset zeroes the miss counter and the empty-detection streak\nimmediately starts climbing again. backoff_multiplier compounds the\n*effective* threshold each time a reset fires without an intervening real\ndetection (a non-empty result), so retries space out over time instead of\nhammering reset_temporal_state() at a fixed cadence. max_backoff_misses\ncaps how far that growth can go, so the detector still retries\noccasionally rather than effectively giving up forever. The backoff\nresets to the base threshold as soon as a real detection occurs."
-      },
-      "KeypointSmoothingConfig": {
-        "properties": {
-          "kind": {
-            "type": "string",
-            "const": "one_euro",
-            "title": "Kind",
-            "default": "one_euro"
-          },
-          "min_cutoff": {
-            "type": "number",
-            "title": "Min Cutoff",
-            "default": 1.0
-          },
-          "beta": {
-            "type": "number",
-            "title": "Beta",
-            "default": 0.0
-          },
-          "d_cutoff": {
-            "type": "number",
-            "title": "D Cutoff",
-            "default": 1.0
-          },
-          "max_gap_frames": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Gap Frames"
-          },
-          "max_velocity": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Velocity"
-          }
-        },
-        "type": "object",
-        "title": "KeypointSmoothingConfig",
-        "description": "One-euro filter parameters for keypoint temporal smoothing.\n\nGap filling: when a keypoint disappears for up to max_gap_frames consecutive\nframes, hold its last filtered position rather than returning NaN. Set to None\nto disable (current default \u2014 re-initialise on re-detection).\n\nAnomaly rejection: discard detections where a keypoint jumps more than\nmax_velocity pixels per frame. Rejected points are treated like missing\ndetections and are gap-filled if max_gap_frames is set. Set to None to\ndisable (accept all detections)."
-      },
-      "KeypointSourceConfig": {
-        "properties": {
-          "stage_path": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Stage Path"
-          },
-          "source_names": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Source Names"
-          },
-          "selected_names": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Selected Names"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "stage_path",
-          "source_names",
-          "selected_names"
-        ],
-        "title": "KeypointSourceConfig"
-      },
-      "KeypointsWithinBBoxRatioConfig": {
-        "properties": {
-          "kind": {
-            "type": "string",
-            "const": "keypoints_within_bbox_ratio",
-            "title": "Kind",
-            "default": "keypoints_within_bbox_ratio"
-          },
-          "threshold": {
-            "type": "number",
-            "title": "Threshold",
-            "default": 0.5
-          }
-        },
-        "type": "object",
-        "title": "KeypointsWithinBBoxRatioConfig"
-      },
       "LoadedCalibration": {
         "properties": {
           "path": {
@@ -6588,23 +6012,6 @@
         ],
         "title": "MatchingFailurePolicy"
       },
-      "MaxFramesWithoutRedetectConfig": {
-        "properties": {
-          "kind": {
-            "type": "string",
-            "const": "max_frames_without_redetect",
-            "title": "Kind",
-            "default": "max_frames_without_redetect"
-          },
-          "n_frames": {
-            "type": "integer",
-            "title": "N Frames",
-            "default": 30
-          }
-        },
-        "type": "object",
-        "title": "MaxFramesWithoutRedetectConfig"
-      },
       "MediapipePoseModelComplexity": {
         "type": "string",
         "enum": [
@@ -6613,23 +6020,6 @@
           "heavy"
         ],
         "title": "MediapipePoseModelComplexity"
-      },
-      "MinKeypointVisibilityConfig": {
-        "properties": {
-          "kind": {
-            "type": "string",
-            "const": "min_keypoint_visibility",
-            "title": "Kind",
-            "default": "min_keypoint_visibility"
-          },
-          "threshold": {
-            "type": "number",
-            "title": "Threshold",
-            "default": 0.3
-          }
-        },
-        "type": "object",
-        "title": "MinKeypointVisibilityConfig"
       },
       "MocapAlignmentConfig": {
         "properties": {
@@ -6687,25 +6077,6 @@
           "kind"
         ],
         "title": "MocapProcessingRequest"
-      },
-      "ObjectDetectorConfig": {
-        "properties": {
-          "detector_type": {
-            "type": "string",
-            "title": "Detector Type"
-          },
-          "session_backend": {
-            "type": "string",
-            "title": "Session Backend"
-          }
-        },
-        "type": "object",
-        "required": [
-          "detector_type",
-          "session_backend"
-        ],
-        "title": "ObjectDetectorConfig",
-        "description": "Base config for ObjectDetector implementations.\n\nSubclasses set detector_type to a Literal value and add model-specific fields.\nsession_backend must match a key in the sessions dict passed to create()."
       },
       "OneEuroConfig": {
         "properties": {
@@ -7509,13 +6880,6 @@
             "title": "Anchorsegmentname",
             "default": "pelvis"
           },
-          "pipelineImplementation": {
-            "type": "string",
-            "const": "typed_dataflow",
-            "title": "Pipelineimplementation",
-            "description": "Typed data flow graph V1.",
-            "default": "typed_dataflow"
-          },
           "graphExecutionProvider": {
             "type": "string",
             "enum": [
@@ -7693,23 +7057,6 @@
             "title": "Mediapipenumfaces",
             "description": "Number of faces to detect. Only used when detector_type='mediapipe'.",
             "default": 1
-          },
-          "videoFps": {
-            "type": "number",
-            "exclusiveMinimum": 0.0,
-            "title": "Videofps",
-            "description": "Frames per second of the recorded video. Used to compute redetect_interval (redetect every 5 s). Set this from cv2.CAP_PROP_FPS before constructing the config for accurate cadence.",
-            "default": 30.0
-          },
-          "tracker_config": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TrackerConfig-Input"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "calibrationTomlPath": {
             "anyOf": [
@@ -8063,11 +7410,6 @@
           "aggregator_config": {
             "$ref": "#/components/schemas/RealtimeAggregatorNodeConfig"
           },
-          "use_centralized_inference": {
-            "type": "boolean",
-            "title": "Use Centralized Inference",
-            "default": true
-          },
           "log_pipeline_times": {
             "type": "boolean",
             "title": "Log Pipeline Times",
@@ -8087,11 +7429,6 @@
           },
           "aggregator_config": {
             "$ref": "#/components/schemas/RealtimeAggregatorNodeConfig"
-          },
-          "use_centralized_inference": {
-            "type": "boolean",
-            "title": "Use Centralized Inference",
-            "default": true
           },
           "log_pipeline_times": {
             "type": "boolean",
@@ -9907,82 +9244,6 @@
         },
         "type": "object",
         "title": "TemporalConfigStatus"
-      },
-      "TrackerConfig-Input": {
-        "properties": {
-          "stages": {
-            "items": {
-              "$ref": "#/components/schemas/DetectionStageConfig-Input"
-            },
-            "type": "array",
-            "title": "Stages"
-          },
-          "preset_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Preset Name"
-          },
-          "keypoint_assembly": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/KeypointAssemblyConfig"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "stages"
-        ],
-        "title": "TrackerConfig",
-        "description": "Top-level declarative config for a Tracker.\n\nPass to Tracker.create() alongside a sessions dict to build the full pipeline."
-      },
-      "TrackerConfig-Output": {
-        "properties": {
-          "stages": {
-            "items": {
-              "$ref": "#/components/schemas/DetectionStageConfig-Output"
-            },
-            "type": "array",
-            "title": "Stages"
-          },
-          "preset_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Preset Name"
-          },
-          "keypoint_assembly": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/KeypointAssemblyConfig"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "stages"
-        ],
-        "title": "TrackerConfig",
-        "description": "Top-level declarative config for a Tracker.\n\nPass to Tracker.create() alongside a sessions dict to build the full pipeline."
       },
       "TriangulationConfig": {
         "properties": {

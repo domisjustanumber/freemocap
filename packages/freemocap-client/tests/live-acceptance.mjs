@@ -33,7 +33,7 @@ try {
     await delay(5000);
     report.providers = (await api.get_session_providers_freemocap_onnx_session_providers_get()).data;
     const models = report.providers.flatMap(pipeline => pipeline.models);
-    assert.ok(models.length > 0 && models.every(model => model.applied_providers.includes('CUDAExecutionProvider')), JSON.stringify(report.providers));
+    assert.ok(models.length > 0 && models.every(model => model.applied_providers.includes('cuda')), JSON.stringify(report.providers));
     const observed = Object.assign({}, ...Object.values(state.camera_groups).map(group => group.configs));
     assert.deepEqual(Object.keys(observed).sort(), Object.keys(config.cameraConfigs).sort());
     await writeFile(path.join(config.output, 'observed-camera-configs.json'), JSON.stringify(observed, null, 2));

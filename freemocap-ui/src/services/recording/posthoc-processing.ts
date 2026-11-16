@@ -16,7 +16,6 @@ export const PROCESSING_STAGES = [
 export type ResumeStage = typeof PROCESSING_STAGES[number][0];
 export interface StageSelection {startStage: ResumeStage; stopStage?: ResumeStage; baseRunId: number; sensorGroup?: string;
     runSaveMode?: 'overwrite' | 'new_run';
-    pipelineImplementation?: 'typed_dataflow';
     graphExecutionProvider?: 'auto' | 'cpu' | 'cuda';
     graphAnnotate?: boolean;
 }

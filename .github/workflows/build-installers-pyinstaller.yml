@@ -201,29 +201,11 @@ jobs:
       - name: Create venv
         run: uv venv
 
-      # ── Conditional dependency install ──
-      # CPU variant  (macOS + Windows/Linux CPU): uv sync --group cpu →
-      #               skellytracker[all-cpu] (onnxruntime CPU, zero NVIDIA packages).
-      # CUDA variant (Windows/Linux GPU only):     uv sync --group cuda →
-      #               skellytracker[all-cuda] (onnxruntime-gpu + NVIDIA CUDA stack).
-      - name: Install dependencies (CPU variant)
-        if: "!matrix.install-gpu"
-        shell: bash
-        run: |
-          echo "=== CPU BUILD — skellytracker[all-cpu] (onnxruntime CPU, zero NVIDIA packages) ==="
-          # Runs for the macOS, Windows-CPU and Linux-CPU jobs. Plain `uv sync` would use
-          # the tracker-default group, which pulls skellytracker[all-cuda] (onnxruntime-gpu
-          # + the ~1.5 GB NVIDIA CUDA stack) on Windows/Linux. Force the CPU group so these
-          # installers stay small, and macOS gets the CPU onnxruntime it needs.
-          uv sync --no-default-groups --group cpu
-
-      - name: Install dependencies (CUDA variant)
-        if: matrix.install-gpu
-        run: |
-          echo "=== CUDA BUILD — skellytracker[all-cuda] (onnxruntime-gpu + NVIDIA CUDA stack) ==="
-          # Runs only for the Windows-CUDA and Linux-CUDA jobs (install-gpu: true).
-          # Force the CUDA group explicitly — symmetric with the CPU step above.
-          uv sync --no-default-groups --group cuda
+      # ── Dependency install ──
+      # One install for each variant: skellytracker 2.0 depends on the CPU onnxruntime, and its GPU
+      # EPs come from its EP packs, so there are no cpu/cuda dependency groups any more.
+      - name: Install dependencies
+        run: uv sync --no-default-groups
 
       - name: Verify installation 1/3
         run: uv pip show freemocap

@@ -4,7 +4,6 @@ import sys
 sys.setrecursionlimit(sys.getrecursionlimit() * 5)
 
 from PyInstaller.utils.hooks import (
-    collect_all,
     collect_data_files,
     collect_dynamic_libs,
     collect_submodules,
@@ -86,71 +85,14 @@ sf_path = os.path.dirname(skellyforge.__file__)
 # definitions tree must ship with the frozen build.
 datas.append((os.path.join(sf_path, 'definitions'), 'skellyforge/definitions'))
 
-# ── skellytracker (active trackers only; exclude v1 legacy, tests, scripts) ──
-datas.extend(collect_data_files('skellytracker', includes=['**/*.yaml']))
+# ── skellytracker: its PyInstaller hook (entry point pyinstaller40) collects its data files ──
 # freemocap owns the tracker→standard-human mapping YAML files.
 datas.extend(collect_data_files('freemocap', includes=['core/mapping/yaml/*.yaml']))
-hiddenimports.extend([
-    'skellytracker',
-    'skellytracker.system',
-    'skellytracker.system.logging_configuration',
-    'skellytracker.system.logging_configuration.handlers',
-    'skellytracker.system.logging_configuration.handlers.websocket_log_queue_handler',
-    'skellytracker.io',
-    'skellytracker.io.process_videos',
-    'skellytracker.io.process_videos.process_single_video',
-    'skellytracker.utilities',
-    'skellytracker.tracked_object_definition',
-    'skellytracker.trackers.mediapipe_tracker',
-    'skellytracker.trackers.rtmpose_tracker',
-    'skellytracker.trackers.rtmpose_tracker.__rtmpose_tracker',
-    'skellytracker.trackers.rtmpose_tracker.run_rtmpose',
-    'skellytracker.trackers.charuco_tracker',
-    'skellytracker.trackers.brightest_point_tracker',
-])
 
-# ── NVIDIA CUDA runtime (bundled so users don't need a system CUDA install) ──
-# skellytracker's rtmpose_detector does `find_spec("nvidia")` +
-# `nvidia_root.glob("*/bin")` at runtime to discover CUDA libraries.
-#
-# `onnxruntime_providers_cuda.dll` imports exactly five CUDA libraries. All five
-# must be bundled or the provider DLL fails to load, ONNX Runtime silently drops
-# CUDAExecutionProvider from its list, and every model runs on CPU (~1-2 fps
-# instead of ~20). Verified against the provider DLL's PE import table:
-#   cublas64_12.dll + cublaslt64_12.dll  <- nvidia.cublas       (737 MB)
-#   cudart64_12.dll                      <- nvidia.cuda_runtime  (11 MB)
-#   cudnn64_9.dll                        <- nvidia.cudnn       (1006 MB)
-#   cufft64_11.dll                       <- nvidia.cufft        (275 MB)
-#
-# Excluded — imported by neither the CUDA provider nor its transitive deps:
-#   nvidia.cuda_nvrtc   (179 MB) — runtime NVRTC compilation
-#   nvidia.nvjitlink     (84 MB) — JIT linker
-#
-# Skipped entirely for CPU-only builds (`FREEMOCAP_BUILD_VARIANT=cpu`, set by
-# the CI matrix's `variant` axis) — those envs never install the `nvidia.*`
-# packages in the first place, since `uv sync --extra cpu` pulls
-# skellytracker[all-cpu] instead of [all-cuda].
-build_variant = os.environ.get('FREEMOCAP_BUILD_VARIANT', 'cuda').lower()
-if build_variant == 'cuda':
-    for nvidia_subpkg in [
-        'nvidia.cublas',
-        'nvidia.cuda_runtime',
-        'nvidia.cudnn',
-        'nvidia.cufft',
-    ]:
-        try:
-            nv_datas, nv_binaries, nv_hidden = collect_all(nvidia_subpkg)
-            datas.extend(nv_datas)
-            binaries.extend(nv_binaries)
-            hiddenimports.extend(nv_hidden)
-        except Exception as e:
-            print(f"[freemocap.spec] WARNING: could not collect '{nvidia_subpkg}' "
-                  f"— GPU acceleration may not work in the frozen build. ({e})")
-else:
-    print(f"[freemocap.spec] FREEMOCAP_BUILD_VARIANT={build_variant} — "
-          f"skipping NVIDIA CUDA runtime bundling (CPU-only build).")
+# GPU execution providers come from skellytracker's EP packs, not from bundled NVIDIA wheels:
+# onnxruntime is the CPU build, and no nvidia.* package is installed.
 
-# ── onnxruntime (GPU build — only DLLs + capi bindings; exclude dev tools) ──
+# ── onnxruntime (only DLLs + capi bindings; exclude dev tools) ──
 binaries.extend(collect_dynamic_libs('onnxruntime'))
 hiddenimports.extend(['onnxruntime', 'onnxruntime.capi'])
 
@@ -218,13 +160,8 @@ a = Analysis(
         'mediapipe.tasks.python.metadata',
         'mediapipe.tasks.python.benchmark',
 
-        # ── skellytracker legacy/unused ──
+        # ── skellytracker tests ──
         'skellytracker.tests',
-        'skellytracker.trackers.v1',
-        'skellytracker.trackers.vitpose_tracker',
-        'skellytracker.trackers.legacy_mediapipe_tracker',
-        'skellytracker.scripts',
-        'skellytracker.__main__',
 
         # ── setuptools cruft ──
         'setuptools.tests',

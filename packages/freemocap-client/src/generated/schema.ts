@@ -1216,103 +1216,6 @@ export interface components {
             available: string[];
         };
         /**
-         * BBoxAreaCollapseConfig
-         * @description Redetect when the keypoint-derived bbox has shrunk drastically vs the last known bbox.
-         *
-         *     Catches cases where the person has left the frame or the track has switched.
-         *     Uses the same keypoint-to-bbox logic as keypoint_bbox_expansion.
-         */
-        BBoxAreaCollapseConfig: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            kind: "bbox_area_collapse";
-            /**
-             * Min Area Ratio
-             * @default 0.25
-             */
-            min_area_ratio?: number;
-            /**
-             * Expansion Ratio
-             * @default 0.05
-             */
-            expansion_ratio?: number;
-            /**
-             * Min Visibility
-             * @default 0
-             */
-            min_visibility?: number;
-        };
-        /**
-         * BBoxPolicyConfig
-         * @description Controls when the ObjectDetector re-runs and how to fill the bbox when it doesn't.
-         *
-         *     When the detector is skipped, the bbox for the current frame can either be
-         *     re-derived from the previous frame's keypoints (if keypoint_bbox_expansion is
-         *     set) or simply reused from the last detection (the default).
-         */
-        BBoxPolicyConfig: {
-            /**
-             * Redetect Interval
-             * @default 1
-             */
-            redetect_interval?: number;
-            /**
-             * Fitness Checks
-             * @default []
-             */
-            fitness_checks?: (components["schemas"]["MinKeypointVisibilityConfig"] | components["schemas"]["KeypointsWithinBBoxRatioConfig"] | components["schemas"]["MaxFramesWithoutRedetectConfig"] | components["schemas"]["BBoxAreaCollapseConfig"])[];
-            /** Keypoint Bbox Expansion */
-            keypoint_bbox_expansion?: number | null;
-            /**
-             * Keypoint Bbox Min Visibility
-             * @default 0
-             */
-            keypoint_bbox_min_visibility?: number;
-            /**
-             * Min Shrink Ratio Per Frame
-             * @default 0.999
-             */
-            min_shrink_ratio_per_frame?: number | null;
-            /**
-             * Min Detected Bbox Ratio
-             * @default 0.5
-             */
-            min_detected_bbox_ratio?: number | null;
-            /**
-             * Min Bbox Size Px
-             * @default 80
-             */
-            min_bbox_size_px?: number;
-        };
-        /**
-         * BBoxSmoothingConfig
-         * @description Crop-corner filtering in pixels and elapsed seconds.
-         */
-        BBoxSmoothingConfig: {
-            /**
-             * Min Cutoff
-             * @default 3
-             */
-            min_cutoff?: number;
-            /**
-             * Beta
-             * @default 0.02
-             */
-            beta?: number;
-            /**
-             * D Cutoff
-             * @default 1
-             */
-            d_cutoff?: number;
-            /**
-             * Reset After Seconds
-             * @default 0.5
-             */
-            reset_after_seconds?: number;
-        };
-        /**
          * BackgroundTaskSnapshot
          * @description Retained status for a job whose executor is not a processing pipeline.
          */
@@ -1956,8 +1859,6 @@ export interface components {
              */
             mediapipe_num_faces?: number;
             charuco_board?: components["schemas"]["CharucoBoardDefinition-Input"];
-            charuco_tracker_config?: components["schemas"]["TrackerConfig-Input"] | null;
-            skeleton_tracker_config?: components["schemas"]["TrackerConfig-Input"] | null;
             /**
              * Confidence Threshold
              * @default 0.4
@@ -2024,8 +1925,6 @@ export interface components {
              */
             mediapipe_num_faces?: number;
             charuco_board?: components["schemas"]["CharucoBoardDefinition-Output"];
-            charuco_tracker_config?: components["schemas"]["TrackerConfig-Output"] | null;
-            skeleton_tracker_config?: components["schemas"]["TrackerConfig-Output"] | null;
             /**
              * Confidence Threshold
              * @default 0.4
@@ -2260,84 +2159,6 @@ export interface components {
             microphones: {
                 [key: string]: string;
             };
-        };
-        /**
-         * DetectionStageConfig
-         * @description Declarative description of a DetectionStage and its subtree.
-         */
-        "DetectionStageConfig-Input": {
-            /** Name */
-            name: string;
-            object_detector?: components["schemas"]["ObjectDetectorConfig"] | null;
-            /**
-             * Keypoint Detectors
-             * @default []
-             */
-            keypoint_detectors?: components["schemas"]["KeypointDetectorConfig"][];
-            /**
-             * Children
-             * @default []
-             */
-            children?: components["schemas"]["DetectionStageConfig-Input"][];
-            /**
-             * @default {
-             *       "redetect_interval": 1,
-             *       "fitness_checks": [],
-             *       "keypoint_bbox_min_visibility": 0,
-             *       "min_shrink_ratio_per_frame": 0.999,
-             *       "min_detected_bbox_ratio": 0.5,
-             *       "min_bbox_size_px": 80
-             *     }
-             */
-            bbox_policy?: components["schemas"]["BBoxPolicyConfig"];
-            bbox_smoothing?: components["schemas"]["BBoxSmoothingConfig"] | null;
-            /** Keypoint Smoothing */
-            keypoint_smoothing?: components["schemas"]["KeypointSmoothingConfig"] | components["schemas"]["KalmanKeypointSmoothingConfig"] | null;
-            /**
-             * @default {
-             *       "backoff_multiplier": 2
-             *     }
-             */
-            keypoint_reset_policy?: components["schemas"]["KeypointResetPolicyConfig"];
-        };
-        /**
-         * DetectionStageConfig
-         * @description Declarative description of a DetectionStage and its subtree.
-         */
-        "DetectionStageConfig-Output": {
-            /** Name */
-            name: string;
-            object_detector?: components["schemas"]["ObjectDetectorConfig"] | null;
-            /**
-             * Keypoint Detectors
-             * @default []
-             */
-            keypoint_detectors?: components["schemas"]["KeypointDetectorConfig"][];
-            /**
-             * Children
-             * @default []
-             */
-            children?: components["schemas"]["DetectionStageConfig-Output"][];
-            /**
-             * @default {
-             *       "redetect_interval": 1,
-             *       "fitness_checks": [],
-             *       "keypoint_bbox_min_visibility": 0,
-             *       "min_shrink_ratio_per_frame": 0.999,
-             *       "min_detected_bbox_ratio": 0.5,
-             *       "min_bbox_size_px": 80
-             *     }
-             */
-            bbox_policy?: components["schemas"]["BBoxPolicyConfig"];
-            bbox_smoothing?: components["schemas"]["BBoxSmoothingConfig"] | null;
-            /** Keypoint Smoothing */
-            keypoint_smoothing?: components["schemas"]["KeypointSmoothingConfig"] | components["schemas"]["KalmanKeypointSmoothingConfig"] | null;
-            /**
-             * @default {
-             *       "backoff_multiplier": 2
-             *     }
-             */
-            keypoint_reset_policy?: components["schemas"]["KeypointResetPolicyConfig"];
         };
         /** ExportInventory */
         ExportInventory: {
@@ -2625,172 +2446,6 @@ export interface components {
             package?: string | null;
         };
         JsonValue: unknown;
-        /**
-         * KalmanKeypointSmoothingConfig
-         * @description Kalman filter (constant-velocity model) for keypoint temporal smoothing.
-         *
-         *     Models each keypoint's x and y axes independently as [position, velocity]
-         *     state vectors. The prediction step extrapolates using the estimated velocity,
-         *     so occluded keypoints track the expected trajectory rather than freezing at
-         *     the last position.
-         *
-         *     process_noise_pos:  Q entry for position (pixels² per frame). Higher = trust
-         *                         measurements more, less smoothing.
-         *     process_noise_vel:  Q entry for velocity ((pixels/frame)² per frame). Higher =
-         *                         velocity adapts faster to changes in motion.
-         *     measurement_noise:  R (pixels²). Higher = trust measurements less, more smoothing.
-         *
-         *     max_gap_frames and max_velocity work identically to KeypointSmoothingConfig.
-         */
-        KalmanKeypointSmoothingConfig: {
-            /**
-             * Kind
-             * @default kalman
-             * @constant
-             */
-            kind?: "kalman";
-            /**
-             * Process Noise Pos
-             * @default 1
-             */
-            process_noise_pos?: number;
-            /**
-             * Process Noise Vel
-             * @default 0.1
-             */
-            process_noise_vel?: number;
-            /**
-             * Measurement Noise
-             * @default 10
-             */
-            measurement_noise?: number;
-            /** Max Gap Frames */
-            max_gap_frames?: number | null;
-            /** Max Velocity */
-            max_velocity?: number | null;
-        };
-        /** KeypointAssemblyConfig */
-        KeypointAssemblyConfig: {
-            /** Target Stage */
-            target_stage: string;
-            /** Sources */
-            sources: components["schemas"]["KeypointSourceConfig"][];
-        };
-        /**
-         * KeypointDetectorConfig
-         * @description Base config for KeypointDetector implementations.
-         *
-         *     Subclasses set detector_type to a Literal value and add model-specific fields.
-         *     session_backend must match a key in the sessions dict passed to create().
-         */
-        KeypointDetectorConfig: {
-            /** Detector Type */
-            detector_type: string;
-            /** Session Backend */
-            session_backend: string;
-        };
-        /**
-         * KeypointResetPolicyConfig
-         * @description Resets a keypoint detector's internal temporal state after consecutive misses.
-         *
-         *     Some keypoint detectors (e.g. MediaPipe's VIDEO-mode PoseLandmarker) maintain
-         *     an internal track-then-detect pipeline: after tracking is lost, the detector
-         *     can get stuck silently returning empty results even when the subject is
-         *     clearly visible, because re-detection is not automatically retried. Calling
-         *     detector.reset_temporal_state() discards the stale state and forces a fresh
-         *     full detection on the next frame.
-         *
-         *     A "miss" is a frame where the detector returns zero valid keypoints, checked
-         *     before any confidence/visibility filtering — a detector that found the person
-         *     but with low-visibility limbs does not count as a miss.
-         *
-         *     Set max_consecutive_misses to None to disable (the default — no behavior
-         *     change for detectors that don't need this, e.g. stateless ONNX detectors).
-         *
-         *     If the subject is genuinely out of frame (not just a stuck tracker), a bare
-         *     threshold re-fires every max_consecutive_misses frames forever, since a
-         *     successful reset zeroes the miss counter and the empty-detection streak
-         *     immediately starts climbing again. backoff_multiplier compounds the
-         *     *effective* threshold each time a reset fires without an intervening real
-         *     detection (a non-empty result), so retries space out over time instead of
-         *     hammering reset_temporal_state() at a fixed cadence. max_backoff_misses
-         *     caps how far that growth can go, so the detector still retries
-         *     occasionally rather than effectively giving up forever. The backoff
-         *     resets to the base threshold as soon as a real detection occurs.
-         */
-        KeypointResetPolicyConfig: {
-            /** Max Consecutive Misses */
-            max_consecutive_misses?: number | null;
-            /**
-             * Backoff Multiplier
-             * @default 2
-             */
-            backoff_multiplier?: number;
-            /** Max Backoff Misses */
-            max_backoff_misses?: number | null;
-        };
-        /**
-         * KeypointSmoothingConfig
-         * @description One-euro filter parameters for keypoint temporal smoothing.
-         *
-         *     Gap filling: when a keypoint disappears for up to max_gap_frames consecutive
-         *     frames, hold its last filtered position rather than returning NaN. Set to None
-         *     to disable (current default — re-initialise on re-detection).
-         *
-         *     Anomaly rejection: discard detections where a keypoint jumps more than
-         *     max_velocity pixels per frame. Rejected points are treated like missing
-         *     detections and are gap-filled if max_gap_frames is set. Set to None to
-         *     disable (accept all detections).
-         */
-        KeypointSmoothingConfig: {
-            /**
-             * Kind
-             * @default one_euro
-             * @constant
-             */
-            kind?: "one_euro";
-            /**
-             * Min Cutoff
-             * @default 1
-             */
-            min_cutoff?: number;
-            /**
-             * Beta
-             * @default 0
-             */
-            beta?: number;
-            /**
-             * D Cutoff
-             * @default 1
-             */
-            d_cutoff?: number;
-            /** Max Gap Frames */
-            max_gap_frames?: number | null;
-            /** Max Velocity */
-            max_velocity?: number | null;
-        };
-        /** KeypointSourceConfig */
-        KeypointSourceConfig: {
-            /** Stage Path */
-            stage_path: string[];
-            /** Source Names */
-            source_names: string[];
-            /** Selected Names */
-            selected_names: string[];
-        };
-        /** KeypointsWithinBBoxRatioConfig */
-        KeypointsWithinBBoxRatioConfig: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            kind: "keypoints_within_bbox_ratio";
-            /**
-             * Threshold
-             * @default 0.5
-             */
-            threshold?: number;
-        };
         /** LoadedCalibration */
         LoadedCalibration: {
             /**
@@ -2809,37 +2464,11 @@ export interface components {
          * @enum {string}
          */
         MatchingFailurePolicy: "continue" | "stop";
-        /** MaxFramesWithoutRedetectConfig */
-        MaxFramesWithoutRedetectConfig: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            kind: "max_frames_without_redetect";
-            /**
-             * N Frames
-             * @default 30
-             */
-            n_frames?: number;
-        };
         /**
          * MediapipePoseModelComplexity
          * @enum {string}
          */
         MediapipePoseModelComplexity: "lite" | "full" | "heavy";
-        /** MinKeypointVisibilityConfig */
-        MinKeypointVisibilityConfig: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            kind: "min_keypoint_visibility";
-            /**
-             * Threshold
-             * @default 0.3
-             */
-            threshold?: number;
-        };
         /** MocapAlignmentConfig */
         MocapAlignmentConfig: {
             /**
@@ -2865,19 +2494,6 @@ export interface components {
              */
             kind: "mocap";
             config?: components["schemas"]["PosthocMocapPipelineConfig"];
-        };
-        /**
-         * ObjectDetectorConfig
-         * @description Base config for ObjectDetector implementations.
-         *
-         *     Subclasses set detector_type to a Literal value and add model-specific fields.
-         *     session_backend must match a key in the sessions dict passed to create().
-         */
-        ObjectDetectorConfig: {
-            /** Detector Type */
-            detector_type: string;
-            /** Session Backend */
-            session_backend: string;
         };
         /** OneEuroConfig */
         OneEuroConfig: {
@@ -3220,13 +2836,6 @@ export interface components {
              */
             anchorSegmentName?: string;
             /**
-             * Pipelineimplementation
-             * @description Typed data flow graph V1.
-             * @default typed_dataflow
-             * @constant
-             */
-            pipelineImplementation?: "typed_dataflow";
-            /**
              * Graphexecutionprovider
              * @default auto
              * @enum {string}
@@ -3335,13 +2944,6 @@ export interface components {
              * @default 1
              */
             mediapipeNumFaces?: number;
-            /**
-             * Videofps
-             * @description Frames per second of the recorded video. Used to compute redetect_interval (redetect every 5 s). Set this from cv2.CAP_PROP_FPS before constructing the config for accurate cadence.
-             * @default 30
-             */
-            videoFps?: number;
-            tracker_config?: components["schemas"]["TrackerConfig-Input"] | null;
             /**
              * Calibrationtomlpath
              * @description Selected calibration TOML. Required for multicamera processing; no implicit file selection.
@@ -3517,11 +3119,6 @@ export interface components {
             camera_node_config?: components["schemas"]["CameraNodeConfig-Input"];
             aggregator_config?: components["schemas"]["RealtimeAggregatorNodeConfig"];
             /**
-             * Use Centralized Inference
-             * @default true
-             */
-            use_centralized_inference?: boolean;
-            /**
              * Log Pipeline Times
              * @default true
              */
@@ -3532,11 +3129,6 @@ export interface components {
         "RealtimePipelineConfig-Output": {
             camera_node_config?: components["schemas"]["CameraNodeConfig-Output"];
             aggregator_config?: components["schemas"]["RealtimeAggregatorNodeConfig"];
-            /**
-             * Use Centralized Inference
-             * @default true
-             */
-            use_centralized_inference?: boolean;
             /**
              * Log Pipeline Times
              * @default true
@@ -4394,32 +3986,6 @@ export interface components {
             defaults?: components["schemas"]["RealtimeFilterConfig"];
             requested?: components["schemas"]["RealtimeFilterConfig"] | null;
             applied?: components["schemas"]["RealtimeFilterConfig"] | null;
-        };
-        /**
-         * TrackerConfig
-         * @description Top-level declarative config for a Tracker.
-         *
-         *     Pass to Tracker.create() alongside a sessions dict to build the full pipeline.
-         */
-        "TrackerConfig-Input": {
-            /** Stages */
-            stages: components["schemas"]["DetectionStageConfig-Input"][];
-            /** Preset Name */
-            preset_name?: string | null;
-            keypoint_assembly?: components["schemas"]["KeypointAssemblyConfig"] | null;
-        };
-        /**
-         * TrackerConfig
-         * @description Top-level declarative config for a Tracker.
-         *
-         *     Pass to Tracker.create() alongside a sessions dict to build the full pipeline.
-         */
-        "TrackerConfig-Output": {
-            /** Stages */
-            stages: components["schemas"]["DetectionStageConfig-Output"][];
-            /** Preset Name */
-            preset_name?: string | null;
-            keypoint_assembly?: components["schemas"]["KeypointAssemblyConfig"] | null;
         };
         /** TriangulationConfig */
         TriangulationConfig: {

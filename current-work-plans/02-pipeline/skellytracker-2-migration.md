@@ -73,7 +73,12 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
   Until then: no new import of `USABLE_STATES` from `eps.records`, no call of private `install_hint()`.
   `/onnx/session_providers` stays untouched until gap 3; the made-up `applied_providers` at
   `inference_service.py:161` **waits for gap 3**.
-  - Part 1, now, its own commit groups with tests:
+  - Part 1 progress: (i) DONE `c4c158fe`; (ii) DONE `f915bc50` (`run_ep_choice` returns key, options,
+    device; `run_execution_provider` is a wrapper for `application_pipeline`; 53 passed in
+    test_pipeline_runs, test_inference_service, test_execution_providers, test_dataflow_tracker_adapter).
+    Next: (iii) host probes, then (iv) to (viii). `freemocap-ui/tsconfig.node.json` has a pre-existing
+    TS deprecation error (`moduleResolution=node10`), not from this work.
+  - Part 1, its own commit groups with tests:
     (i) delete the dead `freemocap-ui/electron/main/services/dependency-manager.ts` and `system-scanner.ts`
     (own commit);
     (ii) FIRST, with a test, Auto = `status().performance.chosen` and pass `options` and `device_key`

@@ -433,6 +433,29 @@ Recorded on 2026-11-16, by the user through `skellytracker-ef`.
 - Q14: keep the detector-ran colour, column and metric, from `node_ran`.
 - Charuco: freemocap uses only the public surface (`create_detector` and the helpers). It calls no
   calibration class directly.
+- Detector choices: only `rtmpose` and `mediapipe` are migrated.
+  - `rtmpose` → `yolox-rtmw-wholebody`.
+  - `mediapipe` → `mediapipe-holistic-tasks` (another model, a 478-point face, no hand crops, no
+    reset).
+  - The other four choices go, with the code that only they use, in the backend, the UI and the
+    SDK. The removal list is §6.
+- Still open with the user: who owns the standard-human mapping (freemocap, or a skellytracker
+  mapping API). Design nothing on it yet.
+
+### Features this migration removes
+
+These four features stay on `sfn26`. They come back when skellytracker has pipelines for them,
+which is later work.
+
+1. **RTMW body + MediaPipe hands** (`rtmw_mediapipe_hands`): RTMW whole-body, with MediaPipe hand
+   landmarks on hand crops from the RTMW wrist points.
+2. **Hands only** (`mediapipe_hands`): MediaPipe hands on the full frame with no body, with per-camera
+   hand tracks, handedness, a hand count of one, two or unknown, hand identity across cameras, and
+   one reconstructed hand for each track in realtime.
+3. **RTMW body + experimental ONNX hands** (`rtmw_onnx_hands`): the experimental ONNX palm and
+   landmark hands on crops from the RTMW points (models from `SKELLYTRACKER_HAND_CANDIDATE_DIR`).
+4. **DeepLabCut** (`dlc`): DLC models for objects and animals, with the DLC import and conversion
+   (`/dlc` routes), the DLC rigid-object skeleton and the DLC overlays.
 
 ## 4. Open questions and gaps
 
@@ -474,6 +497,37 @@ The answers:
   | (new) | `x-384` |
 
 - The batch conversion at the session start takes 0.01 to 1.02 s. No cache will be built.
+
+## 4a. Baseline before the migration (2026-11-16)
+
+- **Commit pair:** freemocap `ca0c17cc`, skellytracker `2d356a6c`.
+- **The other siblings:** skellycam `sfn26` `f486d3882`, skellyforge `sfn26` `5f0fd2d`,
+  freemocap_blender_addon `sfn26` `aefde7d`, skellylogs `eeea4fa` and skellypings `dbaa4b2`.
+- **Where:** fresh clones in a scratchpad workspace. `../skellytracker` and freemocap's `.venv` did
+  not change.
+- **Install:** `uv sync --frozen --group dev`, as CI (tracker-default = `all-cuda`), with
+  `--no-install-package skellycam-rust`.
+  - The Rust build of `skellycam-rust` needs a Windows SDK (`kernel32.lib`), and this machine has
+    none.
+  - No collected test failed for want of it. It is not checked whether any of the 31 skips do.
+- **Runtime:** Python **3.12.13** (the old Python; the target is 3.13.18), onnxruntime-gpu 1.26.0
+  (TensorRT, CUDA and CPU providers), mediapipe 0.10.33 and OpenCV 4.12.0.
+- **Command:** as `.github/workflows/test.yml`:
+  `pytest freemocap/tests/ --timeout=120 --timeout-method=thread -m "not e2e and not slow"`.
+- **Result:** 221 test files: **1572 passed, 15 failed, 31 skipped**, 57 deselected, 117 subtests
+  passed. The counts for each file are in `skellytracker-2-baseline-sfn26.tsv`.
+- **Failures:** all 15 fail again in a second run.
+
+| Tests | Count | Failure |
+|---|---|---|
+| `test_csv_export_ui_api.py::test_completion_exports_only_when_enabled_and_preserves_processing_success[True-False]`, `[False-False]` | 2 | exports incomplete: "Unknown recording run: 0" and `'types.SimpleNamespace' object has no attribute 'files'` |
+| `test_recording_export_jobs.py::test_automatic_export_binds_produced_run_and_separates_failure[False-observations]`, `[False-filtering]`, `[False-reconstruction]` | 3 | the same `SimpleNamespace` error |
+| `test_mocap_pipeline_integration.py::test_worker_exit_without_terminal_report_fails_pipeline` | 1 | beartype refuses a `Mock` as `plan` of `AggregatorNodeProgressMessage` |
+| `test_sidecar_factory_contract.py::test_core_requests_preserve_declared_models_and_settings[*-rtmw]`, `[*-combined]` | 8 | the `SessionRequest` of `OnnxSession` (RTMW model spec) differs from the expected one. This is the old session contract, which the migration deletes. |
+| `test_streaming_vmc.py::test_real_udp_measurement_time_and_clean_close` | 1 | `assert 51 == 21`: the VMC message count |
+
+- **Not run:** the e2e and slow tests (57), the UI tests and the tests in `packages/`. The
+  `packages/freemocap-stream` tests do not collect in this environment, but CI does not run them.
 
 ## 5. Sharing, lifetime and threads (input to the 1.10 investigation)
 

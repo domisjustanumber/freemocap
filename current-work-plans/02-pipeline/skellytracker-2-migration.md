@@ -436,7 +436,44 @@ Recorded on 2026-11-16, by the user through `skellytracker-ef`.
 
 ## 4. Open questions and gaps
 
-Sent to `skellytracker-ef` on 2026-11-16. The gaps of §1.5 go to the user.
+Sent to `skellytracker-ef` on 2026-11-16. The detector-choice and hand gaps of §1.2 and §1.5 are with
+the user as one scope question.
+
+The answers:
+
+- N1: build a baseline in a separate environment, with a clone of skellytracker at `2d356a6c`. Record:
+  - the counts for each test file;
+  - the commit pair;
+  - the Python version;
+  - each failure that exists before the migration.
+  Change no tracked file.
+- N2: `redetect_interval` in `live` counts `frame_index` steps, and a skip counts
+  (`specs/pipeline/nodes/redetect_trigger.md`, Behaviour step 3). Give the source frame number as
+  `frame_index`.
+- N3: `mediapipe` → `mediapipe-holistic-tasks`. The plan decides this. The known consequences:
+  another model, a 478-point face, no hand crops and no reset. Do not design for the decomposed
+  MediaPipe.
+- N4:
+  - RTMW of the built-in: a point with score < 0.4 becomes missing. Do this in the one function that
+    turns the pipeline result into freemocap's result type.
+  - MediaPipe: no gate. The node gives score 1.0 to each found hand or face point, and the
+    visibility to each body point (ADR-Y7C3). Keep freemocap's use of visibility.
+- N5: the skellytracker plan does not name DLC. The DLC detector, `dlc_conversion.py` and
+  `dlc_import.py` exist only on skellytracker `sfn26`. DLC is in the scope question.
+- EP keys in v2: `cpu`, `coreml`, `cuda`, `trt-rtx`. DirectML and the classic TensorRT go
+  (ADR-M2C6). `core.eps.status()`, `recommend()` and `check_start()` replace `provider_loads` and
+  `auto_detect_provider`.
+- RTMW sizes:
+
+  | Old name | New size |
+  |---|---|
+  | `rtmw-l-m_256x192` | `m` |
+  | `rtmw-x-l_256x192` | `l-256` |
+  | `rtmw-x-l_384x288` | `l-384` |
+  | (new) | `x-256` |
+  | (new) | `x-384` |
+
+- The batch conversion at the session start takes 0.01 to 1.02 s. No cache will be built.
 
 ## 5. Sharing, lifetime and threads (input to the 1.10 investigation)
 

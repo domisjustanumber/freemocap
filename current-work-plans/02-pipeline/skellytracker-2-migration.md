@@ -45,7 +45,11 @@ TESTING.md. Local only: `cbor-x` is missing in `freemocap-ui/node_modules` (inst
 
 Next, in order (supervisor, 2026-11-16; ST R1 to R6 = `55b6cd01`, `402c8838`, `a7e591ac`, `654c92b6`
 on the local `../skellytracker` `dom/sidecar-implementation`):
-- A. Boundary commit in `pipeline_runs.py`: `InstanceKeypoints`/`CanonicalKeypoints` have `xy`
+- A. DONE `de80869e` (scratch ST clone detached at `68591617`). Holistic is a `3d` output (its z is
+  kept); RTMW `2d` gets z 0; an absent row 0 is all NaN, score 0; `detector_connections` =
+  `canonical_edges` for both (Holistic canonical_names == point_names). Fast suite on the Phase B env
+  (`-m "not e2e and not slow"`, PYTHONPATH = checkout): 1508 passed, 8 failed (the 7 baseline +
+  `test_observation_imports`, as at the handoff), 20 skipped, 43 deselected. Was: `InstanceKeypoints`/`CanonicalKeypoints` have `xy`
   `(I, P, 2)` float64 (missing = NaN), `z` `(I, P)` for 3D or `None` for 2D, read-only `geometry`
   ("2d"/"3d"); `xyz` and `by_track()` are gone; `instance()`/`single()` give keys `xy`, `z`; read
   person row 0 after checking `present[0]`. Camera result: `image_width`, `image_height` (ints).
@@ -55,12 +59,12 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
   Possible renames (undecided; one import each, do not wait): `CallRefused`→`CallRefusedError`,
   `SetParamsRefused`→`SetParamsRefusedError`, `find_pipeline`→`get_pipeline`,
   `CanonicalKeypoints.names`→`point_names`.
-- B. EP rule (§0.3): inventory every EP key / ORT provider name (path:line) with a sub-agent; report
+- B. (running: read-only inventory sub-agent; report to the supervisor before implementing) EP rule (§0.3): inventory every EP key / ORT provider name (path:line) with a sub-agent; report
   the count and each UI need that `skellytracker.core.eps` does not give (do not work around); then
   implement. This replaces the fixed keys of step 1 and the `trt-rtx` fix of (a): delete those
   literals. (b) the Playwright "Apply sends selected settings" `camera.skeleton_tracker_config`
   check still has to go.
-- C. Installer names lose `-cpu` (`windows-x64`, ...); old `-cpu` and `-cuda` installs must update to
+- C. (running: read-only mechanism sub-agent; report before changing the workflow) Installer names lose `-cpu` (`windows-x64`, ...); old `-cpu` and `-cuda` installs must update to
   the new file and old links must lead to it. First report the auto-update mechanism and the plan as
   path:line facts; do not publish or upload anything.
 - Then the gate runs, once.

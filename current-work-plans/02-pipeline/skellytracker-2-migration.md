@@ -311,10 +311,44 @@ frames, each with `rtmpose` and with `mediapipe`.
 - E2 (2026-11-16, correction): a saved `trt` maps to `trt-rtx` when `trt-rtx` is usable on this host.
   freemocap does NOT hold that mapping: skellytracker gives it through the EP API (a retired key gives
   its successor key with its usable state; names come with the part 2 message). Until then the run start
-  fails with skellytracker's message, as now. Part 2 plan: at settings load or at run start, ask
-  skellytracker for the successor of a key that it does not list, and use the successor when it is
-  usable. OPEN, with the user: a successor that is not usable, and a retired key with no successor
-  (`directml`).
+  fails with skellytracker's message, as now. REPLACED by R2 and G1-G3 below.
+- R1 (2026-11-16, user, NOT implemented yet; report first): "FMC must save the pipeline config in a
+  saved processing config of a recording, as well as the selected EP." Supervisor's reading: the saved
+  processing config of a recording holds (a) the pipeline that ran: key, version and the full config as
+  skellytracker exports it (`skellytracker.core.pipelines.export_pipeline`: JSON types, `schema_version`,
+  `pipeline_id`, `source`, nodes with params and each `onnx_model` node's `sidecar_sha256`), with the run
+  parameters freemocap set (size, thresholds, fps, running mode); (b) the EP the user selected (also
+  Auto) AND what ran: per model the applied EP, device, precision and size, with key, version and
+  sidecar_sha256 from `PipelineRun.models` (applied fields come with part 2). Goal: a recording says
+  exactly how it was processed and can be processed again the same way. Stored as skellytracker gives
+  it, as data; no EP or pipeline knowledge copied into freemocap.
+- R2 (2026-11-16, user): "If loading a legacy settings file, trt or cuda must suggest trt-rtx if
+  supported on the current hardware, else suggest cuda." The rule lives in skellytracker: one EP API call
+  takes the saved key and returns the suggested key or None (name with the part 2 message); freemocap
+  calls it only for a legacy file and holds no key list.
+  - G1: "suggest" = apply with a notice. The setting loads as the suggested EP; the UI shows which saved
+    key was replaced and by which.
+  - G2: a choice made in the new freemocap stays as chosen (a new `cuda` stays `cuda`, also where
+    `trt-rtx` works). Only a file with no new-format marker is legacy, so new saves carry a marker.
+  - G3: no usable suggestion, or a legacy key with no successor (`directml`): the setting becomes Auto,
+    with a notice.
+- R1/R2 facts and plan (reported 2026-11-16, not implemented):
+  - Recording: no separate settings file. The run's settings are the tracker source `definition`
+    (`PosthocMocapPipelineConfig.model_dump(mode="json")` + `execution.requested_provider`,
+    `recording_pipeline.py:214-223`) inside `RecordingMetadata`, embedded in `<rec>_data.parquet`
+    (`parquet_writer.py:57-58`); `Source.definition` is free-form `dict[str, JsonValue]`
+    (`recording_descriptor.py:38`). Restart from triangulation copies only detector fields back
+    (`saved_observation_source.py:21-24`); later starts read no settings. `stage_settings`
+    (`provenance.py:75-77`) still names the removed `tracker_config` and omits the RTMW model,
+    threshold and EP.
+  - R1 plan: one `skellytracker` block in that `definition`: `pipeline` = `export_pipeline(<the config
+    that ran>)`, `running_mode`, `execution` = {selected (raw, None = Auto), requested key, options,
+    device}, `models` = `PipelineRun.models` (+ applied EP/device/precision in part 2); old recordings
+    load unchanged (free-form dict; the reader's config ignores extra keys); absent = unknown.
+  - R2 facts: the only persisted EP choice is the UI localStorage `freemocap:mocap.config`
+    (`persistence-listener.ts:80-89`, load `mocap-slice.ts:140-156`), no version; the realtime config is
+    not persisted. Marker plan: `settingsVersion: 1` in `mocap.config`, as camera settings do
+    (`camera-settings-storage.ts:14`); absent = legacy.
 
 ### 0.4 Open questions
 

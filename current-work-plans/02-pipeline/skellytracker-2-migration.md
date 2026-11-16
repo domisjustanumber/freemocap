@@ -398,6 +398,12 @@ frames, each with `rtmpose` and with `mediapipe`.
     "saved X replaced by Y" with the EP menu's "Not usable here." and Y's `install_hint` (one
     `NotUsableNote` for both). Auto only for None. A run before the install fails with skellytracker's
     message, as for any EP that is not usable.
+- V3 (2026-11-16, user): draw the face points smaller so the face lines show between them; line colour and
+  body, hand and foot point sizes unchanged; by the group of the point (`face/...`), not by detector or
+  count. Done: `annotation_style.FACE_KEYPOINT_RADIUS = 2` (was the stage radius 4); the annotator draws
+  the `face` points of the body stage as a drawing stage of their own (no edge joins a face point to
+  another group, RTMW 68 / Holistic 478 face points). test_data Cam1 frame 100 (face 57 x 57 px): pixels
+  only the face edges draw, radius 4/3/2/1 = 11/83/261/578; at 1 the dots vanish under the 2 px line.
 - S2 (2026-11-16, user): a "process again with the saved pipeline" button or route is NOT part of this
   work; save the data only. LATER WORK: re-run a recording from its saved `skellytracker` block.
 - R1/R2 facts and plan (reported 2026-11-16, not implemented):
@@ -527,6 +533,8 @@ frames, each with `rtmpose` and with `mediapipe`.
     EP key is replaced by skellytracker's suggestion for this computer (legacy `trt`/`cuda` -> `trt-rtx`
     if usable, else `cuda` if usable; another usable key stays; else Auto) and a notice says which key
     was replaced by which. Processing waits until the server has answered.
+17. Annotated videos draw face points with radius 2 instead of 4 (V3), so the face lines show between
+    them; body, hand and foot points and all line colours are unchanged.
 
 ### 0.7 Imports of old skellytracker modules that stage 2.4 can remove
 

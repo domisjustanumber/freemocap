@@ -14,7 +14,7 @@ from dataclasses import dataclass, replace
 import numpy as np
 from numpy.typing import NDArray
 from skellytracker.core.annotation.keypoint_annotator import KeypointAnnotator, KeypointAnnotatorConfig
-from skellytracker.core.data_primitives import Observation
+from skellytracker.core.data_primitives import Keypoints, Observation, StageObservation
 from skellytracker.core.detectors.calibration import CharucoAnnotator, CharucoAnnotatorConfig, CharucoBoardDefinition
 from freemocap.core.tracking.charuco_detection import CHARUCO_STAGE
 from freemocap.core.tracking.tracker_definitions import tracker_definition
@@ -26,6 +26,10 @@ _LEFT_COLOR = (255, 136, 68)      # #4488FF
 _RIGHT_HAND_COLOR = (0, 100, 255)  # #FF6400
 _LEFT_HAND_COLOR = (255, 170, 0)  # #00AAFF
 _FACE_COLOR = (0, 215, 255)       # #FFD700
+# The points of the `face` group are dense: at the stage radius their dots cover the face lines between them
+# (user V3). Body, hand and foot points keep the stage radius.
+FACE_KEYPOINT_RADIUS = 2
+_FACE_POINTS_STAGE = "face_points"  # drawing only: the face points of the body stage, with their own radius
 
 _BOX_COLOR_DETECTED = (0, 255, 0)   # #00FF00
 _BOX_COLOR_REUSED = (0, 140, 255)   # #FF8C00
@@ -135,6 +139,19 @@ def build_skeleton_stage_schema(
     )
 
 
+def _split_face_points(stage: StageObservation) -> tuple[StageObservation, StageObservation | None]:
+    """The stage without the points of the `face` group, and those points as the drawing stage of their own radius."""
+    keypoints = stage.keypoints
+    if keypoints is None:
+        return stage, None
+    face = [index for index, name in enumerate(keypoints.names) if _classify_face(name)]
+    if not face:
+        return stage, None
+    rest = [index for index in range(len(keypoints.names)) if index not in set(face)]
+    part = lambda indices: Keypoints(tuple(keypoints.names[i] for i in indices), keypoints.xyz[indices], keypoints.visibility[indices])
+    return replace(stage, keypoints=part(rest)), StageObservation(name=_FACE_POINTS_STAGE, keypoints=part(face))
+
+
 @dataclass(frozen=True)
 class ObservationAnnotator:
     """Draws the body stages with `KeypointAnnotator` and the charuco stage with `CharucoAnnotator`."""
@@ -146,7 +163,13 @@ class ObservationAnnotator:
         out = image.copy()
         if self.body is not None:
             # KeypointAnnotator draws every stage; the board has its own annotator.
-            stages = {name: stage for name, stage in observation.stages.items() if name != CHARUCO_STAGE or self.board is None}
+            stages = {}
+            for name, stage in observation.stages.items():
+                if name == CHARUCO_STAGE and self.board is not None:
+                    continue
+                stages[name], face = _split_face_points(stage) if name == "body" else (stage, None)
+                if face is not None:
+                    stages[_FACE_POINTS_STAGE] = face
             out = self.body.annotate(out, replace(observation, stages=stages))
         stage = observation.stages.get(CHARUCO_STAGE)
         if self.board is not None and stage is not None and stage.keypoints is not None:
@@ -160,7 +183,14 @@ def build_observation_annotator(*, detector_type: str | None = None,
     body = None
     if detector_type is not None:
         definition = tracker_definition(detector_type)
+        # No connection joins a face point to another group, so each drawing stage keeps all of its lines.
+        face_edges = tuple(edge for edge in definition.connections if _classify_face(edge[0]))
+        face_points = tuple(name for name in definition.tracked_points if _classify_face(name))
         body = KeypointAnnotator(config=KeypointAnnotatorConfig(stage_schemas={
-            "body": build_skeleton_stage_schema(definition.connections, definition.tracked_points)}))
+            "body": build_skeleton_stage_schema(
+                tuple(edge for edge in definition.connections if edge not in face_edges),
+                tuple(name for name in definition.tracked_points if name not in face_points)),
+            _FACE_POINTS_STAGE: replace(build_skeleton_stage_schema(face_edges, face_points),
+                                        keypoint_radius=FACE_KEYPOINT_RADIUS, draw_boxes=False)}))
     board_annotator = None if board is None else CharucoAnnotator(config=CharucoAnnotatorConfig(), board_def=board)
     return ObservationAnnotator(body=body, board=board_annotator)

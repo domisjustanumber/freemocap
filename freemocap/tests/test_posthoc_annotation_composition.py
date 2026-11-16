@@ -33,3 +33,18 @@ class PosthocAnnotationCompositionTests(unittest.TestCase):
         output = renderer.annotate(image=np.zeros((120, 160, 3), dtype=np.uint8),
                                    observation=Observation(frame_number=0, image_size=(120, 160), stages={"body": body}))
         self.assertFalse(np.any(output))
+
+    def test_face_points_are_drawn_smaller_by_their_group_for_each_detector(self) -> None:
+        from freemocap.core.pipeline.posthoc.annotation_style import FACE_KEYPOINT_RADIUS
+        from freemocap.core.tracking.tracker_definitions import tracker_definition
+        for detector in ("rtmpose", "mediapipe"):
+            points = tracker_definition(detector).tracked_points
+            face = next(name for name in points if name.startswith("face/"))
+            other = next(name for name in points if not name.startswith("face/"))
+            body = StageObservation(name="body", keypoints=Keypoints(
+                names=(face, other), xyz=np.array([[30.0, 30.0, 0.0], [90.0, 30.0, 0.0]]), visibility=np.ones(2)))
+            output = build_observation_annotator(detector_type=detector).annotate(
+                image=np.zeros((60, 120, 3), dtype=np.uint8), observation=Observation(frame_number=0, image_size=(60, 120), stages={"body": body}))
+            drawn = lambda x: int(np.any(output[30, x - 10:x + 11] != 0, axis=1).sum())  # the dot's width along its row
+            self.assertEqual(drawn(30), 2 * FACE_KEYPOINT_RADIUS + 1, detector)
+            self.assertGreater(drawn(90), drawn(30), detector)

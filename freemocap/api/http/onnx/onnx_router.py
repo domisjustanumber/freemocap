@@ -14,10 +14,10 @@ class AvailableExecutionProvidersResponse(BaseModel):
 
 @onnx_router.get("/execution_providers")
 def get_available_execution_providers() -> AvailableExecutionProvidersResponse:
-    """List providers advertised by this ONNX build; native library loading is checked at session startup."""
+    """List the v2 EP keys usable on this host; the run checks its EP again when it starts."""
     try:
-        from freemocap.core.tracking.execution_providers import advertised_providers
-        available = advertised_providers()
+        from freemocap.core.tracking.execution_providers import usable_execution_providers
+        available = usable_execution_providers()
         return AvailableExecutionProvidersResponse(available=available)
     except Exception as e:
         logger.exception(f"Error listing ONNX execution providers: {e}")

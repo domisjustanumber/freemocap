@@ -1,25 +1,26 @@
-"""Application-owned inference scheduling with isolated pipeline tracking state."""
+"""Application-owned inference scheduling: one skellytracker pipeline run for each client."""
 
 import multiprocessing
 from contextlib import nullcontext
 from time import perf_counter
 from freemocap.core.pipeline.performance_report import PerformanceReport
 from collections import deque
+from collections.abc import Mapping
 from concurrent.futures import CancelledError, Future
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from enum import StrEnum
 from multiprocessing.sharedctypes import Synchronized
 from threading import Condition
+from typing import Any
 
 
 import numpy as np
 from numpy.typing import NDArray
 from skellycam.core.ipc.process_management.managed_worker import WorkerMode
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
-from skellytracker.core import TrackerConfig
 from skellytracker.core.data_primitives.observation import Observation
-from skellytracker.core.sessions.shared_sessions import SessionRequest, SharedSessionPool, TrackerLease
-from skellytracker.core.tracker.tracker_state import TrackerState
+
+from freemocap.core.tracking.pipeline_runs import RUNNING_MODES, observations_from_results, start_detector_run
 
 
 class InferenceMode(StrEnum):
@@ -29,21 +30,29 @@ class InferenceMode(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class InferenceRegistration:
+    """One camera group (realtime) or one recording (posthoc), and the detector choice of its run."""
+
     pipeline_id: str
     mode: InferenceMode
-    tracker_config: TrackerConfig
-    sessions: tuple[SessionRequest, ...]
+    detector_type: str
+    camera_ids: tuple[str, ...]
     shutdown_flag: Synchronized
+    rtmpose_model_name: str | None = None
+    execution_provider: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class InferenceRequest:
-    """Images must remain unchanged until the returned future is terminal."""
+    """Images must remain unchanged until the returned future is terminal.
+
+    `timestamps_ms` holds the time of each camera's frame: its capture midpoint in realtime, the
+    recording time in posthoc.
+    """
 
     frame_number: int
     images: dict[str, NDArray[np.uint8]]
+    timestamps_ms: Mapping[str, float | int]
     performance: PerformanceReport | None = None
-    timestamp_ms: int | None = None
 
 
 @dataclass(slots=True)
@@ -59,15 +68,12 @@ class InferenceClient:
     _service: "InferenceService"
     _pending: PendingInference | None = None
     _active: PendingInference | None = None
-    _lease: TrackerLease | None = None
-    _states: dict[str, TrackerState] = field(default_factory=dict)
+    _run: Any = None
     _last_frame: int = -1
     _closed: bool = False
     failure: Exception | None = None
     provider_status: tuple = ()
     _startup_ready: bool = False
-    _requested_provider: str | None = None
-    _active_provider: str | None = None
 
     def submit(self, request: InferenceRequest) -> Future[dict[str, Observation]]:
         return self._service.submit(client=self, request=request)
@@ -82,7 +88,7 @@ class InferenceService:
     Round-robin within each mode. After three realtime requests, ready posthoc
     work receives a turn. Requests are never combined across clients. Source
     adapters select the newest live frame before submitting; posthoc adapters
-    submit every ordinal. Model and detector lifetime stays on this thread.
+    submit every ordinal. Each client's run starts and closes on this thread.
     """
 
     def __init__(self, *, worker_registry: WorkerRegistry) -> None:
@@ -107,14 +113,7 @@ class InferenceService:
             if any(client.registration.pipeline_id == registration.pipeline_id and not client._closed
                    for client in self._clients):
                 raise ValueError(f"Inference already registered for pipeline {registration.pipeline_id}")
-            snapshot = InferenceRegistration(
-                pipeline_id=registration.pipeline_id, mode=registration.mode,
-                tracker_config=registration.tracker_config.model_copy(deep=True),
-                sessions=tuple(SessionRequest(session_type=item.session_type, config=item.config.model_copy(deep=True))
-                               for item in registration.sessions),
-                shutdown_flag=registration.shutdown_flag,
-            )
-            client = InferenceClient(registration=snapshot, _service=self)
+            client = InferenceClient(registration=registration, _service=self)
             self._clients.append(client)
             self._record_startup(client, "waiting_for_frames", "Waiting for the first camera frame")
             return client
@@ -150,34 +149,17 @@ class InferenceService:
             record = self._startup_records.get(pipeline_id)
             return record is not None and record["phase"] == "running"
 
-    def _initial_sessions(self, client: InferenceClient) -> tuple[SessionRequest, ...]:
-        requests = []
-        for request in client.registration.sessions:
-            config = request.config
-            if config.backend == "onnx":
-                client._requested_provider = config.execution_provider
-                client._active_provider = config.execution_provider
-                if config.execution_provider in (None, "trt"):
-                    from freemocap.core.tracking.execution_providers import application_provider
-                    safe = application_provider(config.execution_provider)
-                    client._active_provider = safe
-                    config = config.model_copy(deep=True)
-                    config.execution_provider = safe
-                    request = SessionRequest(session_type=request.session_type, config=config)
-            requests.append(request)
-        return tuple(requests)
-
-    def _inspect_client_providers(self, client: InferenceClient) -> tuple:
-        from freemocap.core.tracking.execution_providers import inspect_tracker_providers
-        requests = []
-        for request in client.registration.sessions:
-            if request.config.backend == "onnx" and client._active_provider is not None:
-                config = request.config.model_copy(deep=True)
-                config.execution_provider = client._active_provider
-                request = SessionRequest(session_type=request.session_type, config=config)
-            requests.append(request)
-        statuses = inspect_tracker_providers(client._lease.tracker, tuple(requests))
-        return tuple(replace(item, requested_provider=client._requested_provider) for item in statuses)
+    @staticmethod
+    def _start_run(client: InferenceClient):
+        registration = client.registration
+        run, provider = start_detector_run(
+            detector_type=registration.detector_type, camera_ids=registration.camera_ids,
+            running_mode=RUNNING_MODES[registration.mode.value],
+            rtmpose_model_name=registration.rtmpose_model_name, execution_provider=registration.execution_provider)
+        from freemocap.core.tracking.execution_providers import ModelProviderStatus
+        statuses = tuple(ModelProviderStatus(model["key"], registration.execution_provider, (provider,))
+                         for model in run.models.values()) if provider is not None else ()
+        return run, statuses
 
     def submit(self, *, client: InferenceClient, request: InferenceRequest) -> Future[dict[str, Observation]]:
         with self._condition:
@@ -189,6 +171,8 @@ class InferenceService:
                 raise RuntimeError("Wait for the outstanding inference request before submitting another")
             if not request.images or request.frame_number <= client._last_frame:
                 raise ValueError("Inference requires nonempty images and increasing frame numbers")
+            if request.timestamps_ms.keys() != request.images.keys():
+                raise ValueError("Inference requires one timestamp for each camera image")
             if client.registration.mode == InferenceMode.POSTHOC and request.frame_number != client._last_frame + 1:
                 raise ValueError("Posthoc inference requires consecutive frame numbers starting at zero")
             pending = PendingInference(request=request)
@@ -221,7 +205,7 @@ class InferenceService:
         return client
 
     def _run(self) -> None:
-        pool = SharedSessionPool()
+        from skellytracker.core.pipelines import Frame
         try:
             while not self._shutdown.value:
                 with self._condition:
@@ -236,11 +220,11 @@ class InferenceService:
                         client._pending = None
                         client._active = pending
                 for retired_client in retired:
-                    if retired_client._lease is not None:
-                        retired_client._lease.close()
+                    if retired_client._run is not None:
+                        retired_client._run.close()
                 if client is None or pending is None:
                     with self._condition:
-                        # Submission and retirement can occur while leases are released.
+                        # Submission and retirement can occur while runs are closed.
                         # Check the queue under the condition lock before sleeping.
                         if not self._shutdown.value and not any(
                             item._pending is not None or item._closed or item.registration.shutdown_flag.value
@@ -260,24 +244,20 @@ class InferenceService:
                     performance = pending.request.performance
                     if performance is not None:
                         performance.record("inference.queue_wait", perf_counter() - pending.submitted_at)
-                    if client._lease is None:
+                    if client._run is None:
                         self._record_startup(client, "loading_models", "Loading tracking models")
                         with performance.measure("inference.session_setup") if performance is not None else nullcontext():
-                            initial_sessions = self._initial_sessions(client)
-                            client._lease = pool.create_tracker(
-                                config=client.registration.tracker_config, requests=initial_sessions,
-                                **({"progress": lambda phase, model: self._record_startup(client, phase, model)}
-                                   if any(item.config.backend == "onnx" for item in client.registration.sessions) else {}),
-                            )
-                            statuses = self._inspect_client_providers(client)
+                            client._run, statuses = self._start_run(client)
                             with self._condition:
                                 client.provider_status = statuses
                             self._record_startup(client, "waiting_for_first_result", "Processing the first camera frame")
-                    with performance.measure(f"inference.process_batch.images={len(pending.request.images)}") if performance is not None else nullcontext():
-                        observations, client._states = client._lease.tracker.process_batch(
-                            images=pending.request.images, frame_number=pending.request.frame_number, states=client._states,
-                            **({"timestamp_ms": pending.request.timestamp_ms} if pending.request.timestamp_ms is not None else {}),
-                        )
+                    request = pending.request
+                    with performance.measure(f"inference.process_batch.images={len(request.images)}") if performance is not None else nullcontext():
+                        results = client._run.process_batch({
+                            camera: Frame(image, frame_index=request.frame_number, timestamp_ms=request.timestamps_ms[camera])
+                            for camera, image in request.images.items()})
+                        observations = observations_from_results(results, client._run.output_schema,
+                                                                 client.registration.detector_type)
                     if observations.keys() != pending.request.images.keys():
                         raise ValueError("Inference results do not match the requested sources")
                     if any(observation.frame_number != pending.request.frame_number for observation in observations.values()):
@@ -310,9 +290,12 @@ class InferenceService:
                     for pending in (client._pending, client._active):
                         if pending is not None and not pending.result.done():
                             pending.result.set_exception(client.failure)
+                remaining = list(self._clients)
                 self._clients.clear()
                 self._condition.notify_all()
-            pool.close()
+            for client in remaining:
+                if client._run is not None:
+                    client._run.close()
 
     def provider_status(self) -> list[dict]:
         """Read immutable startup diagnostics without touching native sessions."""

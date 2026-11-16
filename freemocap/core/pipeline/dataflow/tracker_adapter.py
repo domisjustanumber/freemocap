@@ -12,9 +12,7 @@ from multiprocessing.sharedctypes import Synchronized
 
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 from skellycam.core.ipc.process_management.managed_worker import WorkerMode
-from skellytracker.core import TrackerConfig
 from skellytracker.core.data_primitives.observation import Observation
-from skellytracker.core.sessions.execution_provider_name import ExecutionProviderName
 
 from freemocap.core.pipeline.dataflow.camera_join import CameraFrameKey, ProducerOutcome
 from freemocap.core.pipeline.dataflow.video_sources import (
@@ -24,7 +22,6 @@ from freemocap.core.pipeline.inference_service import (
     InferenceMode, InferenceRegistration, InferenceRequest, InferenceService,
 )
 from freemocap.core.pipeline.performance_report import PerformanceReport
-from freemocap.core.tracking.tracker_factory import tracker_session_requests
 
 
 @dataclass(frozen=True)
@@ -49,16 +46,32 @@ def recording_timestamps_ms(sources: RecordingVideoSources) -> tuple[int, ...]:
     return result
 
 
+class CameraSourceEndedError(RuntimeError):
+    """A camera has no frame for a batch, so the recording run cannot take that batch."""
+
+
+def require_every_camera(batch_cameras, run_cameras, frame_number: int) -> None:
+    """A `video` run takes a frame from each of its cameras on each call (skellytracker V-pipeline.running-2).
+
+    shortcut: one failed camera stops the recording; if the user accepts V2 (a call may leave out an
+    ended camera), drop this check.
+    """
+    missing = [camera for camera in run_cameras if camera not in batch_cameras]
+    if missing:
+        raise CameraSourceEndedError(
+            f"Tracking stopped at frame {frame_number}: camera {', '.join(missing)} has no frame there, and the "
+            f"recording run needs a frame from every camera on each frame")
+
+
 class SkellyTrackerAdapter:
-    def __init__(self, *, inference_service: InferenceService,
-                 tracker_config: TrackerConfig, performance_report: PerformanceReport,
-                 execution_provider: ExecutionProviderName | None = None,
-                 mediapipe_disable_gpu: bool | None = None) -> None:
+    def __init__(self, *, inference_service: InferenceService, detector_type: str,
+                 performance_report: PerformanceReport, rtmpose_model_name: str | None = None,
+                 execution_provider: str | None = None) -> None:
         self.inference_service = inference_service
-        self.tracker_config = tracker_config.model_copy(deep=True)
+        self.detector_type = detector_type
+        self.rtmpose_model_name = rtmpose_model_name
         self.performance_report = performance_report
         self.execution_provider = execution_provider
-        self.mediapipe_disable_gpu = mediapipe_disable_gpu
 
     def track_recording(self, *, sources: RecordingVideoSources, execution_id: str,
                         shutdown_flag: Synchronized, queued_frames_per_camera: int = 2,
@@ -73,16 +86,13 @@ class SkellyTrackerAdapter:
         """
         client_shutdown = multiprocessing.Value("b", False)
         timestamps_ms = recording_timestamps_ms(sources)
-        camera_count = len(sources.camera_sources)
+        active_cameras = [source.camera_id for source in sources.camera_sources]
         client = self.inference_service.register(InferenceRegistration(
             pipeline_id=execution_id, mode=InferenceMode.POSTHOC,
-            tracker_config=self.tracker_config,
-            sessions=tracker_session_requests(config=self.tracker_config, batch_size=camera_count,
-                                              execution_provider=self.execution_provider,
-                                              mediapipe_disable_gpu=self.mediapipe_disable_gpu),
+            detector_type=self.detector_type, camera_ids=tuple(active_cameras),
+            rtmpose_model_name=self.rtmpose_model_name, execution_provider=self.execution_provider,
             shutdown_flag=client_shutdown,
         ))
-        active_cameras = [source.camera_id for source in sources.camera_sources]
         frame_count = sources.camera_sources[0].video_metadata.frame_count
         try:
             # Registry public cleanup is all-dead, not owner-scoped. Keep reader
@@ -111,13 +121,14 @@ class SkellyTrackerAdapter:
                     yield from source_outcomes
                     if not batch_frames:
                         break
+                    require_every_camera(batch_frames, client.registration.camera_ids, frame_number)
                     if shutdown_flag.value:
                         raise CancelledError("Graph execution cancelled before inference")
                     future = client.submit(InferenceRequest(
                         frame_number=frame_number,
                         images={camera: frame.image_bgr for camera, frame in batch_frames.items()},
+                        timestamps_ms={camera: timestamps_ms[frame_number] for camera in batch_frames},
                         performance=self.performance_report,
-                        timestamp_ms=timestamps_ms[frame_number],
                     ))
                     while True:
                         try:

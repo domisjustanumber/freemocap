@@ -51,18 +51,13 @@ def validate_application_graph(*, config: PosthocMocapPipelineConfig) -> None:
 
 
 def resolve_tracking_provider(config: PosthocMocapPipelineConfig) -> str:
-    """Preserve CUDA preference; otherwise use Tracker's accelerator discovery."""
+    """The user's EP key, or for Auto the skellytracker recommendation. MediaPipe takes no EP."""
     if config.detector_type == 'mediapipe':
         return 'cpu'
     provider = config.execution_provider or config.graph_execution_provider
     if provider == 'auto' and config.start_stage == 'observations':
-        from skellytracker.core.sessions.ort_session_utils import auto_detect_provider, provider_loads
-        # Preserve the application's CUDA preference over cold TensorRT builds.
-        # Other hardware uses Tracker's existing discovery, including Apple CoreML.
-        # Installed is not loadable: onnxruntime-gpu lists CUDA on machines without NVIDIA.
-        if provider_loads('cuda'):
-            return 'cuda'
-        return auto_detect_provider()
+        from freemocap.core.tracking.pipeline_runs import run_execution_provider
+        return run_execution_provider(provider)
     return provider
 
 

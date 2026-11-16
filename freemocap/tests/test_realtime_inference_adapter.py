@@ -65,9 +65,11 @@ class RealtimeInferenceAdapterTests(unittest.TestCase):
                     result = results.get(timeout=2)
                     self.assertEqual(result.frame_number, 7)
                     self.assertEqual(set(result.per_camera_skeleton), set(camera_ids))
-                    self.assertEqual(client.submit.call_args.args[0].timestamp_ms, 1003)
+                    self.assertEqual(client.submit.call_args.args[0].timestamps_ms,
+                                     {"left": 1001.0, "right": 1003.0, "overhead": 1005.0})
                     registration = service.register.call_args.args[0]
                     self.assertEqual(registration.mode, InferenceMode.REALTIME)
+                    self.assertEqual((registration.detector_type, registration.camera_ids), (detector, tuple(camera_ids)))
                     self.assertEqual(registration.pipeline_id, ipc.pipeline_id)
                     client.close.assert_called_once()
                 finally:

@@ -49,6 +49,7 @@ from freemocap.core.tasks.calibration.shared.calibration_update import Calibrati
 from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
 from freemocap.core.tasks.triangulation.helpers.reprojection_diagnostics import NamedReprojectionDiagnostics
 from freemocap.core.tracking.board_selection import CharucoBoardMode
+from freemocap.core.tracking.execution_providers import EXECUTION_PROVIDERS
 from freemocap.core.tracking.tracker_definitions import MEDIAPIPE_WHOLEBODY_DEFINITION
 from freemocap.core.types.channel_kind import ChannelKind
 from freemocap.system.recording_structure.recording_structure import RecordingStructure
@@ -72,8 +73,8 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
     config = config.model_copy(deep=True)
     structure = RecordingStructure(base_directory=sources.recording_path.parent, recording_name=sources.recording_path.name)
     run_session = run_session or RunSaveSession.resolve(structure=structure, source_run_id=config.base_run_id, mode=config.run_save_mode)
-    if observation_loader is None and (execution_provider not in ("cpu", "cuda", "trt", "coreml", "directml") or (config.detector_type == "mediapipe" and execution_provider != "cpu")):
-        raise ValueError("Choose a supported ONNX provider for RTMPose; the installed MediaPipe adapter supports CPU only")
+    if observation_loader is None and execution_provider not in EXECUTION_PROVIDERS:
+        raise ValueError(f"Choose one of the execution providers {EXECUTION_PROVIDERS}")
     if config.start_stage not in ('observations', 'triangulation') or config.export_to_blender:
         raise ValueError("Recording graph requires observations or triangulation start and Blender export disabled")
     if config.start_stage == 'triangulation' and observation_loader is None:
@@ -151,9 +152,9 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
         service = InferenceService(worker_registry=registry)
         service.start()
         try:
-            adapter = SkellyTrackerAdapter(inference_service=service, tracker_config=tracker_config,
-                performance_report=performance, execution_provider=execution_provider,
-                mediapipe_disable_gpu=True if config.detector_type == "mediapipe" else None)
+            adapter = SkellyTrackerAdapter(inference_service=service, detector_type=config.detector_type,
+                rtmpose_model_name=config.rtmpose_model_name, performance_report=performance,
+                execution_provider=execution_provider)
             with closing(adapter.track_recording(sources=sources, execution_id="recording-graph", shutdown_flag=shutdown_flag)) as events:
                 camera_frame_count = 0
                 tracked_frames_per_camera = {source.camera_id: 0 for source in sources.camera_sources}

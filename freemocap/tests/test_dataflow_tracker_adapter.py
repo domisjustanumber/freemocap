@@ -5,11 +5,10 @@ from threading import Event, Lock
 import unittest
 from unittest.mock import Mock, patch
 
-from skellytracker.core import TrackerConfig
+import pytest
 from skellytracker.core.data_primitives.observation import Observation
-from skellytracker.core.tracker.tracker_state import TrackerState
 
-from freemocap.core.pipeline.dataflow.tracker_adapter import SkellyTrackerAdapter, TrackedCameraFrame
+from freemocap.core.pipeline.dataflow.tracker_adapter import CameraSourceEndedError, SkellyTrackerAdapter, TrackedCameraFrame
 from freemocap.core.pipeline.dataflow.video_sources import VideoSourceFinished
 from freemocap.core.pipeline.inference_service import InferenceService
 from freemocap.core.pipeline.performance_report import PerformanceReport
@@ -19,28 +18,27 @@ from freemocap.tests import test_dataflow_video_sources as source_tests
 class TrackerAdapterTests(unittest.TestCase):
     setUp = source_tests.VideoSourceTests.setUp
 
-    def make_adapter(self, infer):
-        pool = Mock()
-        lease = Mock()
-        lease.tracker.process_batch.side_effect = infer
-        pool.create_tracker.return_value = lease
-        pool_patch = patch("freemocap.core.pipeline.inference_service.SharedSessionPool", return_value=pool)
-        pool_patch.start()
-        self.addCleanup(pool_patch.stop)
-        requests = patch("freemocap.core.pipeline.dataflow.tracker_adapter.tracker_session_requests", return_value=())
-        requests.start()
-        self.addCleanup(requests.stop)
+    def make_adapter(self, infer, detector_type="rtmpose"):
+        """`infer(frames)` stands in for the run; its results are already observations."""
+        run = Mock(models={})
+        run.process_batch.side_effect = infer
+        for target, replacement in (("start_detector_run", lambda **kwargs: (run, None)),
+                                    ("observations_from_results", lambda results, schema, detector: results)):
+            patcher = patch(f"freemocap.core.pipeline.inference_service.{target}", side_effect=replacement)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        return self.real_adapter(detector_type)
+
+    def real_adapter(self, detector_type="mediapipe"):
         service = InferenceService(worker_registry=self.registry)
         service.start()
         self.addCleanup(service.close)
-        report = PerformanceReport()
-        return SkellyTrackerAdapter(inference_service=service,
-                                    tracker_config=TrackerConfig(stages=[]), performance_report=report)
+        return SkellyTrackerAdapter(inference_service=service, detector_type=detector_type, performance_report=PerformanceReport())
 
     @staticmethod
-    def infer(*, images, frame_number, states, timestamp_ms=None):
-        return ({camera: Observation(frame_number=frame_number, image_size=image.shape[:2], stages={})
-                 for camera, image in images.items()}, {camera: TrackerState() for camera in images})
+    def infer(frames):
+        return {camera: Observation(frame_number=frame.frame_index, image_size=frame.image.shape[:2], stages={})
+                for camera, frame in frames.items()}
 
     def stream(self, adapter):
         return adapter.track_recording(sources=self.sources, execution_id="test-tracking",
@@ -71,18 +69,17 @@ class TrackerAdapterTests(unittest.TestCase):
 
         calls = []
 
-        def infer(**kwargs):
-            frame = kwargs["frame_number"]
-            self.assertEqual(kwargs["timestamp_ms"], round(frame * 1000 / 30))
+        def infer(frames):
+            frame = next(iter(frames.values())).frame_index
+            self.assertEqual({item.frame_index for item in frames.values()}, {frame})
+            self.assertEqual({item.timestamp_ms for item in frames.values()}, {round(frame * 1000 / 30)})
             calls.append(frame)
             if frame == 0:
                 self.assertTrue(all_loaded_ahead.wait(3), "Loading should overlap active inference")
                 with lock:
                     self.assertEqual(dict(counts), {source.camera_id: 3 for source in self.sources.camera_sources})
                 # At most active + one queued + one reader-local image per camera.
-            if frame > 0:
-                self.assertEqual(set(kwargs["states"]), set(kwargs["images"]))
-            return self.infer(**kwargs)
+            return self.infer(frames)
 
         adapter = self.make_adapter(infer)
         with patch.object(video_sources, "SequentialVideoReader", ObservedReader):
@@ -94,17 +91,18 @@ class TrackerAdapterTests(unittest.TestCase):
 
     def test_report_counts_actual_detector_runs_separately_from_camera_images(self):
         from skellytracker.core.data_primitives.observation import StageObservation
-        def infer(**kwargs):
-            observations, states = self.infer(**kwargs)
+        def infer(frames):
+            observations = self.infer(frames)
             for observation in observations.values():
-                observation.stages["body"] = StageObservation(name="body", detector_ran=kwargs["frame_number"] % 3 == 0)
-            return observations, states
+                observation.stages["body"] = StageObservation(name="body", detector_ran=observation.frame_number % 3 == 0)
+            return observations
         adapter = self.make_adapter(infer)
         list(self.stream(adapter))
         self.assertEqual(adapter.performance_report.counts_snapshot(), {
             "tracking.body.camera_images": 24, "tracking.body.object_detector_runs": 9})
 
-    def test_source_failure_keeps_healthy_camera_tracking(self):
+    @staticmethod
+    def failing_reader():
         from freemocap.core.pipeline.dataflow import video_sources
         original_reader = video_sources.SequentialVideoReader
 
@@ -121,8 +119,24 @@ class TrackerAdapterTests(unittest.TestCase):
             def close(self):
                 self.reader.close()
 
+        return patch.object(video_sources, "SequentialVideoReader", FailingReader)
+
+    def test_a_source_failure_stops_the_recording_run_with_the_camera_and_frame(self):
+        """A `video` run takes a frame from each camera on each call (skellytracker V-pipeline.running-2)."""
+        from freemocap.core.pipeline.dataflow.tracker_adapter import CameraSourceEndedError
+        adapter = self.real_adapter()
+        events = []
+        with self.failing_reader(), self.assertRaisesRegex(CameraSourceEndedError, "frame 2: camera camera1.avi"):
+            for event in self.stream(adapter):
+                events.append(event)
+        counts = Counter(event.frame_key.camera for event in events if isinstance(event, TrackedCameraFrame))
+        self.assertEqual(counts, {"camera0.avi": 2, "camera1.avi": 2, "camera2.avi": 2})
+        self.assertFalse(self.shutdown.value)
+
+    @pytest.mark.xfail(reason="waits for V2", strict=True, raises=CameraSourceEndedError)
+    def test_source_failure_keeps_healthy_camera_tracking(self):
         adapter = self.make_adapter(self.infer)
-        with patch.object(video_sources, "SequentialVideoReader", FailingReader):
+        with self.failing_reader():
             events = list(self.stream(adapter))
         counts = Counter(event.frame_key.camera for event in events if isinstance(event, TrackedCameraFrame))
         self.assertEqual(counts, {"camera0.avi": 8, "camera1.avi": 2, "camera2.avi": 8})
@@ -146,9 +160,9 @@ class TrackerAdapterTests(unittest.TestCase):
     def test_cancelled_graph_does_not_emit_finished_inference_results(self):
         from concurrent.futures import CancelledError
 
-        def infer(**kwargs):
+        def infer(frames):
             self.shutdown.value = True
-            return self.infer(**kwargs)
+            return self.infer(frames)
 
         adapter = self.make_adapter(infer)
         with self.assertRaises(CancelledError):
@@ -163,25 +177,13 @@ class TrackerAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "millisecond"):
             recording_timestamps_ms(replace(self.sources, group_timing=timing))
 
-    def test_installed_skellytracker_cpu_detector_runs_without_mocked_inference(self):
-        from skellytracker.core import DetectionStageConfig
-        from skellytracker.core.detectors.keypoint_detectors.charuco import CharucoDetectorConfig
-        service = InferenceService(worker_registry=self.registry)
-        service.start()
-        try:
-            adapter = SkellyTrackerAdapter(
-                inference_service=service,
-                tracker_config=TrackerConfig(stages=[DetectionStageConfig(
-                    name="board", keypoint_detectors=[CharucoDetectorConfig()],
-                )]), performance_report=PerformanceReport(),
-            )
-            events = list(self.stream(adapter))
-            tracked = [event for event in events if isinstance(event, TrackedCameraFrame)]
-            self.assertEqual(len(tracked), 24)
-            self.assertTrue(all("board" in event.observation.stages for event in tracked))
-            self.assertEqual(adapter.performance_report.snapshot()["inference.process_batch.images=3"]["count"], 8)
-        finally:
-            service.close()
+    def test_installed_skellytracker_holistic_run_works_without_mocked_inference(self):
+        adapter = self.real_adapter()
+        events = list(self.stream(adapter))
+        tracked = [event for event in events if isinstance(event, TrackedCameraFrame)]
+        self.assertEqual(len(tracked), 24)
+        self.assertTrue(all("body" in event.observation.stages for event in tracked))
+        self.assertEqual(adapter.performance_report.snapshot()["inference.process_batch.images=3"]["count"], 8)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 from skellycam.core.types.numpy_record_dtypes import FRAME_METADATA_DTYPE
-from freemocap.core.tracking.capture_timing import tracker_capture_timestamp_ms
+from freemocap.core.tracking.capture_timing import capture_timestamp_ms
 
 
 def frame(before, after):
@@ -11,16 +11,15 @@ def frame(before, after):
     return record
 
 
-def test_inference_time_uses_capture_midpoints_and_retains_skipped_frame_duration():
-    records = [frame(1_000_000_000, 1_002_000_000), frame(1_002_000_000, 1_004_000_000)]
-    assert tracker_capture_timestamp_ms(records) == 1002
-    for record in records:
-        record.frame_metadata.frame_number = 9999  # Scheduling identity is not elapsed time.
-    assert tracker_capture_timestamp_ms(records) == 1002
-    later = [frame(1_100_000_000, 1_102_000_000), frame(1_102_000_000, 1_104_000_000)]
-    assert tracker_capture_timestamp_ms(later) - tracker_capture_timestamp_ms(records) == 100
+def test_each_camera_gets_its_own_capture_midpoint_and_keeps_skipped_frame_duration():
+    first, second = frame(1_000_000_000, 1_002_000_000), frame(1_002_000_000, 1_004_500_000)
+    assert capture_timestamp_ms(first) == 1001.0
+    assert capture_timestamp_ms(second) == 1003.25
+    first.frame_metadata.frame_number = 9999  # Scheduling identity is not elapsed time.
+    assert capture_timestamp_ms(first) == 1001.0
+    assert capture_timestamp_ms(frame(1_100_000_000, 1_102_000_000)) - capture_timestamp_ms(first) == 100.0
 
 
 def test_invalid_capture_timing_is_rejected():
-    with pytest.raises(ValueError): tracker_capture_timestamp_ms([])
-    with pytest.raises(ValueError): tracker_capture_timestamp_ms([frame(20, 10)])
+    with pytest.raises(ValueError): capture_timestamp_ms(frame(20, 10))
+    with pytest.raises(ValueError): capture_timestamp_ms(frame(-1, 10))

@@ -9,7 +9,7 @@ from skellytracker.core import TrackerConfig
 from skellytracker.core.detectors.keypoint_detectors.mediapipe.mediapipe_model_manager import (
     MediapipePoseModelComplexity,
 )
-from skellytracker.core.sessions.execution_provider_name import ExecutionProviderName
+from freemocap.core.tracking.execution_providers import RequestedExecutionProvider
 
 from freemocap.core.tasks.triangulation.helpers.triangulation_config import TriangulationConfig
 from freemocap.core.tasks.calibration.camera_matching.matching_models import CameraMatchingConfig
@@ -88,7 +88,7 @@ class PosthocMocapPipelineConfig(BaseModel):
             "~96% of visible keypoints. Only used when detector_type='rtmpose'."
         ),
     )
-    execution_provider: ExecutionProviderName | None = Field(
+    execution_provider: RequestedExecutionProvider = Field(
         default=None,
         alias="executionProvider",
         description="ONNX Runtime execution provider for RTMPose. None retains the selected pipeline automatic policy; an explicit choice raises if it cannot load.",

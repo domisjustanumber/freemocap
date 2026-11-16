@@ -8,8 +8,7 @@ from queue import Empty
 from concurrent.futures import CancelledError, TimeoutError
 from skellycam.core.ipc.process_management.managed_worker import WorkerMode
 from freemocap.core.pipeline.inference_service import InferenceService, InferenceMode, InferenceRegistration, InferenceRequest
-from freemocap.core.tracking.tracker_factory import tracker_session_requests
-from freemocap.core.tracking.capture_timing import tracker_capture_timestamp_ms
+from freemocap.core.tracking.capture_timing import capture_timestamp_ms
 
 import cv2
 import numpy as np
@@ -145,13 +144,11 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                 cleanup.callback(camera_shm.close)
 
             settings = pipeline_config.camera_node_config
-            from freemocap.core.tracking.tracker_factory import tracker_config_for_settings
-            tracker_config = tracker_config_for_settings(settings)
             client = inference_service.register(InferenceRegistration(
                 pipeline_id=ipc.pipeline_id, mode=InferenceMode.REALTIME,
-                tracker_config=tracker_config,
-                sessions=tracker_session_requests(config=tracker_config, batch_size=len(camera_ids),
-                    execution_provider=pipeline_config.skeleton_inference_node_config.execution_provider),
+                detector_type=settings.detector_type, camera_ids=tuple(camera_ids),
+                rtmpose_model_name=settings.rtmpose_model_name,
+                execution_provider=pipeline_config.skeleton_inference_node_config.execution_provider,
                 shutdown_flag=ipc.pipeline_shutdown_flag,
             ))
 
@@ -242,8 +239,7 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                         for cam_id, img in zip(ordered_camera_ids, images)
                     }
                     result = client.submit(InferenceRequest(frame_number=requested_frame_number, images=images_dict,
-                        timestamp_ms=tracker_capture_timestamp_ms(
-                            [frame_recarrays[cam_id] for cam_id in ordered_camera_ids])))
+                        timestamps_ms={cam_id: capture_timestamp_ms(frame_recarrays[cam_id]) for cam_id in ordered_camera_ids}))
                     observations = _await_inference_result(result, ipc, shutdown_self_flag)
                     if observations is None:
                         return

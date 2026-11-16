@@ -134,6 +134,15 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
   - Part 2, after the supervisor's message: usable flag, install hint, GPU flag, order, description,
     devices (UI device list: key, name, VRAM), the applied EP of `/onnx/session_providers`, and the
     `app/app.py` probe per the verdict.
+    Also (supervisor, 2026-11-16): the server sends "takes an EP" per detector (from
+    `pipeline_runs.detector_takes_execution_provider`) and the UI shows the EP row from that flag; remove
+    the two detector-name checks (`detector-setting-rows.tsx:111`,
+    `realtimepipeline-mediapipedetector-settings.tsx:73`); reword the comments
+    `realtime_skeleton_inference_node_config.py:8` and `pipeline_runs.py:73`; saved retired keys per §0.3
+    E2 (the user's choice for a key that cannot be honoured, Auto with a notice or fail at start, comes
+    with the part 2 message). Confirmed: 57be4131 (ignore the EP choice for a pipeline with no EP).
+    Done early (part 3 docs, allowed): `gpu-setup.mdx` "How GPU Detection Works" and
+    `backend-overview.mdx:85` no longer name nvidia-smi; the rest of those pages stays for part 3.
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).

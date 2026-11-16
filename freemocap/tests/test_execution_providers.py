@@ -30,18 +30,18 @@ def test_saved_graph_provider_loads_and_is_not_written_again():
     assert config.execution_provider == 'cpu' and 'graphExecutionProvider' not in config.model_dump(by_alias=True)
 
 
-def test_provider_route_lists_the_usable_v2_keys_without_loading_models():
+def test_provider_route_lists_the_key_and_label_of_each_usable_ep_in_skellytracker_order_without_loading_models():
     from freemocap.api.http.onnx.onnx_router import onnx_router
     from skellytracker.core import eps
     app = FastAPI()
     app.include_router(onnx_router, prefix='/freemocap')
-    rows = (SimpleNamespace(key='cpu', state='builtin'), SimpleNamespace(key='gpu-ep', state='not_installed'),
-            SimpleNamespace(key='other-ep', state='ready'))
+    rows = (SimpleNamespace(key='other-ep', label='Other EP', state='ready'),
+            SimpleNamespace(key='gpu-ep', label='GPU EP', state='not_installed'), SimpleNamespace(key='cpu', label='CPU', state='builtin'))
     with patch.object(eps, 'status', return_value=SimpleNamespace(eps=rows)), \
          patch('onnxruntime.InferenceSession') as construct:
         response = TestClient(app).get('/freemocap/onnx/execution_providers')
     assert response.status_code == 200
-    assert response.json() == {'available': ['cpu', 'other-ep']}
+    assert response.json() == {'available': [{'key': 'other-ep', 'label': 'Other EP'}, {'key': 'cpu', 'label': 'CPU'}]}
     construct.assert_not_called()
 
 

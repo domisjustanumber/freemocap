@@ -1,14 +1,14 @@
 import {useEffect, useState} from "react";
 import {serverUrls} from "@/services";
 import {useAppSelector} from "@/store/hooks";
-import type {ExecutionProviderName} from "@/types/execution-provider";
+import type {ExecutionProviderName, ExecutionProviderOption} from "@/types/execution-provider";
 import {requestExecutionProviders, executionProviderOptions} from "@/services/server/execution-providers";
 
 /** Query the connected server again after reconnects or server changes. */
 export function useExecutionProviderOptions(selected: ExecutionProviderName | null) {
     const {isConnected, serverPid} = useAppSelector(state => state.connection);
     const endpoint = serverUrls.getHttpUrl();
-    const [loaded, setLoaded] = useState<{key: string; providers: ExecutionProviderName[]} | null>(null);
+    const [loaded, setLoaded] = useState<{key: string; providers: ExecutionProviderOption[]} | null>(null);
     const key = `${endpoint}:${serverPid}:${isConnected}`;
     useEffect(() => {
         setLoaded(null);

@@ -35,7 +35,6 @@ export interface PosthocFilterConfig {
 
 export type DetectorType = "rtmpose" | "mediapipe";
 export type RTMPoseModelName = "rtmw-x-l_256x192" | "rtmw-x-l_384x288" | "rtmw-l-m_256x192";
-export {EXECUTION_PROVIDERS} from '@/types/execution-provider';
 export type {ExecutionProviderName} from '@/types/execution-provider';
 
 /** Exported after processing unless turned off; the recording's Parquet file is always written. */

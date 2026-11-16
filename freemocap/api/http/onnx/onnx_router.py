@@ -8,17 +8,22 @@ logger = logging.getLogger(__name__)
 onnx_router = APIRouter(prefix="/onnx", tags=["ONNX"])
 
 
+class ExecutionProviderOption(BaseModel):
+    key: str
+    label: str
+
+
 class AvailableExecutionProvidersResponse(BaseModel):
-    available: list[str]
+    available: list[ExecutionProviderOption]
 
 
 @onnx_router.get("/execution_providers")
 def get_available_execution_providers() -> AvailableExecutionProvidersResponse:
-    """List the v2 EP keys usable on this host; the run checks its EP again when it starts."""
+    """The key and label of each EP usable on this host, in skellytracker's order; the run checks its EP again when it starts."""
     try:
-        from freemocap.core.tracking.execution_providers import usable_execution_providers
-        available = usable_execution_providers()
-        return AvailableExecutionProvidersResponse(available=available)
+        from freemocap.core.tracking.execution_providers import usable_execution_provider_rows
+        return AvailableExecutionProvidersResponse(available=[
+            ExecutionProviderOption(key=row.key, label=row.label) for row in usable_execution_provider_rows()])
     except Exception as e:
         logger.exception(f"Error listing ONNX execution providers: {e}")
         raise HTTPException(status_code=500, detail=str(e))

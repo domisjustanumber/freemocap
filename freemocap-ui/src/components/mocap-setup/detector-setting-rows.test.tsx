@@ -6,7 +6,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 // The store import follows the application entry order: the detector rows take their model list from the mocap slice.
 import '@/store';
 import type {DetectorType, TriangulationConfig} from '@/store/slices/mocap';
-import {EXECUTION_PROVIDERS} from '@/types/execution-provider';
+import {executionProviderOptions} from '@/services/server/execution-providers';
 import {DETECTOR_OPTIONS} from './detector-options';
 import {
     CONFIDENCE_INFO, DETECTOR_INFO, DetectorSettingRows, type DetectorSettingsValue, EXECUTION_PROVIDER_INFO, MODEL_INFO,
@@ -31,7 +31,7 @@ const OUTLIER_LIMITS = ['Minimum cameras for triangulation', 'Maximum cameras to
 
 /** The detector rows' props as the realtime controls pass them, for one detector. */
 const detectorProps = (detector: DetectorType, rows: 'all' | 'key', more: Partial<DetectorRowsProps> = {}): DetectorRowsProps => ({
-    value: {...VALUE, detector}, onChange: () => {}, detectors: DETECTOR_OPTIONS, providerOptions: EXECUTION_PROVIDERS,
+    value: {...VALUE, detector}, onChange: () => {}, detectors: DETECTOR_OPTIONS, providerOptions: executionProviderOptions(null, [{key: 'cpu', label: 'CPU'}]),
     context: 'realtime', rows, ...more,
 });
 const detectorRows = (detector: DetectorType, rows: 'all' | 'key', more?: Partial<DetectorRowsProps>): string =>

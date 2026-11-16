@@ -3382,7 +3382,7 @@
         "properties": {
           "available": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/ExecutionProviderOption"
             },
             "type": "array",
             "title": "Available"
@@ -5277,6 +5277,24 @@
           "microphones"
         ],
         "title": "DetectedMicrophonesResponse"
+      },
+      "ExecutionProviderOption": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "ExecutionProviderOption"
       },
       "ExportInventory": {
         "properties": {

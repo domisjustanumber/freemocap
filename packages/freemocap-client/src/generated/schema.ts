@@ -1213,7 +1213,7 @@ export interface components {
         /** AvailableExecutionProvidersResponse */
         AvailableExecutionProvidersResponse: {
             /** Available */
-            available: string[];
+            available: components["schemas"]["ExecutionProviderOption"][];
         };
         /**
          * BackgroundTaskSnapshot
@@ -2115,6 +2115,13 @@ export interface components {
             microphones: {
                 [key: string]: string;
             };
+        };
+        /** ExecutionProviderOption */
+        ExecutionProviderOption: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
         };
         /** ExportInventory */
         ExportInventory: {

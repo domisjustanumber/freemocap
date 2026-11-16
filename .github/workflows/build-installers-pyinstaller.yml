@@ -541,8 +541,8 @@ jobs:
               cp "$file" "release-assets/freemocap_${VERSION}_${label}.${ext}"
             done
           done
-          # Copies under the old names (`-cpu`, `-cuda`, `macos-arm64-apple-silicon`) would go here; none
-          # until the user decides (2026-11-16). Installs of every old name read the same latest*.yml.
+          # No copies under the old names (`-cpu`, `-cuda`): installs of every old name update through
+          # the same latest*.yml (user F2b, 2026-11-16).
 
           echo "=== GitHub-bound release assets ==="
           ls -lh release-assets/

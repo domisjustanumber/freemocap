@@ -59,13 +59,19 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
   Possible renames (undecided; one import each, do not wait): `CallRefused`→`CallRefusedError`,
   `SetParamsRefused`→`SetParamsRefusedError`, `find_pipeline`→`get_pipeline`,
   `CanonicalKeypoints.names`→`point_names`.
-- B. (running: read-only inventory sub-agent; report to the supervisor before implementing) EP rule (§0.3): inventory every EP key / ORT provider name (path:line) with a sub-agent; report
+- B. Inventory reported to the supervisor (130 CODE + 44 DOC entries: backend 43, UI 25, electron 10
+  (both files dead: `dependency-manager.ts`, `system-scanner.ts` are imported nowhere), contract 19,
+  tests 33). Gaps for skellytracker: no usable flag per `PackStatus` (`USABLE_STATES` not exported),
+  no install hint per EP (`install_hint` private), no applied EP per model of a run
+  (`PipelineRun.models` has no used_ep; freemocap makes it up in `inference_service.py:161`), no GPU
+  flag per EP, no documented order of `EpStatus.eps`, no devices in `status()`. Also: Auto drops
+  `EpRecommendation.options` and `device_key` (`pipeline_runs.py:62`). Wait for the answer. EP rule (§0.3): inventory every EP key / ORT provider name (path:line) with a sub-agent; report
   the count and each UI need that `skellytracker.core.eps` does not give (do not work around); then
   implement. This replaces the fixed keys of step 1 and the `trt-rtx` fix of (a): delete those
   literals. (b) the Playwright "Apply sends selected settings" `camera.skeleton_tracker_config`
   check still has to go.
-- C. DONE `b5a5570c` (channel-file fix) and the rename commit after it (§0.6 item 11). Old-name
-  copies wait for the user. Facts: the updater is the
+- C. DONE `b5a5570c` (channel-file fix), `1dd00942` (rename; docs `fileLabel(os, version)` keeps the old
+  labels up to alpha.26). No copies (F2b). Facts: the updater is the
   GitHub provider (`freemocap-ui/electron-builder.json:105-109`), no channel, no feed URL, the same
   for every variant. Installs read `latest.yml`/`latest-linux.yml`/`latest-mac.yml` of the newest
   alpha tag and download the `url` named inside (only sha512 and size are checked). Old `-cuda`
@@ -187,6 +193,8 @@ frames, each with `rtmpose` and with `mediapipe`.
   GPU or platform test, or precision rule in freemocap code, UI or contract enums; the source is
   `skellytracker.core.eps` (`status()`, `recommend(form)`, `run_devices`, `check_start`); Auto = the
   `performance` recommendation; the contract type is a string. Replaces the fixed keys of step 1.
+- F2b (2026-11-16): no copies. New releases ship without installer copies under the old `-cpu` and
+  `-cuda` names; existing installs update through the channel files.
 - F2 revised (2026-11-16): the installer names drop `-cpu` (`windows-x64`, ...); old `-cpu` and
   `-cuda` installs and links must lead to the new file.
 - F1 (2026-11-16): the MediaPipe settings that do nothing for Holistic leave the settings and the UI:
@@ -275,8 +283,8 @@ frames, each with `rtmpose` and with `mediapipe`.
       by extension (`.github/scripts/update_metadata.sh`) and fails when one names a missing asset.
       Checked offline on the published alpha.26 files: they fail the check as published and pass it
       after the rewrite.
-    - Old links keep giving their own old file (every link has the version in it). Copies under the
-      old names are not built; the user decides (the release workflow marks where a copy step goes).
+    - Old links keep giving their own old file (every link has the version in it). New releases ship
+      no copies under the old names (F2b).
     - **Not verifiable without a release:** which tag the updater picks, the download, install and
       restart on each OS, the update of a `.deb` install, and the AppImage saved under its new name.
     - `freemocap-ui/package.json` says `2.0.0-alpha.25` here while `2.0.0-alpha.26` is published. The

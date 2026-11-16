@@ -35,7 +35,7 @@ const GPU = {key: 'gpu-ep', label: 'GPU EP', description: 'Runs on a GPU.', usab
     install_hint: 'Run `install gpu-ep`.', uses_gpu: true, devices: []};
 /** The server's answer as the hook gives it: here only RTMW takes an EP. */
 const PROVIDERS: ExecutionProviderChoices = {
-    options: executionProviderOptions(null, [CPU, GPU]), info: executionProviderInfo([CPU, GPU]),
+    providers: [CPU, GPU], options: executionProviderOptions(null, [CPU, GPU]), info: executionProviderInfo([CPU, GPU]),
     takesExecutionProvider: detector => detector === 'rtmpose', devicesOf: () => [], providerOf: () => undefined,
 };
 

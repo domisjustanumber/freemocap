@@ -30,6 +30,8 @@ export function useExecutionProviderOptions(selected: ExecutionProviderName | nu
     const catalog = loaded?.key === key ? loaded.catalog : NO_CATALOG;
     const info = useMemo(() => executionProviderInfo(catalog.providers), [catalog]);
     return {
+        /** The server's EPs as skellytracker gives them, in its order. */
+        providers: catalog.providers,
         options: executionProviderOptions(selected, catalog.providers),
         info,
         /** The server's row of an EP, as skellytracker gives it; undefined for Auto or a key it does not list. */

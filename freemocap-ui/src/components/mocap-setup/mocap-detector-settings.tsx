@@ -1,13 +1,12 @@
 import {useExecutionProviderOptions} from "@/hooks/useExecutionProviderOptions";
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
-import ButtonSm from '@/components/ui-components/ButtonSm';
 import {mocapCharucoTrackingChanged, executionProviderNoticeDismissed, selectExecutionProviderMigration} from '@/store/slices/mocap';
 import SettingRow from '@/components/common/settings-layout/setting-row';
 import SettingsGroupHeading from '@/components/common/settings-layout/settings-group-heading';
 import SettingToggleSwitch from '@/components/common/settings-layout/setting-toggle-switch';
 import {useMocap} from '@/hooks/useMocap';
 import {DETECTOR_OPTIONS} from './detector-options';
-import {NotUsableNote} from './execution-provider-info';
+import {LegacyExecutionProviderNotice} from './legacy-execution-provider-notice';
 import {BOARD_GROUP_INFO, CHARUCO_INFO, DetectorSettingRows, type DetectorSettingsValue} from './detector-setting-rows';
 
 export default function MocapDetectorSettings() {
@@ -45,19 +44,9 @@ export default function MocapDetectorSettings() {
         if (change.confidence !== undefined) setRtmPoseConfidenceThreshold(change.confidence);
     };
 
-    const labelOf = (key: string | null) => executionProviderOptions.options.find(({value}) => value === key)?.label ?? key ?? 'Auto';
-    const replacement = migration?.status === 'replaced' ? executionProviderOptions.providerOf(migration.replacement) : undefined;
     return <>
-        {migration?.status === 'pending' && <p className="settings-note" role="status">
-            Checking the execution provider <strong>{migration.saved}</strong> saved by an earlier FreeMoCap version;
-            processing waits for the server.</p>}
-        {migration?.status === 'replaced' && <div role="status" className="settings-note settings-note-dismissable">
-            <span>The execution provider <strong>{migration.saved}</strong> saved by an earlier FreeMoCap version was
-                replaced by <strong>{labelOf(migration.replacement)}</strong>
-                {migration.replacement === null ? ': SkellyTracker has no usable replacement on this computer' : ''}.
-                {replacement && !replacement.usable && <> <NotUsableNote provider={replacement}/></>}</span>
-            <ButtonSm text="Dismiss" className="setting-action-button" onClick={() => dispatch(executionProviderNoticeDismissed())}/>
-        </div>}
+        {migration && <LegacyExecutionProviderNotice migration={migration} providers={executionProviderOptions.providers}
+            onDismiss={() => dispatch(executionProviderNoticeDismissed())}/>}
         <DetectorSettingRows value={value} onChange={applyChange} detectors={DETECTOR_OPTIONS}
             providers={executionProviderOptions} context="posthoc" rows="all"/>
 

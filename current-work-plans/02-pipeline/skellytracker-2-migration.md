@@ -206,7 +206,16 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     outside [0, 1], so a fresh posthoc RTMW run fails at save_observations
     (`reference_recordings/test_fresh_posthoc.py`). sfn26 clipped the SIMCC peak to [0, 1]. Owner open:
     skellytracker range, or a clip at `observations_from_results`. Changed nothing.
-    Waiting also for the skellytracker SHA of G4 (suggestion = hardware-supported key).
+    RESOLVED `be341bba` (§0.3 SC): gate on the raw score, then `np.clip` to [0, 1].
+    test_fresh_posthoc.py after it (3 runs, ST b8bfa7d2..de7e18f3 then 1e479fa3 for none of them):
+    run 1 failed at save_recording "Recording changed after selecting the processing run" (intermittent:
+    not seen again); runs 2-3 processed and saved, then the dataset tool's check
+    (`tools/datasets/validation.py:28`) failed: calibrated_world alignment `insufficient_evidence`.
+    Reported; not investigated further.
+  - G4 (ST `1e479fa3`): suggestion check trt->trt-rtx, cuda->trt-rtx, cpu->cpu, directml/coreml/''->None.
+    The notice is `legacy-execution-provider-notice.tsx` (pure; tested); real pass with this host's
+    route data: "…replaced by NVIDIA TensorRT for RTX. Not usable here. Run `skellytracker-eps install
+    trt-rtx`."; the EP select keeps trt-rtx visible under its label.
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).
@@ -544,11 +553,11 @@ frames, each with `rtmpose` and with `mediapipe`.
     EP key is replaced by skellytracker's suggestion for this computer (legacy `trt`/`cuda` -> `trt-rtx`
     if usable, else `cuda` if usable; another usable key stays; else Auto) and a notice says which key
     was replaced by which. Processing waits until the server has answered.
+17. Annotated videos draw face points with radius 2 instead of 4 (V3), so the face lines show between
+    them; body, hand and foot points and all line colours are unchanged.
 18. A saved confidence of 1.0 can mean "1 or more": skellytracker scores have no fixed range and the
     recording stores them clipped to [0, 1] (the 0.4 RTMW gate reads the raw score first). A negative
     score is stored as 0.
-17. Annotated videos draw face points with radius 2 instead of 4 (V3), so the face lines show between
-    them; body, hand and foot points and all line colours are unchanged.
 
 ### 0.7 Imports of old skellytracker modules that stage 2.4 can remove
 

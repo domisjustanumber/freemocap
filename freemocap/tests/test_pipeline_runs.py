@@ -151,3 +151,8 @@ def test_a_real_holistic_run_gives_one_body_stage_with_its_point_names():
     assert stage.keypoints.names[:2] == ("body/nose", "body/left_eye_inner") and len(stage.keypoints.names) == 553
     assert stage.bounding_boxes == [] and stage.detector_ran
     assert observations["1"].image_size == (48, 64) and observations["1"].frame_number == 3
+
+
+def test_skellytracker_says_which_detector_takes_an_ep():
+    assert pipeline_runs.detector_takes_execution_provider("rtmpose")
+    assert not pipeline_runs.detector_takes_execution_provider("mediapipe")

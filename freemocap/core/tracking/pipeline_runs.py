@@ -81,6 +81,13 @@ def start_detector_run(*, detector_type: str, camera_ids: Sequence[str], running
     return run, provider
 
 
+@cache
+def detector_takes_execution_provider(detector_type: str) -> bool:
+    """Whether the pipeline of a detector choice runs a model that takes an EP, as skellytracker says."""
+    from skellytracker.core.pipelines import check_pipeline
+    return check_pipeline(load_detector_pipeline(detector_type)).needs_execution_provider
+
+
 def _output_schema(detector_type: str) -> dict[str, Any]:
     from skellytracker.core.pipelines import check_pipeline
     return check_pipeline(load_detector_pipeline(detector_type)).output_schema

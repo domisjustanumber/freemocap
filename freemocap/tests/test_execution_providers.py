@@ -92,7 +92,8 @@ def test_graph_auto_takes_the_skellytracker_recommendation_and_mediapipe_takes_n
     for chosen in ('gpu-ep', 'cpu'):
         with patch.object(eps, 'recommend', return_value=SimpleNamespace(chosen=SimpleNamespace(ep_key=chosen, device_key=None), options=())):
             assert resolve_tracking_provider(PosthocMocapPipelineConfig()) == chosen
-    assert resolve_tracking_provider(PosthocMocapPipelineConfig(detectorType='mediapipe')) == 'cpu'
+    for saved in (None, 'any-ep-key'):  # the saved choice of the hidden EP setting
+        assert resolve_tracking_provider(PosthocMocapPipelineConfig(detectorType='mediapipe', executionProvider=saved)) is None
 
 
 def test_camera_node_startup_failure_closes_initialized_resources():

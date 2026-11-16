@@ -153,12 +153,7 @@ def test_created_pipeline_exposes_all_waiting_operations_before_worker_start(tmp
     workers.create_worker.return_value.start.assert_not_called()
 
 
-def test_preview_rejects_unsupported_provider_and_missing_source_run(tmp_path):
-    config = PosthocMocapPipelineConfig(detector_type='mediapipe',execution_provider='cuda',
-        stop_stage='observations',export_to_blender=False)
-    result = preview_processing_plan(recording_path=tmp_path,config=config)
-    assert result.plan is None
-    assert 'supports CPU only' in result.errors[0]
+def test_preview_rejects_missing_source_run(tmp_path):
     config = PosthocMocapPipelineConfig(base_run_id=42,stop_stage='observations',export_to_blender=False)
     result = preview_processing_plan(recording_path=tmp_path,config=config)
     assert result.plan is None

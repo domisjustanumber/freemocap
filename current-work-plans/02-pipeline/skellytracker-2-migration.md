@@ -36,7 +36,45 @@ gate). The supervisor is the skellytracker session; the user decides the product
 | Phase B step 5: old API removed | `c5be62ed`, `46e9a55d` | tracker factory, provider policy, per-camera inference, generated recipes, contract, spec, CI install |
 | Phase B step 6: old-recording reader | this commit | a restart from saved `body.<point>` (skellytracker 1) observations raises `SkellytrackerOnePointNamesError`; old 3D results stay readable through their own snapshot |
 
-Handoff state (2026-11-16, end of session): the suite on the Phase B environment, with `PYTHONPATH` set to
+State (2026-11-16, session after freemocap-5d). Committed: `1f532a77` F1 (MediaPipe settings Holistic
+ignores: configs, UI incl. the dead `MediapipeConfigPanel`, contract delta, e2e; client `npm test`
+131/131, realtime-processing 34/34, Playwright skeleton-detector-options pass), `fd7b629f` F2 (one
+installer variant, no R2 in the installer workflow, docs page without variant picker; YAML parses,
+docs `tsc` passes, no CI run), `d00da9d9` realtime replay test over `preset` rtmpose/mediapipe +
+TESTING.md. Local only: `cbor-x` is missing in `freemocap-ui/node_modules` (install problem, not code).
+
+Next, in order (supervisor, 2026-11-16; ST R1 to R6 = `55b6cd01`, `402c8838`, `a7e591ac`, `654c92b6`
+on the local `../skellytracker` `dom/sidecar-implementation`):
+- A. Boundary commit in `pipeline_runs.py`: `InstanceKeypoints`/`CanonicalKeypoints` have `xy`
+  `(I, P, 2)` float64 (missing = NaN), `z` `(I, P)` for 3D or `None` for 2D, read-only `geometry`
+  ("2d"/"3d"); `xyz` and `by_track()` are gone; `instance()`/`single()` give keys `xy`, `z`; read
+  person row 0 after checking `present[0]`. Camera result: `image_width`, `image_height` (ints).
+  Output schema: `canonical_edges` (`[name, name]` pairs) replaces the `shortcut:` rename in
+  `detector_connections`; expect 65 (yolox-rtmw-wholebody) and 213 (mediapipe-holistic-tasks). New
+  rtmw-wholebody133 sidecar sha256 `7d69257a...`, `estimator_type: top_down`; ONNX unchanged.
+  Possible renames (undecided; one import each, do not wait): `CallRefused`→`CallRefusedError`,
+  `SetParamsRefused`→`SetParamsRefusedError`, `find_pipeline`→`get_pipeline`,
+  `CanonicalKeypoints.names`→`point_names`.
+- B. EP rule (§0.3): inventory every EP key / ORT provider name (path:line) with a sub-agent; report
+  the count and each UI need that `skellytracker.core.eps` does not give (do not work around); then
+  implement. This replaces the fixed keys of step 1 and the `trt-rtx` fix of (a): delete those
+  literals. (b) the Playwright "Apply sends selected settings" `camera.skeleton_tracker_config`
+  check still has to go.
+- C. Installer names lose `-cpu` (`windows-x64`, ...); old `-cpu` and `-cuda` installs must update to
+  the new file and old links must lead to it. First report the auto-update mechanism and the plan as
+  path:line facts; do not publish or upload anything.
+- Then the gate runs, once.
+
+Gate plan (accepted by the supervisor): `test_data` only, `numerical` profile, prepared root in this
+session's scratchpad, no model download (the ONNX are hard links in the scratch clone's
+`core/model_zoo/`). A: `python -m freemocap.tools.datasets process test_data --from observations
+--tracker-preset <rtmpose|mediapipe> --calibration existing --output-profile numerical
+--prepared-root <scratch>/prep-<det>`; B: `pytest
+freemocap/tests/reference_recordings/test_realtime_pipeline.py -k "human-<det> and test-data"` with
+`FREEMOCAP_PROVENANCE_PREPARED_ROOT=<scratch>/prep-<det>`. Both with `phasebenv313` and
+`PYTHONPATH` = this checkout.
+
+Handoff state of freemocap-5d (2026-11-16): the suite on the Phase B environment, with `PYTHONPATH` set to
 this checkout, is 1503 passed, 8 failed, 21 skipped (39 deselected). 7 of the failures are the
 baseline ones. `test_observation_imports` fails only because its child runs `python -I`, which imports
 the freemocap of `phaseb\venv313` (the scratch clone at `0bdb052b`); it passes when that clone is at
@@ -127,6 +165,29 @@ frames, each with `rtmpose` and with `mediapipe`.
   - R6: a keypoints output schema gets `canonical_edges` (the `edges` in canonical names; an edge
     with a point that has no canonical name is left out). When it lands,
     `pipeline_runs.detector_connections` becomes one dict read and its `shortcut:` goes.
+- EP rule (2026-11-16): "FreeMoCap must not keep any knowledge of Execution Providers. It uses the
+  new API surface of skellytracker to populate the available options, and it sets the recommended
+  and auto options from the suggestions of skellytracker." No EP key list, display names, ordering,
+  GPU or platform test, or precision rule in freemocap code, UI or contract enums; the source is
+  `skellytracker.core.eps` (`status()`, `recommend(form)`, `run_devices`, `check_start`); Auto = the
+  `performance` recommendation; the contract type is a string. Replaces the fixed keys of step 1.
+- F2 revised (2026-11-16): the installer names drop `-cpu` (`windows-x64`, ...); old `-cpu` and
+  `-cuda` installs and links must lead to the new file.
+- F1 (2026-11-16): the MediaPipe settings that do nothing for Holistic leave the settings and the UI:
+  model complexity, the detection, presence and tracking confidences, and `num_faces`
+  (`mediapipe_num_hands`, fixed at 2, stays). A saved settings file that still has them loads, and
+  they are not written again. This removes the import of the old `mediapipe_model_manager` (§0.7).
+- F2 (2026-11-16): the installer builds one variant; the `cuda` variant goes (matrix, names, docs). GPU
+  EPs come from the skellytracker EP packs at runtime. `cuda` stays as an EP key.
+- F3 (2026-11-16): leave `bench_final.py`, `bench_inference.py`, `bench_redetect.py`, `bench_tracker.py`
+  and `experiments/executable_graph_lab/` untouched: not ported, not deleted. They **do not run on
+  skellytracker 2.0** (they import the old API).
+- F4 (2026-11-16): freemocap accepts RTMW with no face lines for now, and draws none itself. The exporter
+  gets a request for face edges in a fresh export; when that sidecar lands, the lines come back through
+  `canonical_edges` with no freemocap change (§0.6 item 6).
+- U1 (2026-11-16): the user moves the skellycam OpenCV pin and the skellyforge Python cap themself,
+  separately. The freemocap `uv.lock` stays uncommitted until then; tests run with the two pins relaxed
+  in scratch.
 
 ### 0.4 Open questions
 
@@ -137,7 +198,7 @@ frames, each with `rtmpose` and with `mediapipe`.
   - a new small type, which means a rewrite of 24 backend and 34 test files, with a risk to the
     recording format.
   `skellytracker.core.data_primitives` may go at ST stage 2.4. Step 2 waits for this answer.
-- **U1, the sibling pins.** Who moves skellycam (sfn26 pins `opencv-contrib-python==4.12.*`) to
+- **U1, the sibling pins.** Answered (§0.3 U1). Who moves skellycam (sfn26 pins `opencv-contrib-python==4.12.*`) to
   `5.0.0.93`, and skellyforge (sfn26 says `requires-python <3.13`) to 3.13.18, and on which
   branches? The freemocap `uv.lock` waits for it.
   - Facts: skellycam's suite gives the same result on OpenCV 5.0.0.93 and on 4.12 (456 passed;
@@ -181,6 +242,15 @@ frames, each with `rtmpose` and with `mediapipe`.
    `tracker_config`, `pipelineImplementation` or `videoFps` loads and is not written again.
 9. A `charuco_observations_realtime.pkl` written on `sfn26` no longer loads (it pickles the old module
    path of `CharucoBoardDefinition`); calibration detects every frame again.
+10. MediaPipe has no pose model size, detection, presence or tracking confidence, or face count any
+    more (F1). A saved setting with them loads and is not written again.
+11. One installer variant (F2): Windows x64, macOS Apple Silicon and Linux x64. The CUDA installers and
+    the Cloudflare R2 hosting of the installer workflow are gone; the docs download page has no variant
+    choice and no GPU detection.
+    - **Known leftover:** the asset names keep the `-cpu` suffix (`windows-x64-cpu`, `linux-x64-cpu`) so
+      that auto-update channels and old download links keep working. The user can rename them later.
+    - `.github/workflows/test-bucket.yml` (manual R2 test) stays: R2 still hosts the CUDA builds of
+      old releases. The `upx_exclude` CUDA names in `freemocap.spec` are dead but harmless.
 
 ### 0.7 Imports of old skellytracker modules that stage 2.4 can remove
 
@@ -192,9 +262,7 @@ through `core.detectors.calibration` but is old annotation code too (`annotation
 - `skellytracker.core.annotation.keypoint_annotator`:
   - `freemocap/core/pipeline/posthoc/annotation_style.py:16`
   - `freemocap/core/pipeline/posthoc/annotation_style.py:7`
-- `skellytracker.core.detectors.keypoint_detectors.mediapipe.mediapipe_model_manager`:
-  - `freemocap/core/pipeline/realtime/camera_node_config.py:8`
-  - `freemocap/core/tasks/mocap/mocap_task_config.py:8`
+- `skellytracker.core.detectors.keypoint_detectors.mediapipe.mediapipe_model_manager`: none since F1.
 - `skellytracker.core.eps.records`:
   - `freemocap/core/tracking/execution_providers.py:19`
 - `skellytracker.core.data_primitives`:

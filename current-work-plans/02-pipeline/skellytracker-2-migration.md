@@ -129,6 +129,20 @@ frames, each with `rtmpose` and with `mediapipe`.
 - The committed `contracts/openapi.json` was already out of date with the backend at `ca0c17cc`.
   Group 1 applied only the delta of the removal (a 3-way merge).
 
+### 0.6 User-visible changes of Phase B
+
+1. The EP menu offers Auto, CUDA, TensorRT RTX, CoreML and CPU. DirectML is gone; a saved `trt` or
+   `directml` reads as Auto (step 1, `a8d88985`).
+2. `/onnx/session_providers` names each model by its catalog key (`yolox-person@openmmlab-exporter`)
+   and gives the EP key (`cuda`) in `applied_providers`, not the ORT provider name (step 1).
+3. A camera video that fails while it is read stops posthoc tracking with `CameraSourceEndedError`,
+   which names the camera and the frame. On `sfn26` the other cameras went on, but the save refused
+   the incomplete coverage, so nothing was saved in either case. Open as V2 with the user.
+4. New 2D point names are `body.<group>/<point>` (for example `body.body/nose`,
+   `body.left_hand/wrist`); the 3D names are `<group>/<point>`. The mapping YAMLs follow in step 3.
+5. The posthoc MediaPipe GPU switch (`mediapipe_disable_gpu`) is gone: the Holistic built-in has no
+   GPU param.
+
 ## 1. Inventory
 
 ### 1.1 Run and session code

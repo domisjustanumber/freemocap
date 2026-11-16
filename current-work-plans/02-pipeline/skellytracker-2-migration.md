@@ -64,7 +64,19 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
   implement. This replaces the fixed keys of step 1 and the `trt-rtx` fix of (a): delete those
   literals. (b) the Playwright "Apply sends selected settings" `camera.skeleton_tracker_config`
   check still has to go.
-- C. (running: read-only mechanism sub-agent; report before changing the workflow) Installer names lose `-cpu` (`windows-x64`, ...); old `-cpu` and `-cuda` installs must update to
+- C. Reported to the supervisor; waiting for answers to (1) `macos-arm64`, (2) no old-name copies,
+  (3) fix the sed bug in the same commit, (4) the package.json version. Facts: the updater is the
+  GitHub provider (`freemocap-ui/electron-builder.json:105-109`), no channel, no feed URL, the same
+  for every variant. Installs read `latest.yml`/`latest-linux.yml`/`latest-mac.yml` of the newest
+  alpha tag and download the `url` named inside (only sha512 and size are checked). Old `-cuda`
+  installs read the same GitHub files (the R2 `latest-linux-cuda.yml` was never read), so no R2 upload.
+  BUG: the rewrite seds (`build-installers-pyinstaller.yml:555,572,581`) match lowercase `freemocap_`
+  but the files start with `FreeMoCap_`, and `.deb` is never rewritten, so alpha.15/21/26 channel
+  files name assets that 404. The mac name must keep `arm64` (MacUpdater filter). Versioned old links
+  cannot be pointed at a new file. Plan: labels at `:28,:36,:44` + `update-metadata-*-cpu` dirs
+  `:551,552,578,579`; case-insensitive seds + `.deb` + a guard that every `url:`/`path:` is an asset;
+  docs `downloads.ts` `fileLabel` picks the old label for releases that have `_windows-x64-cpu.`.
+  Was: Installer names lose `-cpu` (`windows-x64`, ...); old `-cpu` and `-cuda` installs must update to
   the new file and old links must lead to it. First report the auto-update mechanism and the plan as
   path:line facts; do not publish or upload anything.
 - Then the gate runs, once.

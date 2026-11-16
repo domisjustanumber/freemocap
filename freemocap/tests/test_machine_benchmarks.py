@@ -86,7 +86,7 @@ def test_wrapper_delegates_to_existing_runner_and_persists_failure(tmp_path, mon
     from argparse import Namespace
     from subprocess import CompletedProcess
     from freemocap.tools import machine_benchmarks as module
-    machine = dict(label='test', cpu='test CPU', memory_bytes=1024)
+    machine = dict(label='test', cpu_name='test CPU', memory_total_bytes=1024)
     monkeypatch.setattr(module, 'machine_info', lambda label: machine)
     monkeypatch.setattr(module, 'capture_provenance', lambda: {})
     monkeypatch.setattr(module, 'load_snapshot', lambda: {})
@@ -188,3 +188,10 @@ def test_stage_comparison_keeps_per_call_and_per_frame_distinct():
     assert metrics['posthoc.inference.amortized_ms_per_frame']['median'] == 1500
     assert metrics['posthoc.inference.amortized_ms_per_image']['median'] == 500
     assert 'posthoc.inference.mean_after_first_ms' not in metrics
+
+
+def test_machine_record_is_the_skellytracker_host_and_ep_state_as_json():
+    from freemocap.tools.machine_benchmarks import machine_info
+    machine = json.loads(json.dumps(machine_info('here'), allow_nan=False))
+    assert machine['label'] == 'here' and 'cpu_name' in machine and 'memory_total_bytes' in machine
+    assert machine['execution_providers'] and all(isinstance(state, str) for state in machine['execution_providers'].values())

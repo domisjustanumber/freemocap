@@ -207,7 +207,7 @@ jobs:
       - name: Build with PyInstaller
         run: |
           uv pip install pyinstaller
-          uv run --no-sync python -c "import onnxruntime as ort; print('ONNX Runtime:', ort.__version__); print('Providers:', ort.get_available_providers())"
+          uv run --no-sync skellytracker-eps status
           uv run --no-sync pyinstaller ./freemocap.spec --clean
 
       # ── Move server BUNDLE into freemocap-ui/ ──

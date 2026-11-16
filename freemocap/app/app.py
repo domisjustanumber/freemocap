@@ -4,15 +4,12 @@ Consolidated FastAPI app factory with proper lifecycle management.
 import logging
 import asyncio
 import multiprocessing
-import platform
-import subprocess
 import sys
 from contextlib import asynccontextmanager, suppress
 from multiprocessing.sharedctypes import Synchronized
 from pathlib import Path
 from typing import AsyncGenerator
 
-import psutil
 import skellycam
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
@@ -38,244 +35,15 @@ from freemocap.system.telemetry.telemetry import initialize_telemetry, shutdown_
 logger = logging.getLogger(__name__)
 
 
-# ── GPU hardware detection ───────────────────────────────────────────────
+HOST_FIELDS = ("os_platform", "arch", "cpu_name", "cpu_physical_cores", "cpu_logical_cores", "memory_total_bytes")
+GPU_FIELDS = ("name", "vendor", "vram_total_bytes", "driver_version")
 
 
-def _query_nvidia_smi() -> list[dict]:
-    """Query NVIDIA GPUs via nvidia-smi.
-
-    Returns a list of dicts with keys: name, vram_gb, driver_version, compute_capability.
-    Returns an empty list if nvidia-smi is unavailable or fails.
-    """
-    try:
-        result = subprocess.run(
-            ["nvidia-smi",
-             "--query-gpu=name,memory.total,driver_version,compute_cap",
-             "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=10,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return []
-
-    if result.returncode != 0 or not result.stdout.strip():
-        # Retry without compute_cap for older nvidia-smi versions
-        try:
-            result = subprocess.run(
-                ["nvidia-smi",
-                 "--query-gpu=name,memory.total,driver_version",
-                 "--format=csv,noheader"],
-                capture_output=True, text=True, timeout=10,
-            )
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            return []
-
-    if result.returncode != 0 or not result.stdout.strip():
-        return []
-
-    gpus: list[dict] = []
-    for line in result.stdout.strip().splitlines():
-        if not line.strip():
-            continue
-        parts = [p.strip() for p in line.split(",", maxsplit=3)]
-        # memory.total comes back as e.g. "24576 MiB" — strip the unit
-        vram_mib = 0.0
-        if len(parts) > 1 and parts[1]:
-            vram_str = parts[1].replace("MiB", "").replace(" ", "").strip()
-            try:
-                vram_mib = float(vram_str)
-            except ValueError:
-                vram_mib = 0.0
-        gpu: dict = {
-            "name": parts[0] if parts[0] else "Unknown NVIDIA GPU",
-            "vram_gb": f"{vram_mib / 1024:.1f} GB" if vram_mib > 0 else None,
-            "driver_version": parts[2] if len(parts) > 2 and parts[2] else None,
-            "compute_capability": parts[3] if len(parts) > 3 and parts[3] else None,
-        }
-        gpus.append(gpu)
-    return gpus
-
-
-def _query_wmic_gpus() -> list[dict]:
-    """Fallback GPU detection on Windows via WMIC."""
-    try:
-        result = subprocess.run(
-            ["wmic", "path", "win32_videocontroller",
-             "get", "name,adapterram",
-             "/format:csv"],
-            capture_output=True, timeout=10,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return []
-
-    if result.returncode != 0 or not result.stdout.strip():
-        return []
-
-    # WMIC outputs UTF-16LE with BOM; decode explicitly
-    stdout = result.stdout.decode("utf-16-le", errors="replace")
-
-    gpus: list[dict] = []
-    for line in stdout.strip().splitlines():
-        if not line.strip() or "Node," in line:
-            continue
-        # WMIC CSV column order is: Node,AdapterRAM,Name
-        parts = [p.strip() for p in line.split(",", maxsplit=2)]
-        if len(parts) < 3 or not parts[2]:
-            continue
-        name = parts[2]
-        vram_bytes = int(parts[1]) if parts[1].isdigit() else 0
-        gpu: dict = {
-            "name": name,
-            "vram_gb": f"{vram_bytes / 1e9:.1f} GB" if vram_bytes > 0 else None,
-            "driver_version": None,
-            "compute_capability": None,
-        }
-        gpus.append(gpu)
-    return gpus
-
-
-def _query_lspci_gpus() -> list[dict]:
-    """Fallback GPU detection on Linux via lspci."""
-    try:
-        result = subprocess.run(
-            ["lspci"], capture_output=True, text=True, timeout=10,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return []
-
-    if result.returncode != 0:
-        return []
-
-    gpus: list[dict] = []
-    for line in result.stdout.strip().splitlines():
-        if not any(tag in line for tag in ("VGA", "3D", "Display")):
-            continue
-        # lspci format: "00:02.0 VGA compatible controller: Intel Corporation ..."
-        name = line.split(":", 2)[-1].strip() if ":" in line else line.strip()
-        gpu: dict = {
-            "name": name,
-            "vram_gb": None,
-            "driver_version": None,
-            "compute_capability": None,
-        }
-        gpus.append(gpu)
-    return gpus
-
-
-def _query_macos_gpus() -> list[dict]:
-    """Fallback GPU detection on macOS via system_profiler."""
-    try:
-        result = subprocess.run(
-            ["system_profiler", "SPDisplaysDataType"],
-            capture_output=True, text=True, timeout=10,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return []
-
-    if result.returncode != 0:
-        return []
-
-    gpus: list[dict] = []
-    current: dict | None = None
-    for line in result.stdout.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("Chipset Model:"):
-            if current is not None:
-                gpus.append(current)
-            current = {"name": stripped.split(":", 1)[1].strip(),
-                        "vram_gb": None, "driver_version": None, "compute_capability": None}
-        elif current is not None and stripped.startswith("VRAM"):
-            vram_str = stripped.split(":", 1)[1].strip()
-            # Normalize: "8 GB" or "8192 MB" → "8.0 GB"
-            current["vram_gb"] = vram_str
-        elif current is not None and stripped.startswith("Metal:"):
-            current["metal"] = stripped.split(":", 1)[1].strip()
-    if current is not None:
-        gpus.append(current)
-    return gpus
-
-
-def _detect_gpus() -> list[dict]:
-    """Detect GPU hardware, trying multiple strategies in priority order."""
-    gpus = _query_nvidia_smi()
-    if gpus:
-        return gpus
-
-    system = platform.system()
-    if system == "Windows":
-        return _query_wmic_gpus()
-    elif system == "Linux":
-        return _query_lspci_gpus()
-    elif system == "Darwin":
-        return _query_macos_gpus()
-
-    return []
-
-
-def _format_gpu_section(gpus: list[dict]) -> str:
-    """Format the GPU hardware section for log output."""
-    if not gpus:
-        return "    GPU:                       None detected"
-
-    lines: list[str] = ["    GPU:"]
-    for i, gpu in enumerate(gpus):
-        lines.append(f"      GPU {i}: {gpu['name']}")
-        if gpu.get("vram_gb"):
-            lines.append(f"        VRAM:                {gpu['vram_gb']}")
-        if gpu.get("driver_version"):
-            lines.append(f"        Driver Version:      {gpu['driver_version']}")
-        if gpu.get("compute_capability"):
-            lines.append(f"        Compute Capability:  {gpu['compute_capability']}")
-    return "\n".join(lines)
-
-
-# ── ONNX Runtime detection ───────────────────────────────────────────────
-
-
-def _get_onnx_info() -> tuple[str | None, list[str]]:
-    """Get ONNX Runtime version and available execution providers."""
-    try:
-        import onnxruntime  # noqa: TC002
-    except Exception:
-        return None, []
-    try:
-        return onnxruntime.__version__, onnxruntime.get_available_providers()
-    except Exception:
-        return None, []
-
-
-def _format_onnx_section(version: str | None, providers: list[str], gpus: list[dict]) -> str:
-    """Format the ONNX Runtime section for log output."""
-    lines: list[str] = ["    ONNX Runtime:"]
-
-    if version:
-        lines.append(f"      Version:   {version}")
-    else:
-        lines.append("      Version:   Not installed")
-
-    if providers:
-        lines.append(f"      Providers: {', '.join(providers)}")
-
-    # GPU acceleration capability summary
-    has_cuda = any("CUDA" in p for p in providers)
-    has_trt = any("Tensorrt" in p for p in providers)
-    has_gpu_hw = bool(gpus)
-
-    if has_cuda:
-        lines.append(f"      GPU acceleration:       Available (CUDAExecutionProvider)")
-    elif has_trt:
-        lines.append(f"      GPU acceleration:       Available (TensorrtExecutionProvider)")
-    elif has_gpu_hw:
-        if not version:
-            lines.append("      GPU acceleration:       Not available — ONNX Runtime not installed")
-        else:
-            lines.append("      GPU acceleration:       Not available — onnxruntime-gpu may not be installed")
-    else:
-        lines.append("      GPU acceleration:       Not available — no GPU detected")
-
-    return "\n".join(lines)
-
-
-# ── Main system info logger ──────────────────────────────────────────────
+def _field_lines(record, fields: tuple[str, ...], indent: str) -> list[str]:
+    """The fields the record has, as skellytracker gives them."""
+    values = {name: getattr(record, name, None) for name in fields}
+    return [f"{indent}{name}: {f'{value / 2**30:.1f} GiB' if name.endswith('_bytes') else value}"
+            for name, value in values.items() if value is not None]
 
 
 def _log_system_info() -> None:
@@ -294,39 +62,24 @@ def _log_system_info() -> None:
         "skellypings": _pkg_ver("skellypings"),
         "freemocap_blender_addon": _pkg_ver("freemocap_blender_addon"),
     }
-
-    skelly_pkg_str = "\n".join(f"      {k}={v}" for k, v in skelly_pkgs.items())
-
-    vm = psutil.virtual_memory()
-    cpu_physical = psutil.cpu_count(logical=False)
-    cpu_logical = psutil.cpu_count(logical=True)
+    lines = ["", "  System info:", f"    Python:      {sys.version}", f"    FreeMoCap:   {freemocap.__version__}"]
     try:
-        cpu_freq_ghz = f"{psutil.cpu_freq().current / 1000:.2f} GHz"
-    except Exception:
-        cpu_freq_ghz = "unknown"
-
-    gpus = _detect_gpus()
-    onnx_version, onnx_providers = _get_onnx_info()
-
-    gpu_section = _format_gpu_section(gpus)
-    onnx_section = _format_onnx_section(onnx_version, onnx_providers, gpus)
-
-    logger.info(
-        f"\n"
-        f"  System info:\n"
-        f"    OS:          {platform.system()} {platform.release()} ({platform.version()})\n"
-        f"    CPU:         {platform.processor()} -- {cpu_physical} physical / {cpu_logical} logical cores @ {cpu_freq_ghz}\n"
-        f"    RAM:         {vm.total / 1e9:.1f} GB total, {vm.available / 1e9:.1f} GB available\n"
-        f"    Python:      {sys.version}\n"
-        f"    FreeMoCap:   {freemocap.__version__}\n"
-        f"\n"
-        f"{gpu_section}\n"
-        f"\n"
-        f"{onnx_section}\n"
-        f"\n"
-        f"    Skelly Packages:\n"
-        f"{skelly_pkg_str}"
-    )
+        from skellytracker.core.eps import status
+        from skellytracker.core.system import probe_host
+        host = probe_host()
+        lines += ["    Host:", *_field_lines(host, HOST_FIELDS, "      ")]
+        for index, gpu in enumerate(host.gpus):
+            lines += [f"    GPU {index}:", *_field_lines(gpu, GPU_FIELDS, "      ")]
+        lines += [f"    Host probe error: {error}" for error in host.probe_errors]
+        ep_status = status()
+        lines += ["    Execution providers:", *(f"      {pack.key}: {pack.state}" for pack in ep_status.eps)]
+        chosen = ep_status.performance.chosen
+        lines.append(f"      performance recommendation: {chosen.ep_key}"
+                     f"{f' on {chosen.device_key}' if chosen.device_key else ''}, {ep_status.performance.precision}")
+    except Exception:  # the log of the host must not stop the server
+        logger.exception("The host and execution provider status of skellytracker could not be read")
+    lines += ["    Skelly Packages:", *(f"      {k}={v}" for k, v in skelly_pkgs.items())]
+    logger.info("\n".join(lines))
 
 
 async def collect_task_progress(app: FastAPI) -> None:

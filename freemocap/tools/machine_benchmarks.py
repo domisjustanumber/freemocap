@@ -5,13 +5,13 @@ This module does not implement processing, camera control, or acceptance checks.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 from datetime import datetime, timezone
 import hashlib
 import glob
 import json
 import os
 from pathlib import Path
-import platform
 import statistics
 import subprocess
 import sys
@@ -34,33 +34,10 @@ def write_json(path, value):
 
 
 def machine_info(label: str) -> dict:
-    def query(command):
-        try:
-            return subprocess.check_output(command, text=True, stderr=subprocess.DEVNULL, timeout=10).strip()
-        except (OSError, subprocess.SubprocessError):
-            return None
-    cpu = platform.processor()
-    gpu = None
-    if sys.platform == 'darwin':
-        cpu = query(['sysctl', '-n', 'machdep.cpu.brand_string']) or cpu
-        raw = query(['system_profiler', 'SPDisplaysDataType', '-json'])
-        if raw:
-            gpu = [{k: v for k, v in item.items() if k in ('sppci_model', 'sppci_cores', 'spdisplays_vram')}
-                   for item in json.loads(raw).get('SPDisplaysDataType', [])]
-    elif os.name == 'nt':
-        cpu = query(['powershell', '-NoProfile', '-Command', '(Get-CimInstance Win32_Processor).Name']) or cpu
-        gpu = query(['powershell', '-NoProfile', '-Command', '(Get-CimInstance Win32_VideoController).Name'])
-    else:
-        gpu = query(['nvidia-smi', '--query-gpu=name,memory.total,driver_version', '--format=csv,noheader'])
-    memory = psutil.virtual_memory()
-    try:
-        import onnxruntime
-        providers = onnxruntime.get_available_providers()
-    except ImportError:
-        providers = None
-    return dict(label=label, os=platform.platform(), architecture=platform.machine(), cpu=cpu,
-                physical_cores=psutil.cpu_count(logical=False), logical_cores=psutil.cpu_count(),
-                memory_bytes=memory.total, gpu=gpu, available_onnx_providers=providers,
+    from skellytracker.core.eps import status
+    from skellytracker.core.system import probe_host
+    return dict(label=label, **dataclasses.asdict(probe_host()),
+                execution_providers={pack.key: pack.state for pack in status().eps},
                 thread_environment={key: os.environ.get(key) for key in
                     ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'NUMBA_NUM_THREADS')})
 
@@ -167,9 +144,11 @@ def collect_camera(output: Path, backend: str) -> list[dict]:
 
 
 def render(record):
-    lines = [f"# Machine benchmark: {record['machine']['label']}", '',
+    machine = record['machine']  # records before skellytracker 2 have `cpu` and `memory_bytes`
+    lines = [f"# Machine benchmark: {machine['label']}", '',
              f"Run: {record['started_utc']} | {record['status']}",
-             f"CPU: {record['machine']['cpu']} | RAM: {record['machine']['memory_bytes'] / 2**30:g} GiB", '',
+             f"CPU: {machine.get('cpu_name', machine.get('cpu'))} | "
+             f"RAM: {machine.get('memory_total_bytes', machine.get('memory_bytes')) / 2**30:g} GiB", '',
              record['conditions'], '', '| Workload | Status | Measurement | Value |', '|---|---|---|---|']
     for case in record['cases']:
         label = case['workload'].get('dataset') or f"{case['workload'].get('backend')} / {case['workload'].get('case', 'suite')}"

@@ -296,6 +296,23 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     that seeds each board pose, `freemocap_anipose.py:122` random tie-break when sampling points; global
     `np.random`, no seed in either). Open, supervisor's word needed before a seed.
     Fast suite after X1/X2: 1524 passed, the same 8 failed (also failing with both fixes reverted), 20 skipped.
+  - OpenCV 4.12 vs 5.0 survey (supervisor, read only in skellytracker, 2026-11-16), each measured here:
+    - F-S3 DONE `242d4430`: 5.0 `solvePnP` gives ret=True with exact zeros for one NaN or inf point of 40,
+      a NaN K or NaN D (4.12: NaN pose); probe `0a1e712d-.../scratchpad/x12/fs3_probe.py`.
+      `estimate_pose_points` now also refuses a non-finite K/D; an inf corner is dropped like a NaN one.
+    - F-S6 DONE `56821d94`: `undistortPoints` on empty input: 4.12 `cv2.error`, 5.0 `None`; the
+      triangulator crashed on both (no `except cv2.error` anywhere in freemocap). Zero frames or zero
+      points now triangulate to empty arrays; the unused `_undistort_points_for_camera` is deleted.
+      `matching_fitness.py:25` already skips a camera with no points.
+    - BLOCKER for the lock (F-S2, the user moves the pins, decision U1): skellycam pins
+      `opencv-contrib-python==4.12.*` (`skellycam/pyproject.toml:55`), skellytracker `==5.0.0.93`, and
+      freemocap's `uv.lock` holds 4.12.0.88. The Phase B venv has 5.0.0.93.
+      `tests/test_opencv_matches_skellytracker.py` fails when the installed OpenCV misses skellytracker's
+      requirement. Not changed here.
+    - F-S1/F-S4 (information): RTMW gate comparisons against sfn26 outputs (made on 4.12) use the
+      numerical profile tolerances, not bin-exact. Principal point: fixed, (w-1)/2, (h-1)/2 from
+      `cv2.initCameraMatrix2D` (`bundle_adjust.py:549-553`, same on 4.12 and 5.0, independent of the
+      corners); bundle adjustment optimises only rvec, tvec, focal, k1 (`camera_model_solver_ops.py:14-44`).
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).

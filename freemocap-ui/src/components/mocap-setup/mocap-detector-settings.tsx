@@ -5,6 +5,7 @@ import SettingRow from '@/components/common/settings-layout/setting-row';
 import SettingsGroupHeading from '@/components/common/settings-layout/settings-group-heading';
 import SettingToggleSwitch from '@/components/common/settings-layout/setting-toggle-switch';
 import {useMocap} from '@/hooks/useMocap';
+import {RTMW_CONFIDENCE_THRESHOLD} from '@/types/rtmw-confidence';
 import {DETECTOR_OPTIONS} from './detector-options';
 import {LegacyExecutionProviderNotice} from './legacy-execution-provider-notice';
 import {BOARD_GROUP_INFO, CHARUCO_INFO, DetectorSettingRows, type DetectorSettingsValue} from './detector-setting-rows';
@@ -33,7 +34,7 @@ export default function MocapDetectorSettings() {
         model: rtmPoseModelName ?? "rtmw-x-l_256x192",
         provider: executionProvider ?? null,
         device: executionDevice ?? null,
-        confidence: rtmPoseConfidenceThreshold ?? 0.4,
+        confidence: rtmPoseConfidenceThreshold ?? RTMW_CONFIDENCE_THRESHOLD,
     };
     /** Each field the rows report goes to its own setting in the store. */
     const applyChange = (change: Partial<DetectorSettingsValue>) => {

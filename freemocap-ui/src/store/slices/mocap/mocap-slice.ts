@@ -1,4 +1,5 @@
 import type {ExecutionProviderName} from '@/types/execution-provider';
+import {RTMW_CONFIDENCE_THRESHOLD} from '@/types/rtmw-confidence';
 import {migrateExportSettings, migrateRemovedDetectors, takeLegacyExecutionProvider} from '@/store/export-settings-migration';
 import {CameraMatchingOptions, defaultCameraMatchingOptions} from '@/types/camera-matching';
 import {createSelector, createSlice, PayloadAction} from '@reduxjs/toolkit';
@@ -132,7 +133,7 @@ const DEFAULT_MOCAP_CONFIG: MocapConfig = {
     charucoTrackingEnabled: true,
     detectorType: "rtmpose",
     rtmPoseModelName: "rtmw-x-l_256x192",
-    rtmPoseConfidenceThreshold: 0.004,
+    rtmPoseConfidenceThreshold: RTMW_CONFIDENCE_THRESHOLD,
     executionProvider: null,
     executionDevice: null,
     mediapipeNumHands: 2,

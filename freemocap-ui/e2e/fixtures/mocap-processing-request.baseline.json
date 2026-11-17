@@ -30,7 +30,7 @@
     },
     "detectorType": "rtmpose",
     "rtmPoseModelName": "rtmw-x-l_256x192",
-    "rtmPoseConfidenceThreshold": 0.004,
+    "rtmPoseConfidenceThreshold": 0.5,
     "executionProvider": null,
     "mediapipeNumHands": 2,
     "calibrationTomlPath": "/recordings/baseline/calibration.toml",

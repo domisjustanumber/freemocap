@@ -21,7 +21,7 @@ RTMPose is a top-down pose estimation model from MMPose, running via ONNX Runtim
 
 **Configuration** (`RTMPoseDetectorConfig`):
 - `model_name`: RTMPose model variant (e.g. `"rtmw-x-l_256x192"`) — trades off inference time vs detection quality
-- `confidence_threshold`: minimum confidence for a keypoint to be kept (a float, e.g. `0.004`)
+- `confidence_threshold`: minimum confidence for a keypoint to be kept, default `0.5`. The confidence is SkellyTracker's calibrated score in [0, 1]; 0.5 means even odds that the point is present and close to its true position
 
 **Two deployment modes:**
 

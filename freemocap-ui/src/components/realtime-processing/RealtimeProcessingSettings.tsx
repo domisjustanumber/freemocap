@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import {RTMW_CONFIDENCE_THRESHOLD} from '@/types/rtmw-confidence';
 import {useRealtimePipelineSync} from '@/hooks/useRealtimePipelineSync';
 import {useExecutionProviderOptions} from '@/hooks/useExecutionProviderOptions';
 import {DetectorSettingRows, type DetectorSettingsValue} from '@/components/mocap-setup/detector-setting-rows';
@@ -26,7 +27,7 @@ export default function RealtimeProcessingSettings({onClose}: {onClose: () => vo
     const providers = useExecutionProviderOptions(provider);
     const value: DetectorSettingsValue = {
         detector: camera.detector_type ?? 'rtmpose', model: camera.rtmpose_model_name ?? 'rtmw-x-l_256x192',
-        provider, confidence: camera.rtmpose_confidence_threshold ?? 0.0025, device,
+        provider, confidence: camera.rtmpose_confidence_threshold ?? RTMW_CONFIDENCE_THRESHOLD, device,
     };
     const changeDetector = (change: Partial<DetectorSettingsValue>) => applyOrUpdatePipelineConfig({
         ...pipelineConfig,

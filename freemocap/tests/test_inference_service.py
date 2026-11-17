@@ -44,7 +44,7 @@ class InferenceServiceTests(unittest.TestCase):
         return {camera: {"frame_index": frame.frame_index, "image_width": frame.image.shape[1], "image_height": frame.image.shape[0]} for camera, frame in frames.items()}
 
     @staticmethod
-    def observations(results, output_schema, detector_type, rtmw_min_score=0.4):
+    def observations(results, output_schema, detector_type, rtmw_min_score=0.5):
         return {camera: Observation(frame_number=result["frame_index"], image_size=(result["image_height"], result["image_width"]), stages={})
                 for camera, result in results.items()}
 

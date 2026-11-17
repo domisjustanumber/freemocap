@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from freemocap.core.tasks.triangulation.helpers.triangulation_config import TriangulationConfig
 from freemocap.core.tasks.calibration.camera_matching.matching_models import CameraMatchingConfig
 from freemocap.core.tracking.board_selection import CharucoBoardMode
+from freemocap.core.tracking.pipeline_runs import RTMW_MIN_SCORE
 from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 
@@ -82,14 +83,14 @@ class PosthocMocapPipelineConfig(BaseModel):
         description="RTMPose wholebody model variant. Only used when detector_type='rtmpose'.",
     )
     rtmpose_confidence_threshold: float = Field(
-        default=0.4,
+        default=RTMW_MIN_SCORE,
         alias="rtmPoseConfidenceThreshold",
         ge=0.0,
         le=1.0,
         description=(
-            "Keypoint confidence threshold for RTMPose (raw SIMCC peak clipped to "
-            "[0, 1]). 0.4 clears the model's no-person response band while keeping "
-            "~96% of visible keypoints. Only used when detector_type='rtmpose'."
+            "Keypoint confidence threshold for RTMPose. The score is skellytracker's calibrated "
+            "value in [0, 1]; 0.5 means even odds that the point is present and close to its true "
+            "position. Only used when detector_type='rtmpose'."
         ),
     )
     execution_provider: str | None = Field(

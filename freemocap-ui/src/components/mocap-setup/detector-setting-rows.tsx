@@ -39,6 +39,7 @@ export const CONFIDENCE_INFO = {
     title: "Confidence threshold",
     text: <>
         <p>Keypoints detected below this confidence are <strong>discarded before triangulation</strong>, so they never contribute to a 3D estimate.</p>
+        <p>The confidence runs from 0 to 1; 0.5 means even odds that the point is present and close to its true position.</p>
         <p><em>Raise it to reject noisy detections; lower it to keep sparse ones and rely on outlier rejection instead.</em></p>
     </>,
 };

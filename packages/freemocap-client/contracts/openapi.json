@@ -2316,7 +2316,7 @@
                         "skeleton_tracking_enabled": true,
                         "detector_type": "rtmpose",
                         "rtmpose_model_name": "rtmw-x-l_256x192",
-                        "rtmpose_confidence_threshold": 0.4,
+                        "rtmpose_confidence_threshold": 0.5,
                         "mediapipe_num_hands": 2,
                         "charuco_board": {
                           "squares_x": 5,
@@ -4623,7 +4623,7 @@
           "rtmpose_confidence_threshold": {
             "type": "number",
             "title": "Rtmpose Confidence Threshold",
-            "default": 0.4
+            "default": 0.5
           },
           "mediapipe_num_hands": {
             "type": "integer",
@@ -4682,7 +4682,7 @@
           "rtmpose_confidence_threshold": {
             "type": "number",
             "title": "Rtmpose Confidence Threshold",
-            "default": 0.4
+            "default": 0.5
           },
           "mediapipe_num_hands": {
             "type": "integer",
@@ -7095,8 +7095,8 @@
             "maximum": 1.0,
             "minimum": 0.0,
             "title": "Rtmposeconfidencethreshold",
-            "description": "Keypoint confidence threshold for RTMPose (raw SIMCC peak clipped to [0, 1]). 0.4 clears the model's no-person response band while keeping ~96% of visible keypoints. Only used when detector_type='rtmpose'.",
-            "default": 0.4
+            "description": "Keypoint confidence threshold for RTMPose. The score is skellytracker's calibrated value in [0, 1]; 0.5 means even odds that the point is present and close to its true position. Only used when detector_type='rtmpose'.",
+            "default": 0.5
           },
           "executionProvider": {
             "anyOf": [
@@ -7644,7 +7644,7 @@
                   "confidence_threshold": 0.4,
                   "detector_type": "rtmpose",
                   "mediapipe_num_hands": 2,
-                  "rtmpose_confidence_threshold": 0.4,
+                  "rtmpose_confidence_threshold": 0.5,
                   "rtmpose_model_name": "rtmw-x-l_256x192",
                   "skeleton_tracker_config": {
                     "preset_name": "rtmpose",

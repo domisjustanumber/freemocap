@@ -306,9 +306,8 @@ display, must say so explicitly; the UI must never infer it from a node name.
 4. **Plan identity on snapshots.** The snapshot carries an identity for the plan it is running and
    each node's stage, so a running task is drawn from its own plan, not from the settings being edited.
 5. **Operation id equals node id.** True in code today; state it as the contract in the code that builds operations.
-6. **RTMPose confidence default.** The UI default is 0.004 (`mocap-slice.ts`), the backend default is
-   0.4 (`mocap_task_config.py`). Check which value works on the reference recordings and report it;
-   the UI will use that value.
+6. **RTMPose confidence default.** Settled (user T1, 2026-11-16): 0.5 in the UI
+   (`src/types/rtmw-confidence.ts`) and the backend (`RTMW_MIN_SCORE`, `pipeline_runs.py`).
 
 ## Graph view rebuilt as the panel's sections (design canvas board 12)
 

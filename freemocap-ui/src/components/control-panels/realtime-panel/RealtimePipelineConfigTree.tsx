@@ -9,6 +9,7 @@ import {useExecutionProviderOptions} from "@/hooks/useExecutionProviderOptions";
 import {useRealtimePipelineSync} from "@/hooks/useRealtimePipelineSync";
 import {DetectorType, ExecutionProviderName, RTMPOSE_MODELS} from "@/store/slices/mocap";
 import {useAppDispatch, useAppSelector} from "@/store/hooks";
+import {RTMW_CONFIDENCE_THRESHOLD} from '@/types/rtmw-confidence';
 import {pipelineConfigUpdated, resetSkeletonFitter} from "@/store/slices/realtime";
 import ValueSelector from "@/components/ui-components/ValueSelector";
 import {selectLoadedCalibration} from "@/store/slices/calibration/calibration-slice";
@@ -218,7 +219,7 @@ export const RealtimePipelineConfigTree: React.FC<PipelineConfigTreeProps> = ({
                                 <div className="flex flex-row gap-1 items-center justify-content-space-between">
                                     <span className="text-sm">Confidence threshold</span>
                                     <ValueSelector
-                                        value={rtmPoseConfidenceThreshold ?? 0.004}
+                                        value={rtmPoseConfidenceThreshold ?? RTMW_CONFIDENCE_THRESHOLD}
                                         min={0} max={1} step={0.001} unit=""
                                         onChange={setRtmPoseConfidenceThreshold}
                                     />

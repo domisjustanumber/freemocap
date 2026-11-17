@@ -74,11 +74,11 @@ def _rtmw_result(schema, *, score, roi, present=True, person_ran=True):
                   "image_width": 640, "image_height": 480, "timestamp_ms": 5.0, "node_ran": {pipeline_runs.PERSON_NODE: person_ran}}}
 
 
-def test_rtmw_points_are_taken_by_name_and_gated_at_0_4(rtmw_schema):
+def test_rtmw_points_are_taken_by_name_and_gated_at_0_5(rtmw_schema):
     names = tuple(rtmw_schema[pipeline_runs.RTMW_NODE]["point_names"])
     score = np.full(len(names), 0.9)
-    score[names.index("body/left_shoulder")] = 0.39
-    score[names.index("body/right_shoulder")] = 0.4
+    score[names.index("body/left_shoulder")] = 0.49
+    score[names.index("body/right_shoulder")] = 0.5
     observation = pipeline_runs.observations_from_results(
         _rtmw_result(rtmw_schema, score=score, roi=(100.0, 50.0, 40.0, 20.0, 0.0)), rtmw_schema, "rtmpose")["0"]
     assert observation.frame_number == 12 and observation.image_size == (480, 640)
@@ -90,7 +90,7 @@ def test_rtmw_points_are_taken_by_name_and_gated_at_0_4(rtmw_schema):
     np.testing.assert_array_equal(keypoints.xyz_by_name("left_hand/wrist"), [column, column + 0.5, 0.0])
     assert np.isnan(keypoints.xyz_by_name("body/left_shoulder")).all()
     assert keypoints.visibility[keypoints.index_of("body/left_shoulder")] == 0.0
-    assert keypoints.visibility[keypoints.index_of("body/right_shoulder")] == 0.4
+    assert keypoints.visibility[keypoints.index_of("body/right_shoulder")] == 0.5
     box = stage.bounding_boxes[0]
     assert (box.x1, box.y1, box.x2, box.y2, box.confidence) == (80.0, 40.0, 120.0, 60.0, 0.8)
     assert stage.detector_ran

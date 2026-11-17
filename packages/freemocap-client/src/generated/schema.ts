@@ -1854,7 +1854,7 @@ export interface components {
             rtmpose_model_name?: "rtmw-x-l_256x192" | "rtmw-x-l_384x288" | "rtmw-l-m_256x192";
             /**
              * Rtmpose Confidence Threshold
-             * @default 0.4
+             * @default 0.5
              */
             rtmpose_confidence_threshold?: number;
             /**
@@ -1898,7 +1898,7 @@ export interface components {
             rtmpose_model_name?: "rtmw-x-l_256x192" | "rtmw-x-l_384x288" | "rtmw-l-m_256x192";
             /**
              * Rtmpose Confidence Threshold
-             * @default 0.4
+             * @default 0.5
              */
             rtmpose_confidence_threshold?: number;
             /**
@@ -2904,8 +2904,8 @@ export interface components {
             rtmPoseModelName?: "rtmw-x-l_256x192" | "rtmw-x-l_384x288" | "rtmw-l-m_256x192";
             /**
              * Rtmposeconfidencethreshold
-             * @description Keypoint confidence threshold for RTMPose (raw SIMCC peak clipped to [0, 1]). 0.4 clears the model's no-person response band while keeping ~96% of visible keypoints. Only used when detector_type='rtmpose'.
-             * @default 0.4
+             * @description Keypoint confidence threshold for RTMPose. The score is skellytracker's calibrated value in [0, 1]; 0.5 means even odds that the point is present and close to its true position. Only used when detector_type='rtmpose'.
+             * @default 0.5
              */
             rtmPoseConfidenceThreshold?: number;
             /**
@@ -3228,7 +3228,7 @@ export interface components {
              *         "confidence_threshold": 0.4,
              *         "detector_type": "rtmpose",
              *         "mediapipe_num_hands": 2,
-             *         "rtmpose_confidence_threshold": 0.4,
+             *         "rtmpose_confidence_threshold": 0.5,
              *         "rtmpose_model_name": "rtmw-x-l_256x192",
              *         "skeleton_tracker_config": {
              *           "preset_name": "rtmpose",

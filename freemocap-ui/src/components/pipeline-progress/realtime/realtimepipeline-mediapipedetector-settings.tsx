@@ -9,6 +9,7 @@ import { useExecutionProviderOptions } from '@/hooks/useExecutionProviderOptions
 import { DetectorType, ExecutionProviderName, RTMPOSE_MODELS, RTMPoseModelName } from '@/store/slices/mocap';
 import { CameraNodeConfig } from '@/store/slices/realtime/realtime-types';
 import { DETECTOR_OPTIONS } from '@/components/mocap-setup/detector-options';
+import {RTMW_CONFIDENCE_THRESHOLD} from '@/types/rtmw-confidence';
 import './realtime-settings.css';
 
 interface RTPSkeletonSetupProps {
@@ -75,7 +76,7 @@ const RTPSkeletonSetup: React.FC<RTPSkeletonSetupProps> = ({ open, onClose }) =>
                             options={RTMPOSE_MODELS}
                             onChange={(value: RTMPoseModelName) => handleCameraNodeUpdate({ rtmpose_model_name: value })}/>}/>
                     <SettingRow label="Confidence threshold" info={CONFIDENCE_INFO}
-                        control={<ValueSelector ariaLabel="Confidence threshold" value={cameraNodeConfig.rtmpose_confidence_threshold ?? 0.0025}
+                        control={<ValueSelector ariaLabel="Confidence threshold" value={cameraNodeConfig.rtmpose_confidence_threshold ?? RTMW_CONFIDENCE_THRESHOLD}
                             min={0} max={1} step={0.0005} unit=""
                             onChange={(v) => handleCameraNodeUpdate({ rtmpose_confidence_threshold: v })}/>}/>
                 </>}

@@ -365,7 +365,7 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     `licence_url` as a link (its URL as the text), `note` is a required string (contract patched).
     raw_score: not stored; the observation format has x, y, visibility only (`observation_samples.py:95`),
     no place for it. Fixtures: none replays skellytracker keypoints or a tap folder.
-    Thresholds (unchanged, user decision): `RTMW_MIN_SCORE = 0.4` (`pipeline_runs.py:31`, the default of
+    Thresholds before T1 (now 0.5, see the T1 bullet below): `RTMW_MIN_SCORE = 0.4` (`pipeline_runs.py:31`, the default of
     the user's RTMW threshold); `MocapTaskConfig.rtmpose_confidence_threshold` 0.4
     (`mocap_task_config.py:84-92`; its description still says "raw SIMCC peak clipped to [0, 1]; 0.4 clears
     the no-person band ... ~96% of visible keypoints", tuned on the raw peak, `ce168393`);
@@ -385,6 +385,15 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
       (72 s), mediapipe 2 passed (52 s).
     - Not done: no comparison with sfn26 outputs (made on OpenCV 4.12, ST `2d356a6c`); one would need the
       numerical profile tolerances, not bin-exact (F-S1, F-S4).
+  - T1 LANDED (2026-11-16, user T1 = A, §0.3): the RTMW keypoint confidence threshold is 0.5 everywhere.
+    Re-runs (gate3 in `0a1e712d-.../scratchpad/gate3/`): fast suite 1530 passed, the same 8 failed;
+    `test_fresh_posthoc.py` once: fresh calibration 0.361 px (gate2 0.366; the fresh calibration is not
+    seeded, see R1), then the same rename WinError 5 with 1 Blender window (closed after); 4 gate runs
+    passed (A rtmpose foot_support, A mediapipe body_reference, B 2+2). Gate A rtmpose OVERLAY_2D: 96,355 of
+    152,514 samples kept (63.2 %, min 0.5001) against 96,586 (63.3 %) at 0.4, so 231 samples (0.15 %) had a
+    score in [0.4, 0.5). Finite values against gate2: OVERLAY_2D -0.13 %, RAW_KEYPOINTS_3D -0.09 %,
+    KEYPOINTS_3D -0.02 %, LANDMARKS_3D -0.08 %, ROTATIONS_WORLD -0.05 %. Alignment still foot_support; the
+    person transform moved 0.38 degrees and 18 mm. Gate A mediapipe identical to gate2 (no gate changed).
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).
@@ -640,6 +649,32 @@ frames, each with `rtmpose` and with `mediapipe`.
   descriptors). Test `tests/test_run_save_session_roundtrip.py`.
 - X3 = A (2026-11-16, user): the supervisor investigates the OpenCV 5 charuco differences in
   skellytracker read only, from `scratchpad/bc/` (leave those files in place).
+- T1 = A (2026-11-16, user): the RTMW keypoint confidence threshold of freemocap is 0.5 everywhere. The score
+  is skellytracker's calibrated value in [0, 1]; 0.5 is even odds that the point is present and close to its
+  true position. One constant per language, no new abstraction:
+  - Python `RTMW_MIN_SCORE` (`freemocap/core/tracking/pipeline_runs.py`), read by
+    `MocapTaskConfig.rtmpose_confidence_threshold` and `CameraNodeConfig.rtmpose_confidence_threshold`.
+  - TS `RTMW_CONFIDENCE_THRESHOLD` (`freemocap-ui/src/types/rtmw-confidence.ts`, a leaf module so the slices
+    import it without an import cycle), read by both slice defaults and the four `??` fallbacks
+    (`RealtimeProcessingSettings.tsx`, `realtimepipeline-mediapipedetector-settings.tsx`,
+    `RealtimePipelineConfigTree.tsx`, `mocap-detector-settings.tsx`).
+  - Contract, generated schema, e2e baseline, `backend-mocap.mdx` and handoff item 6 updated.
+  - Not 0.5: `CameraNodeConfig.confidence_threshold` stays 0.4. It is one field for both detectors
+    (`realtime_aggregator_node.py:811` -> `temporal_pipeline.image_observation`). For RTMW it does nothing,
+    since points under `rtmpose_confidence_threshold` are already missing with score 0; for MediaPipe it is
+    the only gate, and MediaPipe thresholds are out of scope.
+  - Left as history or test input: `bench_*.py`, `experiments/`, `UI-TEST-BASELINE.md`,
+    `geometry-matcher-audit.md`, the prototype html, `detector-setting-rows.test.tsx` 0.0025,
+    `realtime-startup.spec` 0.0065.
+  - Saved settings: the UI saves the whole `mocap.config` on any change (`persistence-listener.ts:80-92`,
+    `settingsVersion` 1) and loads `{...DEFAULT_MOCAP_CONFIG, ...persisted}` (`mocap-slice.ts:152-170`). A
+    saved file cannot tell a default from a choice: it stores the old 0.004 as a value, and
+    `settingsVersion` only tells pre-ST2 files from v1. A user with an old file keeps 0.004 (which gates
+    almost nothing) until they change it; a new user gets 0.5. The realtime pipeline config is not saved,
+    so realtime gets 0.5 at every launch. No migration without the supervisor's word.
+  - Tests: `test_pipeline_runs.py` gates at 0.5 (0.49 missing, 0.5 kept); `test_inference_service.py` fake at
+    0.5; new `test_rtmw_threshold_matches_ui.py` (TS constant == `RTMW_MIN_SCORE` == 0.5); e2e
+    `mocap-backend-contract.spec.ts` checks the UI effective value == backend default == 0.5.
 
 ### 0.4 Open questions
 

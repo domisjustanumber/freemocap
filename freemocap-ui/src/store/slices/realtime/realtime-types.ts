@@ -1,5 +1,6 @@
 import {CameraMatchingOptions, defaultCameraMatchingOptions} from '@/types/camera-matching';
 import type {TemporalConfig, TemporalStatus} from '@/types/temporal-config';
+import {RTMW_CONFIDENCE_THRESHOLD} from '@/types/rtmw-confidence';
 import {DetectorType, ExecutionProviderName, RTMPoseModelName} from "@/store/slices/mocap";
 
 export interface CharucoBoardConfigForPipeline {
@@ -51,7 +52,7 @@ export const defaultRealtimePipelineConfig: RealtimePipelineConfig = {
         skeleton_tracking_enabled: true,
         detector_type: "rtmpose",
         rtmpose_model_name: "rtmw-x-l_256x192",
-        rtmpose_confidence_threshold: 0.0025,
+        rtmpose_confidence_threshold: RTMW_CONFIDENCE_THRESHOLD,
         mediapipe_num_hands: 2,
     },
     skeleton_inference_node_config: {

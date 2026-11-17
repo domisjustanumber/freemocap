@@ -42,6 +42,6 @@ print(json.dumps(result))
     const result=JSON.parse(output.trim().split('\n').at(-1)!);
     await info.attach('actual-ui-requests',{body:JSON.stringify(requests,null,2),contentType:'application/json'});
     await info.attach('backend-validation',{body:JSON.stringify(result,null,2),contentType:'application/json'});
-    expect(result.ui_effective).toBe(0.004);
-    expect(result.backend_default).toBe(0.4);
+    expect(result.ui_effective).toBe(result.backend_default);
+    expect(result.backend_default).toBe(0.5);
 });

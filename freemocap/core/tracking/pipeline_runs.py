@@ -28,8 +28,11 @@ RTMW_NODE = "wholebody"
 PERSON_NODE = "person"
 PERSON_ROI = "person_roi"
 HOLISTIC_NODE = "holistic"
-RTMW_MIN_SCORE = 0.4
-"""The default of the user's RTMW confidence threshold; a point with a lower score is missing, as on `sfn26`."""
+RTMW_MIN_SCORE = 0.5
+"""The default of the user's RTMW confidence threshold (user T1); a point with a lower score is missing.
+
+The score is skellytracker's calibrated value in [0, 1]: 0.5 is even odds that the point is present and close to
+its true position."""
 STAGE = "body"
 """The one stage of a converted observation; its point names are the `<group>/<point>` names of the run."""
 RUNNING_MODES = {"realtime": "live", "posthoc": "video"}

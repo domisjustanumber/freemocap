@@ -625,6 +625,19 @@ frames, each with `rtmpose` and with `mediapipe`.
          (`observation_arrays.py:118`), outlier rejection idle below 0.02 normalized (about 17 px;
          `triangulator.py:245-248`); dropping the worst camera would pass 800 of 1108 frames but only hides the
          disagreement. Options (skellytracker, Core, skellyforge) to the supervisor; no fix made.
+         User ruling A5 = A: recorded and parked (older than the migration); possible next step, no go: a measured
+         trial of a triangulation change (score or residual weighting, a pixel outlier limit) on more sample
+         recordings, without landing it.
+       - UI review against upstream sfn26 ca0c17cc (user: "the UI must use the upstream sfn26 as its base"; "yes to
+         all"). W1-W6 keep every new element where it is: the gear flyout next to the lightning bolt, "Open metrics"
+         on the posthoc card, system information only in the metrics window, the Auto offers note and the Device row
+         under the Execution provider row, the two migration notices at the top of posthoc 2D tracking, the DEV
+         legacy toggle. W7 = A DONE `0d0f73b7`: the upstream help sentences are back for RTMW ("Uses GPU batched
+         inference when available") and MediaPipe ("CPU only; runs per camera without GPU batching"), both checked
+         true on 2.0; the Execution provider row shows for RTMW with Auto and the saved key before the server answers
+         or while disconnected (`detectorShowsExecutionProvider`), and the server's flag decides after (MediaPipe:
+         false). The new UI keys exist only in English; the 40 other locales fall back to it (`i18n.ts:54,168`).
+       - V1 = A DONE `59dbe765`: timeline bars shorter than 0.5 ms are hidden; the table keeps every stage.
        - ST `db155c3a` (cpu_threads default 10 here): fast suite 1587 passed, the same 8 failed; seeded test_data gate
          97,425 kept, 0.314339 px, record `cpu_threads: 10`, parquet exactly equal to the `19b55b1d` cpu output.
        - Later, no go yet: show the applied `cpu_threads` in the metrics window's "Models of this run" group, and

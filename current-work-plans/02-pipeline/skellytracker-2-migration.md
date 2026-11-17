@@ -638,6 +638,31 @@ frames, each with `rtmpose` and with `mediapipe`.
          or while disconnected (`detectorShowsExecutionProvider`), and the server's flag decides after (MediaPipe:
          false). The new UI keys exist only in English; the 40 other locales fall back to it (`i18n.ts:54,168`).
        - V1 = A DONE `59dbe765`: timeline bars shorter than 0.5 ms are hidden; the table keeps every stage.
+       - ADR-9HTX STAGE 5 (user go; IN PROGRESS). Worktree `../freemocap-stage5`, local branch `stage5-node-redesign`
+         from `4c1b7955`; run with venv313 python and PYTHONPATH = "<stage5 worktree>;<../skellytracker-node-redesign>"
+         (venv313 adds skellytracker by a static .pth and freemocap by an appended meta-path finder, so PYTHONPATH
+         wins; the main `.venv`, `uv.lock` and this checkout are untouched). Stage 4 (read only):
+         `../skellytracker-node-redesign`, branch `dom/pipeline-node-redesign`, 762b9617 (result keys `wholebody`
+         CanonicalKeypoints, `boxes` OutputBoxes with `xyxy`/`score`=instance_score/`detector_ran`; schema
+         `point_names`/`edges`). Spec: that worktree's `specs/pipeline/proposals/node-and-port-redesign.md` §9.5.
+         - `72d524ca` main reader: `pipeline_runs.py` reads `result["wholebody"]` directly and
+           `result["boxes"]` (`BOXES_OUTPUT`), `xyxy[0]` clipped and int() as before, `detector_ran[0]`;
+           `PERSON_NODE`/`CROP_BOX`/`to_canonical` gone; `point_names`/`edges` replace `canonical_*`;
+           `test_pipeline_runs.py` builds the delivered values (19 passed). `PERSON_NODE` is now a local label in
+           `legacy_tracker_run.py` (supervisor: fine). Boxes stay bit-identical (`values.py:115,127-128`).
+         - Fast suite on the branch against 762b9617: 1582 passed, 12 failed = the known 8 + 4 in
+           `test_legacy_tracker_run.py`.
+         - The seam (user answer "C" = option (a)): skellytracker adds a temporary public function giving a keypoints
+           port's raw `point_names` and `groups`; the seam then builds its `InstanceKeypoints` and calls
+           `to_canonical(value, groups)`. The redesign branch is being rebased (SHAs change). WAIT for the
+           supervisor's message with the new SHA and the exact call, then fix `observations_from_legacy`.
+         - Then: fast suite, and the seeded numerical gate (cpu pinned) on test_data, which must equal today's
+           sidecar-implementation output (97,425 kept, 0.314339 px, parquet equal). Grep is done: no other reader of
+           the old form in code (`pipeline_timing_events.py` stage names unchanged, no test pins d90d5f41).
+         - Report to the supervisor: commits, changed lines, test and gate numbers, what was not checked. Stage 5
+           moves to sidecar-implementation only with stage 4, after the user says so.
+       - Scratch from today (session 0a1e712d scratchpad): `sample/heading/`, `sample/torso/`, `sample/hip/`
+         (341 MB dumps), `stage5/fast*.log`. No temp roots or app processes are left; the user's test app is stopped.
        - ST `db155c3a` (cpu_threads default 10 here): fast suite 1587 passed, the same 8 failed; seeded test_data gate
          97,425 kept, 0.314339 px, record `cpu_threads: 10`, parquet exactly equal to the `19b55b1d` cpu output.
        - Later, no go yet: show the applied `cpu_threads` in the metrics window's "Models of this run" group, and

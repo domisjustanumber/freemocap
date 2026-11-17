@@ -499,7 +499,7 @@ frames, each with `rtmpose` and with `mediapipe`.
    - posthoc calibration is out.
    - **State on 2026-11-17 (IN PROGRESS, local commits only).** All questions are ruled (plan §10.6-§10.7, and
      the user's later rulings listed below).
-     - Scratch ST clone: `0a50c719`.
+     - Scratch ST clone: `19b55b1d` (fast-forwarded 2026-11-17 from `0a50c719`; ADR-9HTX stages 1-3).
      - Phase B venv: `.../phaseb/venv313`; onnx 1.22.0 and ml-dtypes 0.7.0 are installed there.
      - Commits, oldest first:
        - `351391ea` timing model;
@@ -543,11 +543,34 @@ frames, each with `rtmpose` and with `mediapipe`.
        - span cost on ST 0a50c719 is about 0: cpu within noise, cuda 0.0 %, trt-rtx +0.08 ms;
        - legacy against 2.0 on cuda at matched fp32: about 16-17 ms/frame for both;
        - on cpu, legacy is single-threaded (ORT 1 thread), against the ORT default for 2.0.
+     - Supervisor rulings of 2026-11-17 after the final report, DONE:
+       - `354dd036` frames opt-out: a connection sends `{"frames": false}` (StrictBool, invalid closes 1008;
+         default true, so a new connection gets frames until it restates). `FrameRelay.frames_wanted` = false
+         means its source never runs (no JPEG resize, compose or encode, and no `framerate`). `TransportService`
+         option `frames: false` sends it on every connect; the metrics window uses it. Real-connection test in
+         `test_pipeline_timing_relay.py` (fails without the relay change); message-protocol.md and the client
+         README updated; coverage:check 70 verified.
+       - `e80896a1` window title "FreeMoCap pipeline metrics" (document.title), and "Models of this run" asks
+         `system_information` again every 2 s, up to 30 times per run, while the shown answer lists no models for
+         the selected run (`runAwaitingModels`). Fills for posthoc and realtime without a refresh.
+       - Re-measured (`<scratchpad>/st19/frames_cost.py`, one webcam 640x480, realtime timed on trt-rtx, a
+         `main` reader connection throughout, 3 interleaved rounds of 15 s): backend process CPU with no extra
+         connection 99.3/90.0/87.0 % of a core; an extra timing connection WITH frames 113.9/114.1/105.0 %
+         (+19 %, 3.73 MiB/s, 30 frames/s); one DECLINING frames 89.0/82.8/91.6 % (within noise, 80 KiB/s,
+         4 timing/s). Main reader 29.4 fps throughout. Electron hand-run (`<scratchpad>/st19/hand2/`): all
+         steps pass, sent `{"frames":false}` then `{"pipelineTiming":true}`, window wire 6.3 messages/s and
+         70 KiB/s (was 36/s and 3.2 MiB/s), renderer 1.2 % of a core, no page errors.
+       - ST `19b55b1d` check: no freemocap use of `port_type`, `tensor`/`any`, image taps. Fast suite 1586 passed,
+         the same 8 failed, 20 skipped. Seeded numerical fresh gate: 0.314339 px, foot_support; the output parquet
+         is exactly equal to one made at `0a50c719` in the same session (11 columns, 1,889,442 rows), and two runs
+         at `19b55b1d` are equal. Kept OVERLAY_2D is 97,438 at both heads, against 97,425 at the box rename
+         (`803c33fa`): that 13-point shift predates this update and was not investigated. Metrics window rows are
+         unchanged against the earlier hand-run: posthoc 14 rows, `person.*` on 1 of 120 frames (`run_if` false
+         gives no spans), the others on 120; realtime the same nodes.
      - Next:
-       - final report sent to the supervisor (2026-11-17); wait for its ruling on the frame opt-out and for the
-         user's manual tests;
-       - known gaps: "Models of this run" for posthoc fills only after a refresh; the metrics window's title is the
-         page's ("FreeMoCap"), not "FreeMoCap pipeline metrics".
+       - wait for the user's manual tests, and for the supervisor's design and go for ADR-9HTX stages 4 and 5
+         (result form: `outputs` with `wholebody`/`holistic`/`boxes`; `crop_box`/`detector_box` go; changes
+         `pipeline_runs.py`). Do not start them before the go.
 
 ### 0.3 Decisions of the user (all 2026-11-16, through the supervisor)
 

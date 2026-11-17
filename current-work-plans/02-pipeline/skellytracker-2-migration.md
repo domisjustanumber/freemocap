@@ -675,6 +675,26 @@ frames, each with `rtmpose` and with `mediapipe`.
   - Tests: `test_pipeline_runs.py` gates at 0.5 (0.49 missing, 0.5 kept); `test_inference_service.py` fake at
     0.5; new `test_rtmw_threshold_matches_ui.py` (TS constant == `RTMW_MIN_SCORE` == 0.5); e2e
     `mocap-backend-contract.spec.ts` checks the UI effective value == backend default == 0.5.
+- R1 = A (2026-11-16, user): the calibration gets a fixed random generator, passed in, for the dataset tools'
+  NUMERICAL profile only. No global seed; other profiles and the app pass none and stay unseeded.
+  - An optional `rng: np.random.Generator | None` parameter runs `run_anipose_calibration` ->
+    `calibrate_cameras_from_rows` -> `iterative_bundle_adjustment` -> `resample_points` (the tie-break,
+    `freemocap_anipose.py`) and `bundle_adjust` -> `_initialize_params_bundle` (the camera that seeds each
+    board pose, `bundle_adjust.py`). None uses the global numpy generator through the same calls as before.
+  - `PosthocCalibrationPipelineConfig.random_seed: SkipJsonSchema[int | None] = None` (not in the API
+    contract). `_run_anipose_path` makes `np.random.default_rng(seed)` when set, and `preparation.py` sets 0
+    when `output_profile == 'numerical'`.
+  - Other randomness: a grep of `freemocap/` (outside the tests) for random, RANSAC, shuffle and sample finds
+    only these two. skellyforge ground alignment already uses `default_rng(seed=0)`.
+  - Tests: `tests/calibration/test_calibration_rng.py` on a synthetic 3-camera scene. The same seed gives
+    exactly equal error and camera parameters and leaves the global generator alone; another seed differs.
+    Without a generator the global seed drives the result.
+  - Runs: `process test_data --tracker-preset rtmpose --calibration fresh --output-profile numerical`, twice
+    (45 s, 46 s). Calibration error 0.290199 px both times. foot_support, person transform equal to every
+    printed digit, and finite values equal. The camera numbers in the calibration TOML are equal; only
+    solver_time, paths, uuid and timestamps differ. The parquet hash differs only through the
+    `freemocap.recording` metadata: all 11 columns and 1,889,442 rows are exactly equal. So nothing else
+    varies (no thread-order effect seen). Fast suite: 1532 passed, the same 8 failed.
 
 ### 0.4 Open questions
 

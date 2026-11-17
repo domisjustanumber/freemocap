@@ -171,6 +171,7 @@ def _run_anipose_path(
         recording_info=recording_info,
         video_metadata=video_metadata,
         use_charuco_as_groundplane=task_config.use_groundplane,
+        rng=None if task_config.random_seed is None else np.random.default_rng(task_config.random_seed),
     )
 
     logger.info(

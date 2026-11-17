@@ -4,6 +4,7 @@ from freemocap.core.tracking.board_selection import CharucoBoardMode
 from freemocap.core.tasks.calibration.shared.groundplane_alignment import CalibrationAlignmentMethod
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.json_schema import SkipJsonSchema
 from skellytracker.core.detectors.calibration import CharucoBoardDefinition
 
 from freemocap.core.tasks.triangulation.helpers.triangulation_config import TriangulationConfig
@@ -42,6 +43,15 @@ class PosthocCalibrationPipelineConfig(BaseModel):
         description=(
             "Configuration for the post-calibration triangulator: simple DLT "
             "vs. subset-ensemble outlier rejection, plus the outlier-rejection knobs."
+        ),
+    )
+
+    random_seed: SkipJsonSchema[int | None] = Field(
+        default=None,
+        description=(
+            "Seed of the calibration's own random generator, so two calibrations of the same input give the same"
+            " numbers. Set only by the dataset tools' numerical profile (user R1); the app leaves it unset (fresh"
+            " randomness) and the field is not part of the API contract."
         ),
     )
 

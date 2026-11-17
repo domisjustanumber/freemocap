@@ -7,6 +7,8 @@ import logging
 import time
 from pathlib import Path
 
+import numpy as np
+
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
 from skellycam.core.types.type_overloads import CameraIdString
 from skellytracker.core.data_primitives.observation import Observation
@@ -40,8 +42,9 @@ def run_anipose_calibration(
     recording_info: RecordingInfo,
     pin_camera_0_to_origin: bool = True,
     use_charuco_as_groundplane: bool = True,
+    rng: np.random.Generator | None = None,
 ) -> tuple[CalibrationResult, GroundPlaneResult | None]:
-    """Run anipose calibration from charuco observations."""
+    """Run anipose calibration from charuco observations; `rng` None keeps the global numpy generator."""
     t_start = time.perf_counter()
 
     cameras: list[CameraModel] = [
@@ -84,6 +87,7 @@ def run_anipose_calibration(
         cameras=cameras,
         all_rows=all_camera_rows,
         board=board,
+        rng=rng,
     )
 
     logger.info(f"Anipose calibration completed — error: {error}")

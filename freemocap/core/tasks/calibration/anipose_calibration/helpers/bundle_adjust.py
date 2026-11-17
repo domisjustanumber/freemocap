@@ -160,10 +160,12 @@ def iterative_bundle_adjustment(
         num_samples_per_iteration: int = 100,
         num_samples_full: int = 1000,
         error_threshold: float = 0.3,
+        rng: np.random.Generator | None = None,
 ) -> float:
     """Iterative bundle adjustment with a decaying outlier-rejection schedule.
 
-    Mutates `cameras` in place. Returns the final median reprojection error.
+    Mutates `cameras` in place. Returns the final median reprojection error. `rng` drives the point
+    resampling and the board-pose seeding; None uses the global numpy generator.
     """
     if points_2d.shape[0] != len(cameras):
         raise ValueError(
@@ -175,7 +177,7 @@ def iterative_bundle_adjustment(
     board_observations_full = board_observations
 
     points_2d, board_observations = resample_points(
-        points_2d_full, board_observations_full, num_samples=num_samples_full
+        points_2d_full, board_observations_full, num_samples=num_samples_full, rng=rng
     )
     error = average_error(cameras, points_2d, median=True)
 
@@ -185,7 +187,7 @@ def iterative_bundle_adjustment(
 
     for iteration in range(num_iterations):
         points_2d, board_observations = resample_points(
-            points_2d_full, board_observations_full, num_samples=num_samples_full
+            points_2d_full, board_observations_full, num_samples=num_samples_full, rng=rng
         )
         points_3d = triangulate(cameras, points_2d)
         errors_full = reprojection_error(cameras, points_3d, points_2d, mean=False)
@@ -203,7 +205,7 @@ def iterative_bundle_adjustment(
         good = errors_norm < mu
         board_observations_good = subset_extra(board_observations, good)
         points_2d_samp, board_observations_samp = resample_points(
-            points_2d[:, good], board_observations_good, num_samples=num_samples_per_iteration
+            points_2d[:, good], board_observations_good, num_samples=num_samples_per_iteration, rng=rng
         )
 
         error = float(np.median(errors_norm))
@@ -221,10 +223,11 @@ def iterative_bundle_adjustment(
             loss="linear",
             ftol=ftol,
             max_nfev=max_nfev,
+            rng=rng,
         )
 
     points_2d, board_observations = resample_points(
-        points_2d_full, board_observations_full, num_samples=num_samples_full
+        points_2d_full, board_observations_full, num_samples=num_samples_full, rng=rng
     )
     points_3d = triangulate(cameras, points_2d)
     errors_full = reprojection_error(cameras, points_3d, points_2d, mean=False)
@@ -248,6 +251,7 @@ def iterative_bundle_adjustment(
         loss="linear",
         ftol=ftol,
         max_nfev=max(200, max_nfev),
+        rng=rng,
     )
 
     return average_error(cameras, points_2d, median=True)
@@ -262,6 +266,7 @@ def bundle_adjust(
         ftol: float = 1e-4,
         max_nfev: int = 1000,
         start_params: NDArray[np.float64] | None = None,
+        rng: np.random.Generator | None = None,
 ) -> float:
     """Single scipy.least_squares bundle-adjust pass; mutates cameras in place."""
     if points_2d.shape[0] != len(cameras):
@@ -272,7 +277,7 @@ def bundle_adjust(
 
     board_observations.corner_ids_map = remap_ids(board_observations.corner_ids)
 
-    x0, num_camera_params = _initialize_params_bundle(cameras, points_2d, board_observations)
+    x0, num_camera_params = _initialize_params_bundle(cameras, points_2d, board_observations, rng)
 
     if start_params is not None:
         x0 = start_params
@@ -451,6 +456,7 @@ def _initialize_params_bundle(
         cameras: list[CameraModel],
         points_2d: NDArray[np.float64],
         board_observations: BoardObservations,
+        rng: np.random.Generator | None = None,
 ) -> tuple[NDArray[np.float64], int]:
     """Build the initial parameter vector for bundle adjustment.
 
@@ -480,7 +486,7 @@ def _initialize_params_bundle(
         for board_num in range(num_boards):
             point_id = np.where(ids == board_num)[0][0]
             cam_ids_possible = np.where(~np.isnan(points_2d[:, point_id, 0]))[0]
-            cam_id = np.random.choice(cam_ids_possible)
+            cam_id = (np.random if rng is None else rng).choice(cam_ids_possible)
             M_cam = build_transformation_matrix(
                 cameras[cam_id].extrinsics.rodrigues_vector,
                 cameras[cam_id].extrinsics.translation,
@@ -512,6 +518,7 @@ def calibrate_cameras_from_rows(
         cameras: list[CameraModel],
         all_rows: list[list[dict[str, Any]]],
         board: CharucoBoardDefinition,
+        rng: np.random.Generator | None = None,
 ) -> tuple[float, list, list]:
     """Calibrate cameras from charuco board observation rows.
 
@@ -588,7 +595,7 @@ def calibrate_cameras_from_rows(
     apply_extrinsics(cameras, rvecs, tvecs)
 
     logger.info("Starting iterative bundle adjustment...")
-    error = iterative_bundle_adjustment(cameras, image_points, board_observations, error_threshold=1.0)
+    error = iterative_bundle_adjustment(cameras, image_points, board_observations, error_threshold=1.0, rng=rng)
     logger.info(f"Calibration complete — final error: {error:.4f}")
 
     return error, merged, charuco_frames

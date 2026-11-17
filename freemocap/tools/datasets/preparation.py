@@ -215,7 +215,8 @@ def _run_worker(request_path: Path, phases) -> None:
     try:
         with phases.measure('workflow.inference_service_start'):
             service.start()
-        calibration_config = PosthocCalibrationPipelineConfig(board_mode=CharucoBoardMode.EXPLICIT, charuco_board=board)
+        calibration_config = PosthocCalibrationPipelineConfig(board_mode=CharucoBoardMode.EXPLICIT, charuco_board=board,
+                                                              random_seed=0 if profile == 'numerical' else None)
         calibration_status = None
         if request.get('calibration_mode', 'fresh') == 'fresh':
             with phases.measure('workflow.calibration'):

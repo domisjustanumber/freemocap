@@ -92,6 +92,7 @@ def resample_points(
         image_points: np.ndarray,
         board_observations: BoardObservations,
         num_samples: int = 25,
+        rng: np.random.Generator | None = None,
 ) -> tuple[np.ndarray, BoardObservations]:
     """Subsample 2-D image points for bundle adjustment, prioritizing multi-camera coverage.
 
@@ -102,6 +103,7 @@ def resample_points(
         image_points: (num_cameras, N, 2) array; NaN where a camera has no observation.
         board_observations: Optional board data to subset in parallel with points.
         num_samples: Maximum points to sample per camera pair.
+        rng: Generator for the tie-break; None uses the global numpy generator.
 
     Returns:
         Tuple of (subsetted image_points, subsetted board_observations).
@@ -119,7 +121,7 @@ def resample_points(
             n_good = np.sum(subset)
             if n_good > 0:
                 arr = np.copy(num_cams_per_point[subset]).astype("float64")
-                arr += np.random.random(size=arr.shape)
+                arr += (np.random if rng is None else rng).random(size=arr.shape)
                 picked_ix = np.argsort(-arr)[:num_samples]
                 picked = ixs[subset][picked_ix]
                 include.update(picked)

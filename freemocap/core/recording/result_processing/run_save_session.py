@@ -55,10 +55,17 @@ class RunSaveSession:
         return self.target_run_id if self.published else self.source_run_id
 
     def check(self, metadata: RecordingMetadata | None) -> None:
-        if metadata != self.expected_metadata:
+        if _stored_form(metadata) != _stored_form(self.expected_metadata):
             raise ValueError('Recording changed after selecting the processing run; reload and try again')
 
     def accept(self, metadata: RecordingMetadata) -> RecordingMetadata:
         self.expected_metadata = metadata
         self.published = True
         return metadata
+
+
+def _stored_form(metadata: RecordingMetadata | None) -> RecordingMetadata | None:
+    """The descriptor as the Parquet file stores and reads it: JSON keeps a non-finite float, such as a camera
+    assignment fitness error, as null ("no value") on purpose, so an accepted descriptor and its read-back
+    compare equal. Compared as models, not JSON text, because set fields serialize in no fixed order."""
+    return None if metadata is None else RecordingMetadata.model_validate_json(metadata.model_dump_json())

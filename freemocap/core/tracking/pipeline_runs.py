@@ -131,8 +131,8 @@ def observations_from_results(results: Mapping[str, Mapping[str, Any]], output_s
     Points are taken by name: RTMW through `to_canonical`, Holistic by its point names. An RTMW
     point with a score below `rtmw_min_score` or no x and y is missing (NaN, score 0); a kept 2D point has z 0.
     Only row 0 (the one person) is read, and only when it is present.
-    The recording format stores a confidence in [0, 1]; a skellytracker score has no fixed range. So the gate
-    reads the raw score and the stored confidence is then clipped to [0, 1], for every detector (NaN stays NaN).
+    The stored confidence is skellytracker's `score`, in [0, 1]: for RTMW the calibrated chance that the point is
+    present and close to the true position (0.5 = even odds), for Holistic the visibility. Its `raw_score` is not stored.
     """
     # shortcut: the observation type is still skellytracker's; the user's answer to V1 sets freemocap's own.
     from skellytracker.core.data_primitives import BoundingBox, Keypoints, Observation, StageObservation
@@ -159,7 +159,7 @@ def observations_from_results(results: Mapping[str, Mapping[str, Any]], output_s
             names, xyz, score = _person(value.point_names, value.xy, value.z, value.score, value.present)
             detector_ran = True  # Holistic has no person detector
         stage = StageObservation(name=STAGE, bounding_boxes=boxes, detector_ran=detector_ran,
-                                 keypoints=Keypoints(names=tuple(names), xyz=xyz, visibility=np.clip(score, 0.0, 1.0)))
+                                 keypoints=Keypoints(names=tuple(names), xyz=xyz, visibility=score))
         observations[camera_id] = Observation(frame_number=int(result["frame_index"]), image_size=(height, width),
                                               stages={STAGE: stage})
     return observations

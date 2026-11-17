@@ -66,7 +66,9 @@ def _rtmw_result(schema, *, score, roi, present=True, person_ran=True):
     from skellytracker.core.pipelines import InstanceKeypoints, InstanceRois
     names = tuple(schema[pipeline_runs.RTMW_NODE]["point_names"])
     xy = np.stack([np.arange(len(names), dtype=float), np.arange(len(names), dtype=float) + 0.5], axis=-1)
-    keypoints = InstanceKeypoints(names, xy[None], np.asarray(score, float)[None], np.ones(1), np.array([present]), np.array([-1]))
+    # raw_score is skellytracker's decode score before its [0, 1] map; freemocap does not read it.
+    keypoints = InstanceKeypoints(names, xy[None], np.asarray(score, float)[None], np.asarray(score, float)[None],
+                                  np.ones(1), np.array([present]), np.array([-1]))
     rois = InstanceRois(np.asarray([roi], float), np.array([0.8]), np.array([present]))
     return {"0": {pipeline_runs.RTMW_NODE: keypoints, pipeline_runs.PERSON_ROI: rois, "frame_index": 12,
                   "image_width": 640, "image_height": 480, "timestamp_ms": 5.0, "node_ran": {pipeline_runs.PERSON_NODE: person_ran}}}
@@ -193,23 +195,24 @@ def test_the_record_of_a_real_run_is_the_exported_pipeline_and_the_ep_choice_as_
     assert record["execution"] == {"selected": "cpu", "selected_device": None, "requested": "cpu", "options": None, "device": None}
 
 
-def test_the_stored_confidence_is_the_raw_score_clipped_to_0_1_after_the_gate(rtmw_schema):
-    """A skellytracker score has no fixed range; the recording format stores a confidence in [0, 1]."""
+def test_the_stored_confidence_is_the_score_after_the_gate_and_raw_score_is_not_stored(rtmw_schema):
+    """skellytracker's score is in [0, 1] (RTMW calibrated, Holistic visibility); freemocap stores it as given."""
     names = tuple(rtmw_schema[pipeline_runs.RTMW_NODE]["point_names"])
     score = np.full(len(names), 0.9)
-    score[names.index("body/left_shoulder")] = 1.3
-    score[names.index("body/right_shoulder")] = -0.2
+    score[names.index("body/left_shoulder")] = 0.97
+    score[names.index("body/right_shoulder")] = 0.3
     keypoints = pipeline_runs.observations_from_results(
         _rtmw_result(rtmw_schema, score=score, roi=(100.0, 50.0, 40.0, 20.0, 0.0)), rtmw_schema, "rtmpose")["0"].stages[pipeline_runs.STAGE].keypoints
-    assert keypoints.visibility[keypoints.index_of("body/left_shoulder")] == 1.0
+    assert keypoints.visibility[keypoints.index_of("body/left_shoulder")] == 0.97
     assert np.isfinite(keypoints.xyz_by_name("body/left_shoulder")).all()
     assert keypoints.visibility[keypoints.index_of("body/right_shoulder")] == 0.0  # below the gate: missing
     assert np.isnan(keypoints.xyz_by_name("body/right_shoulder")).all()
 
     from skellytracker.core.pipelines import InstanceKeypoints
     holistic_names = ("body/nose", "body/left_eye", "body/right_eye")
-    value = InstanceKeypoints(holistic_names, np.ones((1, 3, 2)), np.array([[1.3, -0.2, np.nan]]), np.ones(1), np.array([True]),
+    visibility = np.array([[0.8, 0.1, np.nan]])
+    value = InstanceKeypoints(holistic_names, np.ones((1, 3, 2)), visibility, visibility.copy(), np.ones(1), np.array([True]),
                               np.array([-1]), z=np.zeros((1, 3)))
     result = {"0": {pipeline_runs.HOLISTIC_NODE: value, "frame_index": 0, "image_width": 64, "image_height": 48}}
-    visibility = pipeline_runs.observations_from_results(result, {}, "mediapipe")["0"].stages[pipeline_runs.STAGE].keypoints.visibility
-    assert visibility[0] == 1.0 and visibility[1] == 0.0 and np.isnan(visibility[2])
+    stored = pipeline_runs.observations_from_results(result, {}, "mediapipe")["0"].stages[pipeline_runs.STAGE].keypoints.visibility
+    assert stored[0] == 0.8 and stored[1] == 0.1 and np.isnan(stored[2])

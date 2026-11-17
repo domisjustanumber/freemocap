@@ -19,7 +19,7 @@ from skellytracker.core.tracker.task_events import TrackerTaskEvent
 import freemocap.core.tracking.legacy_tracker_run as legacy
 from freemocap.core.pipeline.inference_service import InferenceClient, InferenceMode, InferenceRegistration, InferenceService
 from freemocap.core.pipeline.realtime.realtime_skeleton_inference_node_config import RealtimeSkeletonInferenceNodeConfig
-from freemocap.core.tracking.pipeline_runs import _output_schema, detector_point_names
+from freemocap.core.tracking.pipeline_runs import detector_point_names
 
 CAMERAS = ("cam0", "cam1", "cam2")
 CUDA, TRT_RTX = legacy.CUDA, legacy.TRT_RTX
@@ -99,9 +99,10 @@ def _old_observation(frame: int) -> Observation:
 
 
 def test_old_points_get_the_2_0_canonical_names_and_keep_their_raw_scores():
-    converted = legacy.observations_from_legacy({"cam0": _old_observation(4)}, _output_schema("rtmpose"))["cam0"]
+    converted = legacy.observations_from_legacy({"cam0": _old_observation(4)}, legacy.wholebody_port())["cam0"]
     stage = converted.stages["body"]
     names = detector_point_names("rtmpose")
+    assert len(legacy.wholebody_port().point_names) == 133 and len(names) == 137  # raw port names in, canonical out
     assert stage.keypoints.names == names
     assert (converted.frame_number, converted.image_size, stage.detector_ran) == (4, (480, 640), False)
     assert stage.bounding_boxes == [BoundingBox(1, 2, 300, 400, 0.9)]
@@ -112,13 +113,13 @@ def test_old_points_get_the_2_0_canonical_names_and_keep_their_raw_scores():
     with pytest.raises(ValueError, match="gave 17 points"):
         old = _old_observation(0)
         old.stages["body"].keypoints = Keypoints(names=tuple("abcdefghijklmnopq"), xyz=np.zeros((17, 3)), visibility=np.ones(17))
-        legacy.observations_from_legacy({"cam0": old}, _output_schema("rtmpose"))
+        legacy.observations_from_legacy({"cam0": old}, legacy.wholebody_port())
 
 
 def test_legacy_points_are_gated_at_the_old_threshold_and_the_aggregator_uses_it_for_legacy_runs():
     old = _old_observation(4)
     old.stages["body"].keypoints.visibility[0] = 0.0024  # the old point 0 is body/nose
-    converted = legacy.observations_from_legacy({"cam0": old}, _output_schema("rtmpose"))["cam0"].stages["body"].keypoints
+    converted = legacy.observations_from_legacy({"cam0": old}, legacy.wholebody_port())["cam0"].stages["body"].keypoints
     nose = detector_point_names("rtmpose").index("body/nose")
     assert np.isnan(converted.xyz[nose]).all() and converted.visibility[nose] == 0.0
     from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig

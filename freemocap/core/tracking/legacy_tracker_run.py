@@ -3,7 +3,8 @@
 
 It exists to compare the old run code with the 2.0 pipeline on the metrics timeline, and nothing is saved from it.
 The session and the Tracker are built as the old freemocap factory built them (`dadfe94c:tracker_factory.py:67-143`).
-The old RTMW points become the 2.0 canonical names through `to_canonical`, so mapping and overlays need nothing new.
+The old RTMW points take the raw names of the 2.0 `wholebody.keypoints` port and become its canonical names through
+`to_canonical`, so mapping and overlays need nothing new.
 Its scores stay the old raw SimCC scores (old detector threshold 0.004); `rtmpose_confidence_threshold` is not applied.
 """
 from collections.abc import Callable, Mapping, Sequence
@@ -14,7 +15,7 @@ import numpy as np
 
 from freemocap.core.pipeline.pipeline_timing_events import SKELETON_INFERENCE, span_event
 from freemocap.core.pipeline.pipeline_timing_task_ids import batch_task_id, camera_task_id
-from freemocap.core.tracking.pipeline_runs import RTMW_NODE, STAGE, _output_schema, _person
+from freemocap.core.tracking.pipeline_runs import PIPELINE_KEYS, RTMW_NODE, STAGE, _person
 from freemocap.pubsub.pubsub_topics import PipelineTimingEvent
 
 logger = logging.getLogger(__name__)
@@ -122,29 +123,34 @@ def timing_events_from_legacy(events, pipeline_id: str) -> list[PipelineTimingEv
     return converted
 
 
-def observations_from_legacy(observations: Mapping, output_schema: Mapping) -> dict:
+def wholebody_port():
+    """The facts of the 2.0 RTMW keypoints port: its raw `point_names` and its `groups` (temporary skellytracker `describe_port`)."""
+    from skellytracker.core.pipelines import describe_port, load_pipeline
+    return describe_port(load_pipeline(PIPELINE_KEYS["rtmpose"]), f"{RTMW_NODE}.keypoints")
+
+
+def observations_from_legacy(observations: Mapping, port) -> dict:
     """The old observations in the 2.0 canonical names of the run schema; boxes and `detector_ran` pass through.
 
-    The old RTMW gives the 133 COCO-WholeBody points in the order of the 2.0 `point_names`; a point is missing when
-    its x or y is not finite or its old score is below `LEGACY_MIN_SCORE`.
+    The old RTMW gives the 133 COCO-WholeBody points in the order of the raw `point_names` of `port`
+    (`wholebody_port()`); a point is missing when its x or y is not finite or its old score is below `LEGACY_MIN_SCORE`.
     """
     from skellytracker.core.data_primitives import Keypoints, Observation, StageObservation
     from skellytracker.core.pipelines import to_canonical
     from skellytracker.core.pipelines.values import InstanceKeypoints
-    schema = output_schema[RTMW_NODE]
-    point_names = tuple(schema["point_names"])
+    point_names = tuple(port.point_names)
     converted = {}
     for camera_id, observation in observations.items():
         old = observation.stages[STAGE]
         xy, score = np.full((1, len(point_names), 2), np.nan), np.zeros((1, len(point_names)))
         if old.keypoints is not None:
             if len(old.keypoints.names) != len(point_names):
-                raise ValueError(f"The old RTMW gave {len(old.keypoints.names)} points; the run schema has {len(point_names)}")
+                raise ValueError(f"The old RTMW gave {len(old.keypoints.names)} points; the port has {len(point_names)}")
             xy[0], score[0] = old.keypoints.xyz[:, :2], old.keypoints.visibility
         present = np.isfinite(xy[0]).all(axis=1) & (score[0] > 0)
         xy[0, ~present], score[0, ~present] = np.nan, 0.0
         value = InstanceKeypoints(point_names, xy, score, score.copy(), np.ones(1), np.array([present.any()]), np.full(1, -1))
-        canonical = to_canonical(value, schema)
+        canonical = to_canonical(value, port.groups)
         names, xyz, scores = _person(canonical.point_names, canonical.xy, None, canonical.score, value.present)
         missing = (scores < LEGACY_MIN_SCORE) | ~np.isfinite(xyz[:, :2]).all(axis=1)
         xyz[missing], scores[missing] = np.nan, 0.0
@@ -164,7 +170,7 @@ class LegacyTrackerRun:
         self._pipeline_id = pipeline_id
         self._timing_sink = timing_sink
         self.models = models
-        self.output_schema = _output_schema("rtmpose")
+        self._port = wholebody_port()
 
     def process_batch(self, frames: Mapping) -> dict:
         """One call as the old realtime node made it: the newest frame of each camera, one batched call."""
@@ -179,7 +185,7 @@ class LegacyTrackerRun:
         if collector is not None:
             for event in timing_events_from_legacy(collector.events, self._pipeline_id):
                 self._timing_sink(event)
-        return observations_from_legacy(observations, self.output_schema)
+        return observations_from_legacy(observations, self._port)
 
     def close(self) -> None:
         self._tracker.close()

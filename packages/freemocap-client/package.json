@@ -51,7 +51,7 @@
     "examples:check": "node tools/check-examples.mjs"
   },
   "dependencies": {
-    "cbor-x": "1.6.5",
+    "cbor-x": "1.6.9",
     "zod": "4.3.6",
     "hyparquet": "1.25.6",
     "hyparquet-compressors": "1.1.2"

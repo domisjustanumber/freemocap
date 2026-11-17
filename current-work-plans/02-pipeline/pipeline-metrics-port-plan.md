@@ -409,7 +409,7 @@ Missing at 12c477da, and needed. Only these must be added in skellytracker:
 1. `core/tracker/task_events.py`, plus the `event_collector` argument on `Tracker.process_batch` and in
    `DetectionStage`. At 12c477da `process_batch` takes only `timings: ProcessingTimer | None` (ST `tracker.py:74`).
    This is the supervisor's port.
-2. **A GPU EP for the old `OnnxSession`.**
+2. **A GPU EP for the old `OnnxSession`** (L3 is settled: `cuda` only, through a temporary bridge; see §10.6).
    - Today the old run code runs only on CPU or CoreML: `core/sessions/execution_provider_name.py`
      `ExecutionProviderName = Literal["coreml", "cpu"]`, and `ort_session_utils.py:26-29,113-114` falls back to
      `CPUExecutionProvider`. ST commit 9cb65775 removed the rest.
@@ -535,6 +535,15 @@ Deletion at ST 2.4: one commit removes `legacy_tracker_run.py` and every line ma
   - A: the realtime-only boolean `legacy_tracker_benchmark`, behind a DEV toggle (recommended: no aliases, and
     posthoc cannot get it).
   - B: a `detector_type` value `legacy_benchmark_yolox_rtmw`, with an alias at every lookup.
-- **L3 (supervisor): the GPU EP for the old `OnnxSession`.** Without it the legacy path is CPU only.
+- **L3, answered by the user (2026-11-17):** "TRT doesn't work on the legacy models, only CUDA and CPU".
+  - The legacy path offers `cuda` and `cpu` only, never `trt-rtx`.
+  - The supervisor adds a temporary bridge in skellytracker, marked and deleted at ST 2.4: the old `OnnxSession` takes
+    the key `cuda` and builds it through the new EP code, using the `cuda` pack of the EP store.
+  - The legacy seam refuses `trt-rtx` with a clear message.
+  - When the user's EP choice is `trt-rtx` or Auto, the legacy run uses `cuda` if `core.eps.status()` shows its pack
+    usable, else `cpu`. The UI shows the EP it applied, as the 2.0 runs do.
+  - Commit 8 waits for the supervisor's SHA and the exact signatures (the bridge and the task events).
+  - Commits 1-7 and 9 do not wait for it. Each one waits only for the open questions it depends on: Q3 to Q6, Q8,
+    L2 and L4.
 - **L4 (user): no downloads.** Recommended: the legacy seam refuses to start when an old model file is not in the
   cache.

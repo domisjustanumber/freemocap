@@ -40,6 +40,19 @@ class CharucoPoseEstimateTests(TestCase):
         corners[:5] = self.corners[:5]
         self.assertEqual(estimate_pose_points(self.board, self.camera, corners, self.ids), (None, None))
 
+    def test_non_finite_camera_matrix_or_distortion_is_no_pose(self) -> None:
+        # OpenCV 5 returns ret=True with an exact zero pose here, so only the inputs can be checked.
+        for update in ({"fx": float("nan")}, {"k1": float("nan")}):
+            camera = self.camera.model_copy(update={"intrinsics": self.camera.intrinsics.model_copy(update=update)})
+            self.assertEqual(estimate_pose_points(self.board, camera, self.corners, self.ids), (None, None), update)
+
+    def test_one_inf_corner_is_dropped_and_the_rest_give_the_pose(self) -> None:
+        corners = self.corners.copy()
+        corners[0] = np.inf
+        rvec, tvec = estimate_pose_points(self.board, self.camera, corners, self.ids)
+        np.testing.assert_allclose(rvec.ravel(), self.rvec, atol=1e-4)
+        np.testing.assert_allclose(tvec.ravel(), self.tvec, atol=1e-2)
+
     def test_partial_row_uses_its_finite_corners(self) -> None:
         corners = self.corners.copy()
         corners[8:] = np.nan

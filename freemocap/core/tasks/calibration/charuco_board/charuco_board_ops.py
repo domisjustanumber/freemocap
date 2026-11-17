@@ -90,7 +90,8 @@ def estimate_pose_points(
 
     Requires >= 6 finite charuco corner correspondences (cv2.solvePnP DLT minimum). Corners that are
     not finite (skellytracker's anipose export fills an absent board with NaN) are dropped first, and a
-    non-finite result is no pose: OpenCV 5 returns ret=True with a zero pose for NaN input.
+    non-finite camera matrix or distortion is no pose: OpenCV 5 returns ret=True with an exact zero pose
+    for any non-finite input, so only the inputs can be checked; a non-finite result (4.12) is no pose too.
     """
     if corners is None or ids is None:
         return None, None
@@ -104,6 +105,8 @@ def estimate_pose_points(
 
     K = camera.intrinsics.to_camera_matrix()
     D = camera.intrinsics.to_dist_coeffs_5()
+    if not (np.isfinite(K).all() and np.isfinite(D).all()):
+        return None, None
 
     ret, rvec, tvec = cv2.solvePnP(
         objectPoints=obj_points,

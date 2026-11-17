@@ -88,14 +88,19 @@ def estimate_pose_points(
 ) -> tuple[np.ndarray | None, np.ndarray | None]:
     """solvePnP-based board pose estimate. Returns (rvec, tvec) or (None, None).
 
-    Requires >= 6 charuco corner correspondences (cv2.solvePnP DLT minimum).
+    Requires >= 6 finite charuco corner correspondences (cv2.solvePnP DLT minimum). Corners that are
+    not finite (skellytracker's anipose export fills an absent board with NaN) are dropped first, and a
+    non-finite result is no pose: OpenCV 5 returns ret=True with a zero pose for NaN input.
     """
-    if corners is None or ids is None or len(corners) < 6:
+    if corners is None or ids is None:
         return None, None
-
-    flat_ids = ids.flatten()
-    obj_points = get_object_points(board)[flat_ids].astype(np.float64)
     img_points = corners.reshape(-1, 1, 2).astype(np.float64)
+    flat_ids = ids.flatten()
+    finite = np.isfinite(img_points).all(axis=(1, 2))
+    if finite.sum() < 6:
+        return None, None
+    img_points, flat_ids = img_points[finite], flat_ids[finite]
+    obj_points = get_object_points(board)[flat_ids].astype(np.float64)
 
     K = camera.intrinsics.to_camera_matrix()
     D = camera.intrinsics.to_dist_coeffs_5()
@@ -106,7 +111,7 @@ def estimate_pose_points(
         cameraMatrix=K,
         distCoeffs=D,
     )
-    if not ret:
+    if not ret or not (np.isfinite(rvec).all() and np.isfinite(tvec).all()):
         return None, None
     return rvec, tvec
 

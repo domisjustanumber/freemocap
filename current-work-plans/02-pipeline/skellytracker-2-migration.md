@@ -578,6 +578,15 @@ frames, each with `rtmpose` and with `mediapipe`.
          one run only (Cam3 frame 217). The person alignment (foot_support in both) differs by 22.65 degrees and
          about 640/580 mm; after the best rigid fit the 3D differ by median 2.8 mm, p95 10 mm, max 428 mm. So the count
          is EP precision, but it exposes that the person alignment's heading moves 22.65 degrees on fp16 noise.
+       - Supervisor ruling (2026-11-17) DONE `d6274f90`: the `numerical` output profile asks for EP `cpu` explicitly
+         (`preparation.profile_execution_provider`, beside the fixed seed); the other profiles keep Auto. Test: the
+         numerical profile asks for cpu with `eps.status` made to fail. Re-run with the packs installed: 97,425 kept,
+         kept min 0.5001, 0.314339 px, foot_support, run record `execution_provider cpu`, applied cpu fp32.
+         GATE NUMBERS TAKEN BETWEEN THE PACK INSTALL (2026-11-17 10:54) AND `d6274f90` RAN ON TRT-RTX FP16: the
+         ST `19b55b1d` check above (97,438; its old/new equality compared trt-rtx with trt-rtx) and the trace runs.
+         Earlier gates of this doc ran on cpu fp32. GPU runs stay extra evidence, made on purpose.
+       - Finding for the user (relayed by the supervisor; do not investigate before the answer): the person
+         alignment's heading differs by 22.65 degrees between cpu fp32 and trt-rtx fp16 on test_data.
          Metrics window rows are
          unchanged against the earlier hand-run: posthoc 14 rows, `person.*` on 1 of 120 frames (`run_if` false
          gives no spans), the others on 120; realtime the same nodes.

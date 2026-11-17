@@ -517,7 +517,25 @@ frames, each with `rtmpose` and with `mediapipe`.
          pipeline metrics" in a flyout next to the realtime lightning bolt;
        - `f74d605c` user ruling D1 a: `onnx==1.22.0` in the dev group (uv.lock not relocked, because it is stale
          since Phase B, U1);
-       - `b31c03ab` supervisor ruling R-L5: legacy gate 0.0025 in the seam and in the aggregator.
+       - `b31c03ab` supervisor ruling R-L5: legacy gate 0.0025 in the seam and in the aggregator;
+       - `2030ab89` commit 9: `GET /freemocap/onnx/system_information` (five static groups), a 1 Hz
+         `LiveLoadSampler` (`core/streaming/live_load.py`) that runs only while a timing client is connected and
+         rides `pipeline_timing.live_load`, the six-group top panel, and the posthoc run's own inference service
+         registered on its pipeline for "Models of this run";
+       - `2e5272ec` fix found by the hand-run: cbor-x decodes byte counts over 4 GiB to bigint, so the live-load
+         schema rejected every real timing message (the window showed no run);
+       - `a11035e4` hand-run fixes: a second "Open metrics" on the same posthoc card switches back (same hash, so
+         no hashchange), and the banner states the measured span cost instead of 0.6 ms.
+     - Electron hand-run DONE (2026-11-17; Playwright `_electron` on `dist-electron/main/index.js`, Vite dev on
+       7791, backend on 8078 with `FREEMOCAP_BASE_FOLDER` = `<temp>/fmg-metrics`, deleted; one webcam at 640x480,
+       realtime on trt-rtx fp16; posthoc on a temp copy of `freemocap_test_data`). Open from realtime, open from
+       the posthoc card (same window, switches), switch back in the selector, card again: all pass after the two
+       fixes. Script `<scratchpad>/pm/hand_run.mjs`, screenshots `<scratchpad>/pm/hand1/`. Unset
+       `ELECTRON_RUN_AS_NODE` (VS Code sets it) or Electron starts as Node.
+     - Window cost measured: renderer about 1-2 % of one core; but its connection also gets every camera frame
+       (about 25-30 fps, 124 KiB each, 3.2 MiB/s; backend compose 1.3 + encode 5.5 ms per frame per connection,
+       about 17 % of a core). Frames go to every connection; there is no per-connection opt-out. Asked the
+       supervisor whether to add a `{"frames": false}` interest like `pipelineTiming` (not done; transport change).
      - Also landed:
        - `d0f1555b` the client ledger row;
        - `7f27f47b` cbor-x pinned to 1.6.9 (user ruling N1).
@@ -526,12 +544,10 @@ frames, each with `rtmpose` and with `mediapipe`.
        - legacy against 2.0 on cuda at matched fp32: about 16-17 ms/frame for both;
        - on cpu, legacy is single-threaded (ORT 1 thread), against the ORT default for 2.0.
      - Next:
-       - commit 9 (system-information endpoint, live load at 1 Hz while a timing client is connected, and the top
-         panel; a sub-agent is building it);
-       - then run the Electron window by hand (open from realtime, open from a posthoc card, switch between them;
-         freemocap-77 used Playwright `_electron`);
-       - then the final report: what the user needs for the manual tests, the window's own cost, the 0.25 s flush,
-         and the not-ported branch `start_time` alignment.
+       - final report sent to the supervisor (2026-11-17); wait for its ruling on the frame opt-out and for the
+         user's manual tests;
+       - known gaps: "Models of this run" for posthoc fills only after a refresh; the metrics window's title is the
+         page's ("FreeMoCap"), not "FreeMoCap pipeline metrics".
 
 ### 0.3 Decisions of the user (all 2026-11-16, through the supervisor)
 

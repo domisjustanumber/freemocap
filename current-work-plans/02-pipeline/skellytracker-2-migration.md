@@ -352,7 +352,12 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
       `calibrated_world: foot_support`, posthoc wall 40.1 s (process_batch 101 ms per 3-image batch);
       mediapipe exit 0, 222 frames, passed, alignment `body_reference`, wall 30.7 s (55.7 ms per batch).
       Applied EP (descriptor `skellytracker` block): rtmpose Auto -> cpu fp32 for person and wholebody;
-      mediapipe takes none. The report's `execution_provider` row says "not recorded" for Auto (None).
+      mediapipe takes none. The report's `execution_provider` row said "not recorded" for Auto (None);
+      FIXED `59b4016f`: it says Auto, and `applied.<node>.execution_provider/device/
+      precision` rows come from the saved skellytracker run record (`preparation.applied_execution`).
+      Why cpu: in the Phase B venv `status()` gives trt-rtx and cuda `not_installed` (no pack), cpu
+      `builtin`; performance (hardware class nvidia-cc80-r580) chose cpu fp32, skipped both packs,
+      and offers add-pack trt-rtx and cuda. So no GPU pack is installed; the recommendation is right.
     - B realtime replay `test_realtime_pipeline.py -k "human-<det> and test-data"`: rtmpose 2 passed
       (72 s), mediapipe 2 passed (52 s).
     - Not done: no comparison with sfn26 outputs (made on OpenCV 4.12, ST `2d356a6c`); one would need the

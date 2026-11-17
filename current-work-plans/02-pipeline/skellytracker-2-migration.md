@@ -358,6 +358,29 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
       Why cpu: in the Phase B venv `status()` gives trt-rtx and cuda `not_installed` (no pack), cpu
       `builtin`; performance (hardware class nvidia-cc80-r580) chose cpu fp32, skipped both packs,
       and offers add-pack trt-rtx and cuda. So no GPU pack is installed; the recommendation is right.
+  - C1 LANDED (2026-11-16): scratch ST clone `f6a65432` (calibrated RTMW `score` in [0, 1], new required
+    `InstanceKeypoints.raw_score`, RTMW sidecar 0.4.0, `InstallOffer.note` never None, `licence_url`).
+    `ef3faba7`: clip removed (gate before store kept), the 2 `InstanceKeypoints` fakes pass `raw_score`
+    (`test_pipeline_runs.py`, the only constructors). `f75380e4`: A1 shows each add-pack offer's
+    `licence_url` as a link (its URL as the text), `note` is a required string (contract patched).
+    raw_score: not stored; the observation format has x, y, visibility only (`observation_samples.py:95`),
+    no place for it. Fixtures: none replays skellytracker keypoints or a tap folder.
+    Thresholds (unchanged, user decision): `RTMW_MIN_SCORE = 0.4` (`pipeline_runs.py:31`, the default of
+    the user's RTMW threshold); `MocapTaskConfig.rtmpose_confidence_threshold` 0.4
+    (`mocap_task_config.py:84-92`; its description still says "raw SIMCC peak clipped to [0, 1]; 0.4 clears
+    the no-person band ... ~96% of visible keypoints", tuned on the raw peak, `ce168393`);
+    `CameraNodeConfig.rtmpose_confidence_threshold` 0.4 and `confidence_threshold` 0.4 (realtime 2D gate in
+    `temporal_pipeline.py:81`; `camera_node_config.py:32,46`, same raw-peak comment). The UI sends its own
+    defaults: posthoc `rtmPoseConfidenceThreshold: 0.004` (`mocap-slice.ts:135`), realtime 0.0025
+    (`realtime-types.ts:54`), both from `6d4884d6` (2026-07-21), so the app gates almost nothing; the
+    0.4 defaults are what the dataset tools and tests use.
+    Re-runs (gate2 in `0a1e712d-.../scratchpad/gate2/`): fast suite 1529 passed, the same 8 failed;
+    `test_fresh_posthoc.py` once: foot_support, 0.3656 px, no "Recording changed", then the rename
+    WinError 5 with 1 Blender window open (closed after); 4 gate runs passed (A rtmpose foot_support,
+    mediapipe body_reference, Auto -> cpu; B 2+2). Stored RTMW confidence (gate A, OVERLAY_2D, 152,514
+    samples): all in [0, 1], 96,586 kept (> 0) with min 0.4000 (the gate), median 0.974, p5 0.819,
+    max 1.0 (8,632 values exactly 1.0 in float64), 99.8 % of kept above 0.5, 63.2 % of all samples.
+    MediaPipe for comparison: 429,570 samples, all in [0, 1], kept min 0.0878 (no gate), median 1.0.
     - B realtime replay `test_realtime_pipeline.py -k "human-<det> and test-data"`: rtmpose 2 passed
       (72 s), mediapipe 2 passed (52 s).
     - Not done: no comparison with sfn26 outputs (made on OpenCV 4.12, ST `2d356a6c`); one would need the
@@ -595,6 +618,9 @@ frames, each with `rtmpose` and with `mediapipe`.
   declared in the sidecar; the raw score stays as a second field). Not there yet. Until the supervisor
   says the field exists, KEEP the clip `be341bba`; build nothing on the raw score scale. When it lands:
   remove the clip and reread the confidence gate (0.5 then means even odds that the point is correct).
+  DONE in skellytracker (`f6a65432`, `score` in [0, 1], new `raw_score`); clip removed in freemocap
+  `ef3faba7`. The thresholds stay as they are until the user decides (read again in §0.1).
+- X4 (ChArUco marker threshold): still open with the user.
 - A1 = yes (2026-11-16, user): with the EP setting Auto, freemocap shows skellytracker's offers (update the
   driver, install a pack). With EP part 3, after A/B/C. Text and condition only from `status()`
   (`install_hint`, recommendation and offer fields); no EP names, driver versions or hardware logic in
@@ -726,9 +752,10 @@ frames, each with `rtmpose` and with `mediapipe`.
     was replaced by which. Processing waits until the server has answered.
 17. Annotated videos draw face points with radius 2 instead of 4 (V3), so the face lines show between
     them; body, hand and foot points and all line colours are unchanged.
-18. A saved confidence of 1.0 can mean "1 or more": skellytracker scores have no fixed range and the
-    recording stores them clipped to [0, 1] (the 0.4 RTMW gate reads the raw score first). A negative
-    score is stored as 0. TEMPORARY (§0.3 C1): the clip goes when skellytracker's 0-to-1 score lands.
+18. The saved RTMW confidence is skellytracker's calibrated score in [0, 1] (ST `f6a65432`, ADR-F067): the
+    chance that the point is present and close to the true position, 0.5 = even odds; sfn26 saved the raw
+    SimCC peak clipped to [0, 1]. The same number therefore means a different thing, and the 0.4 gate now
+    reads the calibrated score (thresholds open with the user, §0.3 C1). MediaPipe is unchanged.
 
 ### 0.7 Imports of old skellytracker modules that stage 2.4 can remove
 

@@ -608,6 +608,14 @@ frames, each with `rtmpose` and with `mediapipe`.
          Heading spread over the 7 runs: current rule 53.2 degrees; hypothetical rules on the saved inputs:
          all-interval mean 11.4, top-3 mean 48.9, quality-gated circular mean of the skull's per-frame heading 0.36.
          Fix options went to the supervisor; no fix made.
+       - Empty torso (user's request, Opus sub-agent, read-only, 2026-11-17; scratch `sample/torso/`): NOT a regression
+         of the migration. Baseline ca0c17cc + ST 2d356a6c (cpu, same video and calibration): thoracic/pelvis pose in
+         18 of 1108 frames; today 24; skull wins in both. The block is the alignment evidence gate
+         (`alignment_evidence.py:76`, quality >= 0.5) on reprojection quality (`mocap_alignment.py:75-76`,
+         1/(1+(err/5 px)^2) of the second-best camera), unchanged since the baseline; not the RTMW score gate (T1) and
+         not names or derived points. Both segments need both shoulders and both hips; `right_hip` passes in 139
+         frames (baseline 169; Cam2 median error 13 px), `left_hip` 500 (480). Frames with all four at a quality gate
+         of 0.5/0.4/0.3/0.2: today 24/76/216/530, baseline 18/87/270/671. Options to the supervisor; no fix made.
        - ST `db155c3a` (cpu_threads default 10 here): fast suite 1587 passed, the same 8 failed; seeded test_data gate
          97,425 kept, 0.314339 px, record `cpu_threads: 10`, parquet exactly equal to the `19b55b1d` cpu output.
        - Later, no go yet: show the applied `cpu_threads` in the metrics window's "Models of this run" group, and

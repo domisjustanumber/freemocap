@@ -253,3 +253,17 @@ def test_fresh_assertion_failure_retains_scratch_and_prepared_results(lifecycle)
     assert preparation.prepare(TEST_DATA, fresh=False, **args) == current
     with pytest.raises(ValueError, match="fresh=True"):
         preparation.prepare(TEST_DATA, fresh=False, validate_fresh=reject, **args)
+
+
+def test_the_numerical_profile_asks_for_cpu_whatever_the_ep_store_offers(monkeypatch):
+    from skellytracker.core import eps
+    from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
+
+    def unavailable(*_args, **_kwargs):
+        raise AssertionError("the request must not depend on status()")
+    monkeypatch.setattr(eps, "status", unavailable)
+    assert preparation.profile_execution_provider("numerical") == "cpu"
+    assert preparation.profile_execution_provider("standard") is None, "the standard profile keeps Auto"
+    config = PosthocMocapPipelineConfig(calibration_toml_path="calibration.toml",
+                                        execution_provider=preparation.profile_execution_provider("numerical"))
+    assert config.execution_provider == "cpu"

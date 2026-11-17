@@ -155,6 +155,12 @@ def validate_parquet(recording: Path, *, expected_frames: int) -> dict:
             "calibration_updates": {key: value.model_dump(mode="json") for key, value in run.calibration_updates.items()}}
 
 
+def profile_execution_provider(profile: str) -> str | None:
+    """The EP a profile asks for. Numerical pins cpu, so its numbers do not depend on the packs in the per-user EP store;
+    the other profiles keep Auto (None). GPU runs are extra evidence, made on purpose."""
+    return "cpu" if profile == "numerical" else None
+
+
 def run_worker(request_path: Path) -> None:
     """Retain workflow-phase measurements on success and failure."""
     from freemocap.core.pipeline.performance_report import PerformanceReport
@@ -243,6 +249,7 @@ def _run_worker(request_path: Path, phases) -> None:
             start_stage=request.get('start_stage', 'observations'),
             stop_stage=request.get('stop_stage', 'reconstruction'),
             base_run_id=request.get('run_id', 0), sensor_group=request.get('sensor_group'),
+            execution_provider=profile_execution_provider(profile),
         )
         mocap_status = None
         validation = None

@@ -6,27 +6,30 @@ import subprocess
 import sys
 
 
-TRACKER_CASES = ("charuco_cpu", "mediapipe_cpu", "rtmpose_cpu", "rtmpose_cuda", "mediapipe_cuda")
+def tracker_cases() -> list[tuple[str, str]]:
+    """(detector, EP key) cases: the detectors without an EP on CPU, RTMPose on every EP skellytracker lists here."""
+    from freemocap.core.tracking.execution_providers import execution_provider_rows
+    return [("charuco", "cpu"), ("mediapipe", "cpu"), *(("rtmpose", row.key) for row in execution_provider_rows())]
 
 
-def compare_backend_observations(cpu_output: Path, cuda_output: Path) -> dict:
+def compare_backend_observations(cpu_output: Path, other_output: Path) -> dict:
     """Measure backend differences without treating a regression threshold as accuracy."""
     from .tracker_comparison import NumericalComparison
     import numpy as np
     try:
         cpu = json.loads((cpu_output / "report.json").read_text(encoding="utf-8"))
-        cuda = json.loads((cuda_output / "report.json").read_text(encoding="utf-8"))
+        other = json.loads((other_output / "report.json").read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         return {"status": "not_compared", "reason": f"Missing or unreadable backend report: {error}"}
-    if cpu["status"] != "passed" or cuda["status"] != "passed":
+    if cpu["status"] != "passed" or other["status"] != "passed":
         return {"status": "not_compared", "reason": "Both same-backend comparisons must pass first"}
-    if cpu["case"] != "rtmpose_cpu" or cuda["case"] != "rtmpose_cuda":
-        raise ValueError("Cross-backend comparison requires RTMPose CPU and CUDA")
+    if cpu["case"] != "rtmpose_cpu" or not other["case"].startswith("rtmpose_"):
+        raise ValueError("Cross-backend comparison requires RTMPose on CPU and on another EP")
     for field in ("recording", "frame_counts", "tracker", "temporal_input"):
-        if cpu.get(field) != cuda.get(field) or field not in cpu:
+        if cpu.get(field) != other.get(field) or field not in cpu:
             raise ValueError(f"Incompatible backend comparison inputs: {field}")
     # Filenames use the report's insertion-ordered camera indices.
-    if list(cpu["frame_counts"]) != list(cuda["frame_counts"]):
+    if list(cpu["frame_counts"]) != list(other["frame_counts"]):
         raise ValueError("Different camera index assignments")
     comparison = NumericalComparison()
     pixel_errors = []
@@ -38,7 +41,7 @@ def compare_backend_observations(cpu_output: Path, cuda_output: Path) -> dict:
         for frame in range(frame_count):
             relative = Path("baseline_observations") / f"{camera_index}-{frame}.json"
             left = json.loads((cpu_output / relative).read_text(encoding="utf-8"))
-            right = json.loads((cuda_output / relative).read_text(encoding="utf-8"))
+            right = json.loads((other_output / relative).read_text(encoding="utf-8"))
             comparison.compare(left, right, str(relative))
             left_body = left["observation"]["stages"]["body"]
             right_body = right["observation"]["stages"]["body"]
@@ -60,8 +63,8 @@ def compare_backend_observations(cpu_output: Path, cuda_output: Path) -> dict:
                 point_index = int(np.flatnonzero(matched)[distances.argmax()])
                 largest_pixel_difference = dict(camera=list(cpu["frame_counts"])[camera_index], frame=frame,
                     point=left_points["names"][point_index], distance_px=float(distances.max()),
-                    cpu_xy=left_xy[point_index].tolist(), cuda_xy=right_xy[point_index].tolist(),
-                    cpu_visibility=left_points["visibility"][point_index], cuda_visibility=right_points["visibility"][point_index])
+                    cpu_xy=left_xy[point_index].tolist(), other_xy=right_xy[point_index].tolist(),
+                    cpu_visibility=left_points["visibility"][point_index], other_visibility=right_points["visibility"][point_index])
     numbers = comparison.report()
     numbers.pop("passed")
     pixel_summary = dict(matched_visible_points=len(pixel_errors), different_visible_masks=visible_mask_changes,
@@ -72,7 +75,7 @@ def compare_backend_observations(cpu_output: Path, cuda_output: Path) -> dict:
         pixel_summary.update(zip(("median_px", "p95_px", "p99_px", "maximum_px"),
                                  np.percentile(pixel_errors, [50, 95, 99, 100]).tolist()))
     return {"status": "measured", "comparison": numbers, "body_xy_pixel_distances": pixel_summary,
-            "interpretation": "CPU/CUDA differences, not an acceptance verdict. The 1e-6 threshold is descriptive only; quantities have mixed units."}
+            "interpretation": "Differences between CPU and the other EP, not an acceptance verdict. The 1e-6 threshold is descriptive only; quantities have mixed units."}
 
 
 def matrix_summary(reports: list[dict]) -> str:
@@ -92,8 +95,8 @@ def matrix_summary(reports: list[dict]) -> str:
                   "The baseline uses the existing inference service, not the entire current posthoc pipeline.",
                   "Both paths receive the recording timeline (recorded or inferred). This corrects MediaPipe's processing-time fallback.",
                   "Wall times include asymmetric diagnostic serialization/comparison and cold/warm setup: no speedup claim.",
-                  "CUDA provider registration is checked; individual ONNX kernel placement is not profiled.",
-                  "Unsupported is not passed. MediaPipe exposes no CUDA backend here; ChArUco uses CPU.",
+                  "The applied EP of each model is checked; individual ONNX kernel placement is not profiled.",
+                  "Unsupported is not passed. MediaPipe takes no EP; ChArUco runs outside the pipeline run.",
                   "These are default app model configurations, not every downloadable model variant.",
                   "Raw observations are private diagnostics; no accepted recording outputs are saved.", ""])
     return "\n".join(lines)
@@ -103,13 +106,15 @@ def run_matrix(*, datasets: list[str], recordings_root: Path, output: Path) -> i
     output.mkdir(parents=True, exist_ok=False)
     reports = []
     failed = False
+    cases = tracker_cases()
     for dataset in datasets:
-        for case in TRACKER_CASES:
+        for detector, execution_provider in cases:
+            case = f"{detector}_{execution_provider}"
             case_output = output / f"{dataset}-{case}"
             with (output / f"{dataset}-{case}.log").open("w", encoding="utf-8") as log:
                 result = subprocess.run([
                     sys.executable, "-B", "-m", "freemocap.tools.datasets.tracker_comparison",
-                    dataset, case, "--recordings-root", str(recordings_root), "--output", str(case_output),
+                    dataset, detector, "--execution-provider", execution_provider, "--recordings-root", str(recordings_root), "--output", str(case_output),
                 ], stdout=log, stderr=subprocess.STDOUT, check=False)
             report_path = case_output / "report.json"
             try:
@@ -128,13 +133,16 @@ def run_matrix(*, datasets: list[str], recordings_root: Path, output: Path) -> i
             (output / "matrix.json").write_text(json.dumps(reports, indent=2), encoding="utf-8")
             (output / "report.md").write_text(matrix_summary(reports), encoding="utf-8")
             print(f"{dataset} / {case}: {report['status']}", flush=True)
-        try:
-            cross_backend = compare_backend_observations(output / f"{dataset}-rtmpose_cpu",
-                                                         output / f"{dataset}-rtmpose_cuda")
-        except (OSError, ValueError, KeyError, TypeError) as error:
-            cross_backend = {"status": "not_compared", "reason": f"Invalid backend evidence: {error}"}
-            failed = True
-        (output / f"{dataset}-cpu-versus-cuda.json").write_text(json.dumps(cross_backend, indent=2), encoding="utf-8")
+        for detector, execution_provider in cases:
+            if detector != "rtmpose" or execution_provider == "cpu":
+                continue
+            try:
+                cross_backend = compare_backend_observations(output / f"{dataset}-rtmpose_cpu",
+                                                             output / f"{dataset}-rtmpose_{execution_provider}")
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                cross_backend = {"status": "not_compared", "reason": f"Invalid backend evidence: {error}"}
+                failed = True
+            (output / f"{dataset}-cpu-versus-{execution_provider}.json").write_text(json.dumps(cross_backend, indent=2), encoding="utf-8")
     return int(failed)
 
 

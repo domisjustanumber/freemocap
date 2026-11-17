@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import subprocess
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -16,7 +17,7 @@ class TrackerMatrixTests(unittest.TestCase):
             root = Path(temporary)
             for backend, coordinates, visibility in (
                 ("cpu", [[0.0, 0.0, 0.0], [1.0, 1.0, 0.0]], [1.0, 1.0]),
-                ("cuda", [[3.0, 4.0, 0.0], [float("nan"), float("nan"), 0.0]], [1.0, 0.0]),
+                ("gpu-ep", [[3.0, 4.0, 0.0], [float("nan"), float("nan"), 0.0]], [1.0, 0.0]),
             ):
                 directory = root / backend
                 (directory / "baseline_observations").mkdir(parents=True)
@@ -27,7 +28,7 @@ class TrackerMatrixTests(unittest.TestCase):
                     "detector_ran": True, "keypoints": {"names": ["a", "b"], "xyz": coordinates, "visibility": visibility},
                 }}}}
                 (directory / "baseline_observations/0-0.json").write_text(json.dumps(document))
-            report = compare_backend_observations(root / "cpu", root / "cuda")
+            report = compare_backend_observations(root / "cpu", root / "gpu-ep")
             self.assertEqual(report["status"], "measured")
             pixels = report["body_xy_pixel_distances"]
             self.assertEqual(pixels["maximum_px"], 5.0)
@@ -46,16 +47,19 @@ class TrackerMatrixTests(unittest.TestCase):
                     (case_output / "report.json").write_text('{"status":', encoding="utf-8")
                 return subprocess.CompletedProcess(command, 1)
 
-            with patch("freemocap.tools.datasets.tracker_matrix.subprocess.run", side_effect=run) as calls:
+            rows = [SimpleNamespace(key="cpu"), SimpleNamespace(key="gpu-ep")]  # The cases come from skellytracker's EP rows.
+            with (patch("freemocap.tools.datasets.tracker_matrix.subprocess.run", side_effect=run) as calls,
+                  patch("freemocap.core.tracking.execution_providers.execution_provider_rows", return_value=rows)):
                 result = run_matrix(datasets=["test_data", "sample_data"], recordings_root=Path(temporary), output=output)
             self.assertEqual(result, 1)
-            self.assertEqual(calls.call_count, 10)
+            self.assertEqual(calls.call_count, 8)
             reports = json.loads((output / "matrix.json").read_text(encoding="utf-8"))
-            self.assertEqual(len(reports), 10)
+            self.assertEqual(len(reports), 8)
+            self.assertIn(["test_data", "rtmpose", "--execution-provider", "gpu-ep"], [call.args[0][4:8] for call in calls.call_args_list])
             self.assertTrue(all(report["status"] == "failed" for report in reports))
-            self.assertEqual(json.loads((output / "sample_data-cpu-versus-cuda.json").read_text())["status"], "not_compared")
+            self.assertEqual(json.loads((output / "sample_data-cpu-versus-gpu-ep.json").read_text())["status"], "not_compared")
 
     def test_missing_backend_evidence_is_not_a_pass(self):
         with TemporaryDirectory() as temporary:
-            result = compare_backend_observations(Path(temporary) / "cpu", Path(temporary) / "cuda")
+            result = compare_backend_observations(Path(temporary) / "cpu", Path(temporary) / "gpu-ep")
             self.assertEqual(result["status"], "not_compared")

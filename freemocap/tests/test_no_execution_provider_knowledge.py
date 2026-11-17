@@ -10,27 +10,7 @@ PATTERNS = (
     re.compile(r"\b[A-Z][A-Za-z]+ExecutionProvider\b"),  # an ONNX Runtime provider name
     re.compile(r"nvidia-smi|\bwmic\b|\blspci\b|system_profiler", re.IGNORECASE),  # a host GPU command
 )
-PART_3 = "part 3 of the migration: the tools take an EP key as a free string and a matrix takes its keys from status()"
-ALLOWED = {
-    ("freemocap/tools/datasets/recording_comparison.py",
-     'parser.add_argument("--provider", choices=("cpu", "cuda"), default="cpu")'): PART_3,
-    ("freemocap/tools/datasets/tracker_comparison.py",
-     'if case == "rtmpose_cuda" and "cuda" not in usable_execution_providers():'): PART_3,
-    ("freemocap/tools/datasets/tracker_comparison.py",
-     'provider = "cuda" if case == "rtmpose_cuda" else "cpu"'): PART_3,
-    ("freemocap/tools/hardware_validation/camera_transition.py",
-     "configuration.skeleton_inference_node_config.execution_provider = 'cuda'"): PART_3,
-    ("freemocap/tools/hardware_validation/pipeline_run.py",
-     "configuration.skeleton_inference_node_config.execution_provider = 'cuda'"): PART_3,
-    ("freemocap/tools/sdk_live_validation.py",
-     "pipeline.skeleton_inference_node_config.execution_provider = 'cuda'"): PART_3,
-    ("freemocap/tests/test_tracker_matrix.py",
-     '("cuda", [[3.0, 4.0, 0.0], [float("nan"), float("nan"), 0.0]], [1.0, 0.0]),'): PART_3,
-    ("freemocap/tests/test_tracker_matrix.py",
-     'report = compare_backend_observations(root / "cpu", root / "cuda")'): PART_3,
-    ("freemocap/tests/test_tracker_matrix.py",
-     'result = compare_backend_observations(Path(temporary) / "cpu", Path(temporary) / "cuda")'): PART_3,
-}
+ALLOWED: dict[tuple[str, str], str] = {}  # (path, line) -> the reason; empty since part 3 of the migration
 
 
 def test_no_source_file_names_an_ep_an_ort_provider_or_a_gpu_command():

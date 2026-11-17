@@ -154,7 +154,7 @@ def main() -> int:
     parser.add_argument("recording", type=Path)
     parser.add_argument("--calibration", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True, help="New ignored diagnostic directory")
-    parser.add_argument("--provider", choices=("cpu", "cuda"), default="cpu")
+    parser.add_argument("--provider", default="cpu", help="A skellytracker EP key (skellytracker-eps status lists them); skellytracker refuses an unknown one")
     args = parser.parse_args()
     report = run_comparison(recording=args.recording, calibration=args.calibration, output=args.output, provider=args.provider)
     print(render_report(report))

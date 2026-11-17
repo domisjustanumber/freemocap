@@ -33,7 +33,8 @@ def channel_observations(message: dict) -> list[dict]:
 
 
 def run_pipeline(output_directory: Path, backend: str, calibration_path: Path, recording_info_path: Path,
-                 with_ui: bool = False, compare_compression: bool = False, exposure: int | None = None) -> dict:
+                 with_ui: bool = False, compare_compression: bool = False, exposure: int | None = None,
+                 execution_provider: str | None = None) -> dict:
     report = {'backend': backend, 'status': 'failed', 'with_ui': with_ui}
     session = ServerSession(output_directory)
     try:
@@ -59,7 +60,7 @@ def run_pipeline(output_directory: Path, backend: str, calibration_path: Path, r
             configuration = RealtimePipelineConfig(
                 camera_node_config={} if board is None else {'charuco_board': board})
             configuration.aggregator_config.skeleton_fitting_enabled = True
-            configuration.skeleton_inference_node_config.execution_provider = 'cuda'
+            configuration.skeleton_inference_node_config.execution_provider = execution_provider
             report['pipeline_config'] = configuration.model_dump(mode='json', exclude_computed_fields=True)
             api.request('POST', '/freemocap/realtime/apply', {'cameraConfigs': None, 'realtimeCameraIds': None,
                 'realtimeConfig': report['pipeline_config']}, timeout_seconds=180.0)

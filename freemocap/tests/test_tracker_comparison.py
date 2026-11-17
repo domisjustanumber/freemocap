@@ -7,13 +7,16 @@ from freemocap.tools.datasets.tracker_comparison import NumericalComparison, ren
 
 
 class TrackerComparisonTests(unittest.TestCase):
-    def test_cpu_only_runtime_does_not_pretend_to_test_cuda(self):
+    def test_an_ep_that_is_not_usable_or_not_taken_is_not_run(self):
+        from types import SimpleNamespace
         from freemocap.tools.datasets.tracker_comparison import run_comparison
-        with TemporaryDirectory() as temporary, patch("freemocap.tools.datasets.tracker_comparison.usable_execution_providers", return_value=["cpu"]):
-            report = run_comparison(recording=Path(temporary) / "absent-recording", case="rtmpose_cuda",
-                                    output=Path(temporary) / "report")
-        self.assertEqual(report["status"], "unsupported")
-        self.assertEqual(report["paths"], {})
+        rows = [SimpleNamespace(key="pack-ep", usable=False, install_hint="Install the pack.")]
+        for detector, reason in (("rtmpose", "Install the pack."), ("mediapipe", "takes no execution provider")):
+            with TemporaryDirectory() as temporary, patch("freemocap.tools.datasets.tracker_comparison.execution_provider_rows", return_value=rows):
+                report = run_comparison(recording=Path(temporary) / "absent-recording", detector=detector,
+                                        execution_provider="pack-ep", output=Path(temporary) / "report")
+            self.assertEqual((report["case"], report["status"], report["paths"]), (f"{detector}_pack-ep", "unsupported", {}))
+            self.assertIn(reason, report["reason"])
 
     def test_identical_data_including_missing_values_passes(self):
         comparison = NumericalComparison()
@@ -38,9 +41,9 @@ class TrackerComparisonTests(unittest.TestCase):
         self.assertEqual(comparison.maximum_absolute_error, 1.0)
 
     def test_unsupported_is_not_reported_as_a_pass(self):
-        report = dict(case="mediapipe_cuda", status="unsupported", scope="tracking", recording="test",
-                      reason="No CUDA backend")
+        report = dict(case="mediapipe_pack-ep", status="unsupported", scope="tracking", recording="test",
+                      reason="No such backend")
         text = render_comparison(report)
         self.assertIn("unsupported", text)
-        self.assertIn("No CUDA backend", text)
+        self.assertIn("No such backend", text)
         self.assertNotIn("NUMERICAL PARITY", text)

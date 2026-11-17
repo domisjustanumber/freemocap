@@ -68,7 +68,7 @@ def compare_phases(reference_images, candidate_images):
     return results
 
 
-def run_transition(output_directory, backend, recording_info, calibration):
+def run_transition(output_directory, backend, recording_info, calibration, execution_provider=None):
     report = {'backend': backend, 'status': 'failed', 'phases': {}, 'comparisons': {}}
     session = ServerSession(output_directory)
     try:
@@ -90,7 +90,7 @@ def run_transition(output_directory, backend, recording_info, calibration):
                 assert all(image.camera_index == configs[identity]['camera_index']
                            for identity, image in original.items()), 'Camera device indices differ from the request'
                 configuration = RealtimePipelineConfig()
-                configuration.skeleton_inference_node_config.execution_provider = 'cuda'
+                configuration.skeleton_inference_node_config.execution_provider = execution_provider
                 api.request('POST', '/freemocap/realtime/apply', {'cameraConfigs': None, 'realtimeCameraIds': None,
                     'realtimeConfig': configuration.model_dump(mode='json', exclude_computed_fields=True)},
                     timeout_seconds=180.0)
@@ -116,7 +116,9 @@ if __name__ == '__main__':
     parser.add_argument('--backend', choices=('python', 'rust'), required=True)
     parser.add_argument('--recording-info', type=Path, required=True)
     parser.add_argument('--calibration', type=Path, required=True)
+    parser.add_argument('--execution-provider', help="A skellytracker EP key (skellytracker-eps status lists them); default Auto, skellytracker's recommendation")
     arguments = parser.parse_args()
-    result = run_transition(arguments.output.resolve(), arguments.backend, arguments.recording_info, arguments.calibration)
+    result = run_transition(arguments.output.resolve(), arguments.backend, arguments.recording_info, arguments.calibration,
+                            arguments.execution_provider)
     print(json.dumps(result, indent=2))
     raise SystemExit(0 if result['status'] == 'passed' else 1)

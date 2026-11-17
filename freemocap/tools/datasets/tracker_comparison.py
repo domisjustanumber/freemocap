@@ -1,6 +1,7 @@
 """Tracking-boundary parity/timing checks; never publishes accepted recording data.
 
-Run each detector/provider case in a separate process. Baseline is the existing
+Run each detector/EP case in a separate process. The EP is a skellytracker key as a free string;
+skellytracker refuses an unknown one. Baseline is the existing
 InferenceService with sequential camera reads, not the complete posthoc pipeline.
 Both paths use identical model configuration and full recording coverage.
 """
@@ -21,8 +22,8 @@ from freemocap.core.pipeline.dataflow.video_sources import RecordingVideoSources
 from freemocap.core.pipeline.inference_service import InferenceService, InferenceRegistration, InferenceMode, InferenceRequest
 from freemocap.core.pipeline.performance_report import PerformanceReport
 from freemocap.core.pipeline.posthoc.video_group_helper import VideoGroupHelper
-from freemocap.core.tracking.execution_providers import usable_execution_providers
-from freemocap.core.tracking.pipeline_runs import PIPELINE_KEYS
+from freemocap.core.tracking.execution_providers import execution_provider_rows
+from freemocap.core.tracking.pipeline_runs import PIPELINE_KEYS, detector_takes_execution_provider
 from .catalog import TEST_DATA, SAMPLE_DATA
 
 
@@ -80,9 +81,13 @@ class NumericalComparison:
                 "passed": self.outside_tolerance == self.structural_differences == 0}
 
 
-def run_comparison(*, recording: Path, case: str, output: Path) -> dict:
-    if case not in {"charuco_cpu", "mediapipe_cpu", "mediapipe_cuda", "rtmpose_cpu", "rtmpose_cuda"}:
-        raise ValueError(f"Unknown tracker comparison case: {case}")
+DETECTORS = ("charuco", "mediapipe", "rtmpose")
+
+
+def run_comparison(*, recording: Path, detector: str, execution_provider: str, output: Path) -> dict:
+    if detector not in DETECTORS:
+        raise ValueError(f"Unknown tracker comparison detector: {detector}")
+    case = f"{detector}_{execution_provider}"
     output.mkdir(parents=True, exist_ok=False)
     report = {"case": case, "recording": str(recording), "status": "running",
               "scope": "tracking-boundary parity; not full pipeline acceptance", "paths": {}, "provider_evidence": []}
@@ -93,16 +98,20 @@ def run_comparison(*, recording: Path, case: str, output: Path) -> dict:
         (output / "report.txt").write_text(render_comparison(report), encoding="utf-8")
 
     save()
-    if case == "mediapipe_cuda":
-        report.update(status="unsupported", reason="The MediaPipe Holistic built-in takes no execution provider; no CUDA backend is exposed.")
-        save()
-        return report
-    if case == "charuco_cpu":
+    if detector == "charuco":
         report.update(status="unsupported", reason="Charuco detection runs outside the skellytracker 2.0 pipeline run (create_detector); there is no inference-service path to compare.")
         save()
         return report
-    if case == "rtmpose_cuda" and "cuda" not in usable_execution_providers():
-        report.update(status="unsupported", reason="The skellytracker CUDA EP pack is not usable on this host; no CPU fallback was run.")
+    takes_execution_provider = detector_takes_execution_provider(detector)
+    if not takes_execution_provider and execution_provider != "cpu":
+        report.update(status="unsupported", reason=f"The {detector} pipeline takes no execution provider; {execution_provider} was not run.")
+        save()
+        return report
+    # An unknown key goes on to skellytracker, which refuses it; a known one that is not usable is not run.
+    row = next((row for row in execution_provider_rows() if row.key == execution_provider), None)
+    if takes_execution_provider and row is not None and not row.usable:
+        report.update(status="unsupported", reason=f"The EP {execution_provider} is not usable on this host "
+                      f"({row.install_hint or 'skellytracker gives no install hint'}); no CPU fallback was run.")
         save()
         return report
     try:
@@ -117,8 +126,8 @@ def run_comparison(*, recording: Path, case: str, output: Path) -> dict:
         report["frame_counts"] = {source.camera_id: source.video_metadata.frame_count for source in sources.camera_sources}
         report["video_metadata"] = {source.camera_id: source.video_metadata.model_dump(mode="json")
                                     for source in sources.camera_sources}
-        detector_type = case.split("_")[0]
-        provider = "cuda" if case == "rtmpose_cuda" else "cpu"
+        detector_type = detector
+        provider = execution_provider
         report["tracker"] = {"detector_type": detector_type, "pipeline": PIPELINE_KEYS[detector_type]}
         report["execution_provider"] = provider
         from .preparation import software_identity
@@ -254,12 +263,14 @@ def render_comparison(report: dict) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("dataset", choices=("test_data", "sample_data"))
-    parser.add_argument("case", choices=("charuco_cpu", "mediapipe_cpu", "mediapipe_cuda", "rtmpose_cpu", "rtmpose_cuda"))
+    parser.add_argument("detector", choices=DETECTORS)
+    parser.add_argument("--execution-provider", default="cpu", help="A skellytracker EP key (skellytracker-eps status lists them)")
     parser.add_argument("--recordings-root", type=Path, default=Path.home() / "freemocap_data/recordings")
     parser.add_argument("--output", type=Path, required=True, help="New diagnostic directory; must be ignored or outside the repository")
     args = parser.parse_args()
     dataset = TEST_DATA if args.dataset == "test_data" else SAMPLE_DATA
-    report = run_comparison(recording=args.recordings_root / dataset.name, case=args.case, output=args.output)
+    report = run_comparison(recording=args.recordings_root / dataset.name, detector=args.detector,
+                            execution_provider=args.execution_provider, output=args.output)
     print(json.dumps({key: value for key, value in report.items() if key not in ("software_identity", "tracker")}, indent=2), flush=True)
     return 0 if report["status"] in ("passed", "unsupported") else 1
 

@@ -19,6 +19,7 @@ def run_main():
     parser.add_argument('--recording-info', type=Path)
     parser.add_argument('--with-ui', action='store_true')
     parser.add_argument('--compare-compression', action='store_true')
+    parser.add_argument('--execution-provider', help="A skellytracker EP key (skellytracker-eps status lists them); default Auto, skellytracker's recommendation (pipeline-benchmark)")
     parser.add_argument('--exposure', type=int, help='Override manual exposure in camera-baseline or pipeline-benchmark')
     arguments = parser.parse_args()
     if arguments.command == 'ui-idle':
@@ -37,7 +38,8 @@ def run_main():
         results = []
         for backend in (('python', 'rust') if arguments.backend == 'both' else (arguments.backend,)):
             result = run_pipeline(arguments.output / backend, backend, arguments.calibration,
-                                  arguments.recording_info, arguments.with_ui, arguments.compare_compression, arguments.exposure)
+                                  arguments.recording_info, arguments.with_ui, arguments.compare_compression, arguments.exposure,
+                                  execution_provider=arguments.execution_provider)
             results.append(result)
             print(json.dumps({'backend': backend, 'status': result['status'], 'error': result.get('error')}), flush=True)
         raise SystemExit(0 if all(result['status'] == 'measured' for result in results) else 1)

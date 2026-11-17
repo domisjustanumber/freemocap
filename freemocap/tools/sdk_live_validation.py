@@ -25,6 +25,7 @@ def main() -> None:
     parser.add_argument('--calibration', type=Path, required=True)
     parser.add_argument('--electron', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--execution-provider', help="A skellytracker EP key (skellytracker-eps status lists them); default Auto, skellytracker's recommendation")
     args = parser.parse_args()
     output = args.output.resolve()
     before = {str(path.resolve()): digest(path) for path in (args.camera_configs, args.calibration)}
@@ -58,7 +59,7 @@ def main() -> None:
             board = tomllib.loads(args.calibration.read_text(encoding='utf-8')).get('metadata', {}).get('board')
             pipeline = RealtimePipelineConfig(camera_node_config={} if board is None else {'charuco_board': board})
             pipeline.aggregator_config.skeleton_fitting_enabled = True
-            pipeline.skeleton_inference_node_config.execution_provider = 'cuda'
+            pipeline.skeleton_inference_node_config.execution_provider = args.execution_provider
             config = {'url': session.api_client.server_url, 'pid': session.server_pid, 'output': str(output),
                 'cameraConfigs': configs, 'imageSizes': sizes,
                 'pipelineConfig': pipeline.model_dump(mode='json', exclude_computed_fields=True),

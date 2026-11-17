@@ -616,6 +616,15 @@ frames, each with `rtmpose` and with `mediapipe`.
          not names or derived points. Both segments need both shoulders and both hips; `right_hip` passes in 139
          frames (baseline 169; Cam2 median error 13 px), `left_hip` 500 (480). Frames with all four at a quality gate
          of 0.5/0.4/0.3/0.2: today 24/76/216/530, baseline 18/87/270/671. Options to the supervisor; no fix made.
+       - Right hip (user ruling A4 = A, Opus sub-agent, read-only, 2026-11-17; scratch `sample/hip/`): the TRACKER
+         places `right_hip` at a different body height per camera (along the spine Cam1 +6.8 px, Cam2 -12.4 px, Cam3
+         +1.9 px; pair solutions 27-46 mm apart) with high scores (failing frames median 0.84-0.86), not a left/right
+         swap (0/3/0 frames nearer the left hip) and not occlusion guessing. Calibration ruled out (nose 1.9-2.5 px,
+         wrists and ankles 2.4-5.1 px; MediaPipe on the same calibration: right_hip 5.7/5.8/5.6 px, 377 frames, but its
+         left_hip is the bad one in Cam2). Triangulation spreads it: equal weights, score not a weight
+         (`observation_arrays.py:118`), outlier rejection idle below 0.02 normalized (about 17 px;
+         `triangulator.py:245-248`); dropping the worst camera would pass 800 of 1108 frames but only hides the
+         disagreement. Options (skellytracker, Core, skellyforge) to the supervisor; no fix made.
        - ST `db155c3a` (cpu_threads default 10 here): fast suite 1587 passed, the same 8 failed; seeded test_data gate
          97,425 kept, 0.314339 px, record `cpu_threads: 10`, parquet exactly equal to the `19b55b1d` cpu output.
        - Later, no go yet: show the applied `cpu_threads` in the metrics window's "Models of this run" group, and

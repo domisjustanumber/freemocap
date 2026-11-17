@@ -14,12 +14,14 @@ import numpy as np
 
 from freemocap.core.pipeline.pipeline_timing_events import SKELETON_INFERENCE, span_event
 from freemocap.core.pipeline.pipeline_timing_task_ids import batch_task_id, camera_task_id
-from freemocap.core.tracking.pipeline_runs import RTMW_NODE, PERSON_NODE, STAGE, _output_schema, _person
+from freemocap.core.tracking.pipeline_runs import RTMW_NODE, STAGE, _output_schema, _person
 from freemocap.pubsub.pubsub_topics import PipelineTimingEvent
 
 logger = logging.getLogger(__name__)
 
 LEGACY_ENGINE = "legacy"
+PERSON_NODE = "person"
+"""The label of the old person detector's model row (the 2.0 node id it matches); it reads no result."""
 CUDA, TRT_RTX = "cuda", "trt-rtx"
 LEGACY_EPS = ("cpu", CUDA)
 """The EPs of the old session (user ruling L3: TensorRT does not run the old models); the test of EP knowledge allows the keys."""

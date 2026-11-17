@@ -13,7 +13,7 @@ def test_rtmw_size_follows_the_old_model_name():
     config = pipeline_runs.load_detector_pipeline("rtmpose", "rtmw-x-l_384x288")
     sizes = {node.id: node.params.size for node in config.nodes if node.type == "onnx_model"}
     assert sizes[pipeline_runs.RTMW_NODE] == "l-384"
-    assert sizes[pipeline_runs.PERSON_NODE] == "m"  # the YOLOX size of the built-in stays
+    assert sizes["person"] == "m"  # the YOLOX size of the built-in stays
 
 
 def test_a_key_passes_unchanged_and_auto_takes_the_recommendation(monkeypatch):
@@ -62,16 +62,15 @@ def rtmw_schema():
         return run.output_schema
 
 
-def _rtmw_result(schema, *, score, box, present=True, person_ran=True):
-    from skellytracker.core.pipelines import InstanceBoxes, InstanceKeypoints
+def _rtmw_result(schema, *, score, box, present=True, detector_ran=True):
+    """A camera result as the run delivers it: the canonical `wholebody` value and the upright `boxes` value (x1, y1, x2, y2)."""
+    from skellytracker.core.pipelines import CanonicalKeypoints, OutputBoxes
     names = tuple(schema[pipeline_runs.RTMW_NODE]["point_names"])
     xy = np.stack([np.arange(len(names), dtype=float), np.arange(len(names), dtype=float) + 0.5], axis=-1)
-    # raw_score is skellytracker's decode score before its [0, 1] map; freemocap does not read it.
-    keypoints = InstanceKeypoints(names, xy[None], np.asarray(score, float)[None], np.asarray(score, float)[None],
-                                  np.ones(1), np.array([present]), np.array([-1]))
-    boxes = InstanceBoxes(np.asarray([box], float), np.array([0.8]), np.array([-1]), np.array([present]), np.array([-1]))
-    return {"0": {pipeline_runs.RTMW_NODE: keypoints, pipeline_runs.CROP_BOX: boxes, "frame_index": 12,
-                  "image_width": 640, "image_height": 480, "timestamp_ms": 5.0, "node_ran": {pipeline_runs.PERSON_NODE: person_ran}}}
+    keypoints = CanonicalKeypoints(names, xy[None], np.asarray(score, float)[None], (), np.array([present]), np.ones(1))
+    boxes = OutputBoxes(np.asarray([box], float), np.array([0.8]), np.array([-1]), np.array([present]), np.array([detector_ran]))
+    return {"0": {pipeline_runs.RTMW_NODE: keypoints, pipeline_runs.BOXES_OUTPUT: boxes, "frame_index": 12,
+                  "image_width": 640, "image_height": 480, "timestamp_ms": 5.0, "node_ran": {}}}
 
 
 def test_rtmw_points_are_taken_by_name_and_gated_at_0_5(rtmw_schema):
@@ -80,13 +79,12 @@ def test_rtmw_points_are_taken_by_name_and_gated_at_0_5(rtmw_schema):
     score[names.index("body/left_shoulder")] = 0.49
     score[names.index("body/right_shoulder")] = 0.5
     observation = pipeline_runs.observations_from_results(
-        _rtmw_result(rtmw_schema, score=score, box=(100.0, 50.0, 40.0, 20.0, 0.0)), rtmw_schema, "rtmpose")["0"]
+        _rtmw_result(rtmw_schema, score=score, box=(80.0, 40.0, 120.0, 60.0)), rtmw_schema, "rtmpose")["0"]
     assert observation.frame_number == 12 and observation.image_size == (480, 640)
     stage = observation.stages[pipeline_runs.STAGE]
     keypoints = stage.keypoints
-    assert keypoints.names == tuple(rtmw_schema[pipeline_runs.RTMW_NODE]["canonical_names"])
-    # by name, not by column: the canonical column of a point is not its column in the output
-    column = names.index("left_hand/left_hand_root")
+    assert keypoints.names == names
+    column = names.index("left_hand/wrist")
     np.testing.assert_array_equal(keypoints.xyz_by_name("left_hand/wrist"), [column, column + 0.5, 0.0])
     assert np.isnan(keypoints.xyz_by_name("body/left_shoulder")).all()
     assert keypoints.visibility[keypoints.index_of("body/left_shoulder")] == 0.0
@@ -98,7 +96,7 @@ def test_rtmw_points_are_taken_by_name_and_gated_at_0_5(rtmw_schema):
 
 def test_the_user_confidence_threshold_sets_the_rtmw_gate(rtmw_schema):
     names = tuple(rtmw_schema[pipeline_runs.RTMW_NODE]["point_names"])
-    result = _rtmw_result(rtmw_schema, score=np.full(len(names), 0.5), box=(100.0, 50.0, 40.0, 20.0, 0.0))
+    result = _rtmw_result(rtmw_schema, score=np.full(len(names), 0.5), box=(80.0, 40.0, 120.0, 60.0))
     kept = pipeline_runs.observations_from_results(result, rtmw_schema, "rtmpose")["0"].stages[pipeline_runs.STAGE]
     gated = pipeline_runs.observations_from_results(result, rtmw_schema, "rtmpose", rtmw_min_score=0.6)["0"].stages[pipeline_runs.STAGE]
     assert np.isfinite(kept.keypoints.xyz_by_name("body/nose")).all()
@@ -108,12 +106,12 @@ def test_the_user_confidence_threshold_sets_the_rtmw_gate(rtmw_schema):
 def test_the_rtmw_box_is_clipped_to_whole_pixels_and_an_absent_person_has_no_box(rtmw_schema):
     count = len(rtmw_schema[pipeline_runs.RTMW_NODE]["point_names"])
     clipped = pipeline_runs.observations_from_results(
-        _rtmw_result(rtmw_schema, score=np.ones(count), box=(630.7, 10.2, 41.0, 31.3, 0.0), person_ran=False), rtmw_schema, "rtmpose")
+        _rtmw_result(rtmw_schema, score=np.ones(count), box=(610.2, -5.45, 651.2, 25.85), detector_ran=False), rtmw_schema, "rtmpose")
     box = clipped["0"].stages[pipeline_runs.STAGE].bounding_boxes[0]
     assert (box.x1, box.y1, box.x2, box.y2) == (610.0, 0.0, 640.0, 25.0)
     assert not clipped["0"].stages[pipeline_runs.STAGE].detector_ran
     absent = pipeline_runs.observations_from_results(
-        _rtmw_result(rtmw_schema, score=np.zeros(count), box=(np.nan,) * 5, present=False), rtmw_schema, "rtmpose")
+        _rtmw_result(rtmw_schema, score=np.zeros(count), box=(np.nan,) * 4, present=False), rtmw_schema, "rtmpose")
     stage = absent["0"].stages[pipeline_runs.STAGE]
     assert stage.bounding_boxes == [] and stage.keypoints.n_valid == 0
 
@@ -137,7 +135,7 @@ def test_point_names_and_connections_use_the_names_of_the_observations(detector_
     names = pipeline_runs.detector_point_names(detector_type)
     edges = pipeline_runs.detector_connections(detector_type)
     node = pipeline_runs.RTMW_NODE if detector_type == "rtmpose" else pipeline_runs.HOLISTIC_NODE
-    assert 0 < len(edges) == len(pipeline_runs._output_schema(detector_type)[node]["canonical_edges"])
+    assert 0 < len(edges) == len(pipeline_runs._output_schema(detector_type)[node]["edges"])
     assert all(a in names and b in names for a, b in edges)
     assert {"body/nose", "left_hand/wrist", "left_hand/thumb_cmc"} <= set(names)
     if detector_type == "rtmpose":
@@ -202,17 +200,16 @@ def test_the_stored_confidence_is_the_score_after_the_gate_and_raw_score_is_not_
     score[names.index("body/left_shoulder")] = 0.97
     score[names.index("body/right_shoulder")] = 0.3
     keypoints = pipeline_runs.observations_from_results(
-        _rtmw_result(rtmw_schema, score=score, box=(100.0, 50.0, 40.0, 20.0, 0.0)), rtmw_schema, "rtmpose")["0"].stages[pipeline_runs.STAGE].keypoints
+        _rtmw_result(rtmw_schema, score=score, box=(80.0, 40.0, 120.0, 60.0)), rtmw_schema, "rtmpose")["0"].stages[pipeline_runs.STAGE].keypoints
     assert keypoints.visibility[keypoints.index_of("body/left_shoulder")] == 0.97
     assert np.isfinite(keypoints.xyz_by_name("body/left_shoulder")).all()
     assert keypoints.visibility[keypoints.index_of("body/right_shoulder")] == 0.0  # below the gate: missing
     assert np.isnan(keypoints.xyz_by_name("body/right_shoulder")).all()
 
-    from skellytracker.core.pipelines import InstanceKeypoints
+    from skellytracker.core.pipelines import CanonicalKeypoints
     holistic_names = ("body/nose", "body/left_eye", "body/right_eye")
     visibility = np.array([[0.8, 0.1, np.nan]])
-    value = InstanceKeypoints(holistic_names, np.ones((1, 3, 2)), visibility, visibility.copy(), np.ones(1), np.array([True]),
-                              np.array([-1]), z=np.zeros((1, 3)))
+    value = CanonicalKeypoints(holistic_names, np.ones((1, 3, 2)), visibility, (), np.array([True]), np.ones(1), z=np.zeros((1, 3)))
     result = {"0": {pipeline_runs.HOLISTIC_NODE: value, "frame_index": 0, "image_width": 64, "image_height": 48}}
     stored = pipeline_runs.observations_from_results(result, {}, "mediapipe")["0"].stages[pipeline_runs.STAGE].keypoints.visibility
     assert stored[0] == 0.8 and stored[1] == 0.1 and np.isnan(stored[2])

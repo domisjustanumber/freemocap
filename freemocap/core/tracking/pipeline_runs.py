@@ -25,8 +25,7 @@ RTMW_SIZES: dict[str, str] = {
 }
 """The old RTMW model names of the UI and of saved settings, mapped to the sizes of the sidecar."""
 RTMW_NODE = "wholebody"
-PERSON_NODE = "person"
-CROP_BOX = "crop_box"
+BOXES_OUTPUT = "boxes"
 HOLISTIC_NODE = "holistic"
 RTMW_MIN_SCORE = 0.5
 """The default of the user's RTMW confidence threshold (user T1); a point with a lower score is missing.
@@ -114,7 +113,7 @@ def detector_point_names(detector_type: str) -> tuple[str, ...]:
     """The point names of the observations of a detector choice, as `observations_from_results` gives them."""
     schema = _output_schema(detector_type)
     if detector_type == "rtmpose":
-        return tuple(schema[RTMW_NODE]["canonical_names"])
+        return tuple(schema[RTMW_NODE]["point_names"])
     return tuple(schema[HOLISTIC_NODE]["point_names"])
 
 
@@ -127,7 +126,7 @@ def detector_box_stages(detector_type: str) -> tuple[tuple[str, ...], ...]:
 def detector_connections(detector_type: str) -> tuple[tuple[str, str], ...]:
     """The edges between the points of a detector choice, in the names of `detector_point_names`."""
     node = RTMW_NODE if detector_type == "rtmpose" else HOLISTIC_NODE
-    return tuple((a, b) for a, b in _output_schema(detector_type)[node]["canonical_edges"])
+    return tuple((a, b) for a, b in _output_schema(detector_type)[node]["edges"])
 
 
 def _person(names, xy, z, score, present) -> tuple[tuple[str, ...], np.ndarray, np.ndarray]:
@@ -142,7 +141,7 @@ def observations_from_results(results: Mapping[str, Mapping[str, Any]], output_s
                               detector_type: str, rtmw_min_score: float = RTMW_MIN_SCORE) -> dict:
     """The one boundary from a pipeline result to freemocap's observation type, for each camera.
 
-    Points are taken by name: RTMW through `to_canonical`, Holistic by its point names. An RTMW
+    Points are taken by name from the delivered outputs (`wholebody` or `holistic`). An RTMW
     point with a score below `rtmw_min_score` or no x and y is missing (NaN, score 0); a kept 2D point has z 0.
     Only row 0 (the one person) is read, and only when it is present.
     The stored confidence is skellytracker's `score`, in [0, 1]: for RTMW the calibrated chance that the point is
@@ -150,24 +149,22 @@ def observations_from_results(results: Mapping[str, Mapping[str, Any]], output_s
     """
     # shortcut: the observation type is still skellytracker's; the user's answer to V1 sets freemocap's own.
     from skellytracker.core.data_primitives import BoundingBox, Keypoints, Observation, StageObservation
-    from skellytracker.core.pipelines import to_canonical
     observations = {}
     for camera_id, result in results.items():
         width, height = result["image_width"], result["image_height"]
         boxes = []
         if detector_type == "rtmpose":
-            canonical = to_canonical(result[RTMW_NODE], output_schema[RTMW_NODE])
-            names, xyz, score = _person(canonical.point_names, canonical.xy, canonical.z, canonical.score, result[RTMW_NODE].present)
+            value = result[RTMW_NODE]
+            names, xyz, score = _person(value.point_names, value.xy, value.z, value.score, value.present)
             missing = (score < rtmw_min_score) | ~np.isfinite(xyz[:, :2]).all(axis=1)
             xyz[missing], score[missing] = np.nan, 0.0
-            crop = result[CROP_BOX]
-            if crop.present[0]:
-                cx, cy, w, h, _ = crop.boxes[0]
-                # clip, then int(), as the sfn26 crop box was
-                x1, x2 = (int(min(max(0.0, value), width)) for value in (cx - w / 2, cx + w / 2))
-                y1, y2 = (int(min(max(0.0, value), height)) for value in (cy - h / 2, cy + h / 2))
-                boxes.append(BoundingBox(x1, y1, x2, y2, float(crop.instance_score[0])))
-            detector_ran = bool(result["node_ran"][PERSON_NODE])
+            delivered = result[BOXES_OUTPUT]
+            if delivered.present[0]:
+                # clip, then int(), as the sfn26 crop box was; the pipeline does not clip
+                x1, x2 = (int(min(max(0.0, value), width)) for value in delivered.xyxy[0, 0::2])
+                y1, y2 = (int(min(max(0.0, value), height)) for value in delivered.xyxy[0, 1::2])
+                boxes.append(BoundingBox(x1, y1, x2, y2, float(delivered.score[0])))
+            detector_ran = bool(delivered.detector_ran[0])
         else:
             value = result[HOLISTIC_NODE]
             names, xyz, score = _person(value.point_names, value.xy, value.z, value.score, value.present)

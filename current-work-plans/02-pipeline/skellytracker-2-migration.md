@@ -252,6 +252,36 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     - Runs 1-3 (my `--basetemp` under the long scratchpad): Blender export "Failed to open local file"
       on the 236-char parquet path, at `export_completion.py:115`. Caused by the temp path choice.
     - So: neither migration failure occurs in the baseline; B and C proceed.
+    B/C RESULT (2026-11-16; 10 migrated runs m1-m10 + 1 baseline b1, Blender auto-open off through a
+    scratch harness that sets `defer_blender_open`; no product change; evidence and scripts in
+    `0a1e712d-.../scratchpad/bc/`, per run `runs_summary.txt`). Not fixed; owner decision pending.
+    - One cause for both: skellytracker 2.0 pins `opencv-contrib-python==5.0.0.93` (ST
+      `pyproject.toml:54`; baseline OpenCV 4.12.0). `cv2.solvePnP` on an all-NaN 24-corner row returns
+      ret=True with NaN rvec/tvec on 4.12 and ZERO rvec/tvec on 5.0 (`bc/pnp_nan_probe.py`).
+    - B chain: a frame without a board is a NaN-filled row with all 24 ids (ST `anipose_export.py:58-62`,
+      unchanged) -> `charuco_board_ops.py:93` checks only `len(corners) < 6`, :103 solvePnP, :109 only
+      `ret` -> `freemocap_anipose.py:384-410` takes the zero pose as valid: shared frames 214-217 per
+      pair instead of 9-30, every camera starts at the origin, reprojection before bundle adjustment
+      253 px (4.12: 3.4 px) -> bundle adjustment's unseeded randomness (`bundle_adjust.py:483`,
+      `freemocap_anipose.py:122`) lands in a different poor minimum each run: calibration 6.8-262 px
+      (baseline 0.32-0.37 px), fx 0.4-33765 -> triangulation median error 23-334 px (baseline 2.6) ->
+      skellyforge alignment quality 1/(1+(err/5)^2) below 0.5 -> insufficient_evidence 10/10.
+      Dropping non-finite corners before solvePnP (diagnostic only) restores 0.3455/0.3424/0.3611 px
+      on OpenCV 5, equal to the baseline.
+    - Charuco (deterministic; decoded frames identical): OpenCV 5 finds fewer corners (Cam1 666->580,
+      Cam2 619->462, Cam3 1088->978; never one the old misses), common corners shifted about
+      (-0.4, -0.4) px, max 2.1 px; same code (ST `charuco_detector.py:123`, built at :176 with default
+      parameters). Not the cause: 4.12 calibrates both detection sets to 0.25-0.36 px. Skellytracker
+      question.
+    - C, 4/10 (m4, m5, m7, m8): `run_save_session.py:58-59` (via `observation_publication.py:234`):
+      `processing['camera_group:…'].camera_assignment.fitness.cameras[i].median_error`/`p90_error` is
+      `inf` (`matching_fitness.py:72-82` fills invalid points with inf; quantile inf when >= 10%/50%
+      are invalid) and reads back as None (pydantic writes inf as JSON null into a JsonValue dict).
+      Deterministic for a given descriptor (`bc/test_descriptor_roundtrip.py`: 22 pass, 4 fail 10/10).
+      Only with the broken calibration; baseline fitness is finite. Ruled out: mutation after accept,
+      the `skellytracker` block (round-trips in all runs), tuple/list, key order, NaN, timestamps,
+      paths, a second writer (Blender opens after the graph and was off).
+    - EP: all run records cpu fp32 device None (both nodes). Not a factor.
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).

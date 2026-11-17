@@ -487,6 +487,13 @@ The gate of Phase B is the freemocap suite on the Phase B environment, reported 
 1602/15/23, plus real end-to-end runs: one posthoc recording and the realtime path on recorded
 frames, each with `rtmpose` and with `mediapipe`.
 
+7. **Stage PM: the pipeline metrics port (user, 2026-11-17; PLAN ONLY).** It comes after Phase B and before
+   skellytracker stage 2.4 ("Delete the old run code", the stage that removes the legacy pipelines). It ports
+   `dom/pipeline-metrics-rebased` (`dadfe94c`) by area onto this branch, and adds skellytracker's system
+   information to a top panel of the pop-up. The user then runs manual performance tests. The plan, findings and
+   open user questions Q1-Q9 are in [pipeline-metrics-port-plan.md](pipeline-metrics-port-plan.md). No code
+   changes until the user answers.
+
 ### 0.3 Decisions of the user (all 2026-11-16, through the supervisor)
 
 - Base on `upstream/sfn26` at its tip `ca0c17cc`.

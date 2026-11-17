@@ -282,6 +282,20 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
       the `skellytracker` block (round-trips in all runs), tuple/list, key order, NaN, timestamps,
       paths, a second writer (Blender opens after the graph and was off).
     - EP: all run records cpu fp32 device None (both nodes). Not a factor.
+    X1/X2 DONE (§0.3) `964e3cee`, `6f283a8c`. Then `test_fresh_posthoc.py` 3 times (Blender auto-open as
+    the test has it; logs `0a1e712d-.../scratchpad/x12/r1..r3.txt`): alignment
+    `{'calibrated_world': 'foot_support'}` 3/3, calibration 0.2979 / 0.3006 / 0.3472 px (baseline
+    0.32-0.37; OpenCV 5 finds fewer, unbiased corners, §0.3 X3), "Recording changed" 0/3. Each then fails
+    like the baseline at `save_current` rename scratch -> current, WinError 5: the test's own Blender
+    windows (1, 2, 3 open after runs 1-3) hold the folders. Test-environment item for the user, not
+    worked around; the windows were closed afterwards. A truly bad calibration (X1 reverted in the
+    working tree only, X2 kept, scratch harness, `bc/runs/v1..v3`): v1 alignment
+    `insufficient_evidence`; v2 had inf fitness errors, saved (X2), then failed at the Blender export
+    "Cannot fit zero-length Skelly part heel.02.R"; v3 "Invalid prepared calibration"; "Recording
+    changed" 0/3. Bundle adjustment randomness: identical in the baseline (`bundle_adjust.py:483` camera
+    that seeds each board pose, `freemocap_anipose.py:122` random tie-break when sampling points; global
+    `np.random`, no seed in either). Open, supervisor's word needed before a seed.
+    Fast suite after X1/X2: 1524 passed, the same 8 failed (also failing with both fixes reverted), 20 skipped.
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).
@@ -520,6 +534,20 @@ frames, each with `rtmpose` and with `mediapipe`.
   (`install_hint`, recommendation and offer fields); no EP names, driver versions or hardware logic in
   freemocap (`test_no_execution_provider_knowledge.py` still passes); one display test. A missing status
   field is reported to the supervisor as a gap, not derived.
+- X1 = A (2026-11-16, user): the NaN guard goes in freemocap. `estimate_pose_points`
+  (`charuco_board_ops.py`, the only `cv2.solvePnP` call, used by `estimate_pose_rows` and
+  `freemocap_anipose.py:399`) drops non-finite corners, needs >= 6 finite ones, and treats a non-finite
+  result as no pose. skellytracker's anipose export keeps its NaN-filled rows. Done in `964e3cee` with
+  `tests/calibration/test_charuco_pose_estimate.py` (OpenCV 5.0: 3/3 fail without the fix, pass with it;
+  4.12 gave ret=True with a NaN pose, so the old code returned NaN arrays, not None).
+- X2 = A (2026-11-16, user): a non-finite fitness error is stored as null ("no value") on purpose; the save
+  check compares both sides in the stored form. No new field. Done in `6f283a8c`: `RunSaveSession.check`
+  compares `RecordingMetadata.model_validate_json(m.model_dump_json())` of both sides. Compared as models,
+  not JSON text: skellyforge `ModelScaleFit.voting_segment_names` / `measured_segment_names` are
+  frozensets whose JSON order differs run to run (a JSON-text compare failed 6 of the 26 captured
+  descriptors). Test `tests/test_run_save_session_roundtrip.py`.
+- X3 = A (2026-11-16, user): the supervisor investigates the OpenCV 5 charuco differences in
+  skellytracker read only, from `scratchpad/bc/` (leave those files in place).
 
 ### 0.4 Open questions
 

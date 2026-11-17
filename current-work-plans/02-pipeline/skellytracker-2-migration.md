@@ -491,8 +491,13 @@ frames, each with `rtmpose` and with `mediapipe`.
    skellytracker stage 2.4 ("Delete the old run code", the stage that removes the legacy pipelines). It ports
    `dom/pipeline-metrics-rebased` (`dadfe94c`) by area onto this branch, and adds skellytracker's system
    information to a top panel of the pop-up. The user then runs manual performance tests. The plan, findings and
-   open user questions Q1-Q9 are in [pipeline-metrics-port-plan.md](pipeline-metrics-port-plan.md). No code
-   changes until the user answers.
+   open user questions are in [pipeline-metrics-port-plan.md](pipeline-metrics-port-plan.md). Ruled on
+   2026-11-17 (§10 there):
+   - 2.0 pipelines get timing in realtime and in posthoc mocap, through a per-client skellytracker timing sink;
+   - a realtime-only legacy path runs the old YOLOX + RTMW `Tracker` with the old task events, and is deleted at
+     ST 2.4;
+   - posthoc calibration is out.
+   Q3-Q6, Q8 and L2-L4 are open. No code until then.
 
 ### 0.3 Decisions of the user (all 2026-11-16, through the supervisor)
 

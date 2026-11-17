@@ -1,6 +1,8 @@
 # Pipeline metrics port: plan (stage PM)
 
-Status: PLAN ONLY, 2026-11-17. No code has changed for it. The user's decisions are in §8 and are open.
+Status: PLAN ONLY, 2026-11-17. No code has changed for it. The user ruled on Q1, Q2, Q7, L1 and on what
+"RTMPose" means. Those rulings are in §10, which replaces any part of §2-§8 it contradicts. Q3, Q4, Q5, Q6 and
+Q8 are open with the user; Q9 is the supervisor's.
 
 The user, in their words: "Before the stage where legacy pipelines are removed, I want to add a stage that ports
 over the work from dom/pipeline-metrics-rebased and: 1. Clean the code up and get it to work smoothly for both the
@@ -286,3 +288,253 @@ Whether the numbers are comparable:
   spans, and the machine, models and EP can differ. A fair comparison needs the same recording, EP, model size
   and precision, and should report ms/frame with FPS and ranges over repeats (the `benchmarks/README.md` report
   contract).
+
+## 10. The rulings of 2026-11-17 and the updated plan
+
+### 10.1 Rulings
+
+These came through the supervisor.
+
+- **Q1, the user's words:** "it must run for both the legacy, dynamic batch YOLOX + RTMW and RTMPose pipelines, as
+  well as the new fixed-batch YOLOX+RTMW pipeline / any future sidecar + pipeline config based pipelines."
+- **"RTMPose":** the legacy side is only the old YOLOX + RTMW wholebody, the pipeline freemocap had under `rtmpose`.
+  There is no old RTMPose-body path, and no optional step for it.
+- **L1 = C:** the user wrote "No post-hoc for legacy pipelines."
+  - A legacy run path comes back, realtime only, and drives the old skellytracker `Tracker`.
+  - Its per-model timing comes from the old `core/tracker/task_events.py`. The supervisor ports it onto skellytracker
+    `dom/sidecar-implementation`; this session never changes skellytracker.
+  - The legacy path is deleted at ST 2.4 together with the matching freemocap step.
+- **Q2:** 2.0 pipelines use the skellytracker 2.0 timing sink plus freemocap's coarse timers. The legacy path uses the
+  task events plus the same coarse timers.
+- **Q7 and posthoc:** the user's rule is "If it's the same work, do both." Both are done for the 2.0 pipelines, with a
+  live posthoc timeline. Posthoc calibration is out: it has no `PipelineRun` (no inference service in
+  `calibration_pipeline.py`).
+
+### 10.2 The posthoc review, checked in the code
+
+- **Shared THREAD worker:** true for realtime only.
+  - `freemocap_application.py:90` `inference_service = InferenceService(worker_registry=worker_registry)`.
+  - `inference_service.py:106` `worker_mode=WorkerMode.THREAD`.
+- **"Posthoc shares that service": wrong.** Each posthoc recording builds and closes its own service and thread.
+  - `recording_pipeline.py:148-150` `registry = WorkerRegistry(... WorkerMode.THREAD)` /
+    `service = InferenceService(worker_registry=registry)` / `service.start()`.
+  - `PosthocPipelineManager.inference_service` (`posthoc_pipeline_manager.py:47`) is stored but never used.
+  - So the timing sink belongs on the registration of whichever service a client uses. Realtime and posthoc
+    still share the same code: `InferenceRegistration` and `_start_run`.
+- **"Once per frame": true, but imprecise.** There is one `client._run.process_batch({` (`inference_service.py:260`)
+  per frame index, covering all cameras.
+  - Posthoc submits one request per frame, with every camera (`tracker_adapter.py:117`, `:136`
+    `require_every_camera`, `:139`).
+  - Realtime runs only the newest frame and drops older ones (`realtime_skeleton_inference_node.py:189-196`), and
+    unreadable cameras are skipped (`:316-326`). So realtime `batch_size` varies.
+- **"Selector by the posthoc pipeline_id": imprecise.** The posthoc registration id is the fixed string
+  `"recording-graph"` (`recording_pipeline.py:147,156` -> `tracker_adapter.py:99` `pipeline_id=execution_id`).
+  The task's real id (`mocap_pipeline.py:24` `pipeline_id`) has to be passed down.
+- **The realtime id** is `str(uuid.uuid4())[:6]` (`realtime_pipeline.py:210`, used at
+  `realtime_skeleton_inference_node.py:148`). The branch keys its timing by camera group, so every payload carries
+  `mode`, `pipeline_id` and `camera_group_id`.
+- **Extra fact:** realtime requests carry no `performance` (`realtime_skeleton_inference_node.py:243-244`), so
+  `inference.queue_wait` exists only for posthoc.
+
+### 10.3 The per-client 2.0 timing sink
+
+1. `InferenceRegistration` (`inference_service.py:32-43`) gets a field
+   `timing_sink: Callable[[dict], None] | None = None`. `_start_run` (`:157-163`) passes it to `start_detector_run`.
+2. `start_detector_run` (`pipeline_runs.py:69`; the only `start_pipeline` call is at `:82`) takes `timing_sink`.
+   When a sink is given:
+   - It builds the span list from the public node types:
+     `[f"{n.id}.{s}" for n in config.nodes for s in types[n.type].timing_spans] + ["pipeline.run"]`
+     (`list_node_types()`; ST rule V-pipeline.timing-1, `config.py:814-819`).
+   - It starts the run on a `model_copy` whose `instrumentation.timing_spans` holds that list.
+   - The recorded provenance (`:84` `export_pipeline(config, resolved=True)`) stays on the un-instrumented config.
+     Whether `model_copy` marks `instrumentation` as set in the export is unverified; a test checks it.
+3. The sink runs on the inference thread, synchronously after each call, under the run lock (ST
+   `core/pipelines/run.py:132`, `_runtime/executor.py:395-399`).
+   - The header comes through the same callable (`"schema"` in the record). It is kept for the node items,
+     `stage_providers` and `execution`.
+   - The sink only does `deque.append`, because the time it takes is counted inside `pipeline.run`.
+4. Each event becomes one `PipelineTimingEvent`:
+   - `stage = f"{node_id}.{span}"`;
+   - `node_kind = "skeleton_inference"`;
+   - `frame_number = images[0].frame_index`. All images of one call share it: `inference_service.py:261` takes
+     `frame_index=request.frame_number`.
+   - `batch_size` is taken from the event, and `camera_id = None`;
+   - the task id is prefixed with the pipeline id;
+   - parents are derived: the `pipeline.run` event, plus the header `nodes[].inputs`.
+5. **Realtime:** the node owns the deque. Events of frame N are appended before the future resolves
+   (`inference_service.py:287`). The node drains them into the branch's `timer.extend_task_events`, and the existing
+   `timer.maybe_flush(publication_queue=timing_pub, ...)` (`realtime_skeleton_inference_node.py:268-271`) publishes
+   them on `PipelineTimingTopic`.
+6. **Posthoc:** there is no pubsub.
+   - A bounded deque goes on `MocapWorkerRequest` (`mocap_pipeline.py:23-30`). It is passed through
+     `run_recording_pipeline` (`application_pipeline.py:205`) -> `build_recording_pipeline` (`recording_pipeline.py:57`)
+     -> `SkellyTrackerAdapter`, together with the real `pipeline_id` instead of `"recording-graph"`.
+   - The metrics relay reads it through `posthoc_pipeline_manager.pipelines[id]`.
+   - A `graph.camera_batch_wait` event per frame (`perf_counter_ns` around `tracker_adapter.py:120-132`) goes into the
+     same deque, from the graph thread. `deque.append` is thread-safe.
+7. **Posthoc in the UI:**
+   - a run selector (the realtime group or a posthoc pipeline id);
+   - the opener takes `?pipeline=<id>`, which needs the Electron IPC change;
+   - an "Open metrics" entry after "Load in playback" in `PipelineGroupCard.tsx:178-220`, for mocap only;
+   - lag and stall hidden for posthoc. Their rule `max(0.5 s, 15/fps)` (B `pipeline_timing_events.py:354-356`) marks a
+     slow CPU run stale, and the relay then drops its events. Posthoc skips `compute_timing_lag_info` and the stale
+     filter.
+
+### 10.4 The legacy realtime path (L1 = C)
+
+**(a) Old-API names at skellytracker 12c477da**
+
+The legacy path follows `dadfe94c:freemocap/core/tracking/tracker_factory.py:67-143`, which builds the configs
+directly. It does not use the presets or the shared sessions.
+
+Present at 12c477da:
+- `Tracker`, `TrackerConfig`, `DetectionStageConfig` (ST `core/__init__.py:3-9,29-36`; `core/config/__init__.py:1-7`).
+- `TrackerState` (`core/tracker/tracker_state.py`).
+- `OnnxSession`, `OnnxSessionConfig`, `CpuSession`.
+- `RTMPoseDetectorConfig` (a re-export of `RTMWWholebodyDetectorConfig`,
+  `keypoint_detectors/rtmpose/wholebody/rtmpose_wholebody_detector.py:16-18`). It is registered at
+  `rtmw/wholebody/rtmw_wholebody_detector.py:162`, through the `rtmpose/__init__.py` import.
+- `YoloxPersonDetector`, `YoloxPersonDetectorConfig`. The dynamic batch is built in:
+  `yolox_person_detector.py:186-193` `prepare=prepare_yolox_onnx`, and `_yolox_dynamic_batch.py:366`.
+- The temporal-processing configs `BBoxPolicyConfig`, `BBoxSmoothingConfig`, `KeypointResetPolicyConfig` and
+  `KeypointsWithinBBoxRatioConfig` (`temporal_processing_config.py:13,45,88,119`).
+- `Observation`.
+
+Missing at 12c477da, and not needed:
+- `core/tracker/tracker_presets.py`, `core/sessions/shared_sessions.py` (`SessionRequest`) and
+  `tracker_session_requests`. They were imported by the old factory
+  (`c5be62ed^:freemocap/core/tracking/tracker_factory.py:27,29,92,116,190`) and exist only in the `sfn26` line.
+
+Missing at 12c477da, and needed. Only these must be added in skellytracker:
+1. `core/tracker/task_events.py`, plus the `event_collector` argument on `Tracker.process_batch` and in
+   `DetectionStage`. At 12c477da `process_batch` takes only `timings: ProcessingTimer | None` (ST `tracker.py:74`).
+   This is the supervisor's port.
+2. **A GPU EP for the old `OnnxSession`.**
+   - Today the old run code runs only on CPU or CoreML: `core/sessions/execution_provider_name.py`
+     `ExecutionProviderName = Literal["coreml", "cpu"]`, and `ort_session_utils.py:26-29,113-114` falls back to
+     `CPUExecutionProvider`. ST commit 9cb65775 removed the rest.
+   - Without this, legacy runs are CPU only, and a legacy GPU comparison is impossible.
+   - The smallest version: `OnnxSession.create` builds each model with `core.eps.build_session(...)` when the key is
+     not cpu or coreml.
+   - The freemocap EP choice reuses `pipeline_runs.run_ep_choice` (`:53`). freemocap's old `application_provider`
+     needs the removed `ort_session_utils.provider_loads`, so it does not come back.
+
+**Model files** (read from the code, nothing downloaded):
+- The old specs point at openmmlab archives: `rtmw-wholebody.yaml:86-87` `rtmw-x-l_256x192_b1_fp32.onnx`, and
+  `yolox.yaml:60-61` `yolox-m_b1_fp32.onnx`.
+- They are cached in `~/.cache/skellytracker/models` (`sessions/model_registry.py:26`), and downloaded only when
+  missing (`:155-158`). This machine has them.
+- The seam refuses to start when a file is not in the cache, so a run never downloads.
+- These are not the 2.0 files (2.0 uses fixed-batch exports such as `rtmw-wholebody133-l-256_b3_fp32.onnx`). Whether
+  the weights are the same is unverified. This matters for comparability (part (d)).
+
+**(b) Old point names**
+
+- The old RTMW emits `body.<sfn26 name>` (`body.nose`, `body.left_hand_root`; `rtmw_wholebody_detector.py:34`,
+  `coco133_tracked_points.yaml`).
+- The aggregator maps by `detector_type` and 2.0 names (`tracker_mappings.py:13`, `mapping_paths.py:16`), so old
+  names would silently map nothing.
+- No old-to-new map exists in freemocap; the old-recording reader only refuses old names (`saved_observations.py:47`).
+- The seam converts the old names with skellytracker's `to_canonical`. It builds an `InstanceKeypoints` from the old
+  xy and visibility and the run's `output_schema["wholebody"]`. This gives the derived centres too, which a rename
+  table would miss.
+- The old order matches the 2.0 groups (body 0-22, face 23-90, left hand 91-111, right hand 112-132), and boxes and
+  `detector_ran` pass through.
+- One test checks that the legacy output names equal `detector_point_names("rtmpose")`. Which `point_names` the value
+  must carry is unverified.
+- "Realtime only, nothing saved" holds.
+  - Nothing in `core/pipeline/realtime`, `core/streaming` or `api/websocket` writes a file.
+  - LSL and VMC stream live (`streaming/outputs/source.py:71-100`).
+  - `CharucoRecorderNode` buffers ChArUco only (`charuco_recorder_node.py:36`).
+  - Auto-process after a recording uses the posthoc slice (`RecordingControlPanel.tsx:105-106`).
+  - One caveat: an external LSL recorder captures the legacy stream labelled `rtmpose`. Its provenance JSON
+    (`lsl.py:388`) has no detector field.
+- **Scores:** old RTMW scores are raw SimCC. The old detector default is `confidence_threshold: float = 0.004`
+  (`rtmw_wholebody_detector.py:45`), and sfn26 then applied the aggregator's 0.4 gate (`camera_node_config.py:45`).
+  The legacy path keeps that and does not apply `rtmpose_confidence_threshold` (0.5 is on the calibrated scale).
+
+**(c) The choice in config, contract and UI**
+
+- Recommended: a realtime-only field `legacy_tracker_benchmark: bool = False` on
+  `RealtimeSkeletonInferenceNodeConfig` (`realtime_skeleton_inference_node_config.py:5-20`). `detector_type` stays
+  `"rtmpose"`, so mapping, overlays, the wire `tracker_id` and the UI need no aliases.
+- A new `detector_type` value would key at least eight lookups:
+  - `pipeline_runs.py:17` and `:102-119`;
+  - `mapping_paths.py:15`;
+  - `channel_helpers.py:54`;
+  - `tracker_definitions.py:13`;
+  - `onnx_router.py:59`;
+  - `message_composer.py:89`;
+  - the UI `DetectorType` that posthoc shares (`mocap-slice.ts:37`).
+- The field passes through `realtime_skeleton_inference_node.py:147-155` into `InferenceRegistration`.
+- `_start_run` branches to the legacy run, and raises `ValueError` unless `mode == InferenceMode.REALTIME`. So
+  posthoc can never start a legacy run. `MocapTaskConfig` has no such field, and `tracker_adapter.py:100` builds its
+  own registration.
+- Changing the field rebuilds inference (`realtime_pipeline.py:389`).
+- The contract gets one boolean (`openapi.json` `RealtimeSkeletonInferenceNodeConfig` near `:7732`, plus `schema.ts`).
+- The UI gets a toggle "Legacy tracker (benchmark)" in the realtime processing settings, under
+  `import.meta.env.DEV` (precedent `ThreeJsScene.tsx:115`). Benchmarks can also set it through the realtime API.
+- The alternative, if a detector value is wanted: `legacy_benchmark_yolox_rtmw` in the camera-node Literal only (not
+  `mocap_task_config.py:74`, so posthoc returns 422), aliased to `"rtmpose"` at each lookup above. This is question
+  L2 in §10.6.
+- The seam is one new file, `freemocap/core/tracking/legacy_tracker_run.py`. It holds:
+  - the Tracker and session build;
+  - the name translation;
+  - the cache-only check;
+  - the task-event conversion.
+
+  The remaining edits are the field, its pass-through, the `_start_run` branch, the contract boolean and the DEV
+  toggle. Each one carries the comment `# Deleted at skellytracker stage 2.4 (legacy tracker benchmark).` Deleting
+  them is one commit.
+
+**(d) One timeline for legacy and 2.0**
+
+The legacy stages are the old `detection_stage.py` at 94d5fcae. Task ids are `{frame}:{cam}:skeleton_inference:{stage}`
+or the batch form.
+
+| 2.0 span (node ids at 12c477da) | Legacy stage | Comparable |
+|---|---|---|
+| `person.inference` | `object_detection_infer` (`:511`, around `run_batched`) | yes, with caveats: 2.0 pads a fixed batch; the redetect policies differ (legacy redetects all cameras together, `:426-438`); different files |
+| `wholebody.inference` | `keypoint_detection_infer` (`:608`) | yes, with caveats: 2.0 `batch_size` counts cameras, not crops; different files |
+| `pipeline.run` | `predict_batch` (freemocap, around `tracker.process_batch`) | about the same: both are the whole call; `pipeline.run` excludes freemocap's `observations_from_results` (`inference_service.py:263`) |
+| `frame_read` (freemocap) | `frame_read` | yes: same code |
+| `person.preprocess` / `.postprocess` | none (only `context.timings`, `:503`) | no |
+| `wholebody.preprocess` | `crop` (`:551`) plus an untimed preprocess | no |
+| `wholebody.postprocess` | `keypoint_detection` (`:634`; includes translate, miss/reset and smoothing) | no |
+| glue `.run` (trigger, box, crop smoothing, points box) | `bbox_reuse`, `bbox_smoothing`, `keypoint_tracked_bbox` | loose only: different filters and rules |
+
+- The timeline tags each row with its engine (legacy or 2.0) and pairs only the comparable rows.
+- `PRETTY_STAGE_LABELS`, `SKELETON_INFERENCE_STAGE_ORDER` and the indent sets (B `pipelineTaskTopology.ts:53-212`) get
+  the 2.0 names.
+- The 2.0 node ids change with the box rename (ADR-2RWC, ST `803c33fa`). The table must be re-read at that head when
+  the step is built.
+
+### 10.5 (e) Size and commit order
+
+The new PM order replaces §7. Each step is tested on its own.
+
+| # | Commit | Size (estimate) |
+|---|---|---|
+| 1 | Backend timing model and its unit tests (§7) | about 500 lines |
+| 2 | Realtime coarse producers (charuco, predict_batch) and the shared start time and flush interval | about 150 |
+| 3 | Per-client 2.0 timing sink: `InferenceRegistration.timing_sink`, `start_detector_run` spans, event conversion; a test with a fake run | about 200 |
+| 4 | Transport message on the main CBOR transport (if Q4 = A) with a fan-out per client, and codec and reconnect tests | about 300 |
+| 5 | UI store, keyed by mode and pipeline id | about 700 (mostly ported) |
+| 6 | UI window, route, realtime entry, run selector | about 1,500 (mostly ported) |
+| 7 | Posthoc route: real pipeline id, deque, `camera_batch_wait`, progress-panel entry, lag and stall hidden | about 250 |
+| 8 | Legacy seam: `legacy_tracker_run.py`, the flag, the name translation, the cache-only check, task events to `PipelineTimingEvent`, tests. It waits for the supervisor's skellytracker port (task events, and the GPU EP for the old `OnnxSession`) | about 400 |
+| 9 | System-information endpoint and top panel (§5; Q5, Q6) | about 400 |
+| 10 | State doc and a run report | — |
+
+Deletion at ST 2.4: one commit removes `legacy_tracker_run.py` and every line marked
+`# Deleted at skellytracker stage 2.4`.
+
+### 10.6 New questions
+
+- **L2 (user or supervisor): how the legacy choice is offered.**
+  - A: the realtime-only boolean `legacy_tracker_benchmark`, behind a DEV toggle (recommended: no aliases, and
+    posthoc cannot get it).
+  - B: a `detector_type` value `legacy_benchmark_yolox_rtmw`, with an alias at every lookup.
+- **L3 (supervisor): the GPU EP for the old `OnnxSession`.** Without it the legacy path is CPU only.
+- **L4 (user): no downloads.** Recommended: the legacy seam refuses to start when an old model file is not in the
+  cache.

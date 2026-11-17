@@ -638,7 +638,7 @@ frames, each with `rtmpose` and with `mediapipe`.
          or while disconnected (`detectorShowsExecutionProvider`), and the server's flag decides after (MediaPipe:
          false). The new UI keys exist only in English; the 40 other locales fall back to it (`i18n.ts:54,168`).
        - V1 = A DONE `59dbe765`: timeline bars shorter than 0.5 ms are hidden; the table keeps every stage.
-       - ADR-9HTX STAGE 5 (user go; DONE on its branch, not merged). Worktree `../freemocap-stage5`, local branch
+       - ADR-9HTX STAGE 5 (user go; DONE, on sidecar-implementation per M3, local only). Worktree `../freemocap-stage5`, local branch
          `stage5-node-redesign` from `4c1b7955`; run with venv313 python and PYTHONPATH = "<stage5 worktree>;
          <../skellytracker-node-redesign>" (venv313 adds skellytracker by a static .pth and freemocap by an appended
          meta-path finder, so PYTHONPATH wins; the main `.venv`, `uv.lock` and this checkout are untouched). Stage 4
@@ -656,7 +656,15 @@ frames, each with `rtmpose` and with `mediapipe`.
            on test_data, both sides: 97,425 kept, 0.314339 px, foot_support, parquet equal in all 11 columns
            (1,889,442 rows). Legacy cpu run, 60 frames x 3 test_data cameras: 24,399 of 24,660 points kept, names,
            xyz, scores, boxes and detector_ran exactly equal to fb659c8b's seam.
-         - Reported to the supervisor. Stage 5 moves to sidecar-implementation only with stage 4, after the user says so.
+         - USER RULING M3 = A ("Move both, locally, no push"): ST `dom/sidecar-implementation` in `../skellytracker`
+           is at `93d7c9e0` (supervisor, not pushed); here the two commits are cherry-picked as `6d15e07f` (= 72d524ca)
+           and `ebb36199` (= 63cd69c0), code equal to the stage-5 branch; the worktree and branch are removed. Runs now
+           use the scratch ST clone fetched from `../skellytracker` at `93d7c9e0`.
+         - On sidecar-implementation `ebb36199`: test_pipeline_runs + test_legacy_tracker_run 33 passed. GPU check,
+           test_data numerical, EP forced by the scratch harness (FMG_EP, overrides the cpu pin), before = `01c9f8d8` +
+           ST db155c3a, after = `ebb36199` + ST 93d7c9e0: cuda (person/wholebody cuda fp16) 97,402 kept before and
+           after; trt-rtx fp16 (person/wholebody trt-rtx fp16) 97,438 before and after; 0.314339 px and foot_support in
+           all four; each EP's parquet equal before vs after in all 11 columns.
        - Scratch from today (session 0a1e712d scratchpad): `sample/heading/`, `sample/torso/`, `sample/hip/`
          (341 MB dumps), `stage5/` (fast logs, gate.sh, legacy_points.py). No temp roots or app processes are left; the user's test app is stopped.
        - ST `db155c3a` (cpu_threads default 10 here): fast suite 1587 passed, the same 8 failed; seeded test_data gate

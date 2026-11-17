@@ -1,4 +1,5 @@
 """Realtime frame-request adapter for the application inference service."""
+from collections import deque
 from contextlib import ExitStack
 import logging
 from dataclasses import dataclass
@@ -32,7 +33,7 @@ from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC
 from freemocap.core.pipeline.abcs.source_node_abc import SourceNode
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
 from freemocap.core.pipeline.pipeline_stage_timer import PipelineStageTimer
-from freemocap.core.pipeline.pipeline_timing_events import perf_counter_ns, span_event
+from freemocap.core.pipeline.pipeline_timing_events import SkellytrackerTimingEvents, perf_counter_ns, span_event
 from freemocap.core.pipeline.pipeline_timing_task_ids import batch_task_id
 from freemocap.core.types.type_overloads import TopicPublicationQueue
 from freemocap.pubsub.pubsub_manager import PubSubTopicManager
@@ -50,6 +51,8 @@ from freemocap.pubsub.pubsub_topics import (
 logger = logging.getLogger(__name__)
 
 NODE_KIND = "skeleton_inference"
+# A frame gives about one record per node span; the bound only matters if draining stops.
+_MAX_TIMING_RECORDS = 1024
 
 
 @dataclass
@@ -147,6 +150,18 @@ class RealtimeSkeletonInferenceNode(SourceNode):
             for camera_shm in camera_shms.values():
                 cleanup.callback(camera_shm.close)
 
+            log_pipeline_times = pipeline_config.log_pipeline_times
+            timer = (
+                PipelineStageTimer(name=f"SkeletonInferenceNode-{camera_group_id}")
+                if log_pipeline_times else None
+            )
+            # The sink runs inside skellytracker's `pipeline.run` span, so it only appends; the records of
+            # frame N are in the deque before frame N's future resolves.
+            # shortcut: skellytracker fixes the spans when the run starts, so they are on whenever pipeline times
+            # are; switch them with the metrics window once skellytracker can set the spans of a running run.
+            timing_records: deque[dict] | None = deque(maxlen=_MAX_TIMING_RECORDS) if timer is not None else None
+            timing_events = SkellytrackerTimingEvents(pipeline_id=ipc.pipeline_id)
+
             settings = pipeline_config.camera_node_config
             client = inference_service.register(InferenceRegistration(
                 pipeline_id=ipc.pipeline_id, mode=InferenceMode.REALTIME,
@@ -156,13 +171,8 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                 execution_provider=pipeline_config.skeleton_inference_node_config.execution_provider,
                 execution_device=pipeline_config.skeleton_inference_node_config.execution_device,
                 shutdown_flag=ipc.pipeline_shutdown_flag,
+                timing_sink=timing_records.append if timing_records is not None else None,
             ))
-
-            log_pipeline_times = pipeline_config.log_pipeline_times
-            timer = (
-                PipelineStageTimer(name=f"SkeletonInferenceNode-{camera_group_id}")
-                if log_pipeline_times else None
-            )
 
             frame_recarrays: dict[CameraIdString, np.recarray | None] = {
                 cam_id: None for cam_id in camera_ids
@@ -256,6 +266,8 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                             "predict_batch", requested_frame_number, t_inf_ns, perf_counter_ns(), len(images))
                         timer.record_task_event(predict_batch)
                         timer.record("predict_per_camera", predict_batch.duration_ms / max(len(images), 1))
+                        timer.extend_task_events(timing_events.convert(
+                            [timing_records.popleft() for _ in range(len(timing_records))]))
 
                     # ---- Preserve raw detections; aggregator owns temporal processing ----
                     per_camera_skeleton: dict[CameraIdString, Observation | None] = dict(observations)

@@ -6,6 +6,7 @@ import multiprocessing
 from freemocap.core.pipeline.pipeline_stage_timer import MAX_EVENTS_PER_FLUSH, PipelineStageTimer
 from freemocap.core.pipeline.pipeline_timing_events import (
     PipelineTimingEventStore,
+    SkellytrackerTimingEvents,
     cap_events_by_frame_window,
     compute_timing_lag_info,
 )
@@ -207,3 +208,34 @@ class TestComputeTimingLagInfo:
         assert lag_info["node_lag"] == {}
         assert lag_info["incomplete_frames"] == []
         assert lag_info["stale_nodes"] == []
+
+
+class TestSkellytrackerTimingEvents:
+    @staticmethod
+    def _event(node_id: str, span: str, start_ns: int, end_ns: int) -> dict:
+        images = [{"frame_index": 12, "camera_id": "left"}, {"frame_index": 12, "camera_id": "right"}]
+        return {"images": images, "node_id": node_id, "span": span, "batch_size": 2, "start_ns": start_ns, "end_ns": end_ns}
+
+    def test_events_become_batch_events_under_the_pipeline_run_of_their_frame(self) -> None:
+        header = {"schema": "skellytracker.timing/1", "run_id": "r1", "nodes": []}
+        converter = SkellytrackerTimingEvents(pipeline_id="abc123")
+        events = converter.convert([
+            header,
+            self._event("wholebody", "inference", 1_000, 4_000_000),
+            self._event("pipeline", "run", 500, 5_000_000),
+        ])
+        assert converter.header is header
+        inference, run = events
+        assert run.task_id == "abc123:12:batch:skeleton_inference:pipeline.run"
+        assert run.parent_task_ids == []
+        assert inference.task_id == "abc123:12:batch:skeleton_inference:wholebody.inference"
+        assert inference.parent_task_ids == [run.task_id]
+        assert (inference.stage, inference.node_kind, inference.camera_id) == ("wholebody.inference", "skeleton_inference", None)
+        assert (inference.frame_number, inference.batch_size, inference.batch_index) == (12, 2, None)
+        assert (inference.start_time_ns, inference.end_time_ns, inference.duration_ms) == (1_000, 4_000_000, 3.999)
+
+    def test_a_later_batch_keeps_the_last_header(self) -> None:
+        converter = SkellytrackerTimingEvents(pipeline_id="abc123")
+        converter.convert([{"schema": "skellytracker.timing/1", "run_id": "r1"}])
+        assert converter.convert([self._event("person", "preprocess", 1, 2)])[0].stage == "person.preprocess"
+        assert converter.header["run_id"] == "r1"

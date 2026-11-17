@@ -4,7 +4,11 @@ from __future__ import annotations
 import time
 from collections.abc import Iterable
 
+from freemocap.core.pipeline.pipeline_timing_task_ids import batch_task_id
 from freemocap.pubsub.pubsub_topics import PipelineTimingEvent
+
+SKELETON_INFERENCE = "skeleton_inference"
+PIPELINE_RUN_SPAN = "pipeline.run"
 
 
 def perf_counter_ns() -> int:
@@ -29,6 +33,42 @@ def span_event(
         start_time_ns=start_time_ns, end_time_ns=end_time_ns,
         duration_ms=(end_time_ns - start_time_ns) / 1e6, batch_size=batch_size,
     )
+
+
+class SkellytrackerTimingEvents:
+    """Turns the records of a skellytracker 2.0 timing sink into `PipelineTimingEvent`s; keeps the last header.
+
+    A record with `schema` is the run's header (node items, providers, execution); an event becomes
+    one batch event with stage `<node_id>.<span>`, its parent the `pipeline.run` event of its frame.
+    """
+
+    def __init__(self, pipeline_id: str) -> None:
+        self.pipeline_id = pipeline_id
+        self.header: dict | None = None
+
+    def _task_id(self, frame_number: int, stage: str) -> str:
+        return f"{self.pipeline_id}:{batch_task_id(frame_number=frame_number, node_kind=SKELETON_INFERENCE, stage=stage)}"
+
+    def convert(self, records: Iterable[dict]) -> list[PipelineTimingEvent]:
+        events: list[PipelineTimingEvent] = []
+        for record in records:
+            if "schema" in record:
+                self.header = record
+                continue
+            # Every image of one freemocap call has the request's frame number.
+            frame_number = record["images"][0]["frame_index"]
+            stage = f"{record['node_id']}.{record['span']}"
+            # shortcut: a run on two or more GPUs gives one event per device with the same task id; add the
+            # device to the id once skellytracker puts a device key on each event.
+            event = span_event(
+                task_id=self._task_id(frame_number, stage), stage=stage, node_kind=SKELETON_INFERENCE,
+                frame_number=frame_number, start_time_ns=record["start_ns"], end_time_ns=record["end_ns"],
+                batch_size=record["batch_size"],
+            )
+            if stage != PIPELINE_RUN_SPAN:
+                event.parent_task_ids = [self._task_id(frame_number, PIPELINE_RUN_SPAN)]
+            events.append(event)
+        return events
 
 
 class PipelineTimingEventStore:

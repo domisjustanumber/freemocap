@@ -36,8 +36,18 @@ class InferenceServiceTests(unittest.TestCase):
         run.models = {"person": {"key": "yolox-person@openmmlab-exporter", "execution_provider": "gpu-ep", "device": "gpu:0"},
                       "wholebody": {"key": "rtmw-wholebody133@openmmlab-exporter", "execution_provider": "gpu-ep", "device": "gpu:0"}}
         run.process_batch.side_effect = self.infer
+        if kwargs.get("timing_sink") is not None:
+            run.process_batch.side_effect = lambda frames: self.timed_infer(frames, kwargs["timing_sink"])
         self.runs.append(run)
         return run, {"execution": {"selected": kwargs.get("execution_provider"), "requested": "gpu-ep"}}
+
+    def timed_infer(self, frames, sink):
+        """Like a run with timing on: each span event goes to the sink after the call."""
+        results = self.infer(frames)
+        frame_index = next(iter(frames.values())).frame_index
+        sink({"images": [{"frame_index": frame_index, "camera_id": camera} for camera in frames], "node_id": "wholebody",
+              "span": "inference", "batch_size": len(frames), "start_ns": 100, "end_ns": 2_100})
+        return results
 
     @staticmethod
     def infer(frames):
@@ -93,8 +103,21 @@ class InferenceServiceTests(unittest.TestCase):
         self.assertEqual(rows["inference.process_batch.images=3"]["count"], 2)
         self.assertEqual(self.started, [dict(detector_type="rtmpose", camera_ids=("0", "1", "2"), running_mode="video",
                                              rtmpose_model_name="rtmw-x-l_384x288", execution_provider="gpu-ep",
-                                             execution_device="gpu:1")])
+                                             execution_device="gpu:1", timing_sink=None)])
         self.assertEqual(self.runs[0].process_batch.call_count, 2)
+
+    def test_the_registered_timing_sink_reaches_the_run_and_gets_its_events(self) -> None:
+        from freemocap.core.pipeline.pipeline_timing_events import SkellytrackerTimingEvents
+        records: list[dict] = []
+        client = self.service.register(InferenceRegistration(
+            pipeline_id="timed", mode=InferenceMode.REALTIME, detector_type="rtmpose", camera_ids=("same-camera",),
+            shutdown_flag=multiprocessing.Value("b", False), timing_sink=records.append))
+        client.submit(self.request(frame=3)).result(timeout=2)
+        self.assertEqual(self.started[0]["timing_sink"], records.append)
+        converter = SkellytrackerTimingEvents(pipeline_id="timed")
+        (event,) = converter.convert(records)
+        self.assertEqual((event.task_id, event.stage, event.frame_number, event.duration_ms),
+                         ("timed:3:batch:skeleton_inference:wholebody.inference", "wholebody.inference", 3, 0.002))
 
     def test_the_registered_confidence_threshold_reaches_the_boundary(self) -> None:
         seen = []

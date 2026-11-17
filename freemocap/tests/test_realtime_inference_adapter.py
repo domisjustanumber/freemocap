@@ -76,6 +76,7 @@ class RealtimeInferenceAdapterTests(unittest.TestCase):
                     self.assertEqual(registration.mode, InferenceMode.REALTIME)
                     self.assertEqual((registration.detector_type, registration.camera_ids), (detector, tuple(camera_ids)))
                     self.assertEqual(registration.pipeline_id, ipc.pipeline_id)
+                    self.assertIsNone(registration.timing_sink)
                     client.close.assert_called_once()
                 finally:
                     for queue in queues:
@@ -98,7 +99,7 @@ class RealtimeTimingEventTests(unittest.TestCase):
             self.addCleanup(queue.close)
         return queues
 
-    def test_skeleton_inference_flushes_frame_read_and_predict_batch_events(self) -> None:
+    def test_skeleton_inference_flushes_its_spans_and_the_skellytracker_spans_of_the_frame(self) -> None:
         requests, configs, results, timings = self.queues(4)
         service = Mock(spec=InferenceService)
         client = service.register.return_value
@@ -109,6 +110,12 @@ class RealtimeTimingEventTests(unittest.TestCase):
         images = [np.zeros((8, 12, 3), dtype=np.uint8) for _ in camera_ids]
 
         def infer(request: InferenceRequest) -> Future[dict[str, Observation]]:
+            # As the service runs it: skellytracker's sink records reach the deque before the future resolves.
+            sink = service.register.call_args.args[0].timing_sink
+            sink({"schema": "skellytracker.timing/1", "nodes": []})
+            for node_id, span in (("wholebody", "inference"), ("pipeline", "run")):
+                sink({"images": [{"frame_index": request.frame_number, "camera_id": camera} for camera in request.images],
+                      "node_id": node_id, "span": span, "batch_size": len(request.images), "start_ns": 10, "end_ns": 20})
             future: Future[dict[str, Observation]] = Future()
             future.set_result({key: Observation(frame_number=request.frame_number, image_size=(8, 12), stages={})
                                for key in request.images})
@@ -130,8 +137,9 @@ class RealtimeTimingEventTests(unittest.TestCase):
                 timing_pub=timings, inference_service=service)
         message = timings.get(timeout=5)
         events = {event.stage: event for event in message.events}
-        self.assertEqual(set(events), {"frame_read", "predict_batch"})
+        self.assertEqual(set(events), {"frame_read", "predict_batch", "wholebody.inference", "pipeline.run"})
         self.assertEqual(events["predict_batch"].task_id, "7:batch:skeleton_inference:predict_batch")
+        self.assertEqual(events["wholebody.inference"].parent_task_ids, ["live:7:batch:skeleton_inference:pipeline.run"])
         self.assertEqual({event.frame_number for event in message.events}, {7})
         self.assertEqual({event.batch_size for event in message.events}, {2})
         self.assertLessEqual(events["frame_read"].end_time_ns, events["predict_batch"].start_time_ns)

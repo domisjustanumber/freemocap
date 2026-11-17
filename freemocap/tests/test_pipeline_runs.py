@@ -216,3 +216,45 @@ def test_the_stored_confidence_is_the_score_after_the_gate_and_raw_score_is_not_
     result = {"0": {pipeline_runs.HOLISTIC_NODE: value, "frame_index": 0, "image_width": 64, "image_height": 48}}
     stored = pipeline_runs.observations_from_results(result, {}, "mediapipe")["0"].stages[pipeline_runs.STAGE].keypoints.visibility
     assert stored[0] == 0.8 and stored[1] == 0.1 and np.isnan(stored[2])
+
+
+def test_a_timing_sink_turns_every_span_on_and_the_record_keeps_the_config_without_them(monkeypatch):
+    import skellytracker.core.pipelines as pipelines
+    started = []
+    monkeypatch.setattr(pipelines, "start_pipeline", lambda config, **kwargs: started.append((config, kwargs)) or "run")
+    monkeypatch.setattr(pipeline_runs, "run_ep_choice", lambda requested, device=None: ("cpu", None, None))
+    sink = [].append
+    _, plain = pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0"], running_mode="live")
+    _, timed = pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0"], running_mode="live", timing_sink=sink)
+    (plain_config, plain_kwargs), (timed_config, timed_kwargs) = started
+    assert plain_kwargs["timing_sink"] is None and plain_config.instrumentation.timing_spans == []
+    assert timed_kwargs["timing_sink"] is sink
+    spans = {info.type: info.timing_spans for info in pipelines.list_node_types()}
+    assert timed_config.instrumentation.timing_spans == [
+        f"{node.id}.{span}" for node in timed_config.nodes for span in spans[node.type]] + ["pipeline.run"]
+    assert "wholebody.inference" in timed_config.instrumentation.timing_spans
+    config = pipeline_runs.load_detector_pipeline("rtmpose")
+    assert timed["pipeline"] == plain["pipeline"] == pipelines.export_pipeline(config, resolved=True)
+
+
+def test_a_real_timed_run_sends_its_header_and_span_events_to_the_sink():
+    from skellytracker.core.pipelines import Frame
+    from freemocap.core.pipeline.pipeline_timing_events import SkellytrackerTimingEvents
+    records: list[dict] = []
+    run, record = pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0", "1"], running_mode="live",
+                                                   execution_provider="cpu", timing_sink=records.append)
+    with run:
+        _, plain = pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0", "1"], running_mode="live",
+                                                    execution_provider="cpu")
+        assert record == plain
+        assert [item for item in records if "schema" in item] == records  # the header comes when the run starts
+        run.process_batch({camera: Frame(np.zeros((48, 64, 3), np.uint8), frame_index=5, timestamp_ms=1.0) for camera in ("0", "1")})
+    converter = SkellytrackerTimingEvents(pipeline_id="live")
+    events = {event.stage: event for event in converter.convert(records)}
+    assert converter.header is not None and converter.header["spans_on"][-1] == "pipeline.run"
+    assert {"pipeline.run", "person.preprocess", "person.inference", "person.postprocess"} <= set(events)
+    run_event = events["pipeline.run"]
+    assert (run_event.frame_number, run_event.batch_size) == (5, 2)
+    assert all(event.parent_task_ids == [run_event.task_id] for stage, event in events.items() if stage != "pipeline.run")
+    assert all(run_event.start_time_ns <= event.start_time_ns <= event.end_time_ns <= run_event.end_time_ns
+               for event in events.values())

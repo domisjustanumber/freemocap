@@ -5,7 +5,7 @@ from contextlib import nullcontext
 from time import perf_counter
 from freemocap.core.pipeline.performance_report import PerformanceReport
 from collections import deque
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from concurrent.futures import CancelledError, Future
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -41,6 +41,8 @@ class InferenceRegistration:
     execution_provider: str | None = None
     rtmpose_confidence_threshold: float = RTMW_MIN_SCORE
     execution_device: str | None = None
+    timing_sink: Callable[[dict], None] | None = None
+    """Gets the run's skellytracker timing header and span events on the inference thread, inside `pipeline.run`; keep it cheap."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,7 +162,7 @@ class InferenceService:
             detector_type=registration.detector_type, camera_ids=registration.camera_ids,
             running_mode=RUNNING_MODES[registration.mode.value],
             rtmpose_model_name=registration.rtmpose_model_name, execution_provider=registration.execution_provider,
-            execution_device=registration.execution_device)
+            execution_device=registration.execution_device, timing_sink=registration.timing_sink)
         models = {node: dict(model) for node, model in run.models.items()}
         return run, tuple({"node": node, **model} for node, model in models.items()), {**record, "models": models}
 

@@ -4,7 +4,7 @@ One run serves one realtime camera group (`live`) or one posthoc recording (`vid
 is thread-safe: its calls are serial, `close()` from another thread waits for the call that
 runs, and two runs can run at the same time on two threads.
 """
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from functools import cache
 import logging
 from typing import Any
@@ -66,21 +66,32 @@ def run_ep_choice(requested: str | None, device: str | None = None) -> tuple[str
     return chosen.ep_key, dict(recommendation.options) or None, chosen.device_key
 
 
+def _with_every_timing_span(config):
+    """A copy of the pipeline config with each timing span of its nodes on, and `pipeline.run`."""
+    from skellytracker.core.pipelines import list_node_types
+    spans = {info.type: info.timing_spans for info in list_node_types()}
+    timing_spans = [f"{node.id}.{span}" for node in config.nodes for span in spans[node.type]] + ["pipeline.run"]
+    return config.model_copy(update={"instrumentation": config.instrumentation.model_copy(update={"timing_spans": timing_spans})})
+
+
 def start_detector_run(*, detector_type: str, camera_ids: Sequence[str], running_mode: str,
                        rtmpose_model_name: str | None = None, execution_provider: str | None = None,
-                       execution_device: str | None = None):
+                       execution_device: str | None = None, timing_sink: Callable[[dict], None] | None = None):
     """Start the run of a detector choice; return it with its record. Give an EP only when the pipeline needs one.
 
     Auto passes the recommendation's EP options and device too (a precision such as fp16 can need its options).
     The record is what a recording keeps of the run, as skellytracker gives it: the pipeline config as
     `export_pipeline` writes it, the running mode, and the EP the user selected with what the run was asked for.
+    A `timing_sink` gets skellytracker's timing header and each span event, on the calling thread after each call;
+    with one, every span is on for the whole run, and the record keeps the config without the spans.
     """
     from skellytracker.core.pipelines import check_pipeline, export_pipeline, start_pipeline
     config = load_detector_pipeline(detector_type, rtmpose_model_name)
     provider, options, device = (run_ep_choice(execution_provider, execution_device) if check_pipeline(config).needs_execution_provider
                                  else (None, None, None))
-    run = start_pipeline(config, camera_ids=list(camera_ids), running_mode=running_mode, execution_provider=provider,
-                         ep_options=options, device=device)
+    run = start_pipeline(config if timing_sink is None else _with_every_timing_span(config), camera_ids=list(camera_ids),
+                         running_mode=running_mode, execution_provider=provider, ep_options=options, device=device,
+                         timing_sink=timing_sink)
     record = {"pipeline": export_pipeline(config, resolved=True), "running_mode": running_mode,
               "execution": {"selected": execution_provider, "selected_device": execution_device,
                             "requested": provider, "options": options, "device": device}}

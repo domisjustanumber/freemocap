@@ -379,7 +379,7 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     WinError 5 with 1 Blender window open (closed after); 4 gate runs passed (A rtmpose foot_support,
     mediapipe body_reference, Auto -> cpu; B 2+2). Stored RTMW confidence (gate A, OVERLAY_2D, 152,514
     samples): all in [0, 1], 96,586 kept (> 0) with min 0.4000 (the gate), median 0.974, p5 0.819,
-    max 1.0 (8,632 values exactly 1.0 in float64), 99.8 % of kept above 0.5, 63.2 % of all samples.
+    max 1.0 (8,632 values exactly 1.0 in float64; these are the ChArUco/ArUco points, see the T1 correction), 99.8 % of kept above 0.5, 63.2 % of all samples.
     MediaPipe for comparison: 429,570 samples, all in [0, 1], kept min 0.0878 (no gate), median 1.0.
     - B realtime replay `test_realtime_pipeline.py -k "human-<det> and test-data"`: rtmpose 2 passed
       (72 s), mediapipe 2 passed (52 s).
@@ -394,6 +394,10 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
     score in [0.4, 0.5). Finite values against gate2: OVERLAY_2D -0.13 %, RAW_KEYPOINTS_3D -0.09 %,
     KEYPOINTS_3D -0.02 %, LANDMARKS_3D -0.08 %, ROTATIONS_WORLD -0.05 %. Alignment still foot_support; the
     person transform moved 0.38 degrees and 18 mm. Gate A mediapipe identical to gate2 (no gate changed).
+    Correction (found in X4): OVERLAY_2D also holds the ChArUco/ArUco points, whose visibility is always
+    exactly 1.0 (61,272 of the 152,514 samples; 8,632 kept at `f6a65432`). So the "8,632 values exactly 1.0"
+    of C1 are board points, not RTMW saturation: RTMW has no score of exactly 1.0. RTMW alone: 91,242
+    samples, 87,954 kept (96.4 %) at 0.4 and 87,723 (96.1 %) at 0.5.
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).
@@ -695,6 +699,19 @@ frames, each with `rtmpose` and with `mediapipe`.
     solver_time, paths, uuid and timestamps differ. The parquet hash differs only through the
     `freemocap.recording` metadata: all 11 columns and 1,889,442 rows are exactly equal. So nothing else
     varies (no thread-order effect seen). Fast suite: 1532 passed, the same 8 failed.
+- X4 = A DONE (2026-11-16, user): skellytracker `1038f726` (ADR-8YXH) sets the ArUco marker threshold
+  `validBitIdThreshold = 0.5` in the ChArUco and ArUco detectors (OpenCV 5's default of 0.49 rejects a
+  half-white marker cell). The scratch ST clone was fast-forwarded to `12c477da`; freemocap needs no change.
+  - ChArUco corners per camera (`scratchpad/bc/charuco_dump.py new` on the test videos, output in
+    `scratchpad/x4/`): Cam1 664, Cam2 617, Cam3 1089, against 580 / 462 / 978 at `f6a65432` and
+    666 / 619 / 1088 on OpenCV 4.12. All `f6a65432` corners are still found, at nearly the same place (mean
+    0.02 px, max 1.8 px). Against 4.12 the mean is 0.6 px, from the corrected OpenCV 5 positions.
+  - Calibration: valid board poses 31 / 30 / 52 (`f6a65432`: 29 / 26 / 48), 1010 extracted points
+    (770), shared frames 9 / 29 / 30 (6 / 26 / 25). Seeded numerical fresh calibration (R1, seed 0):
+    0.314339 px against 0.290199 px at `f6a65432`. `test_fresh_posthoc.py` once (unseeded): 0.328 px (the
+    last runs 0.361 and 0.366), then the known rename WinError 5 with 1 Blender window (closed after).
+  - RTMPose posthoc gate A (existing calibration): foot_support, person transform identical to gate3.
+    RTMW 2D kept is unchanged at 87,723; the 1,070 extra kept OVERLAY_2D points are ChArUco/ArUco points.
 
 ### 0.4 Open questions
 

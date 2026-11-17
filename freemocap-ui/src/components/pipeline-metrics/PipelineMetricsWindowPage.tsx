@@ -2,7 +2,7 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {PipelineNetworkTimeline} from '@/components/pipeline-metrics/PipelineNetworkTimeline';
 import {buildTimelineViewModel} from '@/components/pipeline-metrics/pipelineTimelineModel';
 import {stageLabel, timingEngine} from '@/components/pipeline-metrics/pipelineTaskTopology';
-import {metricsState, type MetricsState, runLabel, sortStages} from '@/components/pipeline-metrics/pipelineMetricsState';
+import {metricsState, type MetricsState, requestedRunKey, runLabel, sortStages} from '@/components/pipeline-metrics/pipelineMetricsState';
 import {feedPipelineTimingStore, PipelineTimingStore} from '@/services/server/server-helpers/pipeline-timing-store';
 import {PIPELINE_TIMELINE_FRAME_WINDOW, type RunTimingSnapshot} from '@/services/server/server-helpers/pipeline-timing-types';
 import {ConnectionState} from '@/services/server/server-helpers/websocket-connection';
@@ -16,7 +16,7 @@ const POLL_MS = 250;
 
 const STATE_TEXT: Record<Exclude<MetricsState, 'ready'>, string> = {
     'disconnected': 'Not connected to the FreeMoCap server. This window reconnects on its own.',
-    'no-pipeline': 'No pipeline is reporting timing. Start real-time processing in the main window.',
+    'no-pipeline': 'No pipeline is reporting timing. Start real-time processing or process a recording in the main window.',
     'not-running': 'This pipeline is not running.',
     'timing-disabled': 'Pipeline timing is off for this pipeline (log_pipeline_times is false), so it sends no task events.',
 };
@@ -33,9 +33,19 @@ export default function PipelineMetricsWindowPage(): React.ReactElement {
     const [store] = useState(() => new PipelineTimingStore());
     const [connected, setConnected] = useState(false);
     const [runs, setRuns] = useState<RunTimingSnapshot[]>([]);
-    const [selectedKey, setSelectedKey] = useState<string | null>(null);
+    const [selectedKey, setSelectedKey] = useState<string | null>(() => requestedRunKey(window.location.hash));
     const [frozen, setFrozen] = useState<RunTimingSnapshot | null>(null);
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+
+    // An opener that names a run (a posthoc card's "Open metrics") switches an open window to it.
+    useEffect(() => {
+        const onHash = () => {
+            const key = requestedRunKey(window.location.hash);
+            if (key) { setSelectedKey(key); setFrozen(null); }
+        };
+        window.addEventListener('hashchange', onHash);
+        return () => window.removeEventListener('hashchange', onHash);
+    }, []);
 
     // One more transport client, like the main window: it reconnects by itself and asks for timing on every connect.
     useEffect(() => {
@@ -104,12 +114,14 @@ export default function PipelineMetricsWindowPage(): React.ReactElement {
     );
 }
 
-function RunSummary({run}: {run: RunTimingSnapshot}): React.ReactElement {
+export function RunSummary({run}: {run: RunTimingSnapshot}): React.ReactElement {
     const lag = Object.entries(run.nodeLag);
     return (
         <div className="flex flex-col gap-1" style={{padding: '4px 8px'}}>
             <p className="text sm" style={{color: 'var(--warning-300)'}}>
-                Timing is on for this pipeline (log_pipeline_times). Its spans cost about 0.6 ms per frame on CPU.
+                {run.mode === 'realtime'
+                    ? 'Timing is on for this pipeline (log_pipeline_times). Its spans cost about 0.6 ms per frame on CPU.'
+                    : 'Timing is on for the whole posthoc run. Its spans cost about 0.6 ms per frame on CPU.'}
             </p>
             <p className="text md">
                 {run.endToEnd
@@ -123,8 +135,9 @@ function RunSummary({run}: {run: RunTimingSnapshot}): React.ReactElement {
             <p className="text sm" style={{color: 'var(--gray-400)'}}>
                 Dropped timing events: {run.droppedInLastMessage} in the newest message, {run.droppedSinceOpened} since this window opened.
                 {run.incompleteFrames.length > 0 && <span style={{color: 'var(--warning-400)'}}> · {run.incompleteFrames.length} incomplete frame(s)</span>}
-                {lag.map(([kind, frames]) => <span key={kind} style={{color: frames <= 3 ? 'var(--warning-300)' : 'var(--red-300)'}}> · {kind} +{frames}</span>)}
-                {run.staleNodes.length > 0 && <span style={{color: 'var(--red-400)'}}> · stalled: {run.staleNodes.join(', ')}</span>}
+                {/* Lag and stall follow the camera rate; a posthoc run reads its videos as fast as it tracks. */}
+                {run.mode === 'realtime' && lag.map(([kind, frames]) => <span key={kind} style={{color: frames <= 3 ? 'var(--warning-300)' : 'var(--red-300)'}}> · {kind} +{frames}</span>)}
+                {run.mode === 'realtime' && run.staleNodes.length > 0 && <span style={{color: 'var(--red-400)'}}> · stalled: {run.staleNodes.join(', ')}</span>}
             </p>
             {run.stages.length > 0 && <table className="text sm" style={{borderCollapse: 'collapse', maxWidth: 760}}>
                 <thead>

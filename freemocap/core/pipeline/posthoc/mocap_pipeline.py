@@ -1,6 +1,7 @@
 """Managed Mocap recording task: group detection, annotation, and reconstruction."""
 
 from freemocap.core.pipeline.performance_report import PerformanceReport
+from collections import deque
 from dataclasses import dataclass, field
 from multiprocessing.sharedctypes import Synchronized
 from queue import Empty, Queue
@@ -17,6 +18,12 @@ from freemocap.core.pipeline.posthoc.progress_messages import AggregatorNodeProg
 from freemocap.core.pipeline.posthoc.operation_progress import OperationProgressReporter
 from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
 
+# A tracked frame gives about one record per skellytracker span plus its camera wait: some hundreds of frames.
+POSTHOC_TIMING_RECORDS = 4096
+
+
+def new_timing_records() -> deque:
+    return deque(maxlen=POSTHOC_TIMING_RECORDS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +36,9 @@ class MocapWorkerRequest:
 
     performance: PerformanceReport = field(default_factory=PerformanceReport)
     operation_progress: OperationProgressReporter = field(default_factory=OperationProgressReporter)
+    timing_records: deque = field(default_factory=new_timing_records)
+    """The tracking run's timing records, appended on the worker's threads; the app's timing relay drains it.
+    Bounded: without a reader the oldest records go."""
 
     def report(self, stage: str, detail: str, fraction: float) -> None:
         self.operation_progress.report(self, stage, detail, fraction)
@@ -88,6 +98,7 @@ class MocapPipeline(PipelineABC):
     pipeline_type: PosthocPipelineType = field(default=PosthocPipelineType.MOCAP, init=False)
     started: bool = False
     _latest: dict[str, PipelineProgressMessage] = field(default_factory=dict)
+    timing_records: deque = field(default_factory=new_timing_records)
 
     @classmethod
     def create(
@@ -113,7 +124,7 @@ class MocapPipeline(PipelineABC):
             ipc.shutdown_pipeline()
             raise
         pipeline = cls(id=pipeline_id, recording_info=recording_info, ipc=ipc,
-            worker=worker, progress_queue=progress_queue)
+            worker=worker, progress_queue=progress_queue, timing_records=request.timing_records)
         pipeline._latest[pipeline_id] = AggregatorNodeProgressMessage(
             pipeline_id=pipeline_id, pipeline_type=str(PosthocPipelineType.MOCAP),
             phase=AggregatorPhase.SETTING_UP, detail="Mocap pipeline queued",

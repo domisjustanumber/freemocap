@@ -731,7 +731,10 @@ class PipelineTimingStreamMessage:
     envelope: MessageEnvelope = field(default_factory=MessageEnvelope)
     mode: str = "realtime"
     pipeline_id: str = ""
-    camera_group_id: CameraGroupIdString = ""
+    camera_group_id: CameraGroupIdString | None = ""
+    """None for a posthoc run, which has no camera group."""
+    recording_name: str | None = None
+    """The recording a posthoc run processes."""
     realtime_pipeline_active: bool = False
     log_pipeline_times_enabled: bool = False
     configured_camera_fps_hz: float | None = None

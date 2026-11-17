@@ -15,7 +15,7 @@ function event(frame: number, stage: string, startMs: number, endMs: number, ove
 
 function message(overrides: Partial<PipelineTimingMessage> = {}): PipelineTimingMessage {
     return {kind: 'pipeline_timing', version: 0, timestamp: 0, sequence: 1, mode: 'realtime', pipeline_id: 'p1',
-        camera_group_id: 'group1', realtime_pipeline_active: true, log_pipeline_times_enabled: true,
+        camera_group_id: 'group1', recording_name: null, realtime_pipeline_active: true, log_pipeline_times_enabled: true,
         configured_camera_fps_hz: 30, per_node: {}, per_camera: {}, events: [], clock_domain: 'perf_counter',
         relay_perf_counter_ns: 0, dropped_timing_events: 0, node_lag: {}, incomplete_frames: [], stale_nodes: [],
         ...overrides} as PipelineTimingMessage;
@@ -62,6 +62,14 @@ test('runs are keyed by mode and pipeline id, each message replaces its run, and
     assert.deepEqual([p1.events.length, p1.timingEnabled, p1.droppedInLastMessage, p1.droppedSinceOpened], [0, false, 3, 5],
         'events replace; dropped events are per message, with a labelled sum since the window opened');
     assert.deepEqual(store.runs(2500).map(run => run.key), ['realtime:p1'], 'the runs that stopped reporting are gone');
+});
+
+test('a posthoc run keeps its recording name and has no camera group', () => {
+    const store = new PipelineTimingStore();
+    store.ingest(message({mode: 'posthoc', pipeline_id: 'run1', camera_group_id: null, recording_name: 'session_1',
+        configured_camera_fps_hz: null, events: frame7}), 0);
+    const [run] = store.runs(0);
+    assert.deepEqual([run.key, run.cameraGroupId, run.recordingName, run.endToEnd?.frames], ['posthoc:run1', null, 'session_1', 1]);
 });
 
 class Socket {

@@ -15,6 +15,7 @@ import { stopPipeline } from "@/store/slices/pipelines/pipelines-thunks";
 import ProcessingTiming from "./ProcessingTiming";
 import OperationProgressBars from "./OperationProgressBars";
 import IconButton from "@/components/ui-components/IconButton";
+import PipelineMetricsEntry from "./PipelineMetricsEntry";
 
 function formatTimeAgo(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -196,6 +197,7 @@ export default function PipelineGroupCard({
               tooltip={true}
               tooltipText="Load in playback"
             />
+            <PipelineMetricsEntry group={group}/>
             {group.isActive && (
               <IconButton
                 title="Stop pipeline"

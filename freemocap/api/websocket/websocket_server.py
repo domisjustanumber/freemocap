@@ -590,7 +590,7 @@ class WebsocketServer:
             while self.should_continue:
                 if self._pipeline_timing_wanted:
                     build, messages = self._app.pipeline_timing_relay.latest(
-                        self._app.realtime_pipeline_manager.pipelines)
+                        self._app.realtime_pipeline_manager.pipelines, self._app.posthoc_pipeline_manager.pipelines)
                     if build != sent_build:
                         sent_build = build
                         for message in messages:

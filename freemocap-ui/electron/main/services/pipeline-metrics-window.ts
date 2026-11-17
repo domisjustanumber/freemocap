@@ -5,10 +5,14 @@ import {WindowManager} from './window-manager';
 
 let metricsWindow: BrowserWindow | null = null;
 
-/** Open the pipeline metrics page in its own window, or focus the one already open. */
-export function openPipelineMetricsWindow(): void {
+/** Open the pipeline metrics page in its own window, or focus the one already open.
+ *  `pipeline` (`mode:pipeline_id`) selects that run, also in a window already open. */
+export function openPipelineMetricsWindow(pipeline?: string): void {
+    const hash = pipeline ? `/pipeline-metrics?${new URLSearchParams({pipeline})}` : '/pipeline-metrics';
     if (metricsWindow && !metricsWindow.isDestroyed()) {
         if (metricsWindow.isMinimized()) metricsWindow.restore();
+        // A hash change keeps the page and its statistics; the page switches its run on hashchange.
+        if (pipeline) void metricsWindow.webContents.executeJavaScript(`location.hash = ${JSON.stringify(hash)}`);
         metricsWindow.focus();
         return;
     }
@@ -38,8 +42,8 @@ export function openPipelineMetricsWindow(): void {
     window.webContents.on('will-navigate', event => event.preventDefault());
 
     if (APP_ENVIRONMENT.IS_DEV && APP_ENVIRONMENT.VITE_DEV_SERVER_URL) {
-        window.loadURL(`${APP_ENVIRONMENT.VITE_DEV_SERVER_URL}#/pipeline-metrics`);
+        window.loadURL(`${APP_ENVIRONMENT.VITE_DEV_SERVER_URL}#${hash}`);
     } else {
-        window.loadFile(APP_PATHS.RENDERER_HTML, {hash: '/pipeline-metrics'});
+        window.loadFile(APP_PATHS.RENDERER_HTML, {hash});
     }
 }

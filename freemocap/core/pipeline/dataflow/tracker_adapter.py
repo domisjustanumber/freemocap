@@ -3,7 +3,7 @@
 No model/session construction or detector algorithms are implemented here.
 This is a backend iterator, not a WebSocket or UI-driven execution loop.
 """
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from concurrent.futures import CancelledError, TimeoutError
 from dataclasses import dataclass
 import multiprocessing
@@ -22,8 +22,14 @@ from freemocap.core.pipeline.inference_service import (
     InferenceMode, InferenceRegistration, InferenceRequest, InferenceService,
 )
 from freemocap.core.pipeline.performance_report import PerformanceReport
+from freemocap.core.pipeline.pipeline_timing_events import perf_counter_ns, span_event
+from freemocap.core.pipeline.pipeline_timing_task_ids import batch_task_id
 from freemocap.core.tracking.charuco_detection import CHARUCO_STAGE, charuco_observation, create_charuco_detector
 from freemocap.core.tracking.pipeline_runs import RTMW_MIN_SCORE
+
+
+VIDEO_READ = "video_read"
+CAMERA_BATCH_WAIT = "graph.camera_batch_wait"
 
 
 @dataclass(frozen=True)
@@ -68,8 +74,15 @@ class SkellyTrackerAdapter:
     def __init__(self, *, inference_service: InferenceService, detector_type: str,
                  performance_report: PerformanceReport, rtmpose_model_name: str | None = None,
                  execution_provider: str | None = None, execution_device: str | None = None, charuco_board=None,
-                 rtmpose_confidence_threshold: float = RTMW_MIN_SCORE) -> None:
-        """With a `charuco_board`, each observation also gets the charuco stage of that board."""
+                 rtmpose_confidence_threshold: float = RTMW_MIN_SCORE,
+                 timing_sink: Callable[[object], None] | None = None, timing_pipeline_id: str = "") -> None:
+        """With a `charuco_board`, each observation also gets the charuco stage of that board.
+
+        A `timing_sink` gets the run's skellytracker timing records and a `graph.camera_batch_wait`
+        event per frame, whose task id is tagged with `timing_pipeline_id`.
+        """
+        self.timing_sink = timing_sink
+        self.timing_pipeline_id = timing_pipeline_id
         self.inference_service = inference_service
         self.detector_type = detector_type
         self.charuco_board = charuco_board
@@ -100,7 +113,7 @@ class SkellyTrackerAdapter:
             detector_type=self.detector_type, camera_ids=tuple(active_cameras),
             rtmpose_model_name=self.rtmpose_model_name, execution_provider=self.execution_provider,
             execution_device=self.execution_device, rtmpose_confidence_threshold=self.rtmpose_confidence_threshold,
-            shutdown_flag=client_shutdown,
+            shutdown_flag=client_shutdown, timing_sink=self.timing_sink,
         ))
         frame_count = sources.camera_sources[0].video_metadata.frame_count
         board_detector = None
@@ -117,6 +130,7 @@ class SkellyTrackerAdapter:
                 for frame_number in range(frame_count + 1):
                     batch_frames: dict[str, LoadedVideoFrame] = {}
                     source_outcomes: list[VideoSourceFinished] = []
+                    wait_start_ns = perf_counter_ns()
                     with self.performance_report.measure("graph.camera_batch_wait"):
                         for camera in tuple(active_cameras):
                             event = readers.read_camera_event(camera)
@@ -130,6 +144,12 @@ class SkellyTrackerAdapter:
                             if event.frame_key != expected:
                                 raise ValueError("Video result does not match the expected camera/frame identity")
                             batch_frames[camera] = event
+                    if self.timing_sink is not None and batch_frames:
+                        self.timing_sink(span_event(
+                            task_id=f"{self.timing_pipeline_id}:" + batch_task_id(
+                                frame_number=frame_number, node_kind=VIDEO_READ, stage=CAMERA_BATCH_WAIT),
+                            stage=CAMERA_BATCH_WAIT, node_kind=VIDEO_READ, frame_number=frame_number,
+                            start_time_ns=wait_start_ns, end_time_ns=perf_counter_ns(), batch_size=len(batch_frames)))
                     yield from source_outcomes
                     if not batch_frames:
                         break

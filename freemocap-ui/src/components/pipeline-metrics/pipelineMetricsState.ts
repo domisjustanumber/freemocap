@@ -11,8 +11,14 @@ export function metricsState(connected: boolean, run: RunTimingSnapshot | null):
     return run.timingEnabled ? 'ready' : 'timing-disabled';
 }
 
-export function runLabel(run: Pick<RunTimingSnapshot, 'mode' | 'pipelineId' | 'cameraGroupId'>): string {
-    return run.mode === 'realtime' ? `Real-time · camera group ${run.cameraGroupId}` : `Posthoc · ${run.pipelineId}`;
+export function runLabel(run: Pick<RunTimingSnapshot, 'mode' | 'pipelineId' | 'cameraGroupId' | 'recordingName'>): string {
+    return run.mode === 'realtime' ? `Real-time · camera group ${run.cameraGroupId}` : `Posthoc · ${run.recordingName ?? run.pipelineId}`;
+}
+
+/** The run a `#/pipeline-metrics?pipeline=<mode:pipeline_id>` hash asks the window to show. */
+export function requestedRunKey(hash: string): string | null {
+    const query = hash.indexOf('?');
+    return query === -1 ? null : new URLSearchParams(hash.slice(query + 1)).get('pipeline');
 }
 
 export function sortStages(stages: readonly StageStats[]): StageStats[] {

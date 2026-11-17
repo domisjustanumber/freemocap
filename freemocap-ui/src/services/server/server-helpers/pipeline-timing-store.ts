@@ -96,6 +96,7 @@ export class PipelineTimingStore {
         }
         this.runsByKey.set(key, {frames, stageInfo, snapshot: {
             key, mode: message.mode, pipelineId: message.pipeline_id, cameraGroupId: message.camera_group_id,
+            recordingName: message.recording_name,
             active: message.realtime_pipeline_active, timingEnabled: message.log_pipeline_times_enabled,
             configuredCameraFpsHz: message.configured_camera_fps_hz, events,
             incompleteFrames: message.incomplete_frames, nodeLag: message.node_lag, staleNodes: message.stale_nodes,

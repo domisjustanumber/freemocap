@@ -71,7 +71,7 @@ test('the window state comes from the connection and the newest message only', (
     assert.equal(metricsState(true, {...run, timingEnabled: false}), 'timing-disabled');
     assert.equal(metricsState(true, {...run, active: false}), 'not-running');
     assert.equal(runLabel(run), 'Real-time · camera group group1');
-    assert.equal(runLabel({mode: 'posthoc', pipelineId: 'job9', cameraGroupId: 'g'}), 'Posthoc · job9');
+    assert.equal(runLabel({mode: 'posthoc', pipelineId: 'job9', cameraGroupId: null, recordingName: null}), 'Posthoc · job9');
     assert.deepEqual(sortStages(run.stages).map(stage => stage.stage), [
         'charuco_detection', 'frame_read', 'predict_batch', 'pipeline.run', 'wholebody.inference', 'person.inference', 'crop.run']);
 });

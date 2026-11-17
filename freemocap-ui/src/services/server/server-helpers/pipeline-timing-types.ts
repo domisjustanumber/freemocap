@@ -48,7 +48,10 @@ export interface RunTimingSnapshot {
     key: string;
     mode: 'realtime' | 'posthoc';
     pipelineId: string;
-    cameraGroupId: string;
+    /** Null for a posthoc run. */
+    cameraGroupId: string | null;
+    /** The recording a posthoc run processes. */
+    recordingName: string | null;
     active: boolean;
     timingEnabled: boolean;
     configuredCameraFpsHz: number | null;

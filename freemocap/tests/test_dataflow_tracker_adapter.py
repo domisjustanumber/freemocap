@@ -167,6 +167,49 @@ class TrackerAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "millisecond"):
             recording_timestamps_ms(replace(self.sources, group_timing=timing))
 
+    def test_a_timing_sink_gets_the_run_records_and_a_camera_wait_per_frame_tagged_with_the_pipeline_id(self):
+        from collections import deque
+        from freemocap.core.pipeline.pipeline_timing_events import SkellytrackerTimingEvents
+        started = {}
+        run = Mock(models={})
+
+        def infer(frames):
+            # A skellytracker run calls its sink after each call: the header first, then the call's spans.
+            frame = next(iter(frames.values())).frame_index
+            if frame == 0:
+                started["timing_sink"]({"schema": "skellytracker.timing/1", "run_id": "r1", "nodes": []})
+            images = [{"frame_index": frame, "camera_id": camera} for camera in frames]
+            started["timing_sink"]({"images": images, "node_id": "pipeline", "span": "run", "batch_size": len(frames),
+                                    "start_ns": 1, "end_ns": 2})
+            return self.infer(frames)
+
+        run.process_batch.side_effect = infer
+        for target, replacement in (("start_detector_run", lambda **kwargs: (started.update(kwargs) or run, {"execution": {}})),
+                                    ("observations_from_results", lambda results, schema, detector, threshold: results)):
+            patcher = patch(f"freemocap.core.pipeline.inference_service.{target}", side_effect=replacement)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        service = InferenceService(worker_registry=self.registry)
+        service.start()
+        self.addCleanup(service.close)
+        records = deque()
+        adapter = SkellyTrackerAdapter(inference_service=service, detector_type="rtmpose", performance_report=PerformanceReport(),
+                                       timing_sink=records.append, timing_pipeline_id="posthoc-run")
+        list(self.stream(adapter))
+        self.assertEqual(started["running_mode"], "video")
+        converter = SkellytrackerTimingEvents(pipeline_id="posthoc-run")
+        events = converter.convert(list(records))
+        self.assertEqual(converter.header["run_id"], "r1")
+        waits = [event for event in events if event.stage == "graph.camera_batch_wait"]
+        self.assertEqual([event.frame_number for event in waits], list(range(8)))
+        self.assertEqual({(event.node_kind, event.batch_size) for event in waits}, {("video_read", 3)})
+        self.assertTrue(all(event.end_time_ns >= event.start_time_ns for event in waits))
+        runs = [event for event in events if event.stage == "pipeline.run"]
+        self.assertEqual([event.frame_number for event in runs], list(range(8)))
+        self.assertTrue(all(event.task_id.startswith("posthoc-run:") for event in events))
+        # The camera wait of a frame comes before that frame's tracker call.
+        self.assertEqual([event.stage for event in events[:2]], ["graph.camera_batch_wait", "pipeline.run"])
+
     def test_installed_skellytracker_holistic_run_works_without_mocked_inference(self):
         adapter = self.real_adapter()
         events = list(self.stream(adapter))

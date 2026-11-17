@@ -1,6 +1,8 @@
 import type {PipelineTaskCategory, StoredPipelineTaskEvent} from '@/services/server/server-helpers/pipeline-timing-types';
 
 const SKELETON_INFERENCE = 'skeleton_inference';
+/** A posthoc run's wait for the frame of every camera. */
+const VIDEO_READ = 'video_read';
 export const PIPELINE_RUN_STAGE = 'pipeline.run';
 
 /** The engine that measured a row: skellytracker 2.0 spans, or null for freemocap's own stages.
@@ -15,7 +17,7 @@ export function timingEngine(event: EventShape): TimingEngine {
 }
 
 export function classifyTaskCategory(event: Pick<StoredPipelineTaskEvent, 'nodeKind'>): PipelineTaskCategory {
-    if (event.nodeKind === 'camera') return 'capture';
+    if (event.nodeKind === 'camera' || event.nodeKind === VIDEO_READ) return 'capture';
     if (event.nodeKind === SKELETON_INFERENCE) return 'tracking';
     return 'other';
 }
@@ -32,6 +34,7 @@ export const PRETTY_STAGE_LABELS: Record<string, string> = {
     'skeleton_inference:predict_batch': 'Batch inference',
     'skeleton_inference:pipeline.run': 'Tracker run (pipeline.run)',
     'camera:charuco_detection': 'Charuco detection',
+    'video_read:graph.camera_batch_wait': 'Video read (all cameras)',
 };
 
 /** freemocap's skeleton stages in processing order; 2.0 node spans follow `pipeline.run` in the order they ran. */

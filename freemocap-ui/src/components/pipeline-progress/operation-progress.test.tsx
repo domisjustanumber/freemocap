@@ -6,6 +6,7 @@ import {ProcessingPlanSchema, TaskRegistrySnapshotSchema, type TaskOperation} fr
 import reducer, {taskSnapshotReceived, selectGroupedPipelinesAll} from '@/store/slices/pipelines/pipelines-slice';
 import ProcessingTiming from './ProcessingTiming';
 import OperationProgressBars from './OperationProgressBars';
+import PipelineMetricsEntry from './PipelineMetricsEntry';
 import fullPlan from '@/components/processing-graph/fixtures/plan-full.json';
 
 const operation = (operation_id: string, changes: Partial<TaskOperation> = {}): TaskOperation => ({
@@ -129,4 +130,10 @@ test('a planned task reporting an operation outside its plan shows the mismatch 
     const html = renderToStaticMarkup(<OperationProgressBars operations={[operation('unplanned_work')]} plan={plan}/>);
     assert.match(html, /role="alert"/);
     assert.match(html, /unplanned_work/);
+});
+
+test('a mocap card offers the run metrics; a calibration card, which has no tracker run, does not', () => {
+    const mocap = renderToStaticMarkup(<PipelineMetricsEntry group={{pipelineType: 'mocap' as never, basePipelineId: 'run1'}}/>);
+    assert.match(mocap, /Open metrics/);
+    assert.equal(renderToStaticMarkup(<PipelineMetricsEntry group={{pipelineType: 'calibration' as never, basePipelineId: 'run1'}}/>), '');
 });

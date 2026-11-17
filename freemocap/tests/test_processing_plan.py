@@ -151,6 +151,9 @@ def test_created_pipeline_exposes_all_waiting_operations_before_worker_start(tmp
     assert tuple(operation.operation_id for operation in message.operations) == plan.topological_order
     assert all(operation.status == 'waiting' for operation in message.operations)
     workers.create_worker.return_value.start.assert_not_called()
+    # The app's timing relay reads the buffer the worker's tracking appends to.
+    request = workers.create_worker.call_args.kwargs['kwargs']['request']
+    assert pipeline.timing_records is request.timing_records and request.pipeline_id == 'queued'
 
 
 def test_preview_rejects_missing_source_run(tmp_path):

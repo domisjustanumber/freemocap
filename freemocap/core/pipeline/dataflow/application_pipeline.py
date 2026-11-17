@@ -205,7 +205,8 @@ def _run_application_graph(*, request) -> None:
         result = run_recording_pipeline(sources=sources, recording=request.recording, config=config, run_session=session, **source_options,
             execution_provider=provider, annotate=request.config.graph_annotate,
             shutdown_flag=request.ipc.pipeline_shutdown_flag, performance=request.performance, progress=progress,
-            tracking_progress=tracking_progress, artifacts=artifacts, graph_ready=graph_ready)
+            tracking_progress=tracking_progress, artifacts=artifacts, graph_ready=graph_ready,
+            timing_sink=request.timing_records.append, timing_pipeline_id=request.pipeline_id)
     for node, seconds in result.elapsed_seconds.items():
         request.performance.record(f'graph.{node}', seconds)
     for node, prerequisites in result.blocked.items():

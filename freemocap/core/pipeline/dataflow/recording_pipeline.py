@@ -62,6 +62,7 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
     progress: Callable[[str, str, float], None] | None = None,
     tracking_progress: Callable[[Mapping[str, int]], None] | None = None,
     artifacts: Callable | None = None,
+    timing_sink: Callable[[object], None] | None = None, timing_pipeline_id: str = "",
 ) -> tuple[CompiledGraph, dict[str, Callable[[dict[str, object]], dict[str, object]]]]:
     """Build the same definition that execution consumes; callers may serialize it.
 
@@ -152,7 +153,8 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
             adapter = SkellyTrackerAdapter(inference_service=service, detector_type=config.detector_type,
                 rtmpose_model_name=config.rtmpose_model_name, performance_report=performance,
                 execution_provider=execution_provider, execution_device=config.execution_device, charuco_board=board,
-                rtmpose_confidence_threshold=config.rtmpose_confidence_threshold)
+                rtmpose_confidence_threshold=config.rtmpose_confidence_threshold,
+                timing_sink=timing_sink, timing_pipeline_id=timing_pipeline_id)
             with closing(adapter.track_recording(sources=sources, execution_id="recording-graph", shutdown_flag=shutdown_flag)) as events:
                 camera_frame_count = 0
                 tracked_frames_per_camera = {source.camera_id: 0 for source in sources.camera_sources}

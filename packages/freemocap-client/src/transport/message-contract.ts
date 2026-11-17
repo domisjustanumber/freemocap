@@ -386,7 +386,11 @@ export const PipelineTimingEventSchema = z.object({
 /** One pipeline's timing, usable on its own; sent only to a connection that asked for it. */
 export const PipelineTimingMessageSchema = z.object({
   kind: z.literal('pipeline_timing'), ...ENVELOPE,
-  mode: z.enum(['realtime', 'posthoc']), pipeline_id: z.string(), camera_group_id: z.string(),
+  mode: z.enum(['realtime', 'posthoc']), pipeline_id: z.string(),
+  /** Null for a posthoc run, which has no camera group. */
+  camera_group_id: z.string().nullable().default(null),
+  /** The recording a posthoc run processes. */
+  recording_name: z.string().nullable().default(null),
   realtime_pipeline_active: z.boolean(), log_pipeline_times_enabled: z.boolean(),
   configured_camera_fps_hz: z.number().positive().nullable().default(null),
   /** Stage samples the nodes reported since the previous message was built. */

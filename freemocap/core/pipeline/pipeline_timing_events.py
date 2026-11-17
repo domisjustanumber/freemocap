@@ -49,9 +49,13 @@ class SkellytrackerTimingEvents:
     def _task_id(self, frame_number: int, stage: str) -> str:
         return f"{self.pipeline_id}:{batch_task_id(frame_number=frame_number, node_kind=SKELETON_INFERENCE, stage=stage)}"
 
-    def convert(self, records: Iterable[dict]) -> list[PipelineTimingEvent]:
+    def convert(self, records: Iterable[dict | PipelineTimingEvent]) -> list[PipelineTimingEvent]:
         events: list[PipelineTimingEvent] = []
         for record in records:
+            if isinstance(record, PipelineTimingEvent):
+                # freemocap's own events (posthoc camera wait) share the run's buffer.
+                events.append(record)
+                continue
             if "schema" in record:
                 self.header = record
                 continue

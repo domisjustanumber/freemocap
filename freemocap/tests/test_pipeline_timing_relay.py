@@ -14,6 +14,8 @@ from skellycam.core.camera.config.camera_config import CameraConfig
 from freemocap.api.websocket import websocket_connect
 from freemocap.api.websocket.send_serializer import SendSerializer
 from freemocap.api.websocket.websocket_server import WebsocketServer
+from freemocap.core.pipeline.posthoc.calibration_pipeline import CalibrationPipeline
+from freemocap.core.pipeline.posthoc.mocap_pipeline import MocapPipeline, new_timing_records
 from freemocap.core.pipeline.posthoc.task_snapshot import TaskRegistry
 from freemocap.core.pipeline.realtime.realtime_pipeline import RealtimePipeline
 from freemocap.core.streaming.message_model import (
@@ -151,7 +153,7 @@ def _timing_app(pipeline: RealtimePipeline, relay: PipelineTimingRelay):
     app.state.fatal_error = None
     app.include_router(websocket_connect.websocket_router)
     service = SimpleNamespace(
-        to_state_dict=lambda: {}, posthoc_pipeline_manager=SimpleNamespace(task_snapshot=TaskRegistry().snapshot),
+        to_state_dict=lambda: {}, posthoc_pipeline_manager=SimpleNamespace(task_snapshot=TaskRegistry().snapshot, pipelines={}),
         sync_job_manager=SimpleNamespace(task_state=BackgroundTaskState()),
         realtime_pipeline_manager=SimpleNamespace(pipelines={pipeline.id: pipeline}), pipeline_timing_relay=relay)
 
@@ -258,3 +260,79 @@ def test_an_invalid_interest_closes_only_that_connection(monkeypatch, pubsub):
         else:
             pytest.fail("The invalid client was not closed")
     assert not relay._interested and not app.state.global_kill_flag.value
+
+
+def _mocap(pipeline_id: str = "posthoc-run", alive: list[bool] | None = None) -> MocapPipeline:
+    """A started posthoc mocap pipeline whose worker reports `alive[0]`; nothing runs in it."""
+    alive = alive if alive is not None else [True]
+    pipeline = MocapPipeline.__new__(MocapPipeline)
+    pipeline.id, pipeline.started, pipeline.timing_records = pipeline_id, True, new_timing_records()
+    pipeline.recording_info = SimpleNamespace(recording_name="session_1")
+    pipeline.worker = SimpleNamespace(is_alive=lambda: alive[0])
+    return pipeline
+
+
+def _posthoc_frame(pipeline: MocapPipeline, frame: int, *, tracked: bool = True, start_ns: int = 1_000) -> None:
+    """What the tracking of one frame appends: its camera wait, then the run's spans of the call."""
+    pipeline.timing_records.append(PipelineTimingEvent(
+        task_id=f"{pipeline.id}:{frame}:batch:video_read:graph.camera_batch_wait", stage="graph.camera_batch_wait",
+        node_kind="video_read", frame_number=frame, start_time_ns=start_ns, end_time_ns=start_ns + 10, duration_ms=0.00001,
+        batch_size=3))
+    if tracked:
+        images = [{"frame_index": frame, "camera_id": camera} for camera in ("cam0", "cam1", "cam2")]
+        for node_id, span in (("wholebody", "inference"), ("pipeline", "run")):
+            pipeline.timing_records.append({"images": images, "node_id": node_id, "span": span, "batch_size": 3,
+                                            "start_ns": start_ns + 20, "end_ns": start_ns + 30})
+
+
+def _posthoc_messages(relay: PipelineTimingRelay, posthoc: dict) -> list[dict]:
+    return [message for message in map(cbor2.loads, relay.latest({}, posthoc)[1]) if message["mode"] == "posthoc"]
+
+
+def test_a_posthoc_run_is_built_only_with_interest_and_tagged_with_its_pipeline_id():
+    relay, pipeline = PipelineTimingRelay(interval_s=0.0), _mocap()
+    posthoc = {pipeline.id: pipeline}
+    _posthoc_frame(pipeline, 0)
+    assert relay.latest({}, posthoc) == (0, ())
+    assert len(pipeline.timing_records) == 3, "without interest the buffer is not read"
+    relay.add_interest(object())
+    (message,) = _posthoc_messages(relay, posthoc)
+    assert (message["mode"], message["pipeline_id"], message["recording_name"]) == ("posthoc", "posthoc-run", "session_1")
+    assert "camera_group_id" not in message  # None is left out: a posthoc run has no camera group
+    assert message["realtime_pipeline_active"] and message["log_pipeline_times_enabled"]
+    stages = [(event["stage"], event["node_kind"]) for event in message["events"]]
+    assert stages == [("graph.camera_batch_wait", "video_read"), ("wholebody.inference", "skeleton_inference"),
+                      ("pipeline.run", "skeleton_inference")]
+    assert all(event["task_id"].startswith("posthoc-run:") for event in message["events"])
+    assert not pipeline.timing_records
+
+
+def test_a_posthoc_run_sends_its_tracked_frames_without_lag_or_stale_filtering():
+    relay, pipeline = PipelineTimingRelay(interval_s=0.0), _mocap()
+    posthoc = {pipeline.id: pipeline}
+    relay.add_interest(object())
+    # Events far older than the realtime 0.5 s staleness rule, as from a slow CPU run.
+    for frame in range(12):
+        _posthoc_frame(pipeline, frame, start_ns=frame)
+    _posthoc_frame(pipeline, 12, tracked=False)  # its camera wait is in; its tracker call is not
+    (message,) = _posthoc_messages(relay, posthoc)
+    assert sorted({event["frame_number"] for event in message["events"]}) == list(range(5, 12))
+    assert message["node_lag"] == {} and message["stale_nodes"] == [] and message["incomplete_frames"] == []
+    _posthoc_frame(pipeline, 13)
+    (later,) = _posthoc_messages(relay, posthoc)
+    assert max(event["frame_number"] for event in later["events"]) == 13
+
+
+def test_no_posthoc_message_after_the_run_ends_and_calibration_gives_none():
+    relay, alive = PipelineTimingRelay(interval_s=0.0), [True]
+    pipeline = _mocap(alive=alive)
+    calibration = CalibrationPipeline.__new__(CalibrationPipeline)
+    posthoc = {pipeline.id: pipeline, "calibration-run": calibration}
+    relay.add_interest(object())
+    _posthoc_frame(pipeline, 0)
+    assert [message["pipeline_id"] for message in _posthoc_messages(relay, posthoc)] == ["posthoc-run"]
+    alive[0] = False
+    _posthoc_frame(pipeline, 1)
+    assert _posthoc_messages(relay, posthoc) == []
+    assert relay._posthoc == {}
+    assert _posthoc_messages(relay, {"calibration-run": calibration}) == []

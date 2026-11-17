@@ -73,6 +73,9 @@ class ApplicationGraphTests(TestCase):
             complete.assert_called_once()
             self.assertFalse(run.call_args.kwargs['config'].export_options.formats)
             self.assertFalse(run.call_args.kwargs['config'].export_to_blender)
+            # Tracking timing is tagged with the task's own id, and goes to the buffer the relay reads.
+            self.assertEqual(run.call_args.kwargs['timing_pipeline_id'], 'test')
+            self.assertEqual(run.call_args.kwargs['timing_sink'], request.timing_records.append)
             self.assertEqual(Path(run.call_args.kwargs['config'].calibration_toml_path), self.calibration)
             self.assertEqual(self.calibration.read_text(), 'test calibration')
             run_application_graph(request=request)

@@ -427,7 +427,9 @@ export const api = t.router({
     }),
 
     windows: t.router({
-        openPipelineMetrics: t.procedure.mutation(() => openPipelineMetricsWindow()),
+        openPipelineMetrics: t.procedure
+            .input(z.object({pipeline: z.string().regex(/^(realtime|posthoc):[\w-]+$/)}).optional())
+            .mutation(({input}) => openPipelineMetricsWindow(input?.pipeline)),
     }),
 
     // App Info & Updates

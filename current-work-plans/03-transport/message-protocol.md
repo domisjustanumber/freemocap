@@ -74,12 +74,15 @@ and never decodes wrongly.
 | framerate | camera_group_id, backend_framerate, frontend_framerate | on emit | FramerateStore (fast) |
 | app_state | server_pid, state | connect + on change | connection slice (replace) |
 | progress | snapshot of shared task registry, with server identity and revision | on change | task subscribers (replace) |
-| pipeline_timing | mode, pipeline_id, camera_group_id, clock_domain, relay_perf_counter_ns, the task events of the newest complete frames, the stage samples and dropped-event count since the previous build, node lag | ~4 Hz, only to connections that asked | timing subscribers (replace) |
+| pipeline_timing | mode, pipeline_id, camera_group_id (realtime), recording_name (posthoc), clock_domain, relay_perf_counter_ns, the task events of the newest complete frames, the stage samples and dropped-event count since the previous build, node lag | ~4 Hz, only to connections that asked | timing subscribers (replace) |
 
 `pipeline_timing` is sent only to a connection that sent `{"pipelineTiming": true}`. The declaration
 belongs to that connection: the client sends it again on every connect, so a restarted server serves it
 from the fresh declaration. One server reader drains each pipeline's timing topic into a shared store;
 every interested connection gets a copy of the newest build, so two windows see the same events.
+A running posthoc mocap run has no pubsub: the same reader drains the bounded buffer its tracking appends to and
+sends its newest tracked frames as `mode: "posthoc"`, without node lag or the staleness filter; a run that ended
+sends nothing more, and the client drops a run that went silent.
 
 On connect the relay sends the current value of the replace kinds (app_state), then streams frames. A
 later change sends a fresh full replacement. Calibration is NOT a websocket kind: the frontend loads it

@@ -384,7 +384,9 @@ export const PipelineTimingEventSchema = z.object({
   batch_index: z.number().int().nullable().default(null), batch_size: z.number().int().nullable().default(null),
 });
 const Ratio = z.number().min(0).max(1).nullable().default(null);
-const OptionalBytes = z.number().int().nonnegative().nullable().default(null);
+// Byte counts over 4 GiB arrive as CBOR 64-bit integers, which cbor-x decodes to bigint.
+const Bytes = z.union([z.number().int().nonnegative(), z.bigint().nonnegative()]).transform(Number);
+const OptionalBytes = Bytes.nullable().default(null);
 /** One NVIDIA GPU of a live-load sample, by skellytracker device key; VRAM used is null under Windows WDDM. */
 export const LiveGpuLoadSchema = z.object({
   device_key: z.string().nullable().default(null), name: z.string().nullable().default(null), utilization: Ratio,
@@ -393,7 +395,7 @@ export const LiveGpuLoadSchema = z.object({
 /** The host and backend-process load (the inference service runs in the backend); CPU values are null on the first sample. */
 export const LiveLoadSchema = z.object({
   sample_perf_counter_ns: NanosecondsSchema, interval_s: z.number().positive(),
-  memory_used_bytes: z.number().int().nonnegative(), memory_available_bytes: z.number().int().nonnegative(),
+  memory_used_bytes: Bytes, memory_available_bytes: Bytes,
   cpu_utilization: Ratio, process_cpu_utilization: Ratio, process_rss_bytes: OptionalBytes, process_vram_used_bytes: OptionalBytes,
   gpus: z.array(LiveGpuLoadSchema), sample_errors: z.array(z.string()),
 });

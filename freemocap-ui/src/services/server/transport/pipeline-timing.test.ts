@@ -31,15 +31,17 @@ test('a pipeline timing message decodes on its own, with defaults for the fields
 test('live load decodes with null for the values the server leaves out, and is null before the first sample', () => {
     assert.equal((decodeMessage(encode(timing())) as PipelineTimingMessage).live_load, null);
     const message = decodeMessage(encode(timing({live_load: {sample_perf_counter_ns: 1n << 40n, interval_s: 1,
-        memory_used_bytes: 10, memory_available_bytes: 20, process_rss_bytes: 300,
-        gpus: [{device_key: 'gpu:10de:2484:0', name: 'GPU', utilization: 0.5, vram_free_bytes: 600}], sample_errors: []}})));
+        // Sizes over 4 GiB come from the server as CBOR 64-bit integers, as these bigints encode.
+        memory_used_bytes: 40_735_821_824n, memory_available_bytes: 20, process_rss_bytes: 300,
+        gpus: [{device_key: 'gpu:10de:2484:0', name: 'GPU', utilization: 0.5, vram_free_bytes: 4_856_078_336n}], sample_errors: []}})));
     assert.ok(message?.kind === 'pipeline_timing' && message.live_load);
     const load = message.live_load;
     assert.equal(load.sample_perf_counter_ns, 2 ** 40);
+    assert.equal(load.memory_used_bytes, 40_735_821_824);
     assert.deepEqual([load.cpu_utilization, load.process_cpu_utilization, load.process_rss_bytes, load.process_vram_used_bytes],
         [null, null, 300, null]);
     assert.deepEqual(load.gpus[0], {device_key: 'gpu:10de:2484:0', name: 'GPU', utilization: 0.5, vram_used_bytes: null,
-        vram_free_bytes: 600, process_vram_used_bytes: null});
+        vram_free_bytes: 4_856_078_336, process_vram_used_bytes: null});
     assert.throws(() => decodeMessage(encode(timing({live_load: {interval_s: 1}}))));
 });
 

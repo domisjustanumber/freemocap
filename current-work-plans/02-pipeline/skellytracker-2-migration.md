@@ -564,7 +564,21 @@ frames, each with `rtmpose` and with `mediapipe`.
          the same 8 failed, 20 skipped. Seeded numerical fresh gate: 0.314339 px, foot_support; the output parquet
          is exactly equal to one made at `0a50c719` in the same session (11 columns, 1,889,442 rows), and two runs
          at `19b55b1d` are equal. Kept OVERLAY_2D is 97,438 at both heads, against 97,425 at the box rename
-         (`803c33fa`): that 13-point shift predates this update and was not investigated. Metrics window rows are
+         (`803c33fa`). TRACED (supervisor's request, `<scratchpad>/trace/`): no commit of either repository.
+         The seeded gate's execution provider changed. At the box rename (09:53) Auto resolved to cpu fp32; at 10:53-10:54
+         a skellytracker session ran `skellytracker-eps install cuda` and the trt-rtx pack also landed in the per-user
+         store `%LOCALAPPDATA%\skellytracker\eps` (shared by every environment), so Auto now resolves to trt-rtx fp16.
+         Proof: freemocap `bb7d1096` + ST `803c33fa` gives 97,438 on trt-rtx; HEAD + `803c33fa` with
+         `SKELLYTRACKER_EP_STORE` = an empty folder (cpu fp32) gives 97,425 and kept min 0.5001, the box-rename numbers.
+         On trt-rtx, ST `803c33fa` and `0a50c719` give exactly equal parquets. cpu against trt-rtx (same code): every RTMW
+         2D point moves a little (score median |diff| 0.0009, position median 0.67 px, p99 5.7 px, max 288 px);
+         227 kept flips (107 kept only on cpu, 120 only on trt-rtx) in 48 camera-frames (Cam2 124, Cam3 73, Cam1 30),
+         kept-side scores 0.5001-0.787 (median 0.565), mostly whole-hand groups; no board points. The calibration is
+         identical (board detection does not use the EP). The detector ran on 6 frames in both; one box is present in
+         one run only (Cam3 frame 217). The person alignment (foot_support in both) differs by 22.65 degrees and
+         about 640/580 mm; after the best rigid fit the 3D differ by median 2.8 mm, p95 10 mm, max 428 mm. So the count
+         is EP precision, but it exposes that the person alignment's heading moves 22.65 degrees on fp16 noise.
+         Metrics window rows are
          unchanged against the earlier hand-run: posthoc 14 rows, `person.*` on 1 of 120 frames (`run_if` false
          gives no spans), the others on 120; realtime the same nodes.
      - Next:

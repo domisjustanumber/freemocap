@@ -74,7 +74,7 @@ and never decodes wrongly.
 | framerate | camera_group_id, backend_framerate, frontend_framerate | on emit | FramerateStore (fast) |
 | app_state | server_pid, state | connect + on change | connection slice (replace) |
 | progress | snapshot of shared task registry, with server identity and revision | on change | task subscribers (replace) |
-| pipeline_timing | mode, pipeline_id, camera_group_id (realtime), recording_name (posthoc), clock_domain, relay_perf_counter_ns, the task events of the newest complete frames, the stage samples and dropped-event count since the previous build, node lag | ~4 Hz, only to connections that asked | timing subscribers (replace) |
+| pipeline_timing | mode, pipeline_id, camera_group_id (realtime), recording_name (posthoc), clock_domain, relay_perf_counter_ns, the task events of the newest complete frames, the stage samples and dropped-event count since the previous build, node lag, live_load | ~4 Hz, only to connections that asked | timing subscribers (replace) |
 
 `pipeline_timing` is sent only to a connection that sent `{"pipelineTiming": true}`. The declaration
 belongs to that connection: the client sends it again on every connect, so a restarted server serves it
@@ -85,6 +85,12 @@ sends its newest tracked frames as `mode: "posthoc"`, without node lag or the st
 sends nothing more, and the client drops a run that went silent.
 Timing is off by default (`log_pipeline_times`, read when a run starts). A run started with it off still
 sends its message with `log_pipeline_times_enabled: false` and no events, so the window can say so.
+While a connection asks for timing, one backend thread samples skellytracker's `LiveSampler` at 1 Hz for the host
+and the backend process (the inference service is a thread in it); each message carries the newest sample as
+`live_load` (CPU share, memory, process CPU/RSS/VRAM, per-GPU load and VRAM by device key; any value may be
+null). It rides the pipeline messages, so live load needs a pipeline; no other kind carries it. The static
+system information (host, GPUs, runtime, EP status, the models of each live run) is HTTP
+(`GET /freemocap/onnx/system_information`), fetched by the window on every connect.
 
 On connect the relay sends the current value of the replace kinds (app_state), then streams frames. A
 later change sends a fresh full replacement. Calibration is NOT a websocket kind: the frontend loads it

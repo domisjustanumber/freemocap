@@ -39,6 +39,8 @@ class MocapWorkerRequest:
     timing_records: deque | None = None
     """The tracking run's timing records, appended on the worker's threads; the app's timing relay drains it.
     Bounded: without a reader the oldest records go. None when `log_pipeline_times` is off: nothing is timed."""
+    inference_services: list = field(default_factory=list)
+    """The run's own inference services, appended when tracking starts, for the models of the run."""
 
     def report(self, stage: str, detail: str, fraction: float) -> None:
         self.operation_progress.report(self, stage, detail, fraction)
@@ -99,6 +101,8 @@ class MocapPipeline(PipelineABC):
     started: bool = False
     _latest: dict[str, PipelineProgressMessage] = field(default_factory=dict)
     timing_records: deque | None = None
+    inference_services: list = field(default_factory=list)
+    """Shared with the worker's request: the run's own inference services (`provider_status()` gives its models)."""
 
     @classmethod
     def create(
@@ -125,7 +129,8 @@ class MocapPipeline(PipelineABC):
             ipc.shutdown_pipeline()
             raise
         pipeline = cls(id=pipeline_id, recording_info=recording_info, ipc=ipc,
-            worker=worker, progress_queue=progress_queue, timing_records=request.timing_records)
+            worker=worker, progress_queue=progress_queue, timing_records=request.timing_records,
+            inference_services=request.inference_services)
         pipeline._latest[pipeline_id] = AggregatorNodeProgressMessage(
             pipeline_id=pipeline_id, pipeline_type=str(PosthocPipelineType.MOCAP),
             phase=AggregatorPhase.SETTING_UP, detail="Mocap pipeline queued",

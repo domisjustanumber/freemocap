@@ -28,7 +28,7 @@ def test_public_api_categories_and_camera_methods(monkeypatch):
     assert set(schema['paths']['/skellycam/camera/group/all/pause']) == {'put'}
     assert '/skellycam/camera/group/all/pause_unpause' not in schema['paths']
     assert set(schema['paths']['/shutdown']) == {'post'}
-    for path in ('/freemocap/onnx/execution_providers', '/freemocap/onnx/session_providers'):
+    for path in ('/freemocap/onnx/execution_providers', '/freemocap/onnx/session_providers', '/freemocap/onnx/system_information'):
         assert set(schema['paths'][path]) == {'get'}
         assert schema['paths'][path]['get']['tags'] == ['ONNX']
 

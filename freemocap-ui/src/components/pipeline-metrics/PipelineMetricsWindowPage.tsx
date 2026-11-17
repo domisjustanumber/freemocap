@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {PipelineNetworkTimeline} from '@/components/pipeline-metrics/PipelineNetworkTimeline';
 import {buildTimelineViewModel} from '@/components/pipeline-metrics/pipelineTimelineModel';
 import {stageLabel, timingEngine} from '@/components/pipeline-metrics/pipelineTaskTopology';
@@ -11,6 +11,8 @@ import {DEFAULT_HOST, DEFAULT_PORT, serverUrls} from '@/constants/server-urls';
 import {loadFromStorage, STORAGE_KEYS} from '@/components/control-panels/server-connection/storage';
 import IconButton from '@/components/ui-components/IconButton';
 import SettingSelectInput from '@/components/common/settings-layout/setting-select-input';
+import {SystemInformationPanel} from '@/components/pipeline-metrics/SystemInformationPanel';
+import {requestSystemInformation, type SystemInformationState, watchSystemInformation} from '@/services/server/system-information';
 
 const POLL_MS = 250;
 
@@ -52,6 +54,8 @@ export default function PipelineMetricsWindowPage(): React.ReactElement {
     const [selectedKey, setSelectedKey] = useState<string | null>(() => requestedRunKey(window.location.hash));
     const [frozen, setFrozen] = useState<RunTimingSnapshot | null>(null);
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+    const [systemInformation, setSystemInformation] = useState<SystemInformationState>({info: null, loading: false, error: null});
+    const refreshSystemInformation = useRef<() => void>(() => {});
 
     // An opener that names a run (a posthoc card's "Open metrics") switches an open window to it.
     useEffect(() => {
@@ -70,6 +74,9 @@ export default function PipelineMetricsWindowPage(): React.ReactElement {
         const onState = (state: ConnectionState) => setConnected(state === ConnectionState.CONNECTED);
         transport.on('state-change', onState);
         const stopFeed = feedPipelineTimingStore(transport, store);
+        // The static groups: fetched on every connect (a restarted or another server answers for itself) and on refresh.
+        const systemWatch = watchSystemInformation(transport, signal => requestSystemInformation(serverUrls.getHttpUrl(), signal), setSystemInformation);
+        refreshSystemInformation.current = systemWatch.refresh;
         const onStorage = (event: StorageEvent) => {
             if (event.key !== STORAGE_KEYS.SERVER_HOST && event.key !== STORAGE_KEYS.SERVER_PORT) return;
             applySavedServer();
@@ -84,6 +91,7 @@ export default function PipelineMetricsWindowPage(): React.ReactElement {
             clearInterval(poll);
             window.removeEventListener('storage', onStorage);
             stopFeed();
+            systemWatch.stop();
             transport.off('state-change', onState);
             transport.disconnect();
         };
@@ -110,9 +118,9 @@ export default function PipelineMetricsWindowPage(): React.ReactElement {
                     onClick={() => setFrozen(frozen ? null : live)}/>
             </div>
 
-            {/* ── System information panel: host, GPUs, runtime, execution providers, models and live load.
-                 Empty until PM commit 9 fills it (pipeline-metrics-port-plan.md §5). ── */}
-            <section aria-label="System information" data-slot="system-information"/>
+            {/* Host, GPUs, runtime, execution providers, models of the selected run and live load (pipeline-metrics-port-plan.md §5). */}
+            <SystemInformationPanel state={systemInformation} run={run} connected={connected}
+                liveLoad={runs.find(entry => entry.liveLoad)?.liveLoad ?? null} onRefresh={() => refreshSystemInformation.current()}/>
 
             {state !== 'ready' || !run
                 ? <StateNotice state={state as Exclude<MetricsState, 'ready'>} run={run}/>

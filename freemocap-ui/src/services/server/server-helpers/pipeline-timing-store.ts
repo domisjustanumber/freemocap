@@ -102,7 +102,7 @@ export class PipelineTimingStore {
             incompleteFrames: message.incomplete_frames, nodeLag: message.node_lag, staleNodes: message.stale_nodes,
             droppedInLastMessage: message.dropped_timing_events,
             droppedSinceOpened: (previous?.snapshot.droppedSinceOpened ?? 0) + message.dropped_timing_events,
-            endToEnd: sampleStats(timings.map(timing => timing.endToEndMs)), stages, receivedAtMs: nowMs,
+            endToEnd: sampleStats(timings.map(timing => timing.endToEndMs)), stages, liveLoad: message.live_load, receivedAtMs: nowMs,
         }});
     }
 

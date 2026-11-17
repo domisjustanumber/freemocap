@@ -9,6 +9,9 @@ long as it: with no interested connection there is no subscription, no build and
 A running posthoc mocap run has no pubsub: the relay drains the bounded buffer its tracking
 appends to (`MocapPipeline.timing_records`) and sends the newest frames that have a
 `pipeline.run` event, without the realtime lag and staleness rules (a slow CPU run is not stale).
+
+While a connection is interested, one `LiveLoadSampler` samples the host and the backend process at 1 Hz;
+every message carries its newest sample as `live_load`, so live load needs a running pipeline.
 """
 from __future__ import annotations
 
@@ -26,6 +29,7 @@ from freemocap.core.pipeline.pipeline_timing_events import (
 from freemocap.core.pipeline.posthoc.mocap_pipeline import MocapPipeline
 from freemocap.core.pipeline.pipeline_timing_task_ids import CLOCK_DOMAIN_PERF_COUNTER
 from freemocap.core.pipeline.realtime.realtime_pipeline import RealtimePipeline
+from freemocap.core.streaming.live_load import LiveLoadSampler
 from freemocap.core.streaming.message_model import MessageEnvelope, PipelineTimingStreamMessage, encode_message
 from freemocap.pubsub.pubsub_topics import PipelineTimingMessage
 
@@ -71,8 +75,9 @@ class _PosthocTiming:
 
 
 class PipelineTimingRelay:
-    def __init__(self, interval_s: float = PIPELINE_TIMING_INTERVAL_S) -> None:
+    def __init__(self, interval_s: float = PIPELINE_TIMING_INTERVAL_S, live_load: LiveLoadSampler | None = None) -> None:
         self._interval_s = interval_s
+        self.live_load = LiveLoadSampler() if live_load is None else live_load
         self._interested: set[object] = set()
         self._pipelines: dict[str, _PipelineTiming] = {}
         self._posthoc: dict[str, _PosthocTiming] = {}
@@ -82,10 +87,12 @@ class PipelineTimingRelay:
 
     def add_interest(self, connection: object) -> None:
         self._interested.add(connection)
+        self.live_load.start()
 
     def remove_interest(self, connection: object) -> None:
         self._interested.discard(connection)
         if not self._interested:
+            self.live_load.stop()
             for timing in self._pipelines.values():
                 timing.pipeline.release_timing_subscription()
             self._pipelines.clear()
@@ -162,6 +169,7 @@ class PipelineTimingRelay:
             node_lag=dict(lag["node_lag"]),
             incomplete_frames=tuple(lag["incomplete_frames"]),
             stale_nodes=tuple(lag["stale_nodes"]),
+            live_load=self.live_load.latest,
         )
 
     def _posthoc_message(self, pipeline_id: str, pipeline: MocapPipeline) -> PipelineTimingStreamMessage:
@@ -191,4 +199,5 @@ class PipelineTimingRelay:
             events=tuple(capped),
             clock_domain=CLOCK_DOMAIN_PERF_COUNTER,
             relay_perf_counter_ns=time.perf_counter_ns(),
+            live_load=self.live_load.latest,
         )

@@ -63,6 +63,7 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
     tracking_progress: Callable[[Mapping[str, int]], None] | None = None,
     artifacts: Callable | None = None,
     timing_sink: Callable[[object], None] | None = None, timing_pipeline_id: str = "",
+    inference_started: Callable[[InferenceService], None] | None = None,
 ) -> tuple[CompiledGraph, dict[str, Callable[[dict[str, object]], dict[str, object]]]]:
     """Build the same definition that execution consumes; callers may serialize it.
 
@@ -149,6 +150,8 @@ def build_recording_pipeline(*, sources: RecordingVideoSources, recording: Recor
         registry = WorkerRegistry(global_kill_flag=shutdown_flag, worker_mode=WorkerMode.THREAD)
         service = InferenceService(worker_registry=registry)
         service.start()
+        if inference_started is not None:
+            inference_started(service)
         try:
             adapter = SkellyTrackerAdapter(inference_service=service, detector_type=config.detector_type,
                 rtmpose_model_name=config.rtmpose_model_name, performance_report=performance,

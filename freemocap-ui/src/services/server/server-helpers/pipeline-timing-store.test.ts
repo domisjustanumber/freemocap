@@ -17,7 +17,7 @@ function message(overrides: Partial<PipelineTimingMessage> = {}): PipelineTiming
     return {kind: 'pipeline_timing', version: 0, timestamp: 0, sequence: 1, mode: 'realtime', pipeline_id: 'p1',
         camera_group_id: 'group1', recording_name: null, realtime_pipeline_active: true, log_pipeline_times_enabled: true,
         configured_camera_fps_hz: 30, per_node: {}, per_camera: {}, events: [], clock_domain: 'perf_counter',
-        relay_perf_counter_ns: 0, dropped_timing_events: 0, node_lag: {}, incomplete_frames: [], stale_nodes: [],
+        relay_perf_counter_ns: 0, dropped_timing_events: 0, node_lag: {}, incomplete_frames: [], stale_nodes: [], live_load: null,
         ...overrides} as PipelineTimingMessage;
 }
 
@@ -104,4 +104,16 @@ test('a dropped connection or server restart empties the store, and fresh messag
     assert.deepEqual(store.runs().map(run => [run.key, run.droppedSinceOpened, run.endToEnd]), [['realtime:restarted', 1, null]]);
     stop();
     transport.disconnect();
+});
+
+test('each message replaces its run\'s live load, and a message without one empties it', () => {
+    const store = new PipelineTimingStore();
+    const load = (cpu: number | null) => ({sample_perf_counter_ns: 1, interval_s: 1, memory_used_bytes: 1, memory_available_bytes: 2,
+        cpu_utilization: cpu, process_cpu_utilization: null, process_rss_bytes: null, process_vram_used_bytes: null, gpus: [], sample_errors: []});
+    store.ingest(message({live_load: load(null)}), 0);
+    assert.equal(store.runs(0)[0].liveLoad?.cpu_utilization, null);
+    store.ingest(message({live_load: load(0.5)}), 250);
+    assert.equal(store.runs(250)[0].liveLoad?.cpu_utilization, 0.5);
+    store.ingest(message({live_load: null}), 500);
+    assert.equal(store.runs(500)[0].liveLoad, null);
 });

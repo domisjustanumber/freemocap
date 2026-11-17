@@ -9,7 +9,7 @@ function run(overrides: Partial<RunTimingSnapshot> = {}): RunTimingSnapshot {
     return {key: 'realtime:p1', mode: 'realtime', pipelineId: 'p1', cameraGroupId: 'group1', recordingName: null,
         active: true, timingEnabled: true, configuredCameraFpsHz: 30, events: [], incompleteFrames: [],
         nodeLag: {aggregator: 2}, staleNodes: ['skeleton_inference'], droppedInLastMessage: 0, droppedSinceOpened: 0,
-        endToEnd: null, stages: [], receivedAtMs: 0, ...overrides};
+        endToEnd: null, stages: [], liveLoad: null, receivedAtMs: 0, ...overrides};
 }
 
 test('a posthoc run is labelled by its recording, else its pipeline id', () => {

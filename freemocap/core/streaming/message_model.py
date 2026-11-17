@@ -720,6 +720,37 @@ class ProgressMessage:
 
 
 @dataclass(frozen=True, slots=True)
+class LiveGpuLoad:
+    """One NVIDIA GPU of a live-load sample. `device_key` is skellytracker's device key (None for a GPU
+    with no PCI ids); `utilization` is a 0-1 ratio. `process_vram_used_bytes` is the backend's VRAM on
+    this GPU, None under Windows WDDM."""
+    device_key: str | None = None
+    name: str | None = None
+    utilization: float | None = None
+    vram_used_bytes: int | None = None
+    vram_free_bytes: int | None = None
+    process_vram_used_bytes: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LiveLoad:
+    """skellytracker's newest `LiveSample` of the host and the backend process, where the inference service
+    runs as a thread. Utilizations are 0-1 shares of all logical CPUs; the CPU values are None on the first
+    sample. `sample_perf_counter_ns` is on the clock of `relay_perf_counter_ns`."""
+    sample_perf_counter_ns: int
+    interval_s: float
+    memory_used_bytes: int
+    memory_available_bytes: int
+    cpu_utilization: float | None = None
+    process_cpu_utilization: float | None = None
+    process_rss_bytes: int | None = None
+    process_vram_used_bytes: int | None = None
+    """Windows PDH, summed over all GPUs; None off Windows."""
+    gpus: tuple[LiveGpuLoad, ...] = ()
+    sample_errors: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class PipelineTimingStreamMessage:
     """One pipeline's timing, usable on its own: its identity and mode, the clock of its
     nanosecond fields, the task events of its newest complete frames, the stage samples and
@@ -747,6 +778,8 @@ class PipelineTimingStreamMessage:
     node_lag: dict[str, int] = field(default_factory=dict)
     incomplete_frames: tuple[int, ...] = ()
     stale_nodes: tuple[str, ...] = ()
+    live_load: LiveLoad | None = None
+    """The newest host and backend-process load, the same in every pipeline's message; None before the first sample."""
 
 
 # - Serialization -

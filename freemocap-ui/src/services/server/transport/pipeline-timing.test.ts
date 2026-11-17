@@ -28,6 +28,21 @@ test('a pipeline timing message decodes on its own, with defaults for the fields
         ['abc123', 'group1', 'realtime', 3]);
 });
 
+test('live load decodes with null for the values the server leaves out, and is null before the first sample', () => {
+    assert.equal((decodeMessage(encode(timing())) as PipelineTimingMessage).live_load, null);
+    const message = decodeMessage(encode(timing({live_load: {sample_perf_counter_ns: 1n << 40n, interval_s: 1,
+        memory_used_bytes: 10, memory_available_bytes: 20, process_rss_bytes: 300,
+        gpus: [{device_key: 'gpu:10de:2484:0', name: 'GPU', utilization: 0.5, vram_free_bytes: 600}], sample_errors: []}})));
+    assert.ok(message?.kind === 'pipeline_timing' && message.live_load);
+    const load = message.live_load;
+    assert.equal(load.sample_perf_counter_ns, 2 ** 40);
+    assert.deepEqual([load.cpu_utilization, load.process_cpu_utilization, load.process_rss_bytes, load.process_vram_used_bytes],
+        [null, null, 300, null]);
+    assert.deepEqual(load.gpus[0], {device_key: 'gpu:10de:2484:0', name: 'GPU', utilization: 0.5, vram_used_bytes: null,
+        vram_free_bytes: 600, process_vram_used_bytes: null});
+    assert.throws(() => decodeMessage(encode(timing({live_load: {interval_s: 1}}))));
+});
+
 test('a malformed pipeline timing message is rejected, an unknown version is skipped', () => {
     for (const bad of [{mode: 'replay'}, {events: [{task_id: 'x'}]}, {dropped_timing_events: -1}, {pipeline_id: undefined}]) {
         assert.throws(() => decodeMessage(encode(timing(bad))));

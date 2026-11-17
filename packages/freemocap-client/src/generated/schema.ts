@@ -1026,6 +1026,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/freemocap/onnx/system_information": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get System Information
+         * @description skellytracker's host, GPUs (with device keys), runtime and loaded libraries, EP status and performance
+         *     recommendation, and the models of each live run (realtime, legacy and posthoc), for the metrics window.
+         *
+         *     The probes cache themselves per process; the loaded libraries are read again on each request, in the backend
+         *     process where the inference service runs as a thread, because they change once a session loads its EP.
+         */
+        get: operations["get_system_information_freemocap_onnx_system_information_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/freemocap/telemetry/track": {
         parameters: {
             query?: never;
@@ -4218,6 +4242,203 @@ export interface components {
             /** Note */
             note: string;
         };
+        /** LoadedLibrary */
+        LoadedLibrary: {
+            /** Name */
+            name: string;
+            /** Version */
+            version: string | null;
+            /** Source */
+            source: string;
+        };
+        /** SystemEpCandidate */
+        SystemEpCandidate: {
+            /** Ep Key */
+            ep_key: string;
+            /** Device Key */
+            device_key: string | null;
+            /** Status */
+            status: string;
+            /** Reason */
+            reason: string | null;
+        };
+        /** SystemEpRow */
+        SystemEpRow: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** State */
+            state: string;
+            /** Usable */
+            usable: boolean;
+            /** Install Hint */
+            install_hint: string | null;
+            /** Devices */
+            devices: components["schemas"]["ExecutionProviderDevice"][];
+        };
+        /** SystemEpStatus */
+        SystemEpStatus: {
+            /** Ort Version */
+            ort_version: string | null;
+            /** Core Matches Pin */
+            core_matches_pin: boolean;
+            /** Providers */
+            providers: components["schemas"]["SystemEpRow"][];
+            recommendation: components["schemas"]["SystemRecommendation"];
+            /** Warnings */
+            warnings: string[];
+        };
+        /**
+         * SystemGpu
+         * @description `device_key` is None for a GPU with no PCI ids.
+         */
+        SystemGpu: {
+            /** Device Key */
+            device_key: string | null;
+            /** Name */
+            name: string | null;
+            /** Vendor */
+            vendor: string;
+            /** Driver Version */
+            driver_version: string | null;
+            /** Vram Total Bytes */
+            vram_total_bytes: number | null;
+            /** Is Integrated */
+            is_integrated: boolean | null;
+            /** Compute Capability */
+            compute_capability: string | null;
+            /** Brand */
+            brand: string | null;
+        };
+        /** SystemHost */
+        SystemHost: {
+            /** Os Name */
+            os_name: string;
+            /** Os Release */
+            os_release: string;
+            /** Os Version */
+            os_version: string;
+            /** Os Build */
+            os_build: string | null;
+            /** Arch */
+            arch: string;
+            /** Cpu Name */
+            cpu_name: string | null;
+            /** Cpu Physical Cores */
+            cpu_physical_cores: number | null;
+            /** Cpu Logical Cores */
+            cpu_logical_cores: number | null;
+            /** Cpu Max Frequency Hz */
+            cpu_max_frequency_hz: number | null;
+            /** Memory Total Bytes */
+            memory_total_bytes: number;
+            /** Is Wsl */
+            is_wsl: boolean;
+            /** Is Vm */
+            is_vm: boolean | null;
+            /** Hypervisor */
+            hypervisor: string | null;
+            /** Container Runtime */
+            container_runtime: string | null;
+            /** Probe Errors */
+            probe_errors: string[];
+        };
+        /** SystemInformationResponse */
+        SystemInformationResponse: {
+            host: components["schemas"]["SystemHost"];
+            /** Gpus */
+            gpus: components["schemas"]["SystemGpu"][];
+            runtime: components["schemas"]["SystemRuntime"];
+            execution_providers: components["schemas"]["SystemEpStatus"];
+            /** Runs */
+            runs: components["schemas"]["SystemRun"][];
+        };
+        /**
+         * SystemRecommendation
+         * @description skellytracker's performance recommendation for this host.
+         */
+        SystemRecommendation: {
+            /** Hardware Class */
+            hardware_class: string;
+            chosen: components["schemas"]["SystemEpCandidate"];
+            /** Precision */
+            precision: string;
+            /** Skipped */
+            skipped: components["schemas"]["SystemEpCandidate"][];
+            /** Offers */
+            offers: components["schemas"]["ExecutionProviderOffer"][];
+        };
+        /**
+         * SystemRun
+         * @description A live run: `mode` and `pipeline_id` name it as its pipeline_timing messages do.
+         */
+        SystemRun: {
+            /** Mode */
+            mode: string;
+            /** Pipeline Id */
+            pipeline_id: string;
+            /** Requested Provider */
+            requested_provider: string | null;
+            /** Models */
+            models: components["schemas"]["SystemRunModel"][];
+        };
+        /**
+         * SystemRunModel
+         * @description One model node of a run as the run reports it; `device_names` follow `device` (one key or a list).
+         */
+        SystemRunModel: {
+            /** Node */
+            node: string;
+            /** Key */
+            key: string | null;
+            /** Version */
+            version?: string | null;
+            /** Size */
+            size?: string | null;
+            /** Precision */
+            precision?: string | null;
+            /** Engine */
+            engine?: string | null;
+            /** Execution Provider */
+            execution_provider?: string | null;
+            /** Device */
+            device?: string | string[] | null;
+            /**
+             * Device Names
+             * @default []
+             */
+            device_names?: (string | null)[];
+        };
+        /** SystemRuntime */
+        SystemRuntime: {
+            /** Python Implementation */
+            python_implementation: string;
+            /** Python Version */
+            python_version: string;
+            /** Python Build */
+            python_build: string;
+            /** Python Compiler */
+            python_compiler: string;
+            /** Skellytracker Version */
+            skellytracker_version: string;
+            /** Skellytracker Commit */
+            skellytracker_commit: string | null;
+            /** Ort Version */
+            ort_version: string | null;
+            /** Ort Packages */
+            ort_packages: string[];
+            /** Ort Ep Names */
+            ort_ep_names: string[];
+            /** Mediapipe Version */
+            mediapipe_version: string | null;
+            /** Driver Supported Cuda Version */
+            driver_supported_cuda_version: string | null;
+            /** Loaded Libraries */
+            loaded_libraries: components["schemas"]["LoadedLibrary"][];
+            /** Probe Errors */
+            probe_errors: string[];
+        };
     };
     responses: never;
     parameters: never;
@@ -6300,6 +6521,26 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+        };
+    };
+    get_system_information_freemocap_onnx_system_information_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemInformationResponse"];
                 };
             };
         };

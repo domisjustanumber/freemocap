@@ -290,6 +290,11 @@ export const operationDefinitions = {
     "path": "/freemocap/onnx/session_providers",
     "asset": false
   },
+  "get_system_information_freemocap_onnx_system_information_get": {
+    "method": "GET",
+    "path": "/freemocap/onnx/system_information",
+    "asset": false
+  },
   "track_telemetry_event_freemocap_telemetry_track_post": {
     "method": "POST",
     "path": "/freemocap/telemetry/track",

@@ -1,3 +1,5 @@
+import type {LiveLoad} from '@/services/server/transport/message-contract';
+
 /** The timeline shows this many of the newest complete frames a pipeline_timing message carries. */
 export const PIPELINE_TIMELINE_FRAME_WINDOW = 5;
 
@@ -66,5 +68,7 @@ export interface RunTimingSnapshot {
     /** First event start to last event end of each complete frame, from that frame's own events. */
     endToEnd: SampleStats | null;
     stages: StageStats[];
+    /** The server's newest live load of the host and the backend process; null before its first sample. */
+    liveLoad: LiveLoad | null;
     receivedAtMs: number;
 }

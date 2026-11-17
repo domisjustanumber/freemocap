@@ -383,6 +383,20 @@ export const PipelineTimingEventSchema = z.object({
   start_time_ns: NanosecondsSchema, end_time_ns: NanosecondsSchema, duration_ms: z.number().finite(),
   batch_index: z.number().int().nullable().default(null), batch_size: z.number().int().nullable().default(null),
 });
+const Ratio = z.number().min(0).max(1).nullable().default(null);
+const OptionalBytes = z.number().int().nonnegative().nullable().default(null);
+/** One NVIDIA GPU of a live-load sample, by skellytracker device key; VRAM used is null under Windows WDDM. */
+export const LiveGpuLoadSchema = z.object({
+  device_key: z.string().nullable().default(null), name: z.string().nullable().default(null), utilization: Ratio,
+  vram_used_bytes: OptionalBytes, vram_free_bytes: OptionalBytes, process_vram_used_bytes: OptionalBytes,
+});
+/** The host and backend-process load (the inference service runs in the backend); CPU values are null on the first sample. */
+export const LiveLoadSchema = z.object({
+  sample_perf_counter_ns: NanosecondsSchema, interval_s: z.number().positive(),
+  memory_used_bytes: z.number().int().nonnegative(), memory_available_bytes: z.number().int().nonnegative(),
+  cpu_utilization: Ratio, process_cpu_utilization: Ratio, process_rss_bytes: OptionalBytes, process_vram_used_bytes: OptionalBytes,
+  gpus: z.array(LiveGpuLoadSchema), sample_errors: z.array(z.string()),
+});
 /** One pipeline's timing, usable on its own; sent only to a connection that asked for it. */
 export const PipelineTimingMessageSchema = z.object({
   kind: z.literal('pipeline_timing'), ...ENVELOPE,
@@ -402,8 +416,12 @@ export const PipelineTimingMessageSchema = z.object({
   dropped_timing_events: z.number().int().nonnegative(),
   node_lag: z.record(z.string(), z.number().int().nonnegative()),
   incomplete_frames: z.array(z.number().int()), stale_nodes: z.array(z.string()),
+  /** The newest live load, the same in every pipeline's message; null before the first sample. */
+  live_load: LiveLoadSchema.nullable().default(null),
 });
 export type PipelineTimingEvent = z.infer<typeof PipelineTimingEventSchema>;
+export type LiveLoad = z.infer<typeof LiveLoadSchema>;
+export type LiveGpuLoad = z.infer<typeof LiveGpuLoadSchema>;
 export type PipelineTimingMessage = z.infer<typeof PipelineTimingMessageSchema>;
 
 export type CoordinateConvention = z.infer<typeof CoordinateConventionSchema>;

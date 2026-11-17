@@ -2977,6 +2977,28 @@
         }
       }
     },
+    "/freemocap/onnx/system_information": {
+      "get": {
+        "tags": [
+          "ONNX"
+        ],
+        "summary": "Get System Information",
+        "description": "skellytracker's host, GPUs (with device keys), runtime and loaded libraries, EP status and performance\nrecommendation, and the models of each live run (realtime, legacy and posthoc), for the metrics window.\n\nThe probes cache themselves per process; the loaded libraries are read again on each request, in the backend\nprocess where the inference service runs as a thread, because they change once a session loads its EP.",
+        "operationId": "get_system_information_freemocap_onnx_system_information_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemInformationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/freemocap/telemetry/track": {
       "post": {
         "tags": [
@@ -9958,6 +9980,751 @@
         ],
         "title": "ExecutionProviderOffer",
         "type": "object"
+      },
+      "LoadedLibrary": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "version",
+          "source"
+        ],
+        "title": "LoadedLibrary"
+      },
+      "SystemEpCandidate": {
+        "properties": {
+          "ep_key": {
+            "type": "string",
+            "title": "Ep Key"
+          },
+          "device_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Key"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ep_key",
+          "device_key",
+          "status",
+          "reason"
+        ],
+        "title": "SystemEpCandidate"
+      },
+      "SystemEpRow": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "usable": {
+            "type": "boolean",
+            "title": "Usable"
+          },
+          "install_hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Install Hint"
+          },
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionProviderDevice"
+            },
+            "type": "array",
+            "title": "Devices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "state",
+          "usable",
+          "install_hint",
+          "devices"
+        ],
+        "title": "SystemEpRow"
+      },
+      "SystemEpStatus": {
+        "properties": {
+          "ort_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ort Version"
+          },
+          "core_matches_pin": {
+            "type": "boolean",
+            "title": "Core Matches Pin"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/SystemEpRow"
+            },
+            "type": "array",
+            "title": "Providers"
+          },
+          "recommendation": {
+            "$ref": "#/components/schemas/SystemRecommendation"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ort_version",
+          "core_matches_pin",
+          "providers",
+          "recommendation",
+          "warnings"
+        ],
+        "title": "SystemEpStatus"
+      },
+      "SystemGpu": {
+        "properties": {
+          "device_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Key"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "vendor": {
+            "type": "string",
+            "title": "Vendor"
+          },
+          "driver_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Driver Version"
+          },
+          "vram_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vram Total Bytes"
+          },
+          "is_integrated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Integrated"
+          },
+          "compute_capability": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compute Capability"
+          },
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brand"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_key",
+          "name",
+          "vendor",
+          "driver_version",
+          "vram_total_bytes",
+          "is_integrated",
+          "compute_capability",
+          "brand"
+        ],
+        "title": "SystemGpu",
+        "description": "`device_key` is None for a GPU with no PCI ids."
+      },
+      "SystemHost": {
+        "properties": {
+          "os_name": {
+            "type": "string",
+            "title": "Os Name"
+          },
+          "os_release": {
+            "type": "string",
+            "title": "Os Release"
+          },
+          "os_version": {
+            "type": "string",
+            "title": "Os Version"
+          },
+          "os_build": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Os Build"
+          },
+          "arch": {
+            "type": "string",
+            "title": "Arch"
+          },
+          "cpu_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Name"
+          },
+          "cpu_physical_cores": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Physical Cores"
+          },
+          "cpu_logical_cores": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Logical Cores"
+          },
+          "cpu_max_frequency_hz": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Max Frequency Hz"
+          },
+          "memory_total_bytes": {
+            "type": "integer",
+            "title": "Memory Total Bytes"
+          },
+          "is_wsl": {
+            "type": "boolean",
+            "title": "Is Wsl"
+          },
+          "is_vm": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Vm"
+          },
+          "hypervisor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypervisor"
+          },
+          "container_runtime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Container Runtime"
+          },
+          "probe_errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Probe Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "os_name",
+          "os_release",
+          "os_version",
+          "os_build",
+          "arch",
+          "cpu_name",
+          "cpu_physical_cores",
+          "cpu_logical_cores",
+          "cpu_max_frequency_hz",
+          "memory_total_bytes",
+          "is_wsl",
+          "is_vm",
+          "hypervisor",
+          "container_runtime",
+          "probe_errors"
+        ],
+        "title": "SystemHost"
+      },
+      "SystemInformationResponse": {
+        "properties": {
+          "host": {
+            "$ref": "#/components/schemas/SystemHost"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/SystemGpu"
+            },
+            "type": "array",
+            "title": "Gpus"
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/SystemRuntime"
+          },
+          "execution_providers": {
+            "$ref": "#/components/schemas/SystemEpStatus"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/SystemRun"
+            },
+            "type": "array",
+            "title": "Runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "host",
+          "gpus",
+          "runtime",
+          "execution_providers",
+          "runs"
+        ],
+        "title": "SystemInformationResponse"
+      },
+      "SystemRecommendation": {
+        "properties": {
+          "hardware_class": {
+            "type": "string",
+            "title": "Hardware Class"
+          },
+          "chosen": {
+            "$ref": "#/components/schemas/SystemEpCandidate"
+          },
+          "precision": {
+            "type": "string",
+            "title": "Precision"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/SystemEpCandidate"
+            },
+            "type": "array",
+            "title": "Skipped"
+          },
+          "offers": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionProviderOffer"
+            },
+            "type": "array",
+            "title": "Offers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hardware_class",
+          "chosen",
+          "precision",
+          "skipped",
+          "offers"
+        ],
+        "title": "SystemRecommendation",
+        "description": "skellytracker's performance recommendation for this host."
+      },
+      "SystemRun": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "pipeline_id": {
+            "type": "string",
+            "title": "Pipeline Id"
+          },
+          "requested_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Provider"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/SystemRunModel"
+            },
+            "type": "array",
+            "title": "Models"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "pipeline_id",
+          "requested_provider",
+          "models"
+        ],
+        "title": "SystemRun",
+        "description": "A live run: `mode` and `pipeline_id` name it as its pipeline_timing messages do."
+      },
+      "SystemRunModel": {
+        "properties": {
+          "node": {
+            "type": "string",
+            "title": "Node"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "precision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Precision"
+          },
+          "engine": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine"
+          },
+          "execution_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Provider"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "device_names": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Device Names",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "node",
+          "key"
+        ],
+        "title": "SystemRunModel",
+        "description": "One model node of a run as the run reports it; `device_names` follow `device` (one key or a list)."
+      },
+      "SystemRuntime": {
+        "properties": {
+          "python_implementation": {
+            "type": "string",
+            "title": "Python Implementation"
+          },
+          "python_version": {
+            "type": "string",
+            "title": "Python Version"
+          },
+          "python_build": {
+            "type": "string",
+            "title": "Python Build"
+          },
+          "python_compiler": {
+            "type": "string",
+            "title": "Python Compiler"
+          },
+          "skellytracker_version": {
+            "type": "string",
+            "title": "Skellytracker Version"
+          },
+          "skellytracker_commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skellytracker Commit"
+          },
+          "ort_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ort Version"
+          },
+          "ort_packages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ort Packages"
+          },
+          "ort_ep_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ort Ep Names"
+          },
+          "mediapipe_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediapipe Version"
+          },
+          "driver_supported_cuda_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Driver Supported Cuda Version"
+          },
+          "loaded_libraries": {
+            "items": {
+              "$ref": "#/components/schemas/LoadedLibrary"
+            },
+            "type": "array",
+            "title": "Loaded Libraries"
+          },
+          "probe_errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Probe Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "python_implementation",
+          "python_version",
+          "python_build",
+          "python_compiler",
+          "skellytracker_version",
+          "skellytracker_commit",
+          "ort_version",
+          "ort_packages",
+          "ort_ep_names",
+          "mediapipe_version",
+          "driver_supported_cuda_version",
+          "loaded_libraries",
+          "probe_errors"
+        ],
+        "title": "SystemRuntime"
       }
     }
   },

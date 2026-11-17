@@ -10,7 +10,10 @@ PATTERNS = (
     re.compile(r"\b[A-Z][A-Za-z]+ExecutionProvider\b"),  # an ONNX Runtime provider name
     re.compile(r"nvidia-smi|\bwmic\b|\blspci\b|system_profiler", re.IGNORECASE),  # a host GPU command
 )
-ALLOWED: dict[tuple[str, str], str] = {}  # (path, line) -> the reason; empty since part 3 of the migration
+ALLOWED: dict[tuple[str, str], str] = {  # (path, line) -> the reason; empty since part 3 of the migration
+    ("freemocap/core/tracking/legacy_tracker_run.py", 'CUDA, TRT_RTX = "cuda", "trt-rtx"'):  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+        "user ruling L3: the old session runs cpu or cuda, never trt-rtx",  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+}
 
 
 def test_no_source_file_names_an_ep_an_ort_provider_or_a_gpu_command():

@@ -43,6 +43,7 @@ class InferenceRegistration:
     execution_device: str | None = None
     timing_sink: Callable[[dict], None] | None = None
     """Gets the run's skellytracker timing header and span events on the inference thread, inside `pipeline.run`; keep it cheap."""
+    legacy_tracker_benchmark: bool = False  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +159,15 @@ class InferenceService:
     @staticmethod
     def _start_run(client: InferenceClient):
         registration = client.registration
+        if registration.legacy_tracker_benchmark:  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+            if registration.mode != InferenceMode.REALTIME:  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+                raise ValueError("The legacy tracker benchmark runs in real-time processing only")  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+            if registration.detector_type != "rtmpose":  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+                raise ValueError("The legacy tracker benchmark runs YOLOX and RTMW; choose the RTMPose detector")  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+            from freemocap.core.tracking.legacy_tracker_run import legacy_ep_choice, start_legacy_run  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+            return start_legacy_run(camera_ids=registration.camera_ids, pipeline_id=registration.pipeline_id,  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+                                    execution_provider=legacy_ep_choice(registration.execution_provider),  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+                                    selected_provider=registration.execution_provider, timing_sink=registration.timing_sink)  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
         run, record = start_detector_run(
             detector_type=registration.detector_type, camera_ids=registration.camera_ids,
             running_mode=RUNNING_MODES[registration.mode.value],
@@ -262,7 +272,8 @@ class InferenceService:
                         results = client._run.process_batch({
                             camera: Frame(image, frame_index=request.frame_number, timestamp_ms=request.timestamps_ms[camera])
                             for camera, image in request.images.items()})
-                        observations = observations_from_results(results, client._run.output_schema,
+                        observations = results if client.registration.legacy_tracker_benchmark else observations_from_results(  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark): keep only the observations_from_results call.
+                                                                 results, client._run.output_schema,
                                                                  client.registration.detector_type,
                                                                  client.registration.rtmpose_confidence_threshold)
                     if observations.keys() != pending.request.images.keys():

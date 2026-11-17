@@ -7758,6 +7758,11 @@
             ],
             "title": "Execution Device"
           },
+          "legacy_tracker_benchmark": {
+            "type": "boolean",
+            "title": "Legacy Tracker Benchmark",
+            "default": false
+          },
           "debug_draw_bboxes": {
             "type": "boolean",
             "title": "Debug Draw Bboxes",

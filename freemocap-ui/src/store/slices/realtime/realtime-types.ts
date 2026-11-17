@@ -27,6 +27,8 @@ export interface RealtimeSkeletonInferenceNodeConfig {
     execution_provider?: ExecutionProviderName | null;
     /** A skellytracker device key of the chosen EP; null = skellytracker's choice. */
     execution_device?: string | null;
+    /** The old skellytracker Tracker (YOLOX + RTMW) on cpu or cuda, to compare it with 2.0; realtime only. */ // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    legacy_tracker_benchmark?: boolean; // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
 }
 
 export interface RealtimeAggregatorNodeConfig {

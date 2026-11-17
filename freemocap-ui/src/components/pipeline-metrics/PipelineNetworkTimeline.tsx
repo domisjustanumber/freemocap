@@ -97,7 +97,7 @@ const TimelineRow = memo(function TimelineRow({row, visibleWindow, selected, onS
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
                     {row.label}
                 </span>
-                {row.engine && <span title="skellytracker 2.0 span" style={{fontSize: '0.6rem', color: 'var(--blue-300)',
+                {row.engine && <span title={`skellytracker ${row.engine} span`} style={{fontSize: '0.6rem', color: 'var(--blue-300)',
                     border: '1px solid var(--blue-700)', borderRadius: 3, padding: '0 3px'}}>{row.engine}</span>}
             </div>
             <div style={{flex: 1, position: 'relative', height: '100%', paddingRight: CHART_PADDING_RIGHT, minWidth: 0, overflow: 'hidden'}}>

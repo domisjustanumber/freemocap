@@ -3312,6 +3312,11 @@ export interface components {
             /** Execution Device */
             execution_device?: string | null;
             /**
+             * Legacy Tracker Benchmark
+             * @default false
+             */
+            legacy_tracker_benchmark?: boolean;
+            /**
              * Debug Draw Bboxes
              * @default false
              */

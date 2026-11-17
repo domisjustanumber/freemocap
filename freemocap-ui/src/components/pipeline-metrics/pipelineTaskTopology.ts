@@ -5,14 +5,20 @@ const SKELETON_INFERENCE = 'skeleton_inference';
 const VIDEO_READ = 'video_read';
 export const PIPELINE_RUN_STAGE = 'pipeline.run';
 
-/** The engine that measured a row: skellytracker 2.0 spans, or null for freemocap's own stages.
- *  The legacy tracker path (PM commit 8) adds its own tag. */
-export type TimingEngine = '2.0' | null;
+/** The engine that measured a row: skellytracker 2.0 spans, the old Tracker's spans of the legacy tracker
+ *  benchmark, or null for freemocap's own stages. */
+export type TimingEngine = '2.0' | 'legacy' | null; // Deleted at skellytracker stage 2.4 (legacy tracker benchmark): the 'legacy' member.
 
 type EventShape = Pick<StoredPipelineTaskEvent, 'nodeKind' | 'stage'>;
 
+// The span names of the old skellytracker Tracker, and its `child_<stage>` spans. // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+const LEGACY_STAGES = new Set(['object_detection_infer', 'object_detection', 'bbox_reuse', 'bbox_smoothing', 'crop', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    'keypoint_detection_infer', 'keypoint_smoothing', 'keypoint_detection', 'keypoint_merge', 'keypoint_tracked_bbox']); // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+const isLegacyStage = (stage: string) => LEGACY_STAGES.has(stage) || stage.startsWith('child_'); // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+
 /** skellytracker 2.0 names its spans `<node_id>.<span>` (person.inference, crop.run) and `pipeline.run`. */
 export function timingEngine(event: EventShape): TimingEngine {
+    if (event.nodeKind === SKELETON_INFERENCE && isLegacyStage(event.stage)) return 'legacy'; // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
     return event.nodeKind === SKELETON_INFERENCE && event.stage.includes('.') ? '2.0' : null;
 }
 
@@ -35,6 +41,16 @@ export const PRETTY_STAGE_LABELS: Record<string, string> = {
     'skeleton_inference:pipeline.run': 'Tracker run (pipeline.run)',
     'camera:charuco_detection': 'Charuco detection',
     'video_read:graph.camera_batch_wait': 'Video read (all cameras)',
+    // A legacy row comparable with a 2.0 span names it; the others have no 2.0 counterpart. // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    'skeleton_inference:object_detection_infer': 'Person detection inference (compare person.inference)', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    'skeleton_inference:keypoint_detection_infer': 'Wholebody inference (compare wholebody.inference)', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    'skeleton_inference:bbox_reuse': 'Box reuse', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    'skeleton_inference:bbox_smoothing': 'Box smoothing', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    'skeleton_inference:crop': 'Crop', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    'skeleton_inference:keypoint_smoothing': 'Keypoint smoothing', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    'skeleton_inference:keypoint_detection': 'Keypoint decode and smoothing', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    'skeleton_inference:keypoint_merge': 'Keypoint merge', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    'skeleton_inference:keypoint_tracked_bbox': 'Box from keypoints', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
 };
 
 /** freemocap's skeleton stages in processing order; 2.0 node spans follow `pipeline.run` in the order they ran. */
@@ -47,6 +63,7 @@ const PREDICT_BATCH_CHILD_STAGES = new Set([PIPELINE_RUN_STAGE]);
 export function timelineIndent(event: EventShape): number {
     if (event.nodeKind !== SKELETON_INFERENCE) return 0;
     if (PREDICT_BATCH_CHILD_STAGES.has(event.stage)) return 1;
+    if (timingEngine(event) === 'legacy') return 1; // A legacy span runs inside predict_batch. // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
     return timingEngine(event) === '2.0' ? 2 : 0;
 }
 

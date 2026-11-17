@@ -48,6 +48,10 @@ export default function RealtimeProcessingSettings({onClose}: {onClose: () => vo
                     enabled => applyOrUpdatePipelineConfig({...pipelineConfig, camera_node_config: {...camera, skeleton_tracking_enabled: enabled}}))}/>
                 <DetectorSettingRows value={value} onChange={changeDetector} detectors={DETECTOR_OPTIONS}
                     providers={providers} context="realtime" rows="all"/>
+                {import.meta.env.DEV && value.detector === 'rtmpose' && <SettingRow label="Legacy tracker (benchmark)" info={{title: 'Legacy tracker (benchmark)', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+                    text: 'Development only. Run the old skellytracker Tracker (YOLOX and RTMW x-l 256x192) instead of the 2.0 pipeline, to compare their timing in the pipeline metrics window. It runs on CPU or CUDA: Auto and TensorRT RTX use CUDA when it is usable, else CPU. Its scores are the old raw scores.'}} // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+                    control={toggle('Legacy tracker (benchmark)', pipelineConfig.skeleton_inference_node_config.legacy_tracker_benchmark ?? false, enabled => applyOrUpdatePipelineConfig({ // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+                        ...pipelineConfig, skeleton_inference_node_config: {...pipelineConfig.skeleton_inference_node_config, legacy_tracker_benchmark: enabled}}))}/>} {/* Deleted at skellytracker stage 2.4 (legacy tracker benchmark). */}
                 <SettingRow label="Track Charuco board" info={{title: 'Track Charuco board', text: 'Detect the configured Charuco board alongside the person tracker.'}} control={toggle('Track Charuco board', camera.charuco_tracking_enabled,
                     enabled => applyOrUpdatePipelineConfig({...pipelineConfig, camera_node_config: {...camera, charuco_tracking_enabled: enabled}}))}/>
             </>},

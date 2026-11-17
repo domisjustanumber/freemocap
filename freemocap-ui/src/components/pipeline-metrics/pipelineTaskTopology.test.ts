@@ -43,3 +43,21 @@ test('rows put each parent directly above its children, in start order within a 
         'charuco_detection', 'frame_read', 'predict_batch', 'pipeline.run', 'person.inference', 'crop.run', 'wholebody.inference']);
     assert.deepEqual(ordered.slice(7).map(e => e.frameNumber), Array(7).fill(8));
 });
+
+// Deleted at skellytracker stage 2.4 (legacy tracker benchmark): this whole test.
+test('legacy spans are tagged legacy, nest inside predict_batch, and the comparable ones name their 2.0 span', () => {
+    const predict = `7:batch:skeleton_inference:predict_batch`;
+    const base = realtimeFrame(7).filter(e => !e.stage.includes('.'));
+    const legacy = [
+        {...base[2], task_id: `p1:7:batch:skeleton_inference:object_detection_infer`, stage: 'object_detection_infer', parent_task_ids: [predict]},
+        {...base[2], task_id: `p1:7:cam0:skeleton_inference:crop`, stage: 'crop', camera_id: 'cam0', parent_task_ids: [predict]},
+    ];
+    const events = [...base, ...legacy].map(toStoredEvent);
+    assert.deepEqual(events.slice(-2).map(e => [timingEngine(e), timelineIndent(e)]), [['legacy', 1], ['legacy', 1]]);
+    assert.equal(taskLabel(events.at(-2)!), 'F7 · Person detection inference (compare person.inference)');
+    assert.equal(taskLabel(events.at(-1)!), 'F7 · cam0 · Crop');
+    assert.equal(timingEngine({nodeKind: 'skeleton_inference', stage: 'child_hands'}), 'legacy');
+    assert.equal(timingEngine({nodeKind: 'skeleton_inference', stage: 'predict_batch'}), null);
+    const ordered = orderTasksParentsBeforeChildren(linkParents(events));
+    assert.deepEqual(ordered.map(e => e.stage).slice(1), ['frame_read', 'predict_batch', 'object_detection_infer', 'crop']);
+});

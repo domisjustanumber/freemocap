@@ -15,6 +15,9 @@ class RealtimeSkeletonInferenceNodeConfig(BaseModel):
     # A skellytracker device key of the chosen EP; None is skellytracker's choice. Auto ignores it.
     execution_device: str | None = None
 
+    # The old skellytracker Tracker (YOLOX + RTMW x-l 256x192) on cpu or cuda, to compare it with 2.0; realtime only.  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    legacy_tracker_benchmark: bool = False  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+
     # When True, writes debug frames with bbox overlays to
     # {freemocap_data}/debug_bboxes/. (requires GPU mode)
     debug_draw_bboxes: bool = False

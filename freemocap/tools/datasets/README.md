@@ -347,14 +347,19 @@ required assets before an offline run.
 For one case:
 
 ```powershell
-python -B -m freemocap.tools.datasets.tracker_comparison test_data rtmpose_cuda --output .test-artifacts/tracker-matrix/new-cuda-run
+python -B -m freemocap.tools.datasets.tracker_comparison test_data rtmpose --execution-provider EP_KEY --output .test-artifacts/tracker-matrix/new-run
 ```
 
-Cases are `charuco_cpu`, `mediapipe_cpu`, `rtmpose_cpu`, `rtmpose_cuda`, and
-`mediapipe_cuda`. The last is explicitly **unsupported**: the installed MediaPipe
-detectors do not request a GPU delegate and expose no CUDA backend. ChArUco uses
-CPU. RTMPose checks actual ONNX session provider registration and fails if the
-requested provider is not first; this does not profile every kernel's placement.
+The detector is `charuco`, `mediapipe` or `rtmpose`; `--execution-provider` is a
+SkellyTracker EP key (default `cpu`; `skellytracker-eps status` lists the keys of
+this computer), and SkellyTracker refuses an unknown one. The matrix runs ChArUco
+and MediaPipe on CPU and RTMPose on every EP that SkellyTracker lists on this
+host, then compares each RTMPose EP with CPU. An EP that SkellyTracker lists as
+not usable is reported **unsupported** with its install hint, and so is any EP
+other than CPU for MediaPipe, which takes no EP. ChArUco runs outside the
+pipeline run and is unsupported. RTMPose checks the applied EP of each model that
+SkellyTracker reports and fails if it is not the requested one; this does not
+profile every kernel's placement.
 The matrix tests app-default configurations (RTMW-x-l 256×192 with YOLOX-m;
 MediaPipe body/hands/face; the default ChArUco board), not every model variant.
 
@@ -369,8 +374,8 @@ with that fallback [@skellytrackerBatchSessions2026].
 
 Comparisons include original camera timestamps, frame identity, stage structure,
 point names, bounding boxes, keypoints, visibility, and nonfinite masks. Same-backend
-absolute tolerance is 1e-6; exact difference counts are also shown. CPU/CUDA
-comparisons are separate descriptive reports, not acceptance verdicts. Aggregate
+absolute tolerance is 1e-6; exact difference counts are also shown. Comparisons
+of an EP with CPU are separate descriptive reports, not acceptance verdicts. Aggregate
 errors contain mixed units and must not be interpreted as pixel accuracy.
 
 Operation timing includes inference, setup, queue wait and camera batch wait.
@@ -391,12 +396,12 @@ triangulation and the canonical recording writer. Run it against a complete
 recording and an explicit existing calibration, using a fresh ignored directory:
 
 ```powershell
-python -B -m freemocap.tools.datasets.recording_comparison RECORDING_DIRECTORY --calibration CALIBRATION.toml --provider cuda --output .test-artifacts/recording-processing/new-run
+python -B -m freemocap.tools.datasets.recording_comparison RECORDING_DIRECTORY --calibration CALIBRATION.toml --provider EP_KEY --output .test-artifacts/recording-processing/new-run
 ```
 
 `report.txt` is the readable summary; `report.json` preserves configuration,
 software identity, matching fitness, inference timing and numerical comparisons.
-CPU is also accepted. Provider selection here is a request, not independent kernel
+`--provider` is a SkellyTracker EP key (default `cpu`). Provider selection here is a request, not independent kernel
 placement profiling. This command currently exercises RTMPose only; the broader
 detector matrix remains the tracking-boundary test above.
 

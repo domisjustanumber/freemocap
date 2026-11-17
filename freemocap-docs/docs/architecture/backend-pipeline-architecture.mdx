@@ -138,13 +138,13 @@ Each camera gets its own child process running a `CameraNode`:
 
 The **default** skeleton path (`use_centralized_inference=True`): a dedicated GPU worker doing batched inference for all cameras. See [Tracking Integration](/docs/architecture/tracking-integration) for how the tracker is built.
 
-1. **One CUDA context, one `OnnxSession` + `Tracker`** (built via `tracker_factory`) — avoids per-node GPU context switching overhead
+1. **One SkellyTracker run** on the chosen EP — avoids per-node GPU context switching overhead
 2. **Subscribes to `ProcessFrameNumberTopic`**, drains to the latest frame (drops stale frames when GPU falls behind)
 3. **Reads images directly** from per-camera ring buffers (read-only, no copy)
 4. **Calls `tracker.process_batch(images_dict)`** — one batched SkellyTracker call (one ONNX `session.run` per model) for all cameras at once
 5. **Publishes `SkeletonInferenceResultMessage`** — per-camera skeleton observations keyed by frame_number
-6. **GPU OOM recovery**: catches `MemoryError`, rebuilds session (up to 3 retries), skips the affected frame
-7. **TensorRT engine compilation** available when configured with execution provider `"trt"` (1–3 minutes on first run, cached on subsequent runs). The default execution provider is `"cuda"`.
+6. **GPU out of memory**: SkellyTracker closes the run with an out-of-VRAM error; start processing again
+7. **Execution provider**: Auto (SkellyTracker's recommendation) unless the user picks one of the EPs SkellyTracker lists; see [GPU & ONNX Setup](/docs/guides/gpu-setup)
 
 ### RealtimeAggregatorNode (`realtime_aggregator_node.py`, ~621 lines)
 

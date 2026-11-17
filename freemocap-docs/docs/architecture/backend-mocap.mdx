@@ -27,15 +27,15 @@ RTMPose is a top-down pose estimation model from MMPose, running via ONNX Runtim
 
 | Mode | Where it runs | Tradeoff |
 |---|---|---|
-| **Centralized GPU** (realtime default) | `RealtimeSkeletonInferenceNode` batches all cameras | One CUDA context, one `OnnxSession`, batched `process_batch`, lower latency |
+| **Centralized GPU** (realtime default) | `RealtimeSkeletonInferenceNode` batches all cameras | One SkellyTracker run on the chosen EP, batched `process_batch`, lower latency |
 | **Inline** (per-camera fallback / posthoc) | Each CameraNode/VideoNode runs its own `Tracker` | Simpler, no inter-camera dependency, higher total GPU memory |
 
 In centralized GPU mode (the realtime default):
 - CameraNodes skip skeleton detection entirely (they still run ChArUco on CPU)
 - `RealtimeSkeletonInferenceNode` reads raw frames from all camera ring buffers
 - Calls `tracker.process_batch(images_dict)` — one batched SkellyTracker call (one ONNX `session.run` per model) for all cameras simultaneously
-- TensorRT engine compilation on first run (1–3 minutes, cached)
-- GPU OOM recovery: catches `MemoryError`, rebuilds session (up to 3 retries)
+- The execution provider is Auto (SkellyTracker's recommendation) unless the user picks one of the EPs SkellyTracker lists; see [GPU & ONNX Setup](/docs/guides/gpu-setup)
+- GPU out of memory: SkellyTracker closes the run with an out-of-VRAM error; start processing again
 
 ### CharUco Detection
 

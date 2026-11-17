@@ -88,9 +88,9 @@ private copies of both prepared recordings. They verify numerical outputs,
 timestamps, provenance, and that the source recordings remain unchanged.
 
 The tracker matrix in the dataset commands checks default ChArUco, MediaPipe CPU,
-and RTMPose CPU/CUDA configurations at the tracking boundary. It does not certify
-full pipeline reruns across different detector models. MediaPipe CUDA is explicitly
-unsupported. Saved-stage replay retains recorded model definitions;
+and RTMPose on each EP that SkellyTracker lists on this host, at the tracking
+boundary. It does not certify full pipeline reruns across different detector
+models. MediaPipe takes no EP. Saved-stage replay retains recorded model definitions;
 changing a tracker requires new observations rather than relabeling existing data.
 
 Wide CSV and diagnostic tall CSV use this same prepared root:

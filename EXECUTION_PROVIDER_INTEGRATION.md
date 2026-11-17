@@ -23,10 +23,11 @@ Post-hoc `executionProvider` selects the ONNX provider for both pipeline
 implementations. The graph-only UI selector and `graphExecutionProvider` were
 removed; older requests that name it still load and ignore it. Hidden ONNX settings do not select a MediaPipe device.
 
-Automatic defaults are unchanged: graph RTMW processing chooses CUDA when
-advertised, otherwise CPU; graph MediaPipe uses CPU. Live and older post-hoc
-RTMW processing delegate Auto to Tracker. This integration does not tune these
-policies or alter model precision.
+Since skellytracker 2.0, Auto is skellytracker's recommendation for this host in
+live and post-hoc processing, and the EP keys, labels and descriptions come from
+skellytracker at run time; FreeMoCap keeps no EP list (see
+[GPU & ONNX Setup](freemocap-docs/docs/guides/gpu-setup.mdx)). MediaPipe takes
+no EP. This integration does not tune these policies or alter model precision.
 
 Core continues using Tracker's registry requests, its own ONNX construction
 lock and the existing `SharedSessionPool`. Sessions are not allocated by the

@@ -15,7 +15,7 @@ unified `Tracker → Session → Detector` API and owns **batched multi-camera
 inference**. This page documents the seam: how the FreeMoCap backend builds and
 drives SkellyTracker `Tracker`s.
 
-<Tip shortInfo="SkellyTracker has its own docs at freemocap.github.io/skellytracker. It owns the detector implementations (MediaPipe, RTMPose, YOLOX, ArUco, ChArUco), the ONNX/CoreML sessions, temporal smoothing, and the batched process_batch() inference call. FreeMoCap orchestrates it across cameras and consumes the resulting Observations." />
+<Tip shortInfo="SkellyTracker has its own docs at freemocap.github.io/skellytracker. It owns the detector implementations (MediaPipe, RTMPose, YOLOX, ArUco, ChArUco), the ONNX sessions and execution providers, temporal smoothing, and the batched process_batch() inference call. FreeMoCap orchestrates it across cameras and consumes the resulting Observations." />
 
 ## The bridge: `tracker_factory.py`
 
@@ -86,7 +86,7 @@ These are sent as a `TrackerSchemasMessage` over the WebSocket. See the
 | Concern | Owner |
 |---|---|
 | Detector implementations (MediaPipe, RTMPose, YOLOX, ArUco, ChArUco) | SkellyTracker |
-| ONNX / CoreML sessions, execution-provider selection | SkellyTracker |
+| ONNX sessions, execution providers and their selection | SkellyTracker |
 | Batched multi-camera inference (`process_batch` / `run_batched`) | SkellyTracker |
 | Temporal smoothing (bbox policy, keypoint filtering) | SkellyTracker |
 | Building/configuring trackers for FreeMoCap's needs (`tracker_factory`) | FreeMoCap |

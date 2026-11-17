@@ -21,7 +21,7 @@ retention, compatibility, and reproducible validation.
    - Windows: `.venv/bin/activate`
    - Mac/Linux: `source .venv/bin/activate`
 6. Install dependencies
-  - `uv sync` — one install for every system: skellytracker with the CPU ONNX Runtime; GPU execution providers (CUDA, TensorRT RTX, CoreML) come from skellytracker's EP packs at runtime
+  - `uv sync` — one install for every system: skellytracker with the CPU ONNX Runtime; GPU execution providers come from skellytracker's EP packs at runtime (the in-app EP menu and `skellytracker-eps status` list this computer's)
 ### React GUI
 0. Install Node.js
    - https://nodejs.org/en/download/
@@ -167,9 +167,10 @@ uv sync
 This installs `skellytracker` with the CPU ONNX Runtime on every system; GPU
 execution providers come from skellytracker's EP packs at runtime.
 The dependencies are declared in `pyproject.toml` and locked in `uv.lock`.
-Auto and older saved TensorRT selections use CUDA when available, with the
-existing platform fallback otherwise. Explicit CPU selections remain CPU.
-There is no background TensorRT preparation or automatic provider switching.
+Auto uses skellytracker's recommendation for this computer; an explicit choice
+is passed to skellytracker as is. An EP saved by an earlier FreeMoCap version is
+replaced by the key skellytracker suggests, or by Auto, with a notice.
+See [GPU & ONNX Setup](freemocap-docs/docs/guides/gpu-setup.mdx).
 
 The **Realtime processing** toolbar button starts and stops processing. During
 startup it shows the current stage and a spinner; click it to cancel startup.

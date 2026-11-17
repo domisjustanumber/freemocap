@@ -1,6 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {PipelineNetworkTimeline} from '@/components/pipeline-metrics/PipelineNetworkTimeline';
-import {buildTimelineViewModel} from '@/components/pipeline-metrics/pipelineTimelineModel';
+import {buildTimelineViewModel, TIMELINE_MIN_BAR_MS} from '@/components/pipeline-metrics/pipelineTimelineModel';
 import {stageLabel, timingEngine} from '@/components/pipeline-metrics/pipelineTaskTopology';
 import {metricsState, type MetricsState, requestedRunKey, runLabel, sortStages} from '@/components/pipeline-metrics/pipelineMetricsState';
 import {feedPipelineTimingStore, PipelineTimingStore} from '@/services/server/server-helpers/pipeline-timing-store';
@@ -204,7 +204,7 @@ export function RunSummary({run}: {run: RunTimingSnapshot}): React.ReactElement 
             </table>}
             <p className="text sm" style={{color: 'var(--gray-500)'}}>
                 FPS is 1000 ÷ the stage's mean ms/frame: the rate that stage alone would allow, not the pipeline's frame rate.
-                The timeline shows the newest {PIPELINE_TIMELINE_FRAME_WINDOW} frames.
+                The timeline shows the newest {PIPELINE_TIMELINE_FRAME_WINDOW} frames and hides bars shorter than {TIMELINE_MIN_BAR_MS} ms.
             </p>
         </div>
     );

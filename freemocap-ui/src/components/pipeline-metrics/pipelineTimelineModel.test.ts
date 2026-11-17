@@ -29,6 +29,22 @@ test('the timeline keeps the newest five frames, nests rows under their parent s
     assert.deepEqual(edgeTo('p1:7:batch:skeleton_inference:pipeline.run'), ['7:batch:skeleton_inference:predict_batch']);
 });
 
+test('bars shorter than 0.5 ms are not rows, and no edge points at a hidden row', () => {
+    const run = 'p1:9:batch:skeleton_inference:pipeline.run';
+    const short = (stage: string, startMs: number, endMs: number, parents: string[]) => ({...realtimeFrame(9)[0],
+        task_id: `p1:9:batch:skeleton_inference:${stage}`, parent_task_ids: parents, stage, node_kind: 'skeleton_inference',
+        camera_id: null, start_time_ns: startMs * 1_000_000, end_time_ns: endMs * 1_000_000, duration_ms: endMs - startMs});
+    // A 0.2 ms middle row with a child of its own, and a 0.4 ms leaf under pipeline.run (3-19 ms).
+    const events = [...realtimeFrame(9), short('box.run', 5, 5.2, [run]), short('box.child', 5.05, 5.15, ['p1:9:batch:skeleton_inference:box.run']),
+        short('trigger.run', 3.1, 3.5, [run])].map(toStoredEvent);
+    const model = buildTimelineViewModel({events, configuredCameraFpsHz: 30});
+    const ids = new Set(model.rows.map(row => row.taskId));
+    assert.ok(!['box.run', 'box.child', 'trigger.run'].some(stage => ids.has(`p1:9:batch:skeleton_inference:${stage}`)));
+    assert.ok(ids.has(run) && ids.has('p1:9:batch:skeleton_inference:crop.run'), 'pipeline.run and a 1 ms bar stay');
+    assert.ok(model.edges.every(edge => ids.has(edge.fromTaskId) && ids.has(edge.toTaskId)
+        && model.rows[edge.fromRowIndex].taskId === edge.fromTaskId && model.rows[edge.toRowIndex].taskId === edge.toTaskId));
+});
+
 test('a frame slower than the window widens it by whole window steps', () => {
     const slow = realtimeFrame(9).map(event => event.stage === 'predict_batch' ? {...event, end_time_ns: 400 * 1_000_000} : event);
     const model = buildTimelineViewModel({events: slow.map(toStoredEvent), configuredCameraFpsHz: 30});

@@ -15,6 +15,8 @@ import {
 
 export const FALLBACK_FRAME_DURATION_MS = 1000 / 30;
 export const MIN_STARTUP_SCALE_FRAME_ANCHORS = 3;
+// Bars shorter than this are not drawn in the timeline (user V1); the stage table still shows these stages.
+export const TIMELINE_MIN_BAR_MS = 0.5;
 
 export interface TimelineRowView {
     taskId: string;
@@ -111,7 +113,8 @@ export function buildTimelineViewModel(params: {
     const spanMs = windowEvents.length > 0 ? Math.max(...windowEvents.map(e => e.endMs)) - windowStartMs : 0;
     const windowDurationMs = Math.max(1, Math.ceil(spanMs / step)) * step;
 
-    const ordered = orderTasksParentsBeforeChildren(linkParents(windowEvents));
+    // Link and order with every event, then drop the short ones: an edge or parent span to a hidden row is left out.
+    const ordered = orderTasksParentsBeforeChildren(linkParents(windowEvents)).filter(event => event.durationMs >= TIMELINE_MIN_BAR_MS);
     const byId = new Map(ordered.map(event => [event.taskId, event]));
     const rows: TimelineRowView[] = ordered.map(event => {
         const parent = event.parentTaskIds.map(id => byId.get(id)).find(Boolean);

@@ -50,8 +50,8 @@ def _model_specs() -> list:
     except ModuleNotFoundError as error:
         if error.name != "onnx":
             raise
-        raise RuntimeError("The legacy tracker benchmark needs the onnx package (skellytracker's onnx extra) "
-                           "for the old YOLOX dynamic batch; it is not installed.") from error
+        raise RuntimeError("The legacy tracker benchmark needs the onnx package for the old YOLOX dynamic batch; it is "
+                           "in freemocap's dev dependency group (uv sync --group dev), which is not installed here.") from error
     return [YoloxPersonDetector.model_spec(YOLOX_MODEL), RTMPoseKeypointDetector.model_spec(RTMW_MODEL)]
 
 

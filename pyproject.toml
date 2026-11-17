@@ -151,6 +151,9 @@ dev = [
     "pyinstaller>=6.15.0",
     "ruff>=0.9.0",
     "poethepoet>=0.32.0",
+    # The legacy tracker benchmark only (the old YOLOX dynamic batch); the pin of skellytracker's onnx extra.
+    # Deleted with the legacy tracker benchmark at skellytracker stage 2.4 (user ruling D1 a).
+    "onnx==1.22.0",
 ]
 # Poe the Poet tasks live in poe_tasks.toml
 # Run with:   uv run poe <task-name>       (e.g. uv run poe update)

@@ -4,7 +4,8 @@ stream.
 
 Thin supervisor for one WebSocket connection: composes the message send path
 (SendSerializer + FrameRelay) with the log relay, the app-state sender, the
-posthoc-progress sender, and the inbound client-message handler (display sizes). The FrameRelay
+posthoc-progress sender, the pipeline-timing sender, and the inbound client-message handler
+(display sizes, pipeline-timing interest). The FrameRelay
 is the ONE consumer of the pipeline's aggregator output; the camera images ride
 each frame message's image field. Flow control is newest-wins — there is no ack
 window; the inbound frameAcknowledgment carries displayImageSizes only (they
@@ -31,8 +32,9 @@ from skellycam.core.camera.config.camera_config import CameraConfigs
 from skellylogs.handlers.websocket_log_queue_handler import MIN_LOG_LEVEL_FOR_WEBSOCKET
 from starlette.websockets import WebSocket, WebSocketState, WebSocketDisconnect
 
-from freemocap.api.websocket.client_messages import ClientMessageError, FrameAcknowledgment
+from freemocap.api.websocket.client_messages import ClientMessageError, FrameAcknowledgment, PipelineTimingInterest
 from freemocap.api.websocket.frame_relay import FrameRelay
+from freemocap.core.streaming.pipeline_timing_relay import PIPELINE_TIMING_INTERVAL_S
 from freemocap.api.websocket.send_serializer import SendSerializer
 from freemocap.app.freemocap_application import FreemocapApplication, get_freemocap_app
 from freemocap.core.pipeline.realtime.camera_node_config import DEFAULT_DETECTOR_TYPE
@@ -70,6 +72,9 @@ _CAMERA_ROTATION_BY_CONFIG = {
 
 
 class WebsocketServer:
+    # Set by this connection's own interest message; a new connection starts without it.
+    _pipeline_timing_wanted: bool = False
+
     def __init__(self, fastapi_app: FastAPI, websocket: WebSocket):
         self.websocket = websocket
         if not hasattr(fastapi_app, "state") or not hasattr(fastapi_app.state, "global_kill_flag"):
@@ -508,6 +513,7 @@ class WebsocketServer:
             asyncio.create_task(self._client_message_handler(), name="WebsocketClientMessageHandler"),
             asyncio.create_task(self._app_state_sender(), name="WebsocketAppStateSender"),
             asyncio.create_task(self._posthoc_progress_sender(), name="WebsocketPosthocProgressSender"),
+            asyncio.create_task(self._pipeline_timing_sender(), name="WebsocketPipelineTimingSender"),
         ]
 
         try:
@@ -522,6 +528,7 @@ class WebsocketServer:
             raise
         finally:
             self._websocket_should_continue = False
+            self._set_pipeline_timing_wanted(False)
             for task in self.ws_tasks:
                 if not task.done():
                     task.cancel()
@@ -564,6 +571,37 @@ class WebsocketServer:
             logger.info("Client disconnected, ending posthoc-progress sender task...")
         except Exception as e:
             logger.exception(f"Error in posthoc-progress sender: {e.__class__}: {e}")
+            self._websocket_should_continue = False
+            raise
+
+    def _set_pipeline_timing_wanted(self, wanted: bool) -> None:
+        if wanted == self._pipeline_timing_wanted:
+            return
+        self._pipeline_timing_wanted = wanted
+        if wanted:
+            self._app.pipeline_timing_relay.add_interest(self)
+        else:
+            self._app.pipeline_timing_relay.remove_interest(self)
+
+    async def _pipeline_timing_sender(self) -> None:
+        """Send a copy of each new pipeline-timing build while this connection wants them."""
+        sent_build: int | None = None
+        try:
+            while self.should_continue:
+                if self._pipeline_timing_wanted:
+                    build, messages = self._app.pipeline_timing_relay.latest(
+                        self._app.realtime_pipeline_manager.pipelines)
+                    if build != sent_build:
+                        sent_build = build
+                        for message in messages:
+                            await self._serializer.send_message(message)
+                await asyncio.sleep(PIPELINE_TIMING_INTERVAL_S)
+        except asyncio.CancelledError:
+            pass
+        except WebSocketDisconnect:
+            logger.info("Client disconnected, ending pipeline-timing sender task...")
+        except Exception as e:
+            logger.exception(f"Error in pipeline-timing sender: {e.__class__}: {e}")
             self._websocket_should_continue = False
             raise
 
@@ -681,6 +719,9 @@ class WebsocketServer:
                                     raise ClientMessageError('Expected a JSON object')
                                 if "frameNumber" in data:
                                     self._display_image_sizes = FrameAcknowledgment.model_validate(data).display_sizes()
+                                elif "pipelineTiming" in data:
+                                    self._set_pipeline_timing_wanted(
+                                        PipelineTimingInterest.model_validate(data).pipelineTiming)
                                 else:
                                     logger.debug("Received unhandled JSON message: %s", list(data))
                             except (ValueError, TypeError) as error:

@@ -43,6 +43,8 @@ from freemocap.pubsub.pubsub_topics import (
     AggregationNodeOutputMessage,
     PipelineConfigUpdateMessage,
     PipelineConfigUpdateTopic,
+    PipelineTimingMessage,
+    PipelineTimingTopic,
     SkeletonFitterResetTopic,
 )
 
@@ -82,6 +84,7 @@ class RealtimePipeline:
     _pre_calibration_config: RealtimePipelineConfig | None = None
     _calibration_update_subscription: TopicSubscriptionQueue | None = None
     _calibration_update_task: asyncio.Task[LoadedCalibration] | None = None
+    _timing_subscription: TopicSubscriptionQueue | None = None
 
     @property
     def calibration_update_pending(self) -> bool:
@@ -503,6 +506,29 @@ class RealtimePipeline:
             self.result_consumed_event.set()
         latest = self._latest_aggregation_output
         return latest if latest is not None and latest.frame_number > if_newer_than else None
+
+    def drain_timing_messages(self) -> list[PipelineTimingMessage]:
+        """The timing messages published since the last drain.
+
+        The first call subscribes, so a reader that starts in the middle of a run gets the
+        messages from then on; `release_timing_subscription` ends it.
+        """
+        if self._timing_subscription is None:
+            self._timing_subscription = self.pubsub.get_subscription(PipelineTimingTopic)
+        messages: list[PipelineTimingMessage] = []
+        while True:
+            try:
+                messages.append(self._timing_subscription.get_nowait())
+            except Empty:
+                return messages
+            except (ValueError, OSError):
+                # The queue closed with its pipeline after the caller checked `alive`.
+                return messages
+
+    def release_timing_subscription(self) -> None:
+        if self._timing_subscription is not None:
+            self.pubsub.release_subscription(PipelineTimingTopic, self._timing_subscription)
+            self._timing_subscription = None
 
 
 def _shutdown_pipeline_nodes(*, ipc, nodes, pubsub) -> None:

@@ -1,5 +1,5 @@
 """Validate client display hints before they reach camera image scaling."""
-from pydantic import BaseModel, Field, FiniteFloat
+from pydantic import BaseModel, Field, FiniteFloat, StrictBool
 
 
 class ClientMessageError(ValueError):
@@ -18,3 +18,8 @@ class FrameAcknowledgment(BaseModel):
     def display_sizes(self) -> dict[str, dict[str, float]] | None:
         return {camera: size.model_dump() for camera, size in (self.displayImageSizes or {}).items()
                 if size.width > 0 and size.height > 0} or None
+
+
+class PipelineTimingInterest(BaseModel):
+    """Whether this connection wants pipeline timing messages; the client sends it again on every connect."""
+    pipelineTiming: StrictBool

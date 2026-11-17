@@ -36,6 +36,7 @@ from freemocap.core.pipeline.posthoc.progress_messages import PipelineProgressMe
 from freemocap.pubsub.pubsub_topics import AggregationNodeOutputMessage  # noqa: TC001 — beartype resolves the get_latest_aggregator_outputs return annotation at runtime
 from skelly_synchronize.core.models import SyncRequest
 from freemocap.core.streaming.outputs.manager import StreamingOutputManager
+from freemocap.core.streaming.pipeline_timing_relay import PipelineTimingRelay
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ class FreemocapApplication:
     sync_job_manager: SyncJobManager
     camera_group_manager: CameraBackendManager
     streaming_outputs: StreamingOutputManager = field(init=False)
+    pipeline_timing_relay: PipelineTimingRelay = field(default_factory=PipelineTimingRelay, init=False)
     startup_status: RealtimeStartupStatus = field(default_factory=RealtimeStartupStatus, init=False)
     _realtime_lifecycle_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
     _realtime_startup_operation: asyncio.Task | None = field(default=None, init=False, repr=False)

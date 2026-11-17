@@ -26,6 +26,7 @@ from freemocap.core.skeletons.rigid_object_geometry import RigidObjectGeometry
 from freemocap.core.pipeline.posthoc.task_snapshot import TaskRegistrySnapshot
 from freemocap.core.diagnostics.pipeline_diagnostics import PipelineDiagnostics
 from freemocap.core.types.channel_kind import ChannelKind
+from freemocap.pubsub.pubsub_topics import PipelineTimingEvent
 from skellyforge.core.data_tensors.layout_definitions import AxisDefinition, SourceIdentity, TensorLayout
 from skellycam.core.types.type_overloads import (
     CameraGroupIdString,
@@ -61,6 +62,7 @@ class MessageKind(StrEnum):
     FRAMERATE = "framerate"
     APP_STATE = "app_state"
     PROGRESS = "progress"
+    PIPELINE_TIMING = "pipeline_timing"
 
 
 class Units(StrEnum):
@@ -715,6 +717,33 @@ class ProgressMessage:
     kind: ClassVar[MessageKind] = MessageKind.PROGRESS
     snapshot: TaskRegistrySnapshot
     envelope: MessageEnvelope = field(default_factory=MessageEnvelope)
+
+
+@dataclass(frozen=True, slots=True)
+class PipelineTimingStreamMessage:
+    """One pipeline's timing, usable on its own: its identity and mode, the clock of its
+    nanosecond fields, the task events of its newest complete frames, the stage samples and
+    dropped-event count its nodes reported since the previous message was built, and the node lag.
+
+    Sent only to connections that asked for timing; the client replaces what it shows with it.
+    """
+    kind: ClassVar[MessageKind] = MessageKind.PIPELINE_TIMING
+    envelope: MessageEnvelope = field(default_factory=MessageEnvelope)
+    mode: str = "realtime"
+    pipeline_id: str = ""
+    camera_group_id: CameraGroupIdString = ""
+    realtime_pipeline_active: bool = False
+    log_pipeline_times_enabled: bool = False
+    configured_camera_fps_hz: float | None = None
+    per_node: dict[str, dict[str, list[float]]] = field(default_factory=dict)
+    per_camera: dict[str, dict[str, list[float]]] = field(default_factory=dict)
+    events: tuple[PipelineTimingEvent, ...] = ()
+    clock_domain: str = "perf_counter"
+    relay_perf_counter_ns: int = 0
+    dropped_timing_events: int = 0
+    node_lag: dict[str, int] = field(default_factory=dict)
+    incomplete_frames: tuple[int, ...] = ()
+    stale_nodes: tuple[str, ...] = ()
 
 
 # - Serialization -

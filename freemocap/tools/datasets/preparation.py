@@ -412,7 +412,9 @@ def prepare(dataset, *, recordings_root: Path, prepared_root: Path, fresh: bool,
         (recording / "charuco_board_info.json").write_text(json.dumps(report['board_metadata']), encoding='utf-8')
         request = {"recording": str(recording), "timeout": timeout,
                    "filtering_enabled": dataset.name == SAMPLE_DATA.name,
-                   "frames": report["videos"][0]["decoded_frames"], "fps": report["videos"][0]["nominal_fps"]}
+                   "frames": report["videos"][0]["decoded_frames"], "fps": report["videos"][0]["nominal_fps"],
+                   # Blender opens the promoted scene below; one opened inside scratch blocks its rename (user B2).
+                   "defer_blender_open": True}
         request_path = attempt / "request.json"
         request_path.write_text(json.dumps(request, indent=2), encoding="utf-8")
         environment = dict(os.environ, FREEMOCAP_BASE_FOLDER=str(attempt / "app-data"), PYTHONUTF8="1")
@@ -433,6 +435,9 @@ def prepare(dataset, *, recordings_root: Path, prepared_root: Path, fresh: bool,
         ready = {"identity": identity, "recording": str(current), "result": result}
         from .storage import save_current
         save_current(root, attempt, ready)
+        if request.get('output_profile', 'standard') == 'standard':
+            from freemocap.tools.datasets.blender_validation import open_promoted_recording
+            open_promoted_recording(current, request.get('blender_path'), close_after_open=True)
         return current
 
 

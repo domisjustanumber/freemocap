@@ -728,6 +728,14 @@ frames, each with `rtmpose` and with `mediapipe`.
     last runs 0.361 and 0.366), then the known rename WinError 5 with 1 Blender window (closed after).
   - RTMPose posthoc gate A (existing calibration): foot_support, person transform identical to gate3.
     RTMW 2D kept is unchanged at 87,723; the 1,070 extra kept OVERLAY_2D points are ChArUco/ArUco points.
+- B2 = A DONE (2026-11-17, user): the rename WinError 5 of `test_fresh_posthoc.py` is fixed in the test tooling
+  only. `prepare()` (`tools/datasets/preparation.py`) sends `defer_blender_open: True`, so the app does not start
+  Blender inside `scratch/`, and after `save_current` opens the promoted scene for the standard profile with
+  `open_promoted_recording(current, ..., close_after_open=True)`, as `workflow.py` does. Cause as reviewed: the
+  Blender GUI started with its cwd in `scratch/` (`core/blender/export_to_blender.py`) and nobody waited for it,
+  so `candidate.rename(current)` (`storage.py:78`) failed; the Windows part is not proven. The app renames no
+  recording folder. The `test_recording_preparation.py` fixture stubs the open and checks the request and the
+  promoted path. Proof: `test_fresh_posthoc.py` passed once (78 s, calibration 0.360 px), no Blender process left.
 
 ### 0.4 Open questions
 

@@ -88,12 +88,15 @@ def lifecycle(tmp_path, monkeypatch):
     monkeypatch.setattr(preparation, "inspect_recording", lambda *a, **kw: report)
     monkeypatch.setattr(preparation, "software_identity", lambda: {"revision": "first"})
     monkeypatch.setattr(preparation, "validate_parquet", lambda *a, **kw: {})
+    from freemocap.tools.datasets import blender_validation
+    monkeypatch.setattr(blender_validation, "open_promoted_recording", Mock(return_value={'opened': True, 'closed': True}))
     calls = []
 
     def worker(command, *, environment, log_path, timeout):
         from pathlib import Path
         request = json.loads(Path(command[-1]).read_text())
         recording = Path(request["recording"])
+        assert request["defer_blender_open"] is True
         assert not (recording / f"{recording.name}_data.parquet").exists()
         calls.append(recording)
         parquet = recording / f"{recording.name}_data.parquet"
@@ -131,6 +134,10 @@ def test_fresh_runs_replace_results_and_retain_one_comparison(lifecycle, monkeyp
     assert not (args["prepared_root"] / TEST_DATA.name / "scratch").exists()
     assert (raw / "synchronized_videos" / "camera.mp4").read_bytes() == b"original input"
     assert (args["prepared_root"].parent / preparation.WARNING_FILENAME).is_file()
+    # Blender opens each promoted scene, never the scratch one, and closes itself (user B2).
+    from freemocap.tools.datasets.blender_validation import open_promoted_recording
+    assert [c.args[0] for c in open_promoted_recording.call_args_list] == [current, current]
+    assert all(c.kwargs == {'close_after_open': True} for c in open_promoted_recording.call_args_list)
 
 
 def test_failure_preserves_prepared_data_and_next_run_removes_stale_outputs(lifecycle, monkeypatch):

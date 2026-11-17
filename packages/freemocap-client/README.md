@@ -76,9 +76,10 @@ filesystem paths are not automatically downloadable URLs.
 
 ## Streaming and ownership
 
-The stream starts disconnected. It supports `frame`, `log`, `framerate`, `app_state`
-and `progress`; raw validated messages and resolved frame/metadata subscriptions
-are available. Progress uses `snapshot.server_instance_id` and `snapshot.revision`.
+The stream starts disconnected. It supports `frame`, `log`, `framerate`, `app_state`,
+`progress` and `pipeline_timing`; raw validated messages and resolved frame/metadata
+subscriptions are available. The server sends `pipeline_timing` only to a connection
+that asks; `subscribeToPipelineTiming` asks on every connect while it has a subscriber. Progress uses `snapshot.server_instance_id` and `snapshot.revision`.
 Do not treat default envelope counters as universal ordering or wall-clock guarantees.
 
 Every frame carries its descriptors. Metadata identity reuse is an optimization,

@@ -371,6 +371,37 @@ export const TaskRegistrySnapshotSchema = z.object({
 });
 export type TaskRegistrySnapshot = z.infer<typeof TaskRegistrySnapshotSchema>;
 export const ProgressMessageSchema = z.object({kind: z.literal('progress'), ...ENVELOPE, snapshot: TaskRegistrySnapshotSchema});
+
+// shortcut: perf_counter nanoseconds arrive as CBOR uint64, a bigint from cbor-x once past 2^32, and are read
+// as numbers, exact below 2^53 ns (about 104 days of server uptime); keep them bigint if longer uptimes matter.
+const NanosecondsSchema = z.union([z.number().int().nonnegative(), z.bigint().nonnegative()]).transform(Number);
+const StageSamplesSchema = z.record(z.string(), z.record(z.string(), z.array(z.number())));
+/** One measured span of one pipeline task. The server leaves out null fields. */
+export const PipelineTimingEventSchema = z.object({
+  task_id: z.string(), parent_task_ids: z.array(z.string()), stage: z.string(), node_kind: z.string(),
+  camera_id: z.string().nullable().default(null), frame_number: z.number().int().nullable().default(null),
+  start_time_ns: NanosecondsSchema, end_time_ns: NanosecondsSchema, duration_ms: z.number().finite(),
+  batch_index: z.number().int().nullable().default(null), batch_size: z.number().int().nullable().default(null),
+});
+/** One pipeline's timing, usable on its own; sent only to a connection that asked for it. */
+export const PipelineTimingMessageSchema = z.object({
+  kind: z.literal('pipeline_timing'), ...ENVELOPE,
+  mode: z.enum(['realtime', 'posthoc']), pipeline_id: z.string(), camera_group_id: z.string(),
+  realtime_pipeline_active: z.boolean(), log_pipeline_times_enabled: z.boolean(),
+  configured_camera_fps_hz: z.number().positive().nullable().default(null),
+  /** Stage samples the nodes reported since the previous message was built. */
+  per_node: StageSamplesSchema, per_camera: StageSamplesSchema,
+  /** The task events of the newest complete frames. */
+  events: z.array(PipelineTimingEventSchema),
+  clock_domain: z.string().min(1), relay_perf_counter_ns: NanosecondsSchema,
+  /** Events the nodes dropped since the previous message was built; not a running total. */
+  dropped_timing_events: z.number().int().nonnegative(),
+  node_lag: z.record(z.string(), z.number().int().nonnegative()),
+  incomplete_frames: z.array(z.number().int()), stale_nodes: z.array(z.string()),
+});
+export type PipelineTimingEvent = z.infer<typeof PipelineTimingEventSchema>;
+export type PipelineTimingMessage = z.infer<typeof PipelineTimingMessageSchema>;
+
 export type CoordinateConvention = z.infer<typeof CoordinateConventionSchema>;
 export type CameraIntrinsics = z.infer<typeof CameraIntrinsicsSchema>;
 export type CameraExtrinsics = z.infer<typeof CameraExtrinsicsSchema>;
@@ -389,6 +420,7 @@ export const MessageSchema = z.discriminatedUnion("kind", [
   FramerateMessageSchema,
   AppStateMessageSchema,
   ProgressMessageSchema,
+  PipelineTimingMessageSchema,
 ]);
 export type Message = z.infer<typeof MessageSchema>;
 export type MessageKind = Message["kind"];

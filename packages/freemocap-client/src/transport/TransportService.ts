@@ -10,6 +10,8 @@ import {snapshotEqual} from './snapshot-equality.js';
 //   framerate → FramerateStore via framerate subscribers
 //   app_state → connection slice via app-state subscribers
 //   progress  → pipeline slices via progress subscribers
+//   pipeline_timing → timing subscribers; sent only while one is subscribed, and
+//               declared again on every connect (the declaration is per connection)
 //   kinds registered by the application (options.kinds) → their own subscribers
 //
 // Plain TS class — no React, no Redux. The ServerContextProvider subscribes to
@@ -39,6 +41,7 @@ import type {
     FrameMessage,
     ModelDefinition,
     ProgressMessage,
+    PipelineTimingMessage,
     Message,
 } from "./message-contract.js";
 import type { LogRecord } from "./log-record.js";
@@ -62,6 +65,7 @@ export type LogCallback = (record: LogRecord) => void;
 export type FramerateCallback = (message: FramerateMessage) => void;
 export type AppStateCallback = (message: AppStateMessage) => void;
 export type ProgressCallback = (message: ProgressMessage) => void;
+export type PipelineTimingCallback = (message: PipelineTimingMessage) => void;
 
 export interface TransportServiceOptions<Kinds extends ApplicationKinds = {}> {
     url: string;
@@ -137,6 +141,7 @@ export class TransportService<Kinds extends ApplicationKinds = {}> {
     private readonly framerateSubscribers = new Set<FramerateCallback>();
     private readonly appStateSubscribers = new Set<AppStateCallback>();
     private readonly progressSubscribers = new Set<ProgressCallback>();
+    private readonly pipelineTimingSubscribers = new Set<PipelineTimingCallback>();
 
     constructor(options: TransportServiceOptions<Kinds>) {
         const kinds = options.kinds ?? ({} as Kinds);
@@ -154,6 +159,8 @@ export class TransportService<Kinds extends ApplicationKinds = {}> {
             catch (error) { fanOut(this.protocolErrors, error); }
         });
         this.connection.on("close", () => this.reset());
+        // The server keeps timing interest per connection, so each new connection declares it again.
+        this.connection.on("open", () => { if (this.pipelineTimingSubscribers.size) this.connection.send({pipelineTiming: true}); });
     }
 
     // ── inbound demux ────────────────────────────────────────────────────
@@ -199,6 +206,9 @@ export class TransportService<Kinds extends ApplicationKinds = {}> {
                 break;
             case "progress":
                 fanOut(this.progressSubscribers, message);
+                break;
+            case "pipeline_timing":
+                fanOut(this.pipelineTimingSubscribers, message);
                 break;
         }
     }
@@ -366,6 +376,17 @@ export class TransportService<Kinds extends ApplicationKinds = {}> {
     subscribeToProgress(cb: ProgressCallback): () => void {
         this.progressSubscribers.add(cb);
         return () => this.progressSubscribers.delete(cb);
+    }
+
+    /** Pipeline timing messages. While any callback is subscribed, every connection asks the
+     *  server for them when it opens; the last unsubscribe tells the open connection to stop. */
+    subscribeToPipelineTiming(cb: PipelineTimingCallback): () => void {
+        if (!this.pipelineTimingSubscribers.size && this.connection.isConnected()) this.connection.send({pipelineTiming: true});
+        this.pipelineTimingSubscribers.add(cb);
+        return () => {
+            if (this.pipelineTimingSubscribers.delete(cb) && !this.pipelineTimingSubscribers.size
+                && this.connection.isConnected()) this.connection.send({pipelineTiming: false});
+        };
     }
 
     /** Messages of one kind registered through `options.kinds`, validated by its parser.

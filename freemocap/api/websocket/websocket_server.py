@@ -5,7 +5,7 @@ stream.
 Thin supervisor for one WebSocket connection: composes the message send path
 (SendSerializer + FrameRelay) with the log relay, the app-state sender, the
 posthoc-progress sender, the pipeline-timing sender, and the inbound client-message handler
-(display sizes, pipeline-timing interest). The FrameRelay
+(display sizes, pipeline-timing and frames interest). The FrameRelay
 is the ONE consumer of the pipeline's aggregator output; the camera images ride
 each frame message's image field. Flow control is newest-wins — there is no ack
 window; the inbound frameAcknowledgment carries displayImageSizes only (they
@@ -32,7 +32,7 @@ from skellycam.core.camera.config.camera_config import CameraConfigs
 from skellylogs.handlers.websocket_log_queue_handler import MIN_LOG_LEVEL_FOR_WEBSOCKET
 from starlette.websockets import WebSocket, WebSocketState, WebSocketDisconnect
 
-from freemocap.api.websocket.client_messages import ClientMessageError, FrameAcknowledgment, PipelineTimingInterest
+from freemocap.api.websocket.client_messages import ClientMessageError, FrameAcknowledgment, FramesInterest, PipelineTimingInterest
 from freemocap.api.websocket.frame_relay import FrameRelay
 from freemocap.core.streaming.pipeline_timing_relay import PIPELINE_TIMING_INTERVAL_S
 from freemocap.api.websocket.send_serializer import SendSerializer
@@ -722,6 +722,8 @@ class WebsocketServer:
                                 elif "pipelineTiming" in data:
                                     self._set_pipeline_timing_wanted(
                                         PipelineTimingInterest.model_validate(data).pipelineTiming)
+                                elif "frames" in data:
+                                    self._relay.frames_wanted = FramesInterest.model_validate(data).frames
                                 else:
                                     logger.debug("Received unhandled JSON message: %s", list(data))
                             except (ValueError, TypeError) as error:

@@ -73,7 +73,8 @@ export default function PipelineMetricsWindowPage(): React.ReactElement {
     // One more transport client, like the main window: it reconnects by itself and asks for timing on every connect.
     useEffect(() => {
         applySavedServer();
-        const transport = new TransportService({url: serverUrls.getWebSocketUrl()});
+        // It draws no camera images, so it declines frames: the server then skips their JPEG, compose and encode work.
+        const transport = new TransportService({url: serverUrls.getWebSocketUrl(), frames: false});
         const onState = (state: ConnectionState) => setConnected(state === ConnectionState.CONNECTED);
         transport.on('state-change', onState);
         const stopFeed = feedPipelineTimingStore(transport, store);

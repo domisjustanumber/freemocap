@@ -79,7 +79,7 @@ filesystem paths are not automatically downloadable URLs.
 The stream starts disconnected. It supports `frame`, `log`, `framerate`, `app_state`,
 `progress` and `pipeline_timing`; raw validated messages and resolved frame/metadata
 subscriptions are available. The server sends `pipeline_timing` only to a connection
-that asks; `subscribeToPipelineTiming` asks on every connect while it has a subscriber. Progress uses `snapshot.server_instance_id` and `snapshot.revision`.
+that asks; `subscribeToPipelineTiming` asks on every connect while it has a subscriber. A client that draws no frames passes `frames: false`: it declines frame messages on every connect, and the server does no frame work (image, compose, encode) for that connection. A client that draws no frames passes `frames: false`: it declines frame messages on every connect, and the server does no frame work (image, compose, encode) for that connection. Progress uses `snapshot.server_instance_id` and `snapshot.revision`.
 Do not treat default envelope counters as universal ordering or wall-clock guarantees.
 
 Every frame carries its descriptors. Metadata identity reuse is an optimization,

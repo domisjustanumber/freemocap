@@ -1,6 +1,7 @@
-"""The pipeline-timing message, its shared reader and the per-connection interest that gates it."""
+"""The pipeline-timing message, its shared reader and the per-connection interests that gate it and frames."""
 import asyncio
 import multiprocessing
+import threading
 import time
 from queue import Queue
 from types import SimpleNamespace
@@ -12,12 +13,15 @@ from fastapi.testclient import TestClient
 from skellycam.core.camera.config.camera_config import CameraConfig
 
 from freemocap.api.websocket import websocket_connect
+from freemocap.api.websocket.frame_relay import FrameRelay
 from freemocap.api.websocket.send_serializer import SendSerializer
 from freemocap.api.websocket.websocket_server import WebsocketServer
 from freemocap.core.pipeline.posthoc.calibration_pipeline import CalibrationPipeline
 from freemocap.core.pipeline.posthoc.mocap_pipeline import MocapPipeline, new_timing_records
 from freemocap.core.pipeline.posthoc.task_snapshot import TaskRegistry
 from freemocap.core.pipeline.realtime.realtime_pipeline import RealtimePipeline
+from freemocap.core.streaming.message_composer import compose_messages
+from freemocap.core.streaming.producers.producer_contexts import FrameContext, StreamContext
 from freemocap.core.streaming.message_model import (
     MessageEnvelope,
     PipelineTimingStreamMessage,
@@ -260,6 +264,59 @@ def test_an_invalid_interest_closes_only_that_connection(monkeypatch, pubsub):
         else:
             pytest.fail("The invalid client was not closed")
     assert not relay._interested and not app.state.global_kill_flag.value
+
+
+def test_a_connection_that_declines_frames_gets_none_and_costs_no_frame_work(monkeypatch, pubsub):
+    pipeline, relay = _pipeline(pubsub), PipelineTimingRelay()
+    app, timing_server = _timing_app(pipeline, relay)
+    started, produced = threading.Event(), []
+
+    def connection_server(*, websocket, fastapi_app):
+        server, index = timing_server(websocket=websocket, fastapi_app=fastapi_app), len(produced)
+        produced.append(0)
+
+        async def source():
+            # Each call is one frame's work (the real source resizes and encodes every camera's JPEG).
+            if not started.is_set():
+                await asyncio.sleep(0.01)
+                return None
+            produced[index] += 1
+            await asyncio.sleep(0.02)
+            return FrameContext(frame_number=produced[index], timestamp=0.0, image_payload=b"jpeg")
+        server._relay = FrameRelay(serializer=server._serializer, source=source, connection_id=str(index),
+                                   should_continue=lambda: server.should_continue)
+        server._relay.set_composition(compose_messages(StreamContext(skeletons=(), camera_ids=("cam0",))))
+        return server
+    monkeypatch.setattr(websocket_connect, "WebsocketServer", connection_server)
+    with TestClient(app) as client:
+        with client.websocket_connect("/websocket/connect") as main,                 client.websocket_connect("/websocket/connect") as metrics:
+            metrics.send_json({"frames": False})
+            metrics.send_json({"pipelineTiming": True})
+            _next_timing(metrics)  # handled after the frames declaration
+            started.set()
+            assert _kinds(main, 30).count("frame") >= 10, "the main window on the same pipeline keeps every frame"
+            assert "frame" not in _kinds(metrics, 3) and produced[1] == 0
+        with client.websocket_connect("/websocket/connect") as reconnected:
+            # A new connection gets frames until it declines them again.
+            assert "frame" in _kinds(reconnected, 30)
+            reconnected.send_json({"frames": False})
+            deadline = time.monotonic() + 5
+            while (before := produced[2]) and time.monotonic() < deadline:
+                time.sleep(0.2)
+                if produced[2] == before:
+                    break
+            time.sleep(0.3)
+            assert produced[2] == before, "no frame work after declining"
+            reconnected.send_json({"frames": True})
+            assert "frame" in _kinds(reconnected, 60)
+        with client.websocket_connect("/websocket/connect") as invalid:
+            invalid.send_json({"frames": "no"})
+            for _ in range(200):
+                if (message := invalid.receive())["type"] == "websocket.close":
+                    assert message["code"] == 1008
+                    break
+            else:
+                pytest.fail("The invalid client was not closed")
 
 
 def _mocap(pipeline_id: str = "posthoc-run", alive: list[bool] | None = None) -> MocapPipeline:

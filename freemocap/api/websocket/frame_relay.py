@@ -52,10 +52,16 @@ class FrameRelay:
         self._timing = FrameDeliveryTiming(connection_id=connection_id)
         self._source_seconds = 0.0
         self._on_frame_sent = on_frame_sent
+        # Set by this connection's `{"frames": bool}`; a new connection gets frames until it declines them.
+        self.frames_wanted = True
 
     async def run(self) -> None:
         """Relay frames until the supervisor's should_continue goes False."""
         while self._should_continue():
+            if not self.frames_wanted:
+                # Not even the source runs: its JPEG resize and encode is the bulk of a frame's cost.
+                await asyncio.sleep(0.05)
+                continue
             started = time.perf_counter()
             frame_ctx = await self._source()
             self._source_seconds += time.perf_counter() - started

@@ -92,3 +92,22 @@ test('a timing subscriber asks on every connect, receives the messages, and the 
     assert.deepEqual(interest(sockets[1]), [{pipelineTiming: true}, {pipelineTiming: false}]);
     service.disconnect();
 });
+
+test('a client that declines frames says so on every connect; the default client never sends it', async () => {
+    const sockets: Socket[] = [];
+    const factory = () => {const socket = new Socket(); sockets.push(socket); return socket as unknown as WebSocket;};
+    const metrics = new TransportService({url: 'ws://server.invalid/websocket/connect', socketFactory: factory, frames: false});
+    metrics['connection']['config'].reconnectDelay = 1;
+    metrics.connect(); sockets[0].open();
+    assert.deepEqual(sockets[0].sent.map(text => JSON.parse(text)), [{frames: false}]);
+    sockets[0].drop();
+    await new Promise(resolve => setTimeout(resolve, 20));
+    sockets[1].open();
+    assert.deepEqual(sockets[1].sent.map(text => JSON.parse(text)), [{frames: false}], 'a new connection declines again');
+    metrics.disconnect();
+
+    const main = new TransportService({url: 'ws://server.invalid/websocket/connect', socketFactory: factory});
+    main.connect(); sockets[2].open();
+    assert.ok(!sockets[2].sent.some(text => text.includes('frames')));
+    main.disconnect();
+});

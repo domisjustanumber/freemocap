@@ -23,3 +23,8 @@ class FrameAcknowledgment(BaseModel):
 class PipelineTimingInterest(BaseModel):
     """Whether this connection wants pipeline timing messages; the client sends it again on every connect."""
     pipelineTiming: StrictBool
+
+
+class FramesInterest(BaseModel):
+    """Whether this connection wants frame messages (a new connection does); the client sends false again on every connect."""
+    frames: StrictBool

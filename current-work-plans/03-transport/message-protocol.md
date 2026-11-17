@@ -78,7 +78,12 @@ and never decodes wrongly.
 
 `pipeline_timing` is sent only to a connection that sent `{"pipelineTiming": true}`. The declaration
 belongs to that connection: the client sends it again on every connect, so a restarted server serves it
-from the fresh declaration. One server reader drains each pipeline's timing topic into a shared store;
+from the fresh declaration.
+Frames are the opposite: a connection gets `frame` (and `framerate`) messages until it sends
+`{"frames": false}`, validated the same way (a non-boolean closes the connection with 1008). The client sends
+it again on every connect, so a reconnect gets frames until then. A connection that declined frames costs no
+frame work: its frame source never runs, so there is no camera JPEG resize, compose or encode for it. The
+pipeline-metrics window declines frames. One server reader drains each pipeline's timing topic into a shared store;
 every interested connection gets a copy of the newest build, so two windows see the same events.
 A running posthoc mocap run has no pubsub: the same reader drains the bounded buffer its tracking appends to and
 sends its newest tracked frames as `mode: "posthoc"`, without node lag or the staleness filter; a run that ended

@@ -73,6 +73,9 @@ export interface TransportServiceOptions<Kinds extends ApplicationKinds = {}> {
     /** Message kinds defined by the application, keyed by kind. FreeMoCap's own
      *  kinds cannot be redefined. */
     kinds?: Kinds;
+    /** `false`: this client never wants frame messages, and says so on every connect, so the server
+     *  does no frame work for its connection. Default `true`, the server's default for a connection. */
+    frames?: boolean;
 }
 
 /** Call every callback in a set, isolating faults: one throwing subscriber must
@@ -159,8 +162,11 @@ export class TransportService<Kinds extends ApplicationKinds = {}> {
             catch (error) { fanOut(this.protocolErrors, error); }
         });
         this.connection.on("close", () => this.reset());
-        // The server keeps timing interest per connection, so each new connection declares it again.
-        this.connection.on("open", () => { if (this.pipelineTimingSubscribers.size) this.connection.send({pipelineTiming: true}); });
+        // The server keeps both interests per connection, so each new connection declares them again.
+        this.connection.on("open", () => {
+            if (options.frames === false) this.connection.send({frames: false});
+            if (this.pipelineTimingSubscribers.size) this.connection.send({pipelineTiming: true});
+        });
     }
 
     // ── inbound demux ────────────────────────────────────────────────────

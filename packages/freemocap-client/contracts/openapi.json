@@ -6997,6 +6997,12 @@
             "title": "Graphannotate",
             "default": true
           },
+          "logPipelineTimes": {
+            "type": "boolean",
+            "title": "Logpipelinetimes",
+            "description": "Record the tracking run's timing for the pipeline metrics window; read when the run starts.",
+            "default": false
+          },
           "startStage": {
             "type": "string",
             "enum": [
@@ -7484,7 +7490,7 @@
           "log_pipeline_times": {
             "type": "boolean",
             "title": "Log Pipeline Times",
-            "default": true
+            "default": false
           },
           "skeleton_inference_node_config": {
             "$ref": "#/components/schemas/RealtimeSkeletonInferenceNodeConfig"
@@ -7504,7 +7510,7 @@
           "log_pipeline_times": {
             "type": "boolean",
             "title": "Log Pipeline Times",
-            "default": true
+            "default": false
           },
           "skeleton_inference_node_config": {
             "$ref": "#/components/schemas/RealtimeSkeletonInferenceNodeConfig"

@@ -7,11 +7,12 @@ from tempfile import TemporaryDirectory
 from freemocap.core.pipeline.dataflow.video_sources import RecordingVideoSources
 from unittest import TestCase
 from unittest.mock import Mock, patch
+import dataclasses
 import multiprocessing
 
 from freemocap.core.pipeline.dataflow.application_pipeline import validate_application_graph, run_application_graph
 from freemocap.core.pipeline.dataflow.recording_executor import RecordingExecutionResult
-from freemocap.core.pipeline.posthoc.mocap_pipeline import MocapWorkerRequest, _run_mocap_pipeline
+from freemocap.core.pipeline.posthoc.mocap_pipeline import MocapWorkerRequest, _run_mocap_pipeline, new_timing_records
 from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
 
@@ -73,12 +74,15 @@ class ApplicationGraphTests(TestCase):
             complete.assert_called_once()
             self.assertFalse(run.call_args.kwargs['config'].export_options.formats)
             self.assertFalse(run.call_args.kwargs['config'].export_to_blender)
-            # Tracking timing is tagged with the task's own id, and goes to the buffer the relay reads.
-            self.assertEqual(run.call_args.kwargs['timing_pipeline_id'], 'test')
-            self.assertEqual(run.call_args.kwargs['timing_sink'], request.timing_records.append)
+            # Timing is off by default: no buffer, so tracking gets no timing sink.
+            self.assertIsNone(run.call_args.kwargs['timing_sink'])
             self.assertEqual(Path(run.call_args.kwargs['config'].calibration_toml_path), self.calibration)
             self.assertEqual(self.calibration.read_text(), 'test calibration')
+            # With a buffer, tracking timing is tagged with the task's own id, and goes to the buffer the relay reads.
+            request = dataclasses.replace(request, timing_records=new_timing_records())
             run_application_graph(request=request)
+            self.assertEqual(run.call_args.kwargs['timing_pipeline_id'], 'test')
+            self.assertEqual(run.call_args.kwargs['timing_sink'], request.timing_records.append)
             self.assertEqual(Path(run.call_args.kwargs['config'].calibration_toml_path), self.calibration)
             self.assertFalse((destination / 'calibration_copies').exists())
             self.assertFalse((destination / 'exports' / 'calibration_copies').exists())

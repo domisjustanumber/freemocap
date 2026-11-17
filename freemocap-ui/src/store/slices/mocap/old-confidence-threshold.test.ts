@@ -17,6 +17,7 @@ test('an old file opens the prompt and keeps its value until the answer; reset s
     const {store} = await import('@/store');
     const slice = await import('./mocap-slice');
     assert.equal(store.getState().mocap.oldConfidenceThreshold, 0.004);
+    assert.equal(store.getState().mocap.config.logPipelineTimes, false, 'a file saved before the timing setting loads with it off');
     assert.equal(store.getState().mocap.config.rtmPoseConfidenceThreshold, 0.004);
     // Another setting changed while the prompt is open is saved, with the old version so the prompt survives a restart.
     store.dispatch(slice.exportTallCsvUpdated(true));

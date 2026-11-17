@@ -68,9 +68,10 @@ def test_provider_route_gives_each_ep_as_skellytracker_does_in_its_order_without
     construct.assert_not_called()
 
 
-@pytest.mark.parametrize('change', ['provider', 'model', 'filter'])
+@pytest.mark.parametrize('change', ['provider', 'model', 'filter', 'timing'])
 def test_live_changes_rebuild_only_affected_inference(change):
     pipeline = object.__new__(live.RealtimePipeline)
+    pipeline.id = 'live'
     pipeline.config = live.RealtimePipelineConfig()
     pipeline.config.camera_node_config.skeleton_tracking_enabled = True
     pipeline._calibration_update_pending = False
@@ -88,11 +89,15 @@ def test_live_changes_rebuild_only_affected_inference(change):
         updated.skeleton_inference_node_config.execution_provider = 'cpu'
     elif change == 'model':
         updated.camera_node_config.rtmpose_model_name = 'rtmw-l-m_256x192'
-    else:
+    elif change == 'filter':
         updated.aggregator_config.realtime_filter_config = updated.aggregator_config.realtime_filter_config.model_copy(update={'gap_duration_s': .6})
+    else:
+        updated.log_pipeline_times = True
     with patch.object(live.RealtimeSkeletonInferenceNode, 'create') as create:
         pipeline.update_config(updated)
-    if change == 'filter':
+    # Timing is fixed when the pipeline starts: a live change keeps the running value, so the metrics window says it is off.
+    assert pipeline.config.log_pipeline_times is False
+    if change in ('filter', 'timing'):
         original.shutdown.assert_not_called()
         create.assert_not_called()
     else:

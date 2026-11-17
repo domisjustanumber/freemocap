@@ -307,6 +307,14 @@ def test_a_posthoc_run_is_built_only_with_interest_and_tagged_with_its_pipeline_
     assert not pipeline.timing_records
 
 
+def test_a_posthoc_run_started_with_timing_off_says_so_and_sends_no_events():
+    relay, pipeline = PipelineTimingRelay(interval_s=0.0), _mocap()
+    pipeline.timing_records = None
+    relay.add_interest(object())
+    (message,) = _posthoc_messages(relay, {pipeline.id: pipeline})
+    assert message["log_pipeline_times_enabled"] is False and message["events"] == []
+
+
 def test_a_posthoc_run_sends_its_tracked_frames_without_lag_or_stale_filtering():
     relay, pipeline = PipelineTimingRelay(interval_s=0.0), _mocap()
     posthoc = {pipeline.id: pipeline}

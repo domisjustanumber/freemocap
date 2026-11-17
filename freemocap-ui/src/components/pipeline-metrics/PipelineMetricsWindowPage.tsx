@@ -14,12 +14,28 @@ import SettingSelectInput from '@/components/common/settings-layout/setting-sele
 
 const POLL_MS = 250;
 
-const STATE_TEXT: Record<Exclude<MetricsState, 'ready'>, string> = {
+const STATE_TEXT: Record<Exclude<MetricsState, 'ready' | 'timing-disabled'>, string> = {
     'disconnected': 'Not connected to the FreeMoCap server. This window reconnects on its own.',
     'no-pipeline': 'No pipeline is reporting timing. Start real-time processing or process a recording in the main window.',
     'not-running': 'This pipeline is not running.',
-    'timing-disabled': 'Pipeline timing is off for this pipeline (log_pipeline_times is false), so it sends no task events.',
 };
+
+const TURN_ON = 'To turn it on: in the main window, click the gear next to the Real-time processing button and switch on "Log pipeline times" (it is off by default and saved).';
+
+/** What the window says when the chosen run started with timing off, and exactly how to turn it on. */
+export const TIMING_OFF_TEXT: Record<RunTimingSnapshot['mode'], string> = {
+    realtime: `Pipeline timing is off for this real-time pipeline, so it sends no task events. ${TURN_ON} `
+        + 'Then stop and start Real-time processing (click it twice): a running pipeline keeps the setting it started with.',
+    posthoc: `Pipeline timing was off when this recording started processing, so it sends no task events. ${TURN_ON} `
+        + 'The next recording you process is timed; a run keeps the setting it started with.',
+};
+
+export function StateNotice({state, run}: {state: Exclude<MetricsState, 'ready'>; run: RunTimingSnapshot | null}): React.ReactElement {
+    return <p className="text md" style={{margin: 8, padding: '8px 12px', borderRadius: 4, backgroundColor: 'var(--gray-800)',
+        borderLeft: `3px solid ${state === 'timing-disabled' ? 'var(--warning-400)' : 'var(--green-500)'}`}}>
+        {state === 'timing-disabled' ? TIMING_OFF_TEXT[run?.mode ?? 'realtime'] : STATE_TEXT[state]}
+    </p>;
+}
 
 const ms = (value: number) => value.toFixed(value >= 100 ? 0 : 1);
 
@@ -99,10 +115,7 @@ export default function PipelineMetricsWindowPage(): React.ReactElement {
             <section aria-label="System information" data-slot="system-information"/>
 
             {state !== 'ready' || !run
-                ? <p className="text md" style={{margin: 8, padding: '8px 12px', borderRadius: 4, backgroundColor: 'var(--gray-800)',
-                    borderLeft: `3px solid ${state === 'timing-disabled' ? 'var(--warning-400)' : 'var(--green-500)'}`}}>
-                    {STATE_TEXT[state as Exclude<MetricsState, 'ready'>]}
-                </p>
+                ? <StateNotice state={state as Exclude<MetricsState, 'ready'>} run={run}/>
                 : <RunSummary run={run}/>}
 
             {state === 'ready' && (
@@ -133,7 +146,9 @@ export function RunSummary({run}: {run: RunTimingSnapshot}): React.ReactElement 
                 From each frame's own events: its first event start to its last event end. Frames are sampled about four times a second.
             </p>
             <p className="text sm" style={{color: 'var(--gray-400)'}}>
-                Dropped timing events: {run.droppedInLastMessage} in the newest message, {run.droppedSinceOpened} since this window opened.
+                {run.mode === 'realtime'
+                    ? `Dropped timing events: ${run.droppedInLastMessage} in the newest message, ${run.droppedSinceOpened} since this window opened.`
+                    : 'Dropped timing events are not counted for a posthoc run: its buffer drops its oldest records silently while nothing reads them.'}
                 {run.incompleteFrames.length > 0 && <span style={{color: 'var(--warning-400)'}}> · {run.incompleteFrames.length} incomplete frame(s)</span>}
                 {/* Lag and stall follow the camera rate; a posthoc run reads its videos as fast as it tracks. */}
                 {run.mode === 'realtime' && lag.map(([kind, frames]) => <span key={kind} style={{color: frames <= 3 ? 'var(--warning-300)' : 'var(--red-300)'}}> · {kind} +{frames}</span>)}

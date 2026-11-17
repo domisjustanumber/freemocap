@@ -36,9 +36,9 @@ class MocapWorkerRequest:
 
     performance: PerformanceReport = field(default_factory=PerformanceReport)
     operation_progress: OperationProgressReporter = field(default_factory=OperationProgressReporter)
-    timing_records: deque = field(default_factory=new_timing_records)
+    timing_records: deque | None = None
     """The tracking run's timing records, appended on the worker's threads; the app's timing relay drains it.
-    Bounded: without a reader the oldest records go."""
+    Bounded: without a reader the oldest records go. None when `log_pipeline_times` is off: nothing is timed."""
 
     def report(self, stage: str, detail: str, fraction: float) -> None:
         self.operation_progress.report(self, stage, detail, fraction)
@@ -98,7 +98,7 @@ class MocapPipeline(PipelineABC):
     pipeline_type: PosthocPipelineType = field(default=PosthocPipelineType.MOCAP, init=False)
     started: bool = False
     _latest: dict[str, PipelineProgressMessage] = field(default_factory=dict)
-    timing_records: deque = field(default_factory=new_timing_records)
+    timing_records: deque | None = None
 
     @classmethod
     def create(
@@ -112,7 +112,8 @@ class MocapPipeline(PipelineABC):
             heartbeat_timestamp=worker_registry.heartbeat_timestamp, pipeline_id=pipeline_id)
         progress_queue: Queue[PipelineProgressMessage] = Queue()
         request = MocapWorkerRequest(pipeline_id=pipeline_id, recording=recording_info,
-            config=config, ipc=ipc, progress_queue=progress_queue)
+            config=config, ipc=ipc, progress_queue=progress_queue,
+            timing_records=new_timing_records() if config.log_pipeline_times else None)
         request.operation_progress.initialize(request, plan)
         try:
             worker = worker_registry.create_worker(

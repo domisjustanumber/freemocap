@@ -2852,6 +2852,12 @@ export interface components {
              */
             graphAnnotate?: boolean;
             /**
+             * Logpipelinetimes
+             * @description Record the tracking run's timing for the pipeline metrics window; read when the run starts.
+             * @default false
+             */
+            logPipelineTimes?: boolean;
+            /**
              * Startstage
              * @default observations
              * @enum {string}
@@ -3101,7 +3107,7 @@ export interface components {
             aggregator_config?: components["schemas"]["RealtimeAggregatorNodeConfig"];
             /**
              * Log Pipeline Times
-             * @default true
+             * @default false
              */
             log_pipeline_times?: boolean;
             skeleton_inference_node_config?: components["schemas"]["RealtimeSkeletonInferenceNodeConfig"];
@@ -3112,7 +3118,7 @@ export interface components {
             aggregator_config?: components["schemas"]["RealtimeAggregatorNodeConfig"];
             /**
              * Log Pipeline Times
-             * @default true
+             * @default false
              */
             log_pipeline_times?: boolean;
             skeleton_inference_node_config?: components["schemas"]["RealtimeSkeletonInferenceNodeConfig"];

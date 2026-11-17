@@ -171,6 +171,7 @@ def test_a_realtime_legacy_registration_starts_the_seam_on_the_applied_ep(monkey
     monkeypatch.setattr("freemocap.core.pipeline.inference_service.start_detector_run", lambda **kwargs: pytest.fail("started 2.0"))
     assert InferenceService._start_run(_client(InferenceMode.REALTIME)) == ("run", (), {})
     assert (started[0]["execution_provider"], started[0]["selected_provider"], started[0]["camera_ids"]) == (CUDA, TRT_RTX, CAMERAS)
+    assert started[0]["timing_sink"] is None, "a registration without timing gives the seam no sink, so no collector"
 
 
 def test_the_flag_round_trips_through_the_contract():

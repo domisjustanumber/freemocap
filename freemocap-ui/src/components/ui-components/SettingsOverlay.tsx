@@ -13,7 +13,7 @@ import ValueSelector from "@/components/ui-components/ValueSelector";
 import SegmentedControl from "@/components/ui-components/SegmentedControl";
 import { Row } from "@/components/ui-components/Row";
 import { useRealtimePipelineSync } from "@/hooks/useRealtimePipelineSync";
-import { openPipelineMetricsWindow } from "@/services/electron-ipc/open-pipeline-metrics-window";
+import RTPPipelineActionsFlyout from "@/components/pipeline-progress/realtime/realtimepipeline-actions-flyout";
 
 
 interface SettingsOverlayProps {
@@ -32,6 +32,7 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
 
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [processingSettingsOpen, setProcessingSettingsOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [isAuto, setIsAuto] = useState<boolean>(settings.columns === null);
   const [manualColumns, setManualColumns] = useState<number>(
     settings.columns ?? 2,
@@ -84,13 +85,22 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
           <div className="p-1 live-action-buttons-group-3 flex flex-row items-center gap-3">
 
             <RealtimeProcessingButton connected={isConnected} loading={isPipelineLoading} onToggle={handleLiveStreamClick}/>
+            <div className="modal-container pos-rel">
+              <IconButton
+                icon="settings-icon"
+                onClick={() => setActionsOpen(!actionsOpen)}
+                tooltip={!actionsOpen}
+                tooltipText={t("pipelineActions")}
+                ariaLabel={t("pipelineActions")}
+                tooltipPosition="pos-bottom"
+                className={`is-menu icon-size-25 ${actionsOpen ? "active" : ""}`}
+              />
+              <RTPPipelineActionsFlyout open={actionsOpen} onClose={() => setActionsOpen(false)}/>
+            </div>
             <button type="button" className="button sm secondary br-1" onClick={() => setProcessingSettingsOpen(true)}>
               Processing settings
             </button>
             {processingSettingsOpen && <RealtimeProcessingSettings onClose={() => setProcessingSettingsOpen(false)}/>}
-            <button type="button" className="button sm secondary br-1" onClick={() => void openPipelineMetricsWindow()}>
-              {t("openPipelineMetrics")}
-            </button>
           </div>
 
         </div>

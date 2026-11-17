@@ -1,4 +1,5 @@
 """Preview and retained task plan contracts, independent of expensive inference."""
+import pytest
 from pathlib import Path
 from queue import Queue
 from types import SimpleNamespace
@@ -126,10 +127,11 @@ def test_invalid_launch_does_not_allocate_ipc_or_worker(tmp_path):
     workers.create_worker.assert_not_called()
 
 
-def test_created_pipeline_exposes_all_waiting_operations_before_worker_start(tmp_path):
+@pytest.mark.parametrize('timed', [False, True])
+def test_created_pipeline_exposes_all_waiting_operations_before_worker_start(tmp_path, timed):
     from unittest.mock import Mock
     from freemocap.core.pipeline.posthoc.mocap_pipeline import MocapPipeline
-    config = PosthocMocapPipelineConfig(stop_stage='observations', export_to_blender=False)
+    config = PosthocMocapPipelineConfig(stop_stage='observations', export_to_blender=False, log_pipeline_times=timed)
     plan = plan_from_graph(graph=application_definition(config=config,camera_count=2),
         config=config,recording_path=tmp_path)
     from multiprocessing import Value
@@ -151,9 +153,10 @@ def test_created_pipeline_exposes_all_waiting_operations_before_worker_start(tmp
     assert tuple(operation.operation_id for operation in message.operations) == plan.topological_order
     assert all(operation.status == 'waiting' for operation in message.operations)
     workers.create_worker.return_value.start.assert_not_called()
-    # The app's timing relay reads the buffer the worker's tracking appends to.
+    # The app's timing relay reads the buffer the worker's tracking appends to; with timing off there is none.
     request = workers.create_worker.call_args.kwargs['kwargs']['request']
     assert pipeline.timing_records is request.timing_records and request.pipeline_id == 'queued'
+    assert (request.timing_records is not None) == timed
 
 
 def test_preview_rejects_missing_source_run(tmp_path):

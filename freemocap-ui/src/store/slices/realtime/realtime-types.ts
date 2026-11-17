@@ -44,6 +44,8 @@ export interface RealtimeAggregatorNodeConfig {
 
 export interface RealtimePipelineConfig {
     camera_node_config: CameraNodeConfig;
+    /** Set from the saved `mocap.config.logPipelineTimes` on every apply. */
+    log_pipeline_times?: boolean;
     skeleton_inference_node_config: RealtimeSkeletonInferenceNodeConfig;
     aggregator_config: RealtimeAggregatorNodeConfig;
 }

@@ -374,5 +374,8 @@
       "postprocess": "skellytracker 2.0 node span: turning this node's model output into boxes or keypoints.",
       "run": "skellytracker 2.0 node span: one run of this node. For a glue node this is box choice, gating or smoothing; for MediaPipe it is the whole model call."
     }
-  }
+  },
+  "pipelineActions": "Pipeline actions",
+  "logPipelineTimes": "Log pipeline times",
+  "logPipelineTimesHint": "Off by default. Saved, and used by real-time processing and by processing a recording. It is read when a run starts: after switching it, stop and start Real-time processing (click the lightning bolt twice); the next recording you process uses it."
 }

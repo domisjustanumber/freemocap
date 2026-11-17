@@ -132,6 +132,30 @@ test('a previous calibration failure does not prevent a fresh apply from reachin
     } finally {globalThis.fetch = original;}
 });
 
+test('every apply sends the one saved timing setting, off by default', async () => {
+    const {store} = await import('@/store');
+    const {applyRealtimePipeline} = await import('@/store/slices/realtime/realtime-thunks');
+    const {logPipelineTimesChanged} = await import('@/store/slices/mocap');
+    const original = globalThis.fetch;
+    const sent: unknown[] = [];
+    globalThis.fetch = async (input, init) => {
+        const url = String(input);
+        if (url.includes('/calibration/most-recent')) return new Response('null', {status:200});
+        if (url.includes('/realtime/apply')) {
+            sent.push(JSON.parse(String(init?.body)).realtimeConfig.log_pipeline_times);
+            return new Response(JSON.stringify({pipeline_id:'p',camera_group_id:'g',
+                resolved_config:defaultRealtimePipelineConfig}), {status:200});
+        }
+        throw new Error('Unexpected request ' + url);
+    };
+    try {
+        await store.dispatch(applyRealtimePipeline(defaultRealtimePipelineConfig));
+        store.dispatch(logPipelineTimesChanged(true));
+        await store.dispatch(applyRealtimePipeline(defaultRealtimePipelineConfig));
+        assert.deepEqual(sent, [false, true]);
+    } finally {globalThis.fetch = original;}
+});
+
 test('structured errors preserve their message after Redux serialization', async () => {
     const {describeError} = await import('@/store/slices/thunk-helpers');
     assert.equal(describeError({name:'Error',message:'Camera unavailable'}), 'Camera unavailable');

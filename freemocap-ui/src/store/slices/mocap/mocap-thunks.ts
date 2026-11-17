@@ -25,6 +25,7 @@ function buildPosthocConfig(state: RootState) {
         cameraMatching: config.cameraMatching,
         anchorSegmentName: config.anchorSegmentName,
         exportTallCsv: config.exportTallCsv ?? false,
+        logPipelineTimes: config.logPipelineTimes,
         exportOptions: {
             formats: config.exportAfterProcessing ? (config.exportFormats ?? []) : [],
             data: config.exportChannels ?? ['LANDMARKS_3D'],

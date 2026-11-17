@@ -55,8 +55,7 @@ class RealtimeInferenceAdapterTests(unittest.TestCase):
                     return future
 
                 client.submit.side_effect = infer
-                config = RealtimePipelineConfig(log_pipeline_times=False,
-                    camera_node_config={"detector_type": detector})
+                config = RealtimePipelineConfig(camera_node_config={"detector_type": detector})
                 requests.put(ProcessFrameNumberMessage(frame_number=7))
                 try:
                     with patch("freemocap.core.pipeline.realtime.realtime_skeleton_inference_node.CameraGroupSharedMemory.recreate"), \
@@ -76,7 +75,9 @@ class RealtimeInferenceAdapterTests(unittest.TestCase):
                     self.assertEqual(registration.mode, InferenceMode.REALTIME)
                     self.assertEqual((registration.detector_type, registration.camera_ids), (detector, tuple(camera_ids)))
                     self.assertEqual(registration.pipeline_id, ipc.pipeline_id)
+                    # The default config times nothing: no skellytracker sink and nothing on the timing topic.
                     self.assertIsNone(registration.timing_sink)
+                    self.assertTrue(timings.empty())
                     client.close.assert_called_once()
                 finally:
                     for queue in queues:

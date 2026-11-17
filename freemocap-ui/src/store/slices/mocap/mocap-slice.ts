@@ -73,6 +73,8 @@ export interface MocapConfig {
     /** Row-major rigid offset applied after posthoc alignment, with translation in mm. */
     referenceTransform: number[] | null;
     referenceTransformEnabled: boolean;
+    /** Pipeline timing for the metrics window, for real-time processing and posthoc runs alike; read when a run starts. */
+    logPipelineTimes: boolean;
 }
 
 export const DEFAULT_TRIANGULATION_CONFIG: TriangulationConfig = {
@@ -148,6 +150,7 @@ const DEFAULT_MOCAP_CONFIG: MocapConfig = {
     exportAfterProcessing: true,
     referenceTransform: null,
     referenceTransformEnabled: false,
+    logPipelineTimes: false,
 };
 
 // ==================== Initial State ====================
@@ -215,6 +218,9 @@ export const mocapSlice = createSlice({
         },
         exportTallCsvUpdated: (state, action: PayloadAction<boolean>) => {
             state.config.exportTallCsv = action.payload;
+        },
+        logPipelineTimesChanged: (state, action: PayloadAction<boolean>) => {
+            state.config.logPipelineTimes = action.payload;
         },
         bodyAlignmentModeUpdated: (state, action: PayloadAction<'auto' | 'calibration' | 'person'>) => {
             state.config.bodyAlignmentMode = action.payload;
@@ -423,6 +429,7 @@ export const {
     bodyAlignmentModeUpdated,
     anchorSegmentNameUpdated,
     exportTallCsvUpdated,
+    logPipelineTimesChanged,
     exportSettingsReset,
     exportFormatsUpdated,
     exportChannelsUpdated,

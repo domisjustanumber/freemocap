@@ -56,6 +56,8 @@ export const applyRealtimePipeline = createAsyncThunk<
 
         const configWithBoard = realtimePipelineSettings({
             ...realtimeConfig,
+            // The one saved timing setting; the server reads it when the pipeline starts.
+            log_pipeline_times: getState().mocap.config.logPipelineTimes,
             camera_node_config: {
                 ...realtimeConfig.camera_node_config,
                 charuco_board: liveBoard,

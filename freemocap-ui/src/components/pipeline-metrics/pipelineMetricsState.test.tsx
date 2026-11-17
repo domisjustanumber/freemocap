@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {RunSummary} from './PipelineMetricsWindowPage';
+import {RunSummary, StateNotice} from './PipelineMetricsWindowPage';
 import {requestedRunKey, runLabel} from './pipelineMetricsState';
 import type {RunTimingSnapshot} from '@/services/server/server-helpers/pipeline-timing-types';
 
@@ -30,4 +30,22 @@ test('lag and stall show for a realtime run and are hidden for a posthoc run', (
 test('the window reads the run to preselect from its hash', () => {
     assert.equal(requestedRunKey('#/pipeline-metrics?pipeline=posthoc%3Aabc-1'), 'posthoc:abc-1');
     assert.equal(requestedRunKey('#/pipeline-metrics'), null);
+});
+
+test('timing off says how to turn it on, and that real-time processing must restart', () => {
+    const realtime = renderToStaticMarkup(<StateNotice state="timing-disabled" run={run({timingEnabled: false})}/>);
+    assert.match(realtime, /off for this real-time pipeline/);
+    assert.match(realtime, /gear next to the Real-time processing button/);
+    assert.match(realtime, /Log pipeline times/);
+    assert.match(realtime, /stop and start Real-time processing/);
+    const posthoc = renderToStaticMarkup(<StateNotice state="timing-disabled" run={run({mode: 'posthoc', timingEnabled: false})}/>);
+    assert.match(posthoc, /off when this recording started processing/);
+    assert.match(posthoc, /next recording you process is timed/);
+});
+
+test('a posthoc run says its dropped timing events are not counted', () => {
+    const posthoc = renderToStaticMarkup(<RunSummary run={run({mode: 'posthoc', key: 'posthoc:p1', cameraGroupId: null, droppedSinceOpened: 0})}/>);
+    assert.match(posthoc, /not counted for a posthoc run/);
+    assert.doesNotMatch(posthoc, /since this window opened/);
+    assert.match(renderToStaticMarkup(<RunSummary run={run()}/>), /since this window opened/);
 });

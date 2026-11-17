@@ -384,6 +384,11 @@ class RealtimePipeline:
         """Keep inference subscribed while paused; create its worker before enabling it."""
         if self.calibration_update_pending:
             raise ValueError("Wait for the calibration save before changing pipeline settings.")
+        if new_config.log_pipeline_times != self.config.log_pipeline_times:
+            # Timers and spans are fixed at start; the running config keeps saying what the nodes do.
+            logger.info(f"RealtimePipeline [{self.id}]: log_pipeline_times={new_config.log_pipeline_times} "
+                        f"applies when real-time processing restarts")
+            new_config = new_config.model_copy(update={"log_pipeline_times": self.config.log_pipeline_times})
 
         old_detector = self.config.camera_node_config.detector_type
         new_detector = new_config.camera_node_config.detector_type

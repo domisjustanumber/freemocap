@@ -14,7 +14,9 @@ class RealtimePipelineConfig(BaseModel):
     aggregator_config: RealtimeAggregatorNodeConfig = Field(
         default_factory=RealtimeAggregatorNodeConfig,
     )
-    log_pipeline_times: bool = True
+    # Off by default. Read when the pipeline starts: the node timers, the 30 s timing log and skellytracker's
+    # timing spans are fixed for the run, so a change applies when real-time processing restarts.
+    log_pipeline_times: bool = False
 
     skeleton_inference_node_config: RealtimeSkeletonInferenceNodeConfig = Field(
         default_factory=RealtimeSkeletonInferenceNodeConfig,

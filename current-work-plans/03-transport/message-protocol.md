@@ -83,6 +83,8 @@ every interested connection gets a copy of the newest build, so two windows see 
 A running posthoc mocap run has no pubsub: the same reader drains the bounded buffer its tracking appends to and
 sends its newest tracked frames as `mode: "posthoc"`, without node lag or the staleness filter; a run that ended
 sends nothing more, and the client drops a run that went silent.
+Timing is off by default (`log_pipeline_times`, read when a run starts). A run started with it off still
+sends its message with `log_pipeline_times_enabled: false` and no events, so the window can say so.
 
 On connect the relay sends the current value of the replace kinds (app_state), then streams frames. A
 later change sends a fresh full replacement. Calibration is NOT a websocket kind: the frontend loads it

@@ -50,6 +50,8 @@ class PosthocMocapPipelineConfig(BaseModel):
         return migrated
 
     graph_annotate: bool = Field(default=True, alias="graphAnnotate")
+    log_pipeline_times: bool = Field(default=False, alias="logPipelineTimes",
+        description="Record the tracking run's timing for the pipeline metrics window; read when the run starts.")
 
     start_stage: Literal['observations', 'triangulation', 'filtering', 'scale_fit', 'reconstruction'] = Field(
         default='observations', alias='startStage')

@@ -168,8 +168,9 @@ class PipelineTimingRelay:
         timing = self._posthoc.get(pipeline_id)
         if timing is None:
             timing = self._posthoc[pipeline_id] = _PosthocTiming(converter=SkellytrackerTimingEvents(pipeline_id=pipeline_id))
-        records = pipeline.timing_records
-        timing.store.ingest(timing.converter.convert([records.popleft() for _ in range(len(records))]))
+        records = pipeline.timing_records  # None: the run started with log_pipeline_times off
+        if records is not None:
+            timing.store.ingest(timing.converter.convert([records.popleft() for _ in range(len(records))]))
         timing.store.prune(retain_frames=PIPELINE_TIMING_RETAIN_FRAMES, max_contextless=PIPELINE_TIMING_MAX_CONTEXTLESS)
         events = timing.store.snapshot()
         # A frame is complete once its tracker call ended; its camera wait arrives before that.
@@ -186,7 +187,7 @@ class PipelineTimingRelay:
             camera_group_id=None,
             recording_name=pipeline.recording_info.recording_name,
             realtime_pipeline_active=True,
-            log_pipeline_times_enabled=True,
+            log_pipeline_times_enabled=records is not None,
             events=tuple(capped),
             clock_domain=CLOCK_DOMAIN_PERF_COUNTER,
             relay_perf_counter_ns=time.perf_counter_ns(),

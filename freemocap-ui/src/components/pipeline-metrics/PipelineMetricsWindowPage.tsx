@@ -11,10 +11,12 @@ import {DEFAULT_HOST, DEFAULT_PORT, serverUrls} from '@/constants/server-urls';
 import {loadFromStorage, STORAGE_KEYS} from '@/components/control-panels/server-connection/storage';
 import IconButton from '@/components/ui-components/IconButton';
 import SettingSelectInput from '@/components/common/settings-layout/setting-select-input';
-import {SystemInformationPanel} from '@/components/pipeline-metrics/SystemInformationPanel';
+import {runAwaitingModels, SystemInformationPanel} from '@/components/pipeline-metrics/SystemInformationPanel';
 import {requestSystemInformation, type SystemInformationState, watchSystemInformation} from '@/services/server/system-information';
 
 const POLL_MS = 250;
+// A run's models load after it starts; the window asks again this often, for about a minute per run.
+const MODELS_RETRY_MS = 2000, MODELS_RETRIES = 30;
 
 const STATE_TEXT: Record<Exclude<MetricsState, 'ready' | 'timing-disabled'>, string> = {
     'disconnected': 'Not connected to the FreeMoCap server. This window reconnects on its own.',
@@ -60,6 +62,9 @@ export default function PipelineMetricsWindowPage(): React.ReactElement {
     const [systemInformation, setSystemInformation] = useState<SystemInformationState>({info: null, loading: false, error: null});
     const refreshSystemInformation = useRef<() => void>(() => {});
 
+    // The page's own title would otherwise name the window "FreeMoCap".
+    useEffect(() => { document.title = 'FreeMoCap pipeline metrics'; }, []);
+
     // An opener that names a run (a posthoc card's "Open metrics") switches an open window to it.
     useEffect(() => {
         const onHash = () => {
@@ -104,6 +109,17 @@ export default function PipelineMetricsWindowPage(): React.ReactElement {
     const live = runs.find(run => run.key === selectedKey) ?? runs[0] ?? null;
     const run = frozen ?? live;
     const state = metricsState(connected, run);
+    const awaitingModels = runAwaitingModels(systemInformation, run);
+    const modelRetries = useRef(new Map<string, number>());
+    useEffect(() => {
+        const attempts = awaitingModels ? modelRetries.current.get(awaitingModels) ?? 0 : MODELS_RETRIES;
+        if (!awaitingModels || attempts >= MODELS_RETRIES) return;
+        const timer = setTimeout(() => {
+            modelRetries.current.set(awaitingModels, attempts + 1);
+            refreshSystemInformation.current();
+        }, MODELS_RETRY_MS);
+        return () => clearTimeout(timer);
+    }, [awaitingModels, systemInformation]);
     const model = useMemo(() => buildTimelineViewModel({
         events: run?.events ?? [], configuredCameraFpsHz: run?.configuredCameraFpsHz ?? null, incompleteFrames: run?.incompleteFrames,
     }), [run]);

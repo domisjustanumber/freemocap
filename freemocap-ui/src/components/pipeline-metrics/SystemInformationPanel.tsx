@@ -115,12 +115,20 @@ function ExecutionProviderGroup({eps, gpus}: {eps: SystemInformation['execution_
     </Group>;
 }
 
+const modelsOfRun = (info: SystemInformation, run: RunTimingSnapshot) =>
+    info.runs.find(entry => entry.mode === run.mode && entry.pipeline_id === run.pipelineId);
+
+/** The run whose models the shown answer does not list yet: they load after the run starts, so ask again. */
+export function runAwaitingModels(state: SystemInformationState, run: RunTimingSnapshot | null): string | null {
+    return run && state.info && !state.loading && !modelsOfRun(state.info, run)?.models.length ? run.key : null;
+}
+
 function ModelsGroup({info, run}: {info: SystemInformation; run: RunTimingSnapshot | null}): React.ReactElement {
-    const models = run ? info.runs.find(entry => entry.mode === run.mode && entry.pipeline_id === run.pipelineId) : undefined;
+    const models = run ? modelsOfRun(info, run) : undefined;
     return <Group title="Models of this run" summary={models?.requested_provider ? `requested EP: ${models.requested_provider}` : undefined}>
         {!run ? <p className="text sm" style={muted}>No run is selected.</p>
             : !models || models.models.length === 0
-                ? <p className="text sm" style={muted}>This run reports no models yet: it has not started tracking, or runs none. Refresh once it tracks.</p>
+                ? <p className="text sm" style={muted}>This run reports no models yet: it has not started tracking, or runs none. This window asks again for a minute.</p>
                 : <Table head={['Node', 'Model', 'Size', 'Precision', 'EP', 'Device']} rows={models.models.map(model => {
                     const keys = model.device == null ? [] : Array.isArray(model.device) ? model.device : [model.device];
                     return [model.node, `${shown(model.key)}${model.version ? ` ${model.version}` : ''}${model.engine ? ` (${model.engine})` : ''}`,

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {formatBytes, formatHz, LiveLoadGroup, MISSING, SystemInformationPanel} from './SystemInformationPanel';
+import {formatBytes, formatHz, LiveLoadGroup, MISSING, runAwaitingModels, SystemInformationPanel} from './SystemInformationPanel';
 import type {SystemInformation} from '@/services/server/system-information';
 import type {RunTimingSnapshot} from '@/services/server/server-helpers/pipeline-timing-types';
 import type {LiveLoad} from '@/services/server/transport/message-contract';
@@ -105,4 +105,15 @@ test('without information the panel shows its state, the live load, and a refres
 
 test('the panel shows no absolute path or host name', () => {
     assert.doesNotMatch(panel(), /[A-Za-z]:\\|\/home\/|\/Users\//);
+});
+
+test('a run is awaiting models until the shown answer lists some for it, and never while an answer loads', () => {
+    const run = {key: 'posthoc:new', mode: 'posthoc', pipelineId: 'new'} as RunTimingSnapshot;
+    const listed = {...INFO, runs: [...INFO.runs, {mode: 'posthoc', pipeline_id: 'new', requested_provider: null,
+        models: INFO.runs[0].models}]} as SystemInformation;
+    assert.equal(runAwaitingModels({info: INFO, loading: false, error: null}, run), 'posthoc:new');
+    assert.equal(runAwaitingModels({info: INFO, loading: true, error: null}, run), null);
+    assert.equal(runAwaitingModels({info: null, loading: false, error: 'HTTP 500'}, run), null);
+    assert.equal(runAwaitingModels({info: listed, loading: false, error: null}, run), null);
+    assert.equal(runAwaitingModels({info: INFO, loading: false, error: null}, null), null);
 });

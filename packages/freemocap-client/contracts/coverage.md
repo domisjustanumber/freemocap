@@ -58,6 +58,7 @@ errors, aborts, cancellation and asset ownership; compatibility records list act
 | POST | `/freemocap/blender/open` | `open_in_blender_endpoint_freemocap_blender_open_post` | Core integration |
 | GET | `/freemocap/ffmpeg/detect` | `detect_ffmpeg_freemocap_ffmpeg_detect_get` | Core integration |
 | GET | `/freemocap/onnx/execution_providers` | `get_available_execution_providers_freemocap_onnx_execution_providers_get` | Core integration |
+| GET | `/freemocap/onnx/execution_providers/suggestion` | `get_execution_provider_suggestion_freemocap_onnx_execution_providers_suggestion_get` | Core integration |
 | GET | `/freemocap/onnx/session_providers` | `get_session_providers_freemocap_onnx_session_providers_get` | Core integration |
 | POST | `/freemocap/telemetry/track` | `track_telemetry_event_freemocap_telemetry_track_post` | Core integration |
 | POST | `/skellycam/camera/detect` | `cameras_detect_endpoint_skellycam_camera_detect_post` | SkellyCam |

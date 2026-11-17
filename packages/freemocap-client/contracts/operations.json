@@ -689,6 +689,19 @@
     },
     {
       "method": "GET",
+      "path": "/freemocap/onnx/execution_providers/suggestion",
+      "operation_id": "get_execution_provider_suggestion_freemocap_onnx_execution_providers_suggestion_get",
+      "handler": "get_execution_provider_suggestion",
+      "source": "freemocap/api/http/onnx/onnx_router.py",
+      "owner": "Core integration",
+      "validation": [
+        "request path/query/body serialization matches declared aliases and optionality",
+        "response and error bodies retain contract distinctions",
+        "network failure and request abort surfaced without blind mutation retry"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/freemocap/onnx/session_providers",
       "operation_id": "get_session_providers_freemocap_onnx_session_providers_get",
       "handler": "get_session_providers",

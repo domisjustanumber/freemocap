@@ -313,6 +313,35 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
       numerical profile tolerances, not bin-exact. Principal point: fixed, (w-1)/2, (h-1)/2 from
       `cv2.initCameraMatrix2D` (`bundle_adjust.py:549-553`, same on 4.12 and 5.0, independent of the
       corners); bundle adjustment optimises only rvec, tvec, focal, k1 (`camera_model_solver_ops.py:14-44`).
+  - PART 3 DONE (2026-11-16):
+    - Tools `bd990784`: `tracker_comparison DATASET {charuco,mediapipe,rtmpose} --execution-provider KEY`
+      (free string, default cpu; an unknown key goes to skellytracker, which refuses it; a listed one
+      that is not usable is "unsupported" with its install hint; an EP other than cpu for a detector
+      that takes none is "unsupported"). `tracker_matrix.tracker_cases()` = charuco/cpu, mediapipe/cpu,
+      rtmpose on every key of `status()`, and `{dataset}-cpu-versus-{key}.json` per other RTMPose EP.
+      `recording_comparison --provider` is a free string. The hardware tools (`camera_transition`,
+      `pipeline_run`/`__main__ pipeline-benchmark`, `sdk_live_validation`) take
+      `--execution-provider`, default Auto (None), instead of a fixed key. The guard's allowlist is
+      empty.
+    - Docs `a21f1f54`: README, `EXECUTION_PROVIDER_INTEGRATION.md`, `freemocap-docs` `gpu-setup.mdx`
+      (rewritten: no EP table, link to skellytracker's EP docs and the in-app list; the removed
+      `use_centralized_inference`/`on_provider_missing`/3-retry OOM text is gone),
+      `backend-mocap.mdx`, `backend-pipeline-architecture.mdx`, `tracking-integration.mdx`, the datasets
+      and reference-recordings READMEs. Kept as written (history, measured facts): `benchmarks/`,
+      `current-work-plans/`, `SFN26-INTEGRATION.md`, `TRACKER_INTEGRATION.md`,
+      `freemocap-ui/UI-TEST-BASELINE.md`, the two contract READMEs ("four-camera CUDA capture" is a
+      test record), `TRACKER_COMPOSITION_INTEGRATION.md` (DLC and `hand_tracker_comparison`, on the
+      removal list); `experiments/` untouched (F3).
+    - A1 `2f392e4c`: `/onnx/execution_providers` gains `auto_offers` = `status().performance.offers`
+      (kind, ep_key, download_bytes, disk_bytes, licence_url, note); with the EP setting Auto the EP row
+      shows `AutoOffersNote`: each offer's `note`, the label of its EP from the same route, and the
+      download size. GAP for skellytracker: `InstallOffer.note` may be None (`recommendation.py:117`);
+      such an offer is not shown (no text derived). The licence link is not shown yet. Contract:
+      only the two EP schemas were patched into `contracts/openapi.json` (the committed file is
+      behind the app by other routes, about 1,400 lines; not regenerated whole). Tests: route test,
+      service test 5/5, UI runner 38/38 (new A1 display test), tsc only the 4 `cbor-x`; client package
+      131/131, its `coverage:check` 68 vs 69 fails also without this change.
+    - Fast suite after part 3: 1528 passed, the same 8 failed, 20 skipped.
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).

@@ -499,7 +499,8 @@ frames, each with `rtmpose` and with `mediapipe`.
    - posthoc calibration is out.
    - **State on 2026-11-17 (IN PROGRESS, local commits only).** All questions are ruled (plan §10.6-§10.7, and
      the user's later rulings listed below).
-     - Scratch ST clone: `19b55b1d` (fast-forwarded 2026-11-17 from `0a50c719`; ADR-9HTX stages 1-3).
+     - Scratch ST clone: `db155c3a` (2026-11-17; from `0a50c719` via `19b55b1d`, ADR-9HTX stages 1-3, then ADR-HB8Z
+       `cpu_threads`; the branch head `52a4de60` adds decision docs only).
      - Phase B venv: `.../phaseb/venv313`; onnx 1.22.0 and ml-dtypes 0.7.0 are installed there.
      - Commits, oldest first:
        - `351391ea` timing model;
@@ -587,6 +588,20 @@ frames, each with `rtmpose` and with `mediapipe`.
          Earlier gates of this doc ran on cpu fp32. GPU runs stay extra evidence, made on purpose.
        - Finding for the user (relayed by the supervisor; do not investigate before the answer): the person
          alignment's heading differs by 22.65 degrees between cpu fp32 and trt-rtx fp16 on test_data.
+       - Full-recording check (user A1, 2026-11-17; measurement only, ST `19b55b1d`, EP and precision forced by a
+         scratch harness, seeded numerical, filtering on): the heading is NOT stable on freemocap_sample_data (1108
+         frames) either. Against cpu fp32: trt-rtx fp16 34.7 degrees (release-equivalent FMP4 copy: 5.1), cuda fp32
+         21.5, cpu fp16 15.0 (FMP4: 17.4); cpu fp16 against trt-rtx fp16 49.8; a cpu fp32 repeat 0.0. The ground normal
+         moves at most 0.94 degrees, calibration and detector frames (8 per camera) are equal, and KEYPOINTS_3D after
+         the best rigid fit differ by median 1.2-1.4 mm. Every run anchors on `skull`: the heading is the forward axis
+         of the best-scoring steady interval of the skull orientation track (`estimate_body_alignment`), projected on
+         the foot-contact plane. The user's local copy of freemocap_sample_data has no videos in its own
+         `synchronized_videos`; its parent folder holds an h264 re-encode, not the release's FMP4 files. Sent to the
+         supervisor; no fix.
+       - ST `db155c3a` (cpu_threads default 10 here): fast suite 1587 passed, the same 8 failed; seeded test_data gate
+         97,425 kept, 0.314339 px, record `cpu_threads: 10`, parquet exactly equal to the `19b55b1d` cpu output.
+       - Later, no go yet: show the applied `cpu_threads` in the metrics window's "Models of this run" group, and
+         decide with the user whether freemocap sets the count itself.
          Metrics window rows are
          unchanged against the earlier hand-run: posthoc 14 rows, `person.*` on 1 of 120 frames (`run_if` false
          gives no spans), the others on 120; realtime the same nodes.

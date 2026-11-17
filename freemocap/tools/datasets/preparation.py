@@ -103,6 +103,18 @@ def wait_for_success(manager, pipeline, *, timeout: float) -> dict:
         time.sleep(0.1)
 
 
+def applied_execution(recording: Path) -> dict:
+    """The EP, device and precision each model node applied, from the skellytracker run record that the saved
+    observations keep (`definition["skellytracker"]["models"]`); empty for a pipeline with no model EP."""
+    from freemocap.core.recording.parquet_storage.parquet_reader import read_metadata
+    from freemocap.system.recording_structure.recording_structure import RecordingStructure
+
+    metadata = read_metadata(path=RecordingStructure(base_directory=recording.parent, recording_name=recording.name).data_parquet_path)
+    return {node: {field: model.get(field) for field in ("execution_provider", "device", "precision")}
+            for source in metadata.runs[metadata.selected_run_id].sources.values()
+            for node, model in ((source.definition.get("skellytracker") or {}).get("models") or {}).items()}
+
+
 def validate_parquet(recording: Path, *, expected_frames: int) -> dict:
     import pyarrow.compute as pc
     import pyarrow.parquet as pq
@@ -273,7 +285,8 @@ def _run_worker(request_path: Path, phases) -> None:
         result = {"implementation": implementation,
                   "calibration_task": calibration_status, "mocap_task": mocap_status,
                   "calibration_config": calibration_config.model_dump(mode="json"),
-                  "mocap_config": config.model_dump(mode="json"), "validation": validation,
+                  "mocap_config": config.model_dump(mode="json"), "applied_execution": applied_execution(recording),
+                  "validation": validation,
                   "calibration_input": calibration_input,
                   "calibration": calibration.to_metadata().model_dump(mode="json"),
                   "calibration_filename": calibration_path.name, "calibration_sha256": file_digest(calibration_path)}

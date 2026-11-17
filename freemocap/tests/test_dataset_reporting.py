@@ -15,6 +15,17 @@ class DatasetReportingTests(unittest.TestCase):
         self.assertIn('Processing log unavailable', text)
         self.assertIn('does not revalidate', text)
 
+    def test_an_auto_ep_setting_reads_auto_next_to_the_applied_ep(self):
+        result = {'mocap_config': {'execution_provider': None, 'execution_device': None, 'calibration_toml_path': None},
+                  'applied_execution': {'wholebody': {'execution_provider': 'cpu', 'device': None, 'precision': 'fp32'}}}
+        with patch.object(Path, 'is_file', return_value=False):
+            text = render_report(result, log_path=Path('missing.log'), label='fixture')
+        rows = {line.split()[0]: line.split(None, 1)[1].strip() for line in text.splitlines()
+                if line.startswith(('execution_', 'calibration_toml_path', 'applied.'))}
+        self.assertEqual(rows, {'execution_provider': 'Auto', 'execution_device': 'Auto', 'calibration_toml_path': 'not recorded',
+                                'applied.wholebody.execution_provider': 'cpu', 'applied.wholebody.device': 'not recorded',
+                                'applied.wholebody.precision': 'fp32'})
+
     def test_existing_statistics_and_timing_survive_rendering(self):
         log = '\n'.join([
             'Detection throughput: 12.31 synchronized frames/s;',

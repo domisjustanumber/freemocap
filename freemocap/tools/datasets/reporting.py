@@ -124,8 +124,11 @@ def render_report(result: dict, *, log_path: Path, label: str, identity=None) ->
           for field in ('status', 'created_at', 'updated_at')]])]
     lines += ['', 'WORKLOAD / SOFTWARE IDENTITY',
               table(['Field', 'Recorded value'], list(leaves(identity or {})) or [['Identity', None]])]
-    lines += ['', 'EXECUTED SETTINGS',
-              table(['Setting', 'Value'], list(leaves(result.get('mocap_config', {}))) or [['Settings', None]])]
+    # None in these settings is Auto (skellytracker's choice), not a missing measurement.
+    settings = [[name, 'Auto' if value is None and name in ('execution_provider', 'execution_device') else value]
+                for name, value in leaves(result.get('mocap_config', {}))]
+    lines += ['', 'EXECUTED SETTINGS', table(['Setting', 'Value'], [
+        *settings, *leaves(result.get('applied_execution', {}), 'applied')] or [['Settings', None]])]
     statistics, summaries, log_lines = [], [], []
     malformed = 0
     if log_path.is_file():

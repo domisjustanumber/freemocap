@@ -342,6 +342,21 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
       service test 5/5, UI runner 38/38 (new A1 display test), tsc only the 4 `cbor-x`; client package
       131/131, its `coverage:check` 68 vs 69 fails also without this change.
     - Fast suite after part 3: 1528 passed, the same 8 failed, 20 skipped.
+  - GATE RUNS DONE (2026-11-16, freemocap `66ab9f2b`; Python 3.13.18, OpenCV 5.0.0, ORT 1.31.1, scratch ST
+    clone `1e479fa3`; `test_data`, numerical profile, from observations, existing calibration). Prepared
+    root `<system temp>/fmg-<det>` (supervisor, option a: the scratchpad path is too long for
+    `workflow.py:177-179`), deleted after the report. Blender auto-open: off (numerical profile; it opens
+    only for standard, `preparation.py:224`); 0 Blender windows. Logs and ready.json in
+    `0a1e712d-.../scratchpad/gate/`.
+    - A posthoc `datasets process`: rtmpose exit 0, 222 frames, parquet validation passed, alignment
+      `calibrated_world: foot_support`, posthoc wall 40.1 s (process_batch 101 ms per 3-image batch);
+      mediapipe exit 0, 222 frames, passed, alignment `body_reference`, wall 30.7 s (55.7 ms per batch).
+      Applied EP (descriptor `skellytracker` block): rtmpose Auto -> cpu fp32 for person and wholebody;
+      mediapipe takes none. The report's `execution_provider` row says "not recorded" for Auto (None).
+    - B realtime replay `test_realtime_pipeline.py -k "human-<det> and test-data"`: rtmpose 2 passed
+      (72 s), mediapipe 2 passed (52 s).
+    - Not done: no comparison with sfn26 outputs (made on OpenCV 4.12, ST `2d356a6c`); one would need the
+      numerical profile tolerances, not bin-exact (F-S1, F-S4).
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).

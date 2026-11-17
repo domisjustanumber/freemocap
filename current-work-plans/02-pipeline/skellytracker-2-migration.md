@@ -467,6 +467,17 @@ frames, each with `rtmpose` and with `mediapipe`.
     (`persistence-listener.ts:80-89`, load `mocap-slice.ts:140-156`), no version; the realtime config is
     not persisted. Marker plan: `settingsVersion: 1` in `mocap.config`, as camera settings do
     (`camera-settings-storage.ts:14`); absent = legacy.
+- G5 = A (2026-11-16, user): for a legacy `trt` or `cuda` key the EP that the host supports wins over the
+  pack that is installed. No freemocap change: `suggest_execution_provider` stays as built (ST `1e479fa3`).
+- C1 (2026-11-16, user): skellytracker will give a normalised 0-to-1 keypoint score (a logistic map
+  declared in the sidecar; the raw score stays as a second field). Not there yet. Until the supervisor
+  says the field exists, KEEP the clip `be341bba`; build nothing on the raw score scale. When it lands:
+  remove the clip and reread the confidence gate (0.5 then means even odds that the point is correct).
+- A1 = yes (2026-11-16, user): with the EP setting Auto, freemocap shows skellytracker's offers (update the
+  driver, install a pack). With EP part 3, after A/B/C. Text and condition only from `status()`
+  (`install_hint`, recommendation and offer fields); no EP names, driver versions or hardware logic in
+  freemocap (`test_no_execution_provider_knowledge.py` still passes); one display test. A missing status
+  field is reported to the supervisor as a gap, not derived.
 
 ### 0.4 Open questions
 
@@ -581,7 +592,7 @@ frames, each with `rtmpose` and with `mediapipe`.
     them; body, hand and foot points and all line colours are unchanged.
 18. A saved confidence of 1.0 can mean "1 or more": skellytracker scores have no fixed range and the
     recording stores them clipped to [0, 1] (the 0.4 RTMW gate reads the raw score first). A negative
-    score is stored as 0.
+    score is stored as 0. TEMPORARY (§0.3 C1): the clip goes when skellytracker's 0-to-1 score lands.
 
 ### 0.7 Imports of old skellytracker modules that stage 2.4 can remove
 

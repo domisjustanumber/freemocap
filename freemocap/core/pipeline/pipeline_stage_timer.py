@@ -6,33 +6,54 @@ accumulated samples to a publication queue as a `PipelineTimingMessage`.
 The aggregator runs a `PipelineTimingReporter` thread that subscribes,
 maintains rolling windows across all nodes, and prints one consolidated
 report (see `pipeline_timing_reporter.py`).
+
+Task events with perf_counter timestamps are batched alongside the elapsed
+samples so the metrics timeline can render true start/end bars.
 """
 import logging
 import time
 from dataclasses import dataclass, field
 from queue import Full
 
+from freemocap.core.pipeline.pipeline_timing_events import perf_counter_ns
+from freemocap.core.pipeline.pipeline_timing_task_ids import CLOCK_DOMAIN_PERF_COUNTER
 from freemocap.core.types.type_overloads import TopicPublicationQueue
+from freemocap.pubsub.pubsub_topics import PipelineTimingEvent
 
 logger = logging.getLogger(__name__)
 
-FLUSH_INTERVAL_SECONDS: float = 5.0
+FLUSH_INTERVAL_SECONDS: float = 0.25
 ROLLING_WINDOW_FRAMES: int = 500
+MAX_EVENTS_PER_FLUSH: int = 256
 
 
 @dataclass
 class PipelineStageTimer:
-    """Accumulates per-stage elapsed times and flushes them to a pubsub topic."""
+    """Accumulates per-stage elapsed times and task events and flushes them to a pubsub topic."""
 
     name: str
     flush_interval: float = field(default=FLUSH_INTERVAL_SECONDS)
-    last_flush: float = field(default_factory=time.monotonic)
+    last_flush: float = field(default_factory=time.perf_counter)
     samples: dict[str, list[float]] = field(default_factory=dict)
+    events: list[PipelineTimingEvent] = field(default_factory=list)
+    dropped_events: int = 0
 
     def record(self, stage: str, elapsed_ms: float) -> None:
         if stage not in self.samples:
             self.samples[stage] = []
         self.samples[stage].append(elapsed_ms)
+
+    def record_task_event(self, event: PipelineTimingEvent) -> None:
+        """Keep the event and its duration as a sample of its stage; over the cap, count it as dropped."""
+        if len(self.events) >= MAX_EVENTS_PER_FLUSH:
+            self.dropped_events += 1
+            return
+        self.events.append(event)
+        self.record(event.stage, event.duration_ms)
+
+    def extend_task_events(self, events: list[PipelineTimingEvent]) -> None:
+        for event in events:
+            self.record_task_event(event)
 
     def maybe_flush(
             self,
@@ -47,13 +68,15 @@ class PipelineStageTimer:
         if now - self.last_flush < self.flush_interval:
             return
         self.last_flush = now
-        if not self.samples:
-            return
 
         batch = {stage: list(values) for stage, values in self.samples.items() if values}
         for values in self.samples.values():
             values.clear()
-        if not batch:
+        events_batch = self.events
+        self.events = []
+        dropped = self.dropped_events
+        self.dropped_events = 0
+        if not batch and not events_batch:
             return
 
         msg = PipelineTimingMessage(
@@ -61,6 +84,10 @@ class PipelineStageTimer:
             node_label=self.name,
             camera_id=camera_id,
             samples=batch,
+            events=events_batch,
+            clock_domain=CLOCK_DOMAIN_PERF_COUNTER,
+            relay_perf_counter_ns=perf_counter_ns(),
+            dropped_timing_events=dropped,
         )
         try:
             publication_queue.put_nowait(msg)

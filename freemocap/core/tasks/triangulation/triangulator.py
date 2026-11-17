@@ -34,19 +34,6 @@ PointsArray = NDArray[np.float64]
 TriangulateInput = PointsByCamera | PointsArray
 
 
-def _undistort_points_for_camera(
-        *,
-        points_2d: NDArray[np.float64],
-        camera: CameraModel,
-) -> NDArray[np.float64]:
-    """Undistort 2D pixel points using camera intrinsics. Returns normalized coords."""
-    pts = points_2d.reshape(-1, 1, 2).astype(np.float64)
-    K = camera.intrinsics.to_camera_matrix()
-    dist = camera.intrinsics.to_dist_coeffs()
-    undistorted = cv2.undistortPoints(pts, K, dist)
-    return undistorted.reshape(-1, 2)
-
-
 class Triangulator(BaseModel):
     """Triangulates 2D observations into 3D using calibrated CameraModels."""
 
@@ -209,7 +196,8 @@ class Triangulator(BaseModel):
 
         stacked, was_single_frame, n_frames, n_points = self._normalize_input(data2d=data2d)
 
-        if assume_undistorted_normalized:
+        # No points: skip cv2.undistortPoints, which raises on empty input in 4.12 and returns None in 5.0.
+        if assume_undistorted_normalized or stacked.size == 0:
             undistorted = stacked
         else:
             undistorted = np.empty_like(stacked)

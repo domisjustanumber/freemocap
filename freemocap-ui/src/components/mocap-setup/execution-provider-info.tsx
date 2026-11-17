@@ -6,20 +6,20 @@ export function NotUsableNote({provider}: {provider: ExecutionProviderOption}) {
 }
 
 /**
- * What Auto could gain on the server's host, as skellytracker offers it (A1): each offer's own sentence, the label of its EP
- * and its download size. An offer without a sentence is not shown: freemocap derives no text.
+ * What Auto could gain on the server's host, as skellytracker offers it (A1): each offer's own sentence, the label of its EP,
+ * its download size and the licence link of a pack. All text comes from skellytracker; freemocap derives none.
  */
 export function AutoOffersNote({offers, providers}: {
     offers: readonly ExecutionProviderOffer[]; providers: readonly ExecutionProviderOption[];
 }) {
-    const shown = offers.filter(offer => offer.note);
-    if (!shown.length) return null;
+    if (!offers.length) return null;
     return <div className="settings-note" role="status">
         <p>For Auto, SkellyTracker offers:</p>
-        {shown.map((offer, index) => <p key={`${offer.kind}:${offer.ep_key ?? index}`}>
+        {offers.map((offer, index) => <p key={`${offer.kind}:${offer.ep_key ?? index}`}>
             {offer.ep_key && <><strong>{providers.find(({key}) => key === offer.ep_key)?.label ?? offer.ep_key}</strong>: </>}
             {offer.note}
             {offer.download_bytes !== null && <> ({Math.round(offer.download_bytes / 1e6)} MB download)</>}
+            {offer.licence_url && <> <a href={offer.licence_url} target="_blank" rel="noopener noreferrer">{offer.licence_url}</a></>}
         </p>)}
     </div>;
 }

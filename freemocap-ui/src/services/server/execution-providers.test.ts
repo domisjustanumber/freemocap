@@ -43,7 +43,7 @@ test('HTTP failures and malformed provider lists are not advertised as support',
     for (const response of [new Response('', {status: 503}), Response.json({available: [CPU]}),
         Response.json(answer([{key: 'cpu', label: 'CPU'}])), Response.json({providers: [CPU]}),
         Response.json(answer([{...GPU, devices: [{key: 'gpu:0'}]}])),
-        Response.json({providers: [CPU], detector_takes_execution_provider: TAKES}), Response.json(answer([CPU], [{kind: 'add-pack'}]))]) {
+        Response.json({providers: [CPU], detector_takes_execution_provider: TAKES}), Response.json(answer([CPU], [{kind: 'add-pack'}])), Response.json(answer([CPU], [{...OFFER, note: null}]))]) {
         await assert.rejects(requestExecutionProviders('http://providers.invalid', undefined, (async () => response) as typeof fetch));
     }
 });

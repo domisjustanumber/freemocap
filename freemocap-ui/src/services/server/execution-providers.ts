@@ -12,7 +12,7 @@ const isNumberOrNull = (value: unknown) => value === null || typeof value === 'n
 const isStringOrNull = (value: unknown) => value === null || typeof value === 'string';
 const isOffer = (offer: Record<string, unknown> | null) => typeof offer?.kind === 'string' && isStringOrNull(offer.ep_key)
     && isNumberOrNull(offer.download_bytes) && isNumberOrNull(offer.disk_bytes) && isStringOrNull(offer.licence_url)
-    && isStringOrNull(offer.note);
+    && typeof offer.note === 'string';
 
 export async function requestExecutionProviders(baseUrl: string, signal?: AbortSignal,
     request: typeof fetch = fetch): Promise<ExecutionProviderCatalog> {

@@ -4205,7 +4205,7 @@ export interface components {
             /** Licence Url */
             licence_url: string | null;
             /** Note */
-            note: string | null;
+            note: string;
         };
     };
     responses: never;

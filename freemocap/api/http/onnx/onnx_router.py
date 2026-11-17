@@ -31,7 +31,7 @@ class ExecutionProviderOffer(BaseModel):
     download_bytes: int | None
     disk_bytes: int | None
     licence_url: str | None
-    note: str | None
+    note: str
 
 
 class AvailableExecutionProvidersResponse(BaseModel):

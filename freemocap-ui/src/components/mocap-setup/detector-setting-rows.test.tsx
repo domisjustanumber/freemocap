@@ -139,13 +139,15 @@ test('a device row follows an EP with more than one device and reports the devic
 });
 
 test('with Auto, the EP row shows the offers of skellytracker in its own words; not with an explicit EP (A1)', () => {
-    const offers = [{kind: 'add-pack', ep_key: 'gpu-ep', download_bytes: 110_875_664, disk_bytes: 286_000_621, licence_url: null,
-        note: 'Run `install gpu-ep`.'}, {kind: 'update-driver', ep_key: null, download_bytes: null, disk_bytes: null, licence_url: null,
-        note: 'Update the GPU driver.'}, {kind: 'none-available', ep_key: null, download_bytes: null, disk_bytes: null, licence_url: null, note: null}];
+    const offers = [{kind: 'add-pack', ep_key: 'gpu-ep', download_bytes: 110_875_664, disk_bytes: 286_000_621,
+        licence_url: 'https://example.org/gpu-ep-licence', note: 'Run `install gpu-ep`.'},
+        {kind: 'update-driver', ep_key: null, download_bytes: null, disk_bytes: null, licence_url: null, note: 'Update the GPU driver.'}];
     const providers = {...PROVIDERS, autoOffers: offers};
-    const text = (html: string) => html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ');
-    const auto = text(detectorRows('rtmpose', 'all', {providers}));
-    assert.match(auto, /For Auto, SkellyTracker offers:GPU EP: Run `install gpu-ep`\. \(111 MB download\)Update the GPU driver\./);
+    const html = detectorRows('rtmpose', 'all', {providers});
+    const text = (markup: string) => markup.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ');
+    assert.match(text(html), /For Auto, SkellyTracker offers:GPU EP: Run `install gpu-ep`\. \(111 MB download\) https:\/\/example\.org\/gpu-ep-licenceUpdate the GPU driver\./);
+    assert.match(html, /<a href="https:\/\/example\.org\/gpu-ep-licence" target="_blank" rel="noopener noreferrer">/);
+    assert.equal((html.match(/<a /g) ?? []).length, 1);
     assert.ok(!text(detectorRows('rtmpose', 'all', {providers, value: {...VALUE, provider: 'cpu'}})).includes('SkellyTracker offers'));
     assert.ok(!text(detectorRows('rtmpose', 'all')).includes('SkellyTracker offers'));
 });

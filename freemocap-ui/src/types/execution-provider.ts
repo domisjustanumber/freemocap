@@ -26,7 +26,7 @@ export interface ExecutionProviderOffer {
     download_bytes: number | null;
     disk_bytes: number | null;
     licence_url: string | null;
-    note: string | null;
+    note: string;
 }
 
 /** The server's EPs in skellytracker's order, whether the pipeline of each detector takes an EP, and the Auto offers. */

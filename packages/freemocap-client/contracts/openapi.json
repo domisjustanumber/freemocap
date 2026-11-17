@@ -9933,15 +9933,8 @@
             "title": "Licence Url"
           },
           "note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
+            "title": "Note",
+            "type": "string"
           }
         },
         "required": [

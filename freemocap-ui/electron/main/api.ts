@@ -12,6 +12,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import {APP_PATHS} from './app-paths';
 import {getBaseDataFolder, setBaseDataFolder, resetBaseDataFolder} from './base-folder';
+import {openPipelineMetricsWindow} from './services/pipeline-metrics-window';
 
 const { autoUpdater } = pkg;
 
@@ -423,6 +424,10 @@ export const api = t.router({
                 writeTelemetryConfig({ telemetry_enabled: input.enabled });
                 return input.enabled;
             }),
+    }),
+
+    windows: t.router({
+        openPipelineMetrics: t.procedure.mutation(() => openPipelineMetricsWindow()),
     }),
 
     // App Info & Updates

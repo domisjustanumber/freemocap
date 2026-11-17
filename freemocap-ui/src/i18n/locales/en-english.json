@@ -346,5 +346,33 @@
       "docs": "Read the calibration guide",
       "targetHidden": "Can't highlight this right now — it may be in a collapsed panel. Click Next to continue."
     }
+  },
+  "openPipelineMetrics": "Open pipeline metrics",
+  "pipelineMetrics": {
+    "stages": {
+      "skeleton_inference_frame_read": {
+        "short": "Frame read",
+        "long": "Time to read every camera's image of the frame from shared memory before inference."
+      },
+      "skeleton_inference_predict_batch": {
+        "short": "Batch inference",
+        "long": "Wall-clock time freemocap waits for one tracker call on every camera's image of the frame, including the hand-off to the inference service."
+      },
+      "skeleton_inference_pipeline_run": {
+        "short": "Tracker run",
+        "long": "skellytracker 2.0's span around one whole pipeline call (pipeline.run). It excludes freemocap's conversion of the results."
+      },
+      "camera_charuco_detection": {
+        "short": "Charuco detection",
+        "long": "Time to find the Charuco board in one camera's image."
+      },
+      "no_description": "No description is available for this stage."
+    },
+    "spans": {
+      "preprocess": "skellytracker 2.0 node span: preparing this node's model input (resize, crop and batch).",
+      "inference": "skellytracker 2.0 node span: running this node's model on the execution provider.",
+      "postprocess": "skellytracker 2.0 node span: turning this node's model output into boxes or keypoints.",
+      "run": "skellytracker 2.0 node span: one run of this node. For a glue node this is box choice, gating or smoothing; for MediaPipe it is the whole model call."
+    }
   }
 }

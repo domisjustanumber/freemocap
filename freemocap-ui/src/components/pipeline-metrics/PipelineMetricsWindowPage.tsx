@@ -1,0 +1,155 @@
+import React, {useEffect, useMemo, useState} from 'react';
+import {PipelineNetworkTimeline} from '@/components/pipeline-metrics/PipelineNetworkTimeline';
+import {buildTimelineViewModel} from '@/components/pipeline-metrics/pipelineTimelineModel';
+import {stageLabel, timingEngine} from '@/components/pipeline-metrics/pipelineTaskTopology';
+import {metricsState, type MetricsState, runLabel, sortStages} from '@/components/pipeline-metrics/pipelineMetricsState';
+import {feedPipelineTimingStore, PipelineTimingStore} from '@/services/server/server-helpers/pipeline-timing-store';
+import {PIPELINE_TIMELINE_FRAME_WINDOW, type RunTimingSnapshot} from '@/services/server/server-helpers/pipeline-timing-types';
+import {ConnectionState} from '@/services/server/server-helpers/websocket-connection';
+import {TransportService} from '@/services/server/transport/TransportService';
+import {DEFAULT_HOST, DEFAULT_PORT, serverUrls} from '@/constants/server-urls';
+import {loadFromStorage, STORAGE_KEYS} from '@/components/control-panels/server-connection/storage';
+import IconButton from '@/components/ui-components/IconButton';
+import SettingSelectInput from '@/components/common/settings-layout/setting-select-input';
+
+const POLL_MS = 250;
+
+const STATE_TEXT: Record<Exclude<MetricsState, 'ready'>, string> = {
+    'disconnected': 'Not connected to the FreeMoCap server. This window reconnects on its own.',
+    'no-pipeline': 'No pipeline is reporting timing. Start real-time processing in the main window.',
+    'not-running': 'This pipeline is not running.',
+    'timing-disabled': 'Pipeline timing is off for this pipeline (log_pipeline_times is false), so it sends no task events.',
+};
+
+const ms = (value: number) => value.toFixed(value >= 100 ? 0 : 1);
+
+// The main window saves its server address in storage this window shares.
+function applySavedServer(): void {
+    serverUrls.setHost(loadFromStorage(STORAGE_KEYS.SERVER_HOST, DEFAULT_HOST));
+    serverUrls.setPort(loadFromStorage(STORAGE_KEYS.SERVER_PORT, DEFAULT_PORT));
+}
+
+export default function PipelineMetricsWindowPage(): React.ReactElement {
+    const [store] = useState(() => new PipelineTimingStore());
+    const [connected, setConnected] = useState(false);
+    const [runs, setRuns] = useState<RunTimingSnapshot[]>([]);
+    const [selectedKey, setSelectedKey] = useState<string | null>(null);
+    const [frozen, setFrozen] = useState<RunTimingSnapshot | null>(null);
+    const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+
+    // One more transport client, like the main window: it reconnects by itself and asks for timing on every connect.
+    useEffect(() => {
+        applySavedServer();
+        const transport = new TransportService({url: serverUrls.getWebSocketUrl()});
+        const onState = (state: ConnectionState) => setConnected(state === ConnectionState.CONNECTED);
+        transport.on('state-change', onState);
+        const stopFeed = feedPipelineTimingStore(transport, store);
+        const onStorage = (event: StorageEvent) => {
+            if (event.key !== STORAGE_KEYS.SERVER_HOST && event.key !== STORAGE_KEYS.SERVER_PORT) return;
+            applySavedServer();
+            transport.updateUrl(serverUrls.getWebSocketUrl());
+            transport.disconnect();
+            transport.connect();
+        };
+        window.addEventListener('storage', onStorage);
+        transport.connect();
+        const poll = setInterval(() => setRuns(store.runs()), POLL_MS);
+        return () => {
+            clearInterval(poll);
+            window.removeEventListener('storage', onStorage);
+            stopFeed();
+            transport.off('state-change', onState);
+            transport.disconnect();
+        };
+    }, [store]);
+
+    const live = runs.find(run => run.key === selectedKey) ?? runs[0] ?? null;
+    const run = frozen ?? live;
+    const state = metricsState(connected, run);
+    const model = useMemo(() => buildTimelineViewModel({
+        events: run?.events ?? [], configuredCameraFpsHz: run?.configuredCameraFpsHz ?? null, incompleteFrames: run?.incompleteFrames,
+    }), [run]);
+
+    return (
+        <div style={{height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--gray-900)', color: 'var(--gray-300)'}}>
+            <div className="flex flex-row items-center gap-2 flex-wrap" style={{padding: '4px 8px', borderBottom: '1px solid var(--gray-700)'}}>
+                <span className="title">Pipeline metrics</span>
+                <span className="text md" style={{color: connected ? 'var(--green-300)' : 'var(--gray-400)'}}>
+                    {connected ? 'Connected' : 'Not connected'}
+                </span>
+                <div className="flex-1"/>
+                {runs.length > 0 && <SettingSelectInput label="Pipeline run" value={live?.key ?? ''} disabled={frozen != null}
+                    options={runs.map(option => ({label: runLabel(option), value: option.key}))} onChange={setSelectedKey}/>}
+                <IconButton icon={frozen ? 'play-icon' : 'pause-icon'} title={frozen ? 'Resume' : 'Pause'}
+                    onClick={() => setFrozen(frozen ? null : live)}/>
+            </div>
+
+            {/* ── System information panel: host, GPUs, runtime, execution providers, models and live load.
+                 Empty until PM commit 9 fills it (pipeline-metrics-port-plan.md §5). ── */}
+            <section aria-label="System information" data-slot="system-information"/>
+
+            {state !== 'ready' || !run
+                ? <p className="text md" style={{margin: 8, padding: '8px 12px', borderRadius: 4, backgroundColor: 'var(--gray-800)',
+                    borderLeft: `3px solid ${state === 'timing-disabled' ? 'var(--warning-400)' : 'var(--green-500)'}`}}>
+                    {STATE_TEXT[state as Exclude<MetricsState, 'ready'>]}
+                </p>
+                : <RunSummary run={run}/>}
+
+            {state === 'ready' && (
+                <div style={{flex: 1, minHeight: 0, margin: '0 8px 8px', border: '1px solid var(--gray-700)', borderRadius: 4, overflow: 'hidden'}}>
+                    <PipelineNetworkTimeline model={model} selectedTaskId={selectedTaskId} onSelectTask={setSelectedTaskId}/>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function RunSummary({run}: {run: RunTimingSnapshot}): React.ReactElement {
+    const lag = Object.entries(run.nodeLag);
+    return (
+        <div className="flex flex-col gap-1" style={{padding: '4px 8px'}}>
+            <p className="text sm" style={{color: 'var(--warning-300)'}}>
+                Timing is on for this pipeline (log_pipeline_times). Its spans cost about 0.6 ms per frame on CPU.
+            </p>
+            <p className="text md">
+                {run.endToEnd
+                    ? <>End-to-end per complete frame: <strong>{ms(run.endToEnd.meanMs)} ms</strong> mean
+                        (range {ms(run.endToEnd.minMs)}–{ms(run.endToEnd.maxMs)} ms, {run.endToEnd.frames} frames)</>
+                    : 'Waiting for a complete frame…'}
+            </p>
+            <p className="text sm" style={{color: 'var(--gray-500)'}}>
+                From each frame's own events: its first event start to its last event end. Frames are sampled about four times a second.
+            </p>
+            <p className="text sm" style={{color: 'var(--gray-400)'}}>
+                Dropped timing events: {run.droppedInLastMessage} in the newest message, {run.droppedSinceOpened} since this window opened.
+                {run.incompleteFrames.length > 0 && <span style={{color: 'var(--warning-400)'}}> · {run.incompleteFrames.length} incomplete frame(s)</span>}
+                {lag.map(([kind, frames]) => <span key={kind} style={{color: frames <= 3 ? 'var(--warning-300)' : 'var(--red-300)'}}> · {kind} +{frames}</span>)}
+                {run.staleNodes.length > 0 && <span style={{color: 'var(--red-400)'}}> · stalled: {run.staleNodes.join(', ')}</span>}
+            </p>
+            {run.stages.length > 0 && <table className="text sm" style={{borderCollapse: 'collapse', maxWidth: 760}}>
+                <thead>
+                    <tr style={{color: 'var(--gray-500)', textAlign: 'left'}}>
+                        <th>Stage</th><th>Engine</th><th style={{textAlign: 'right'}}>ms/frame</th><th style={{textAlign: 'right'}}>FPS</th>
+                        <th style={{textAlign: 'right'}}>range (ms)</th><th style={{textAlign: 'right'}}>frames</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {sortStages(run.stages).map(stage => (
+                        <tr key={stage.sourceKey}>
+                            <td style={{paddingRight: 12}}>{stageLabel(stage.sourceKey, stage.stage, stage.cameraId)}</td>
+                            <td>{timingEngine(stage) ?? 'freemocap'}</td>
+                            <td style={{textAlign: 'right'}}>{ms(stage.meanMs)}</td>
+                            <td style={{textAlign: 'right'}}>{stage.fps.toFixed(1)}</td>
+                            <td style={{textAlign: 'right'}}>{ms(stage.minMs)}–{ms(stage.maxMs)}</td>
+                            <td style={{textAlign: 'right'}}>{stage.frames}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>}
+            <p className="text sm" style={{color: 'var(--gray-500)'}}>
+                FPS is 1000 ÷ the stage's mean ms/frame: the rate that stage alone would allow, not the pipeline's frame rate.
+                The timeline shows the newest {PIPELINE_TIMELINE_FRAME_WINDOW} frames.
+            </p>
+        </div>
+    );
+}

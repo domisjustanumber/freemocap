@@ -13,6 +13,7 @@ import ValueSelector from "@/components/ui-components/ValueSelector";
 import SegmentedControl from "@/components/ui-components/SegmentedControl";
 import { Row } from "@/components/ui-components/Row";
 import { useRealtimePipelineSync } from "@/hooks/useRealtimePipelineSync";
+import { openPipelineMetricsWindow } from "@/services/electron-ipc/open-pipeline-metrics-window";
 
 
 interface SettingsOverlayProps {
@@ -87,6 +88,9 @@ export const SettingsOverlay: React.FC<SettingsOverlayProps> = ({
               Processing settings
             </button>
             {processingSettingsOpen && <RealtimeProcessingSettings onClose={() => setProcessingSettingsOpen(false)}/>}
+            <button type="button" className="button sm secondary br-1" onClick={() => void openPipelineMetricsWindow()}>
+              {t("openPipelineMetrics")}
+            </button>
           </div>
 
         </div>

@@ -67,8 +67,8 @@ interface Info {title: string; text: ReactNode}
  * selected detector's note in its explanation; what runs on which hardware comes from SkellyTracker's EP sentences.
  */
 export const REALTIME_DETECTOR_NOTES = {
-    rtmpose: '133 keypoints (body, hands, face) via YOLOX + RTMW.',
-    mediapipe: 'Body + hands + face via MediaPipe.',
+    rtmpose: '133 keypoints (body, hands, face) via YOLOX + RTMW. Uses GPU batched inference when available.',
+    mediapipe: 'Body + hands + face via MediaPipe. CPU-only; runs per-camera without GPU batching.',
 } satisfies Partial<Record<DetectorType, string>>;
 
 /** An explanation with a note as one more paragraph after its own. */

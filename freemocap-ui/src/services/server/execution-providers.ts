@@ -37,6 +37,12 @@ export function executionProviderOptions(selected: ExecutionProviderName | null,
         ? options : [...options, {label: providers.find(({key}) => key === selected)?.label ?? selected, value: selected}];
 }
 
+/** Whether a detector shows the Execution provider row: the server's flag once it has answered; before that (also
+ *  while disconnected or after a failed query) the RTMW detector shows it with Auto and the saved key, as upstream sfn26. */
+export function detectorShowsExecutionProvider(answer: Readonly<Record<string, boolean>> | null, detector: string): boolean {
+    return answer ? answer[detector] ?? false : detector === 'rtmpose';
+}
+
 /** skellytracker's replacement for an EP key saved before skellytracker 2 (null = Auto). */
 export async function requestExecutionProviderSuggestion(baseUrl: string, saved: string, signal?: AbortSignal,
     request: typeof fetch = fetch): Promise<string | null> {

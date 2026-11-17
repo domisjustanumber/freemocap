@@ -228,7 +228,7 @@ export const RealtimePipelineConfigTree: React.FC<PipelineConfigTreeProps> = ({
                         )}
                         {activeDetectorType === "rtmpose" && context === "realtime" && (
                             <p className="text-sm text-gray">
-                                133 keypoints (body, hands, face) via YOLOX + RTMPose.
+                                133 keypoints (body, hands, face) via YOLOX + RTMPose. Uses GPU batched inference when available.
                             </p>
                         )}
                         {executionProviderOptions.takesExecutionProvider(activeDetectorType) && (

@@ -1,7 +1,7 @@
 // Bundle with esbuild --bundle --platform=node --format=cjs, then node --test.
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {requestExecutionProviders, executionProviderOptions, requestExecutionProviderSuggestion} from './execution-providers';
+import {detectorShowsExecutionProvider, requestExecutionProviders, executionProviderOptions, requestExecutionProviderSuggestion} from './execution-providers';
 
 const CPU = {key: 'cpu', label: 'CPU', description: 'Runs on the processor.', usable: true, install_hint: null, uses_gpu: false, devices: []};
 const GPU = {key: 'gpu-ep', label: 'GPU EP', description: 'Runs on a GPU.', usable: true, install_hint: null, uses_gpu: true,
@@ -17,6 +17,15 @@ test('the options are Auto and the usable server rows in their order, with their
     assert.deepEqual(executionProviderOptions(null, []), [{label: 'Auto', value: null}]);
     assert.deepEqual(executionProviderOptions(null, [GPU, PACK, CPU]),
         [{label: 'Auto', value: null}, {label: 'GPU EP', value: 'gpu-ep'}, {label: 'CPU', value: 'cpu'}]);
+});
+
+test('before the server answers RTMW shows the provider row with Auto and the saved key; then the server decides', () => {
+    assert.equal(detectorShowsExecutionProvider(null, 'rtmpose'), true);
+    assert.equal(detectorShowsExecutionProvider(null, 'mediapipe'), false);
+    assert.deepEqual(executionProviderOptions('saved-ep', []), [{label: 'Auto', value: null}, {label: 'saved-ep', value: 'saved-ep'}]);
+    assert.equal(detectorShowsExecutionProvider({rtmpose: false, mediapipe: true}, 'rtmpose'), false, 'the answer decides');
+    assert.equal(detectorShowsExecutionProvider({rtmpose: true, mediapipe: true}, 'mediapipe'), true);
+    assert.equal(detectorShowsExecutionProvider({}, 'rtmpose'), false, 'a detector the answer does not list');
 });
 
 test('a saved key that is not offered stays visible, with its label when the server lists it', () => {

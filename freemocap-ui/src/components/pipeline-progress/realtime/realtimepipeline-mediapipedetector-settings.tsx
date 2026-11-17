@@ -20,8 +20,8 @@ interface RTPSkeletonSetupProps {
 const DETECTOR_INFO = {
     title: 'Skeleton detector',
     text: <>
-        <p><strong>RTMW</strong> — 133 keypoints (body, hands, face) via YOLOX + RTMW.</p>
-        <p><strong>MediaPipe</strong> — body, hands and face.</p>
+        <p><strong>RTMW</strong> — 133 keypoints (body, hands, face) via YOLOX + RTMW. Uses GPU batched inference when available.</p>
+        <p><strong>MediaPipe</strong> — body, hands and face. CPU only; runs per camera without GPU batching.</p>
         <p><em>The detector decides which settings below apply.</em></p>
     </>,
 };

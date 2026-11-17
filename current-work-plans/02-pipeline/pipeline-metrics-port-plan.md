@@ -547,3 +547,26 @@ Deletion at ST 2.4: one commit removes `legacy_tracker_run.py` and every line ma
     L2 and L4.
 - **L4 (user): no downloads.** Recommended: the legacy seam refuses to start when an old model file is not in the
   cache.
+
+### 10.7 Rulings of the supervisor (2026-11-17)
+
+These are technical rulings. The supervisor reports them to the user, who can overturn any one.
+
+- **Q3 = A.** The end-to-end time of each complete frame comes from that frame's own events, and each stage shows
+  ms/frame with FPS. No sum of separately sampled windows.
+- **Q4 = A.** A new message kind on the main CBOR transport; the metrics window is one more client.
+- **Q5 = A.** One HTTP endpoint gives the static groups and the run's models; live load goes in the metrics message
+  at 1 to 2 Hz.
+- **Q6.** Loaded libraries and models are read where the run lives. One `LiveSampler` runs with the inference pid.
+- **Q8 = A.** Events are sent only while a metrics client is connected.
+  - The report says what the open window itself costs: the sink runs inside `pipeline.run`.
+  - A window opened in the middle of a run gets events without a restart, or the report says clearly that it needs
+    one.
+- **L2.** The boolean `legacy_tracker_benchmark` on the realtime inference node config, with a DEV-only toggle
+  "Legacy tracker (benchmark)". No new detector value.
+- **L4 = yes.** The legacy seam refuses to start when an old model file is not in the cache; nothing is downloaded.
+- **Go:** PM commits 1 to 7 and 9, in the order of §10.5. Commit 8 waits for the supervisor's skellytracker SHA.
+  - A missing skellytracker API is not worked around silently. The step is built against what exists, and the
+    request goes to the supervisor with its exact shape.
+  - The Electron window code stays separate from the pipeline-editor window that freemocap-77 builds on
+    `pipeline-gui`. The report lists the Electron files that change.

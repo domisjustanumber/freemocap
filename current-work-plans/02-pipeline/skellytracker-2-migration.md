@@ -240,6 +240,18 @@ on the local `../skellytracker` `dom/sidecar-implementation`):
        tuple -> list in the `skellytracker` block (`models`, `device` str or list, `options`), a
        timestamp or path in `export_pipeline(..., resolved=True)`, a second writer between accept and
        save. If no repro in 10 runs, report what was ruled out; no guessed fix.
+    A RESULT (2026-11-16, baseline `$B/freemocap` ca0c17cc, its .venv Python 3.12, empty scratch
+    FREEMOCAP_PROVENANCE_PREPARED_ROOT; `$B` git status clean before and after; logs
+    `0a1e712d-.../scratchpad/baseline-A/run1..6.txt`):
+    - Runs 4-6 (default pytest temp, as the migration runs): the worker succeeds, `verify_outputs` and
+      `check_fresh_outputs` pass, alignment `{'calibrated_world': 'foot_support'}` 3/3 (result.json);
+      no "Recording changed". Each then fails at `preparation.py:422` `save_current` ->
+      `storage.py:78` rename scratch -> current: `PermissionError [WinError 5] Access is denied`. The
+      test's own Blender export opens the scene (`auto_open_blend_file`, standard profile) and the 3
+      Blender windows were still open on the recording folders. Baseline environment, not this migration.
+    - Runs 1-3 (my `--basetemp` under the long scratchpad): Blender export "Failed to open local file"
+      on the 236-char parquet path, at `export_completion.py:115`. Caused by the temp path choice.
+    - So: neither migration failure occurs in the baseline; B and C proceed.
   - Part 3: the tools (an EP key as a free string, skellytracker refuses a bad one; a matrix takes its
     keys from `status()`), then the docs (41 files: remove EP lists, link to the skellytracker EP docs
     or the in-app list). `bench_*.py` and `experiments/` stay untouched (F3).

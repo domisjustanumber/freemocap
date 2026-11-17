@@ -1,7 +1,7 @@
 import {createListenerMiddleware} from '@reduxjs/toolkit';
 import {RootState} from './root-state-types';
 import {saveToStorage} from './persistence';
-import {MOCAP_SETTINGS_VERSION} from './export-settings-migration';
+import {savedMocapConfig} from './export-settings-migration';
 
 export const persistenceListenerMiddleware = createListenerMiddleware();
 
@@ -79,16 +79,17 @@ persistenceListenerMiddleware.startListening({
 
 // ─── mocap.config ─────────────────────────────────────────────────────────────
 persistenceListenerMiddleware.startListening({
-    predicate: (_, curr, prev) =>
-        (curr as RootState).mocap.config !== (prev as RootState).mocap.config,
+    predicate: (_, curr, prev) => {
+        const c = (curr as RootState).mocap;
+        const p = (prev as RootState).mocap;
+        // An answer that keeps the old threshold changes no config value, but its new version must be saved.
+        return c.config !== p.config || c.oldConfidenceThreshold !== p.oldConfidenceThreshold;
+    },
     effect: async (_, api) => {
         api.cancelActiveListeners();
         await api.delay(DEBOUNCE_MS);
-        const mocap = (api.getState() as RootState).mocap;
-        // A pending legacy EP key is not saved over: the file keeps it until its replacement is applied.
-        if (!mocap.exportSettingsError && mocap.executionProviderMigration?.status !== 'pending') {
-            saveToStorage('mocap.config', {...mocap.config, settingsVersion: MOCAP_SETTINGS_VERSION});
-        }
+        const saved = savedMocapConfig((api.getState() as RootState).mocap);
+        if (saved) saveToStorage('mocap.config', saved);
     },
 });
 

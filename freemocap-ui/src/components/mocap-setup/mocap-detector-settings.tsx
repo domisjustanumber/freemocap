@@ -1,6 +1,9 @@
 import {useExecutionProviderOptions} from "@/hooks/useExecutionProviderOptions";
 import {useAppDispatch, useAppSelector} from '@/store/hooks';
-import {mocapCharucoTrackingChanged, executionProviderNoticeDismissed, selectExecutionProviderMigration} from '@/store/slices/mocap';
+import {
+    mocapCharucoTrackingChanged, executionProviderNoticeDismissed, oldConfidenceThresholdAnswered, selectExecutionProviderMigration,
+    selectOldConfidenceThreshold,
+} from '@/store/slices/mocap';
 import SettingRow from '@/components/common/settings-layout/setting-row';
 import SettingsGroupHeading from '@/components/common/settings-layout/settings-group-heading';
 import SettingToggleSwitch from '@/components/common/settings-layout/setting-toggle-switch';
@@ -8,12 +11,14 @@ import {useMocap} from '@/hooks/useMocap';
 import {RTMW_CONFIDENCE_THRESHOLD} from '@/types/rtmw-confidence';
 import {DETECTOR_OPTIONS} from './detector-options';
 import {LegacyExecutionProviderNotice} from './legacy-execution-provider-notice';
+import {OldConfidenceThresholdPrompt} from './old-confidence-threshold-prompt';
 import {BOARD_GROUP_INFO, CHARUCO_INFO, DetectorSettingRows, type DetectorSettingsValue} from './detector-setting-rows';
 
 export default function MocapDetectorSettings() {
     const dispatch = useAppDispatch();
     const detectBoard = useAppSelector(state => state.mocap.config.charucoTrackingEnabled);
     const migration = useAppSelector(selectExecutionProviderMigration);
+    const oldThreshold = useAppSelector(selectOldConfidenceThreshold);
     const {
         detectorType,
         rtmPoseModelName,
@@ -48,6 +53,8 @@ export default function MocapDetectorSettings() {
     return <>
         {migration && <LegacyExecutionProviderNotice migration={migration} providers={executionProviderOptions.providers}
             onDismiss={() => dispatch(executionProviderNoticeDismissed())}/>}
+        {oldThreshold !== null && <OldConfidenceThresholdPrompt saved={oldThreshold}
+            onAnswer={answer => dispatch(oldConfidenceThresholdAnswered(answer))}/>}
         <DetectorSettingRows value={value} onChange={applyChange} detectors={DETECTOR_OPTIONS}
             providers={executionProviderOptions} context="posthoc" rows="all"/>
 

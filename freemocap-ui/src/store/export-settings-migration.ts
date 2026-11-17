@@ -1,3 +1,6 @@
+import type {MocapState} from '@/store/slices/mocap/mocap-slice';
+import {RTMW_CONFIDENCE_THRESHOLD} from '@/types/rtmw-confidence';
+
 /** Historical local settings are input aliases, never names written by new clients. */
 const aliases = {
     scientificExportFormats: 'exportFormats',
@@ -40,8 +43,23 @@ export function migrateRemovedDetectors(saved: Record<string, unknown>): Record<
     return config;
 }
 
-/** Written with every saved mocap config. A saved config without it was written before skellytracker 2: its EP key is legacy. */
-export const MOCAP_SETTINGS_VERSION = 1;
+/**
+ * Written with every saved mocap config. A saved config without it was written before skellytracker 2: its EP key is
+ * legacy. Version 1 was written before the calibrated RTMW score (user T1): its confidence threshold is on the old scale.
+ */
+export const MOCAP_SETTINGS_VERSION = 2;
+/** Saved while the old-scale threshold prompt is open, so the prompt shows again until the user answers (user M1). */
+export const PRE_CALIBRATED_SCORE_SETTINGS_VERSION = 1;
+
+/**
+ * The confidence threshold of a config saved before the calibrated RTMW score, when the user must be asked about it
+ * (user M1): only a saved number below the new default. Nothing is changed here; the saved value stays in force.
+ */
+export function oldScaleConfidenceThreshold(saved: Record<string, unknown>): number | null {
+    const {settingsVersion: version, rtmPoseConfidenceThreshold: value} = saved;
+    if (typeof version === 'number' && version > PRE_CALIBRATED_SCORE_SETTINGS_VERSION) return null;
+    return typeof value === 'number' && value < RTMW_CONFIDENCE_THRESHOLD ? value : null;
+}
 
 /**
  * Holds back the EP key of a legacy saved config until skellytracker suggests its replacement (user G1-G3): the config
@@ -54,4 +72,14 @@ export function takeLegacyExecutionProvider(saved: Record<string, unknown>): {
     const key = config.executionProvider;
     if (settingsVersion !== undefined || typeof key !== 'string') return {config, legacyKey: null};
     return {config: {...config, executionProvider: null, executionDevice: null}, legacyKey: key};
+}
+
+/**
+ * The mocap config to save, or null to leave the saved file as it is: a conflict or a pending legacy EP key is not
+ * saved over. While the old-scale threshold prompt is open, the config is saved with the pre-T1 version (user M1).
+ */
+export function savedMocapConfig(mocap: MocapState): Record<string, unknown> | null {
+    if (mocap.exportSettingsError || mocap.executionProviderMigration?.status === 'pending') return null;
+    const settingsVersion = mocap.oldConfidenceThreshold === null ? MOCAP_SETTINGS_VERSION : PRE_CALIBRATED_SCORE_SETTINGS_VERSION;
+    return {...mocap.config, settingsVersion};
 }

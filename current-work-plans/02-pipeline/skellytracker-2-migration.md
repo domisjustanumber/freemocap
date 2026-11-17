@@ -675,7 +675,23 @@ frames, each with `rtmpose` and with `mediapipe`.
     saved file cannot tell a default from a choice: it stores the old 0.004 as a value, and
     `settingsVersion` only tells pre-ST2 files from v1. A user with an old file keeps 0.004 (which gates
     almost nothing) until they change it; a new user gets 0.5. The realtime pipeline config is not saved,
-    so realtime gets 0.5 at every launch. No migration without the supervisor's word.
+    so realtime gets 0.5 at every launch.
+  - M1 (2026-11-17, user: "reset it on load, but prompt the user before changing it"; cases 2-5 and 7 ruled
+    by the supervisor, 1 = (a) provisional, 6 = B by the user): `MOCAP_SETTINGS_VERSION` 2
+    (`export-settings-migration.ts`). `oldScaleConfidenceThreshold` returns the saved value of a file with no
+    version or version 1 when it is a number below `RTMW_CONFIDENCE_THRESHOLD`; no key, 0.5 or higher, or
+    version 2 get no prompt, and the version goes up at the next save. Any detector type gets the prompt.
+    `MocapState.oldConfidenceThreshold` holds it. The saved value stays in force until the answer:
+    `oldConfidenceThresholdAnswered('reset' | 'keep')`, or an edit of the field
+    (`mocapRtmPoseConfidenceThresholdChanged`), closes it. `savedMocapConfig` saves other changes made while
+    it is open with `PRE_CALIBRATED_SCORE_SETTINGS_VERSION` (1), so it shows again until answered, and saves
+    version 2 after the answer; the listener also saves when only the prompt closes (keep). The prompt
+    (`old-confidence-threshold-prompt.tsx`) is a settings note in the mocap detector settings, next to the EP
+    notice. Known limit (case 5): a pre-ST2 file also has a pending legacy EP key, and nothing is saved
+    until that resolves when the server connects; an answer given before that is lost if the app closes, and
+    the prompt shows again. Tests: `old-confidence-threshold.test.ts` (a real store loads a v1 file:
+    prompt open and 0.004 in force, another change saved with version 1, reset saves 0.5 with version 2;
+    keep and an edit save their value with version 2; the no-prompt cases), `old-confidence-threshold-prompt.test.tsx`.
   - Tests: `test_pipeline_runs.py` gates at 0.5 (0.49 missing, 0.5 kept); `test_inference_service.py` fake at
     0.5; new `test_rtmw_threshold_matches_ui.py` (TS constant == `RTMW_MIN_SCORE` == 0.5); e2e
     `mocap-backend-contract.spec.ts` checks the UI effective value == backend default == 0.5.

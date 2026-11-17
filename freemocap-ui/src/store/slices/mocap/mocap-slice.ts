@@ -1,6 +1,6 @@
 import type {ExecutionProviderName} from '@/types/execution-provider';
 import {RTMW_CONFIDENCE_THRESHOLD} from '@/types/rtmw-confidence';
-import {migrateExportSettings, migrateRemovedDetectors, takeLegacyExecutionProvider} from '@/store/export-settings-migration';
+import {migrateExportSettings, migrateRemovedDetectors, oldScaleConfidenceThreshold, takeLegacyExecutionProvider} from '@/store/export-settings-migration';
 import {CameraMatchingOptions, defaultCameraMatchingOptions} from '@/types/camera-matching';
 import {createSelector, createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {RootState} from '../../root-state-types';
@@ -115,6 +115,8 @@ export interface MocapState {
     config: MocapConfig;
     exportSettingsError: string | null;
     executionProviderMigration: ExecutionProviderMigration | null;
+    /** A saved threshold on the old score scale, until the user resets or keeps it (user M1); it stays in force meanwhile. */
+    oldConfidenceThreshold: number | null;
     isRecording: boolean;
     recordingProgress: number;
     isLoading: boolean;
@@ -151,7 +153,8 @@ const DEFAULT_MOCAP_CONFIG: MocapConfig = {
 // ==================== Initial State ====================
 
 const exportSettingsMigration = migrateExportSettings(loadFromStorage<Record<string, unknown> | null>('mocap.config', null));
-const legacyExecutionProvider = takeLegacyExecutionProvider(migrateRemovedDetectors(exportSettingsMigration.config));
+const _savedMocapConfig = migrateRemovedDetectors(exportSettingsMigration.config);
+const legacyExecutionProvider = takeLegacyExecutionProvider(_savedMocapConfig);
 const _persistedMocapConfig = legacyExecutionProvider.config as Partial<MocapConfig>;
 
 const initialMocapConfig: MocapConfig = {
@@ -174,6 +177,7 @@ const initialState: MocapState = {
     exportSettingsError: exportSettingsMigration.error,
     executionProviderMigration: legacyExecutionProvider.legacyKey === null ? null
         : {saved: legacyExecutionProvider.legacyKey, status: 'pending'},
+    oldConfidenceThreshold: oldScaleConfidenceThreshold(_savedMocapConfig),
     isRecording: false,
     recordingProgress: 0,
     isLoading: false,
@@ -265,7 +269,15 @@ export const mocapSlice = createSlice({
 
         /** Change the RTMPose keypoint confidence threshold. */
         mocapRtmPoseConfidenceThresholdChanged: (state, action: PayloadAction<number>) => {
+            // An edit is the user's answer to a pending old-scale prompt (user M1).
+            state.oldConfidenceThreshold = null;
             state.config.rtmPoseConfidenceThreshold = action.payload;
+        },
+        /** The user's answer to the old-scale threshold prompt: reset to the new default, or keep the saved value. */
+        oldConfidenceThresholdAnswered: (state, action: PayloadAction<'reset' | 'keep'>) => {
+            if (state.oldConfidenceThreshold === null) return;
+            if (action.payload === 'reset') state.config.rtmPoseConfidenceThreshold = RTMW_CONFIDENCE_THRESHOLD;
+            state.oldConfidenceThreshold = null;
         },
 
         triangulationConfigUpdated: (state, action: PayloadAction<Partial<TriangulationConfig>>) => {
@@ -397,6 +409,7 @@ export const selectCanStartMocapRecording = createSelector(
 );
 
 export const selectExecutionProviderMigration = (state: RootState) => state.mocap.executionProviderMigration;
+export const selectOldConfidenceThreshold = (state: RootState) => state.mocap.oldConfidenceThreshold;
 
 /** Processing waits for the replacement of a legacy EP key: no request goes out with the old key. */
 export const selectCanProcessMocapRecording = createSelector(
@@ -422,6 +435,7 @@ export const {
     mocapDetectorTypeChanged,
     mocapRtmPoseModelNameChanged,
     mocapRtmPoseConfidenceThresholdChanged,
+    oldConfidenceThresholdAnswered,
     mocapExecutionProviderChanged,
     mocapExecutionDeviceChanged,
     legacyExecutionProviderResolved,

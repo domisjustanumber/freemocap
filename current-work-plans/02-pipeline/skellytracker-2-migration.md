@@ -497,7 +497,41 @@ frames, each with `rtmpose` and with `mediapipe`.
    - a realtime-only legacy path runs the old YOLOX + RTMW `Tracker` with the old task events, and is deleted at
      ST 2.4;
    - posthoc calibration is out.
-   Q3-Q6, Q8 and L2-L4 are open. No code until then.
+   - **State on 2026-11-17 (IN PROGRESS, local commits only).** All questions are ruled (plan §10.6-§10.7, and
+     the user's later rulings listed below).
+     - Scratch ST clone: `0a50c719`.
+     - Phase B venv: `.../phaseb/venv313`; onnx 1.22.0 and ml-dtypes 0.7.0 are installed there.
+     - Commits, oldest first:
+       - `351391ea` timing model;
+       - `dcec4b16` realtime coarse events;
+       - `983efb7f` per-client 2.0 timing sink;
+       - `a67501a0` and `643b2f01` `pipeline_timing` on the main CBOR transport, with a fan-out and a per-connection
+         interest message;
+       - `d41ede1c` UI store;
+       - `cfb8cbfb` metrics window (Electron: new `services/pipeline-metrics-window.ts`, plus one tRPC mutation in
+         `api.ts`);
+       - `91758067` posthoc route, with the real pipeline id and "Open metrics" on Mocap cards;
+       - `7d4c9bf0` legacy tracker seam (`core/tracking/legacy_tracker_run.py`; every line marked "Deleted at
+         skellytracker stage 2.4");
+       - `78270916` user ruling: timing OFF by default behind `log_pipeline_times`, and the toggle plus "Open
+         pipeline metrics" in a flyout next to the realtime lightning bolt;
+       - `f74d605c` user ruling D1 a: `onnx==1.22.0` in the dev group (uv.lock not relocked, because it is stale
+         since Phase B, U1);
+       - `b31c03ab` supervisor ruling R-L5: legacy gate 0.0025 in the seam and in the aggregator.
+     - Also landed:
+       - `d0f1555b` the client ledger row;
+       - `7f27f47b` cbor-x pinned to 1.6.9 (user ruling N1).
+     - Measurements, in `<scratchpad>/pm/` of session 0a1e712d:
+       - span cost on ST 0a50c719 is about 0: cpu within noise, cuda 0.0 %, trt-rtx +0.08 ms;
+       - legacy against 2.0 on cuda at matched fp32: about 16-17 ms/frame for both;
+       - on cpu, legacy is single-threaded (ORT 1 thread), against the ORT default for 2.0.
+     - Next:
+       - commit 9 (system-information endpoint, live load at 1 Hz while a timing client is connected, and the top
+         panel; a sub-agent is building it);
+       - then run the Electron window by hand (open from realtime, open from a posthoc card, switch between them;
+         freemocap-77 used Playwright `_electron`);
+       - then the final report: what the user needs for the manual tests, the window's own cost, the 0.25 s flush,
+         and the not-ported branch `start_time` alignment.
 
 ### 0.3 Decisions of the user (all 2026-11-16, through the supervisor)
 

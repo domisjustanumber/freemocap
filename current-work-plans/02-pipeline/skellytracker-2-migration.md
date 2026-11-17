@@ -598,6 +598,16 @@ frames, each with `rtmpose` and with `mediapipe`.
          the foot-contact plane. The user's local copy of freemocap_sample_data has no videos in its own
          `synchronized_videos`; its parent folder holds an h264 re-encode, not the release's FMP4 files. Sent to the
          supervisor; no fix.
+       - Heading cause (user's request, Opus sub-agent, read-only, 2026-11-17; scratch `sample/heading/`): not fixed
+         and not different on sfn26 against development-streaming; this branch (sfn26 + 128) changes no alignment
+         file. skellyforge f5404db (development-streaming pin) and 5f0fd2d (sfn26) have identical alignment blobs;
+         the single-best-interval rule dates from skellyforge 9d7d6da (2026-09-08) and never changed. Proven on 7
+         sample runs: the heading comes from one 0.5-1 s skull interval chosen among 5+ near-tied candidates (gaps
+         0.005-0.037) that point 20-45 degrees apart; tiny score changes switch the winner and the greedy
+         `start = end` split re-cuts intervals. Torso tracks never qualify (hydrated in only 21-30 of 1108 frames).
+         Heading spread over the 7 runs: current rule 53.2 degrees; hypothetical rules on the saved inputs:
+         all-interval mean 11.4, top-3 mean 48.9, quality-gated circular mean of the skull's per-frame heading 0.36.
+         Fix options went to the supervisor; no fix made.
        - ST `db155c3a` (cpu_threads default 10 here): fast suite 1587 passed, the same 8 failed; seeded test_data gate
          97,425 kept, 0.314339 px, record `cpu_threads: 10`, parquet exactly equal to the `19b55b1d` cpu output.
        - Later, no go yet: show the applied `cpu_threads` in the metrics window's "Models of this run" group, and

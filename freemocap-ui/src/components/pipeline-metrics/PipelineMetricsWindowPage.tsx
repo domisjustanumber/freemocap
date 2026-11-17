@@ -41,6 +41,9 @@ export function StateNotice({state, run}: {state: Exclude<MetricsState, 'ready'>
 
 const ms = (value: number) => value.toFixed(value >= 100 ? 0 : 1);
 
+// Measured on skellytracker 0a50c719 (pipeline-metrics-port-plan.md, PM state): CPU within noise, cuda 0.0 %, trt-rtx +0.08 ms.
+const SPAN_COST = 'Its spans cost under 0.1 ms per frame (within noise on CPU).';
+
 // The main window saves its server address in storage this window shares.
 function applySavedServer(): void {
     serverUrls.setHost(loadFromStorage(STORAGE_KEYS.SERVER_HOST, DEFAULT_HOST));
@@ -141,8 +144,8 @@ export function RunSummary({run}: {run: RunTimingSnapshot}): React.ReactElement 
         <div className="flex flex-col gap-1" style={{padding: '4px 8px'}}>
             <p className="text sm" style={{color: 'var(--warning-300)'}}>
                 {run.mode === 'realtime'
-                    ? 'Timing is on for this pipeline (log_pipeline_times). Its spans cost about 0.6 ms per frame on CPU.'
-                    : 'Timing is on for the whole posthoc run. Its spans cost about 0.6 ms per frame on CPU.'}
+                    ? `Timing is on for this pipeline (log_pipeline_times). ${SPAN_COST}`
+                    : `Timing is on for the whole posthoc run. ${SPAN_COST}`}
             </p>
             <p className="text md">
                 {run.endToEnd

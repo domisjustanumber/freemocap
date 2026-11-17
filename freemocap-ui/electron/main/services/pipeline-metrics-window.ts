@@ -12,7 +12,9 @@ export function openPipelineMetricsWindow(pipeline?: string): void {
     if (metricsWindow && !metricsWindow.isDestroyed()) {
         if (metricsWindow.isMinimized()) metricsWindow.restore();
         // A hash change keeps the page and its statistics; the page switches its run on hashchange.
-        if (pipeline) void metricsWindow.webContents.executeJavaScript(`location.hash = ${JSON.stringify(hash)}`);
+        // The same hash again fires no hashchange (the user picked another run since), so send one.
+        if (pipeline) void metricsWindow.webContents.executeJavaScript(`{const hash = ${JSON.stringify('#' + hash)};
+            if (location.hash === hash) dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = hash;}`);
         metricsWindow.focus();
         return;
     }

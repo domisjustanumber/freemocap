@@ -26,7 +26,7 @@ RTMW_SIZES: dict[str, str] = {
 """The old RTMW model names of the UI and of saved settings, mapped to the sizes of the sidecar."""
 RTMW_NODE = "wholebody"
 PERSON_NODE = "person"
-PERSON_ROI = "person_roi"
+CROP_BOX = "crop_box"
 HOLISTIC_NODE = "holistic"
 RTMW_MIN_SCORE = 0.5
 """The default of the user's RTMW confidence threshold (user T1); a point with a lower score is missing.
@@ -149,13 +149,13 @@ def observations_from_results(results: Mapping[str, Mapping[str, Any]], output_s
             names, xyz, score = _person(canonical.point_names, canonical.xy, canonical.z, canonical.score, result[RTMW_NODE].present)
             missing = (score < rtmw_min_score) | ~np.isfinite(xyz[:, :2]).all(axis=1)
             xyz[missing], score[missing] = np.nan, 0.0
-            roi = result[PERSON_ROI]
-            if roi.present[0]:
-                cx, cy, w, h, _ = roi.rois[0]
+            crop = result[CROP_BOX]
+            if crop.present[0]:
+                cx, cy, w, h, _ = crop.boxes[0]
                 # clip, then int(), as the sfn26 crop box was
                 x1, x2 = (int(min(max(0.0, value), width)) for value in (cx - w / 2, cx + w / 2))
                 y1, y2 = (int(min(max(0.0, value), height)) for value in (cy - h / 2, cy + h / 2))
-                boxes.append(BoundingBox(x1, y1, x2, y2, float(roi.instance_score[0])))
+                boxes.append(BoundingBox(x1, y1, x2, y2, float(crop.instance_score[0])))
             detector_ran = bool(result["node_ran"][PERSON_NODE])
         else:
             value = result[HOLISTIC_NODE]

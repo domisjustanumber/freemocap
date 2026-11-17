@@ -743,6 +743,16 @@ frames, each with `rtmpose` and with `mediapipe`.
   so `candidate.rename(current)` (`storage.py:78`) failed; the Windows part is not proven. The app renames no
   recording folder. The `test_recording_preparation.py` fixture stubs the open and checks the request and the
   promoted path. Proof: `test_fresh_posthoc.py` passed once (78 s, calibration 0.360 px), no Blender process left.
+- Box rename (2026-11-17, skellytracker `803c33fa`, ADR-2RWC and ADR-4WR9): the `roi` and `detections` port
+  types are now one type, `boxes` (`InstanceBoxes`). The built-in's outputs `person_roi` and `person_box` are now
+  `crop_box` and `detector_box`.
+  - freemocap takes the Core part of `d6ea1f97` (branch `pipeline-gui`): `pipeline_runs.CROP_BOX = "crop_box"`
+    and `crop.boxes[0]`. In `test_pipeline_runs.py` the `InstanceBoxes` fakes sit beside the `raw_score` fakes.
+  - No other use of the old names is in code, tests or tools. The older text of this doc keeps `person_roi` as
+    history.
+  - The scratch ST clone is at `803c33fa`.
+  - Proof: fast suite 1532 passed, the same 8 failed. The seeded numerical fresh run gives 0.314339 px and
+    foot_support, with 97,425 RTMW and board 2D points kept, the same as at X4.
 
 ### 0.4 Open questions
 

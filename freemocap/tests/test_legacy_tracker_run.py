@@ -115,6 +115,19 @@ def test_old_points_get_the_2_0_canonical_names_and_keep_their_raw_scores():
         legacy.observations_from_legacy({"cam0": old}, _output_schema("rtmpose"))
 
 
+def test_legacy_points_are_gated_at_the_old_threshold_and_the_aggregator_uses_it_for_legacy_runs():
+    old = _old_observation(4)
+    old.stages["body"].keypoints.visibility[0] = 0.0024  # the old point 0 is body/nose
+    converted = legacy.observations_from_legacy({"cam0": old}, _output_schema("rtmpose"))["cam0"].stages["body"].keypoints
+    nose = detector_point_names("rtmpose").index("body/nose")
+    assert np.isnan(converted.xyz[nose]).all() and converted.visibility[nose] == 0.0
+    from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
+    config = RealtimePipelineConfig()
+    assert legacy.realtime_confidence_threshold(config) == config.camera_node_config.confidence_threshold
+    config.skeleton_inference_node_config.legacy_tracker_benchmark = True
+    assert legacy.realtime_confidence_threshold(config) == legacy.LEGACY_MIN_SCORE == 0.0025
+
+
 def _event(stage: str, camera_id: str | None) -> TrackerTaskEvent:
     return TrackerTaskEvent(task_id="ignored", parent_task_ids=(), stage=stage, node_kind="skeleton_inference",
                             camera_id=camera_id, frame_number=9, start_time_ns=1_000, end_time_ns=3_000_000, duration_ms=2.999)

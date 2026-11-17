@@ -25,6 +25,16 @@ LEGACY_EPS = ("cpu", CUDA)
 """The EPs of the old session (user ruling L3: TensorRT does not run the old models); the test of EP knowledge allows the keys."""
 YOLOX_MODEL = "yolox-m"
 RTMW_MODEL = "rtmw-x-l_256x192"
+LEGACY_MIN_SCORE = 0.0025
+"""The point gate of legacy runs (supervisor ruling R-L5): the old app's threshold for the old raw RTMW scores, which
+peak far below the 2.0 thresholds (`camera_node_config.confidence_threshold` 0.0025 at `dadfe94c`)."""
+
+
+def realtime_confidence_threshold(pipeline_config) -> float:
+    """The aggregator's 2D point gate: `LEGACY_MIN_SCORE` for a legacy run, else the camera node's threshold."""
+    if pipeline_config.skeleton_inference_node_config.legacy_tracker_benchmark:
+        return LEGACY_MIN_SCORE
+    return pipeline_config.camera_node_config.confidence_threshold
 CONFIDENCE_THRESHOLD = 0.004
 """The old RTMW detector default; the aggregator's own confidence threshold applies afterwards."""
 _REDETECT_SECONDS = 5.0
@@ -114,7 +124,7 @@ def observations_from_legacy(observations: Mapping, output_schema: Mapping) -> d
     """The old observations in the 2.0 canonical names of the run schema; boxes and `detector_ran` pass through.
 
     The old RTMW gives the 133 COCO-WholeBody points in the order of the 2.0 `point_names`; a point is missing when
-    its x or y is not finite or its old score is 0.
+    its x or y is not finite or its old score is below `LEGACY_MIN_SCORE`.
     """
     from skellytracker.core.data_primitives import Keypoints, Observation, StageObservation
     from skellytracker.core.pipelines import to_canonical
@@ -134,7 +144,7 @@ def observations_from_legacy(observations: Mapping, output_schema: Mapping) -> d
         value = InstanceKeypoints(point_names, xy, score, score.copy(), np.ones(1), np.array([present.any()]), np.full(1, -1))
         canonical = to_canonical(value, schema)
         names, xyz, scores = _person(canonical.point_names, canonical.xy, None, canonical.score, value.present)
-        missing = ~np.isfinite(xyz[:, :2]).all(axis=1)
+        missing = (scores < LEGACY_MIN_SCORE) | ~np.isfinite(xyz[:, :2]).all(axis=1)
         xyz[missing], scores[missing] = np.nan, 0.0
         stage = StageObservation(name=STAGE, bounding_boxes=list(old.bounding_boxes), detector_ran=old.detector_ran,
                                  keypoints=Keypoints(names=names, xyz=xyz, visibility=scores))

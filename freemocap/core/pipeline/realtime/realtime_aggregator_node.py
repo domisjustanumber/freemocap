@@ -82,6 +82,7 @@ from freemocap.core.tasks.triangulation.helpers.angulation_result import (
     AngulationResult,
 )
 from freemocap.core.pipeline.realtime.temporal_pipeline import TemporalPipeline
+from freemocap.core.tracking.legacy_tracker_run import realtime_confidence_threshold  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
 from freemocap.core.types.type_overloads import (
     TopicPublicationQueue,
     TrackedPointNameString,
@@ -808,7 +809,8 @@ class RealtimeAggregatorNode(AggregatorNode):
                         output.skeleton_observation = temporal_pipeline.image_observation(
                             camera_id=source, observation=output.skeleton_observation,
                             timestamp_s=output.capture_timestamp_s,
-                            confidence_threshold=pipeline_config.camera_node_config.confidence_threshold)
+                            # Deleted at skellytracker stage 2.4 (legacy tracker benchmark): back to camera_node_config.confidence_threshold.
+                            confidence_threshold=realtime_confidence_threshold(pipeline_config))
 
                 # ---- Triangulate and process if calibration is valid ----
                 matching_observations: dict[str, Observation] = {}

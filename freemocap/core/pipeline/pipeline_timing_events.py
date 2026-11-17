@@ -12,6 +12,25 @@ def perf_counter_ns() -> int:
     return time.perf_counter_ns()
 
 
+def span_event(
+        *,
+        task_id: str,
+        stage: str,
+        node_kind: str,
+        frame_number: int,
+        start_time_ns: int,
+        end_time_ns: int,
+        camera_id: str | None = None,
+        batch_size: int | None = None,
+) -> PipelineTimingEvent:
+    """One measured span as a task event, its duration from its perf_counter_ns ends."""
+    return PipelineTimingEvent(
+        task_id=task_id, stage=stage, node_kind=node_kind, camera_id=camera_id, frame_number=frame_number,
+        start_time_ns=start_time_ns, end_time_ns=end_time_ns,
+        duration_ms=(end_time_ns - start_time_ns) / 1e6, batch_size=batch_size,
+    )
+
+
 class PipelineTimingEventStore:
     """Rolling, frame-keyed event buffer that survives drain cycles.
 

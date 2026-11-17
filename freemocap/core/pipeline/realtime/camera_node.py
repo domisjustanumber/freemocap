@@ -24,6 +24,8 @@ from freemocap.core.pipeline.abcs.source_node_abc import SourceNode
 from freemocap.core.pipeline.realtime.camera_node_config import CameraNodeConfig
 from freemocap.core.types.type_overloads import TopicPublicationQueue
 from freemocap.core.pipeline.pipeline_stage_timer import PipelineStageTimer
+from freemocap.core.pipeline.pipeline_timing_events import perf_counter_ns, span_event
+from freemocap.core.pipeline.pipeline_timing_task_ids import camera_task_id
 from freemocap.core.pipeline.realtime.temporal_pipeline import capture_timestamp
 from freemocap.pubsub.pubsub_manager import PubSubTopicManager
 from freemocap.pubsub.pubsub_topics import (
@@ -219,10 +221,15 @@ class CameraNode(SourceNode):
 
                 if charuco_detector is not None:
                     if actual_frame_number > charuco_skip_until_frame_number:
-                        t0 = time.perf_counter() if timer is not None else 0.0
+                        t0_ns = perf_counter_ns() if timer is not None else 0
                         charuco_observation = board_observation(charuco_detector, image, actual_frame_number)
                         if timer is not None:
-                            timer.record("charuco_detection", (time.perf_counter() - t0) * 1e3)
+                            timer.record_task_event(span_event(
+                                task_id=camera_task_id(frame_number=actual_frame_number, camera_id=camera_id,
+                                                       node_kind="camera", stage="charuco_detection"),
+                                stage="charuco_detection", node_kind="camera", camera_id=camera_id,
+                                frame_number=actual_frame_number, start_time_ns=t0_ns, end_time_ns=perf_counter_ns(),
+                            ))
 
                         if not _board_was_seen(charuco_observation):
                             # Board not in view: skip the next N frames instead of

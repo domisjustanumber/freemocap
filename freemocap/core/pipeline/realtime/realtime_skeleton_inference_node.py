@@ -1,7 +1,6 @@
 """Realtime frame-request adapter for the application inference service."""
 from contextlib import ExitStack
 import logging
-import time
 from dataclasses import dataclass
 from multiprocessing.sharedctypes import Synchronized
 from queue import Empty
@@ -33,11 +32,14 @@ from freemocap.core.pipeline.abcs.pipeline_ipc import PipelineIPC
 from freemocap.core.pipeline.abcs.source_node_abc import SourceNode
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
 from freemocap.core.pipeline.pipeline_stage_timer import PipelineStageTimer
+from freemocap.core.pipeline.pipeline_timing_events import perf_counter_ns, span_event
+from freemocap.core.pipeline.pipeline_timing_task_ids import batch_task_id
 from freemocap.core.types.type_overloads import TopicPublicationQueue
 from freemocap.pubsub.pubsub_manager import PubSubTopicManager
 from freemocap.pubsub.pubsub_topics import (
     PipelineConfigUpdateMessage,
     PipelineConfigUpdateTopic,
+    PipelineTimingEvent,
     ProcessFrameNumberMessage,
     ProcessFrameNumberTopic,
     SkeletonInferenceResultMessage,
@@ -46,6 +48,8 @@ from freemocap.pubsub.pubsub_topics import (
 )
 
 logger = logging.getLogger(__name__)
+
+NODE_KIND = "skeleton_inference"
 
 
 @dataclass
@@ -215,7 +219,7 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                         continue
 
                     # ---- Read N images from per-camera ring buffers ----
-                    t_read = time.perf_counter() if timer is not None else 0.0
+                    t_read_ns = perf_counter_ns() if timer is not None else 0
                     images, ordered_camera_ids = _read_frames(
                         camera_ids=camera_ids,
                         camera_shms=camera_shms,
@@ -223,7 +227,8 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                         requested_frame_number=requested_frame_number,
                     )
                     if timer is not None:
-                        timer.record("frame_read", (time.perf_counter() - t_read) * 1e3)
+                        timer.record_task_event(_batch_event(
+                            "frame_read", requested_frame_number, t_read_ns, perf_counter_ns(), len(images)))
 
                     if not images:
                         skeleton_result_pub.put(
@@ -235,7 +240,7 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                         continue
 
                     # ---- Batched skeleton inference ----
-                    t_inf = time.perf_counter() if timer is not None else 0.0
+                    t_inf_ns = perf_counter_ns() if timer is not None else 0
                     images_dict = {
                         cam_id: img
                         for cam_id, img in zip(ordered_camera_ids, images)
@@ -247,9 +252,10 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                         return
 
                     if timer is not None:
-                        inf_ms = (time.perf_counter() - t_inf) * 1e3
-                        timer.record("predict_batch", inf_ms)
-                        timer.record("predict_per_camera", inf_ms / max(len(images), 1))
+                        predict_batch = _batch_event(
+                            "predict_batch", requested_frame_number, t_inf_ns, perf_counter_ns(), len(images))
+                        timer.record_task_event(predict_batch)
+                        timer.record("predict_per_camera", predict_batch.duration_ms / max(len(images), 1))
 
                     # ---- Preserve raw detections; aggregator owns temporal processing ----
                     per_camera_skeleton: dict[CameraIdString, Observation | None] = dict(observations)
@@ -267,7 +273,7 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                     if timer is not None:
                         timer.maybe_flush(
                             publication_queue=timing_pub,
-                            node_kind="skeleton_inference",
+                            node_kind=NODE_KIND,
                         )
 
                 if client.failure is not None:
@@ -282,6 +288,13 @@ class RealtimeSkeletonInferenceNode(SourceNode):
             finally:
                 client.close()
                 logger.debug(f"RealtimeSkeletonInferenceNode [{camera_group_id}] exiting")
+
+
+def _batch_event(stage: str, frame_number: int, start_ns: int, end_ns: int, batch_size: int) -> PipelineTimingEvent:
+    return span_event(
+        task_id=batch_task_id(frame_number=frame_number, node_kind=NODE_KIND, stage=stage), stage=stage,
+        node_kind=NODE_KIND, frame_number=frame_number, start_time_ns=start_ns, end_time_ns=end_ns, batch_size=batch_size,
+    )
 
 
 def _await_inference_result(result, ipc, shutdown_self_flag):

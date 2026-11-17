@@ -10,3 +10,13 @@ def batch_task_id(
         stage: str,
 ) -> str:
     return f"{frame_number}:batch:{node_kind}:{stage}"
+
+
+def camera_task_id(
+        *,
+        frame_number: int,
+        camera_id: str,
+        node_kind: str,
+        stage: str,
+) -> str:
+    return f"{frame_number}:{camera_id}:{node_kind}:{stage}"

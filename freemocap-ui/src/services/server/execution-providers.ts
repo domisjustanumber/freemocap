@@ -8,6 +8,11 @@ const isProvider = (row: Record<string, unknown> | null) => typeof row?.key === 
     && typeof row.description === 'string' && typeof row.usable === 'boolean' && typeof row.uses_gpu === 'boolean'
     && (row.install_hint === null || typeof row.install_hint === 'string')
     && Array.isArray(row.devices) && row.devices.every(isDevice);
+const isNumberOrNull = (value: unknown) => value === null || typeof value === 'number';
+const isStringOrNull = (value: unknown) => value === null || typeof value === 'string';
+const isOffer = (offer: Record<string, unknown> | null) => typeof offer?.kind === 'string' && isStringOrNull(offer.ep_key)
+    && isNumberOrNull(offer.download_bytes) && isNumberOrNull(offer.disk_bytes) && isStringOrNull(offer.licence_url)
+    && isStringOrNull(offer.note);
 
 export async function requestExecutionProviders(baseUrl: string, signal?: AbortSignal,
     request: typeof fetch = fetch): Promise<ExecutionProviderCatalog> {
@@ -16,10 +21,11 @@ export async function requestExecutionProviders(baseUrl: string, signal?: AbortS
     const data = await response.json();
     const takes = data.detector_takes_execution_provider;
     if (!Array.isArray(data.providers) || !data.providers.every(isProvider) || typeof takes !== 'object' || takes === null
-        || !Object.values(takes).every(value => typeof value === 'boolean')) {
+        || !Object.values(takes).every(value => typeof value === 'boolean')
+        || !Array.isArray(data.auto_offers) || !data.auto_offers.every(isOffer)) {
         throw new Error('Invalid provider response');
     }
-    return {providers: data.providers, detectorTakesExecutionProvider: takes};
+    return {providers: data.providers, detectorTakesExecutionProvider: takes, autoOffers: data.auto_offers};
 }
 
 /** Auto, then the server's usable EPs in its order; a saved key that is not offered stays visible as itself. */

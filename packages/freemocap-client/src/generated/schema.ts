@@ -1233,12 +1233,14 @@ export interface components {
     schemas: {
         /** AvailableExecutionProvidersResponse */
         AvailableExecutionProvidersResponse: {
-            /** Providers */
-            providers: components["schemas"]["ExecutionProviderOption"][];
+            /** Auto Offers */
+            auto_offers: components["schemas"]["ExecutionProviderOffer"][];
             /** Detector Takes Execution Provider */
             detector_takes_execution_provider: {
                 [key: string]: boolean;
             };
+            /** Providers */
+            providers: components["schemas"]["ExecutionProviderOption"][];
         };
         /**
          * BackgroundTaskSnapshot
@@ -4186,6 +4188,24 @@ export interface components {
              * @default false
              */
             preview_ready?: boolean;
+        };
+        /**
+         * ExecutionProviderOffer
+         * @description An offer of skellytracker's Auto recommendation for this host, as `InstallOffer` gives it.
+         */
+        ExecutionProviderOffer: {
+            /** Disk Bytes */
+            disk_bytes: number | null;
+            /** Download Bytes */
+            download_bytes: number | null;
+            /** Ep Key */
+            ep_key: string | null;
+            /** Kind */
+            kind: string;
+            /** Licence Url */
+            licence_url: string | null;
+            /** Note */
+            note: string | null;
         };
     };
     responses: never;

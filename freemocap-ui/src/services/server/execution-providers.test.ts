@@ -9,7 +9,9 @@ const GPU = {key: 'gpu-ep', label: 'GPU EP', description: 'Runs on a GPU.', usab
 const PACK = {key: 'pack-ep', label: 'Pack EP', description: 'Needs a pack.', usable: false,
     install_hint: 'Run `install pack-ep`.', uses_gpu: true, devices: []};
 const TAKES = {rtmpose: true, mediapipe: false};
-const answer = (providers: unknown[]) => ({providers, detector_takes_execution_provider: TAKES});
+const OFFER = {kind: 'add-pack', ep_key: 'pack-ep', download_bytes: 110_000_000, disk_bytes: 286_000_000,
+    licence_url: null, note: 'Run `install pack-ep`.'};
+const answer = (providers: unknown[], auto_offers: unknown[] = [OFFER]) => ({providers, detector_takes_execution_provider: TAKES, auto_offers});
 
 test('the options are Auto and the usable server rows in their order, with their labels', () => {
     assert.deepEqual(executionProviderOptions(null, []), [{label: 'Auto', value: null}]);
@@ -32,7 +34,7 @@ test('reconnected or different servers are queried again and preserve abort sign
         return Response.json(answer(calls.length === 1 ? [GPU, CPU] : [CPU]));
     }) as typeof fetch;
     assert.deepEqual(await requestExecutionProviders('http://first.invalid', controller.signal, request),
-        {providers: [GPU, CPU], detectorTakesExecutionProvider: TAKES});
+        {providers: [GPU, CPU], detectorTakesExecutionProvider: TAKES, autoOffers: [OFFER]});
     assert.deepEqual((await requestExecutionProviders('http://second.invalid', controller.signal, request)).providers, [CPU]);
     assert.deepEqual(calls, ['http://first.invalid/freemocap/onnx/execution_providers', 'http://second.invalid/freemocap/onnx/execution_providers']);
 });
@@ -40,7 +42,8 @@ test('reconnected or different servers are queried again and preserve abort sign
 test('HTTP failures and malformed provider lists are not advertised as support', async () => {
     for (const response of [new Response('', {status: 503}), Response.json({available: [CPU]}),
         Response.json(answer([{key: 'cpu', label: 'CPU'}])), Response.json({providers: [CPU]}),
-        Response.json(answer([{...GPU, devices: [{key: 'gpu:0'}]}]))]) {
+        Response.json(answer([{...GPU, devices: [{key: 'gpu:0'}]}])),
+        Response.json({providers: [CPU], detector_takes_execution_provider: TAKES}), Response.json(answer([CPU], [{kind: 'add-pack'}]))]) {
         await assert.rejects(requestExecutionProviders('http://providers.invalid', undefined, (async () => response) as typeof fetch));
     }
 });

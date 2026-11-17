@@ -49,7 +49,10 @@ def test_provider_route_gives_each_ep_as_skellytracker_does_in_its_order_without
                             uses_gpu=True, devices=(device,)),
             SimpleNamespace(key='other-ep', label='Other EP', description='Needs a pack.', usable=False,
                             install_hint='Run `install other-ep`.', uses_gpu=True, devices=()))
-    with patch.object(eps, 'status', return_value=SimpleNamespace(eps=rows)), \
+    offer = SimpleNamespace(kind='add-pack', ep_key='other-ep', pack_id='other-pack', download_bytes=100, disk_bytes=300,
+                            licence_url='https://example.org/licence', note='Run `install other-ep`.')
+    status = SimpleNamespace(eps=rows, performance=SimpleNamespace(offers=(offer,)))
+    with patch.object(eps, 'status', return_value=status), \
          patch('onnxruntime.InferenceSession') as construct:
         response = TestClient(app).get('/freemocap/onnx/execution_providers')
     assert response.status_code == 200
@@ -59,7 +62,9 @@ def test_provider_route_gives_each_ep_as_skellytracker_does_in_its_order_without
              'uses_gpu': True, 'devices': [{'key': 'gpu:0', 'name': 'Some GPU', 'vram_total_bytes': 8 * 2**30}]},
             {'key': 'other-ep', 'label': 'Other EP', 'description': 'Needs a pack.', 'usable': False,
              'install_hint': 'Run `install other-ep`.', 'uses_gpu': True, 'devices': []}],
-        'detector_takes_execution_provider': {'rtmpose': True, 'mediapipe': False}}
+        'detector_takes_execution_provider': {'rtmpose': True, 'mediapipe': False},
+        'auto_offers': [{'kind': 'add-pack', 'ep_key': 'other-ep', 'download_bytes': 100, 'disk_bytes': 300,
+                         'licence_url': 'https://example.org/licence', 'note': 'Run `install other-ep`.'}]}
     construct.assert_not_called()
 
 

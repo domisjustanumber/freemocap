@@ -35,7 +35,7 @@ const GPU = {key: 'gpu-ep', label: 'GPU EP', description: 'Runs on a GPU.', usab
     install_hint: 'Run `install gpu-ep`.', uses_gpu: true, devices: []};
 /** The server's answer as the hook gives it: here only RTMW takes an EP. */
 const PROVIDERS: ExecutionProviderChoices = {
-    providers: [CPU, GPU], options: executionProviderOptions(null, [CPU, GPU]), info: executionProviderInfo([CPU, GPU]),
+    providers: [CPU, GPU], autoOffers: [], options: executionProviderOptions(null, [CPU, GPU]), info: executionProviderInfo([CPU, GPU]),
     takesExecutionProvider: detector => detector === 'rtmpose', devicesOf: () => [], providerOf: () => undefined,
 };
 
@@ -136,6 +136,18 @@ test('a device row follows an EP with more than one device and reports the devic
     handlerOf(rows, 'Device')('auto');
     handlerOf(rows, 'Execution provider')('cpu');
     assert.deepEqual(changes, [{device: 'gpu:1'}, {device: null}, {provider: 'cpu', device: null}]);
+});
+
+test('with Auto, the EP row shows the offers of skellytracker in its own words; not with an explicit EP (A1)', () => {
+    const offers = [{kind: 'add-pack', ep_key: 'gpu-ep', download_bytes: 110_875_664, disk_bytes: 286_000_621, licence_url: null,
+        note: 'Run `install gpu-ep`.'}, {kind: 'update-driver', ep_key: null, download_bytes: null, disk_bytes: null, licence_url: null,
+        note: 'Update the GPU driver.'}, {kind: 'none-available', ep_key: null, download_bytes: null, disk_bytes: null, licence_url: null, note: null}];
+    const providers = {...PROVIDERS, autoOffers: offers};
+    const text = (html: string) => html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ');
+    const auto = text(detectorRows('rtmpose', 'all', {providers}));
+    assert.match(auto, /For Auto, SkellyTracker offers:GPU EP: Run `install gpu-ep`\. \(111 MB download\)Update the GPU driver\./);
+    assert.ok(!text(detectorRows('rtmpose', 'all', {providers, value: {...VALUE, provider: 'cpu'}})).includes('SkellyTracker offers'));
+    assert.ok(!text(detectorRows('rtmpose', 'all')).includes('SkellyTracker offers'));
 });
 
 test('the execution provider explanation is the sentence of each EP, with the install hint of one that is not usable', () => {

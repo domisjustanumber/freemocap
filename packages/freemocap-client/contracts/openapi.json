@@ -3423,11 +3423,11 @@
     "schemas": {
       "AvailableExecutionProvidersResponse": {
         "properties": {
-          "providers": {
+          "auto_offers": {
             "items": {
-              "$ref": "#/components/schemas/ExecutionProviderOption"
+              "$ref": "#/components/schemas/ExecutionProviderOffer"
             },
-            "title": "Providers",
+            "title": "Auto Offers",
             "type": "array"
           },
           "detector_takes_execution_provider": {
@@ -3436,11 +3436,19 @@
             },
             "title": "Detector Takes Execution Provider",
             "type": "object"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionProviderOption"
+            },
+            "title": "Providers",
+            "type": "array"
           }
         },
         "required": [
           "providers",
-          "detector_takes_execution_provider"
+          "detector_takes_execution_provider",
+          "auto_offers"
         ],
         "title": "AvailableExecutionProvidersResponse",
         "type": "object"
@@ -9872,6 +9880,80 @@
           "phase_elapsed_seconds"
         ],
         "title": "RealtimeStartupResponse"
+      },
+      "ExecutionProviderOffer": {
+        "description": "An offer of skellytracker's Auto recommendation for this host, as `InstallOffer` gives it.",
+        "properties": {
+          "disk_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Bytes"
+          },
+          "download_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Download Bytes"
+          },
+          "ep_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ep Key"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "licence_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Licence Url"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "kind",
+          "ep_key",
+          "download_bytes",
+          "disk_bytes",
+          "licence_url",
+          "note"
+        ],
+        "title": "ExecutionProviderOffer",
+        "type": "object"
       }
     }
   },

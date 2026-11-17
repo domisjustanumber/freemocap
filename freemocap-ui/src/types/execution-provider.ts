@@ -19,8 +19,19 @@ export interface ExecutionProviderOption {
     devices: ExecutionProviderDevice[];
 }
 
-/** The server's EPs in skellytracker's order, and whether the pipeline of each detector takes an EP. */
+/** An offer of skellytracker's Auto recommendation for the server's host (install a pack, update a driver), as it gives it. */
+export interface ExecutionProviderOffer {
+    kind: string;
+    ep_key: ExecutionProviderName | null;
+    download_bytes: number | null;
+    disk_bytes: number | null;
+    licence_url: string | null;
+    note: string | null;
+}
+
+/** The server's EPs in skellytracker's order, whether the pipeline of each detector takes an EP, and the Auto offers. */
 export interface ExecutionProviderCatalog {
     providers: ExecutionProviderOption[];
     detectorTakesExecutionProvider: Record<string, boolean>;
+    autoOffers: ExecutionProviderOffer[];
 }

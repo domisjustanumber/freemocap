@@ -7,6 +7,7 @@ import ValueSelector from '@/components/ui-components/ValueSelector';
 import {type DetectorType, RTMPOSE_MODELS, type RTMPoseModelName} from '@/store/slices/mocap';
 import type {ExecutionProviderName} from '@/types/execution-provider';
 import type {ExecutionProviderChoices} from '@/hooks/useExecutionProviderOptions';
+import {AutoOffersNote} from './execution-provider-info';
 
 export const DETECTOR_INFO = {
     title: "Skeleton detector",
@@ -118,6 +119,8 @@ export function DetectorSettingRows({value, onChange, detectors, providers, cont
             control={<SettingSelectInput label="Execution provider" value={value.provider ?? 'auto'}
                 options={providers.options.map(option => ({...option, value: option.value ?? 'auto' as const}))}
                 onChange={(provider: ExecutionProviderName | 'auto') => onChange({provider: provider === 'auto' ? null : provider, device: null})}/>}/>}
+
+        {takesProvider && value.provider === null && <AutoOffersNote offers={providers.autoOffers} providers={providers.providers}/>}
 
         {devices.length > 1 && <SettingRow inactive={inactive} label="Device" info={DEVICE_INFO}
             control={<SettingSelectInput label="Device" value={value.device ?? 'auto'}

@@ -1,10 +1,15 @@
 """The EP rows of skellytracker for the application, never per-frame work."""
 
 
+def execution_provider_status():
+    """skellytracker's `EpStatus` of this host: its EP rows and its recommendations. It loads no library."""
+    from skellytracker.core import eps
+    return eps.status()
+
+
 def execution_provider_rows() -> list:
     """The skellytracker `PackStatus` row of each EP of this host, in skellytracker's order. It loads no library."""
-    from skellytracker.core import eps
-    return list(eps.status().eps)
+    return list(execution_provider_status().eps)
 
 
 def usable_execution_providers() -> list[str]:

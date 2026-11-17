@@ -5,7 +5,7 @@ import type {ExecutionProviderCatalog, ExecutionProviderName} from "@/types/exec
 import {requestExecutionProviders, executionProviderOptions} from "@/services/server/execution-providers";
 import {executionProviderInfo} from "@/components/mocap-setup/execution-provider-info";
 
-const NO_CATALOG: ExecutionProviderCatalog = {providers: [], detectorTakesExecutionProvider: {}};
+const NO_CATALOG: ExecutionProviderCatalog = {providers: [], detectorTakesExecutionProvider: {}, autoOffers: []};
 
 /** The server's EP choices, their explanation, and which detectors take an EP. Queried again after reconnects or server changes. */
 export function useExecutionProviderOptions(selected: ExecutionProviderName | null) {
@@ -32,6 +32,8 @@ export function useExecutionProviderOptions(selected: ExecutionProviderName | nu
     return {
         /** The server's EPs as skellytracker gives them, in its order. */
         providers: catalog.providers,
+        /** skellytracker's offers for its Auto recommendation on the server's host. */
+        autoOffers: catalog.autoOffers,
         options: executionProviderOptions(selected, catalog.providers),
         info,
         /** The server's row of an EP, as skellytracker gives it; undefined for Auto or a key it does not list. */

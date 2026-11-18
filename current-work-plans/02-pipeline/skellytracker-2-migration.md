@@ -665,6 +665,12 @@ frames, each with `rtmpose` and with `mediapipe`.
            ST db155c3a, after = `ebb36199` + ST 93d7c9e0: cuda (person/wholebody cuda fp16) 97,402 kept before and
            after; trt-rtx fp16 (person/wholebody trt-rtx fp16) 97,438 before and after; 0.314339 px and foot_support in
            all four; each EP's parquet equal before vs after in all 11 columns.
+         - ST `dom/sidecar-implementation` is now `e85c2472`, PUSHED by the supervisor with user approval (stages 6-7:
+           new `merge`, `assign_keypoints`, `flag_when`, `concat` removed; built-in pipelines unchanged). Scratch clone
+           moved there. On `a8459fc1`: the two test files 33 passed; cpu gate 97,425 kept, 0.314339 px, foot_support,
+           parquet equal in all 11 columns to the same-day cpu run at ST 93d7c9e0. No freemocap change.
+         - User rulings relayed by the supervisor: E2 dropped (`merge` adds no edge between a body point and a part);
+           ADR-9HTX is absorbed; stage 8 (the editor) is with freemocap-77 and the user, not this session.
        - Scratch from today (session 0a1e712d scratchpad): `sample/heading/`, `sample/torso/`, `sample/hip/`
          (341 MB dumps), `stage5/` (fast logs, gate.sh, legacy_points.py). No temp roots or app processes are left; the user's test app is stopped.
        - ST `db155c3a` (cpu_threads default 10 here): fast suite 1587 passed, the same 8 failed; seeded test_data gate

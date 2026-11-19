@@ -1,4 +1,5 @@
 from freemocap.api.http.onnx.onnx_router import onnx_router
+from freemocap.api.http.certify.certify_router import certify_router
 from freemocap.api.http.streaming.streaming_router import streaming_router
 from freemocap.api.http.capture.capture_router import capture_router
 from freemocap.api.http.recording_import.import_router import import_router
@@ -32,6 +33,7 @@ FREEMOCAP_ROUTERS = [streaming_router, capture_router, import_router, processing
                      blender_router,
                      ffmpeg_router,
                      onnx_router,
+                     certify_router,
                      playback_router,
                      telemetry_router
                      ]

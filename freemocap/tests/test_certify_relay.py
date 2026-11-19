@@ -240,3 +240,33 @@ def test_issue_url_or_none_accepts_only_issues_of_the_relay_repository():
     for bad in (None, 7, ISSUE + "#x", ISSUE + "/", "https://github.com.evil/domisjustanumber/skellycertify/issues/7",
                 "https://github.com/domisjustanumber/skellycertify/pull/7", ISSUE.replace("7", "0")):
         assert relay.issue_url_or_none(bad) is None
+
+
+def test_the_routes_view_send_and_list_the_hand_in(fake_relay, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from freemocap.api.http.certify.certify_router import certify_router
+
+    app = FastAPI()
+    app.include_router(certify_router)
+    client = TestClient(app)
+    selection = {"report_ids": ["quick-1"], "note": "it failed twice"}
+    viewed = client.post("/certify/hand_in/file", json=selection).json()
+    assert viewed["file_name"] == "certify-report-20261119T100000Z.md" and viewed["fits_relay"]
+    assert hashlib.sha256(viewed["content"].encode()).hexdigest() == viewed["sha256"]
+    refused = client.post("/certify/hand_in/file", json={**selection, "note": "mail me at a@example.org"})
+    assert (refused.status_code, refused.json()["detail"]) == (422, {"code": "privacy-rule", "detail": "5"})
+    changed = client.post("/certify/hand_in/send", json={**selection, "note": "edited", "sha256": viewed["sha256"]})
+    assert (changed.status_code, changed.json()["detail"]["code"]) == (409, "file-changed")
+    fake_relay.answer(422, {"error": "privacy-rule", "retry": False, "detail": 3})
+    sent = client.post("/certify/hand_in/send", json={**selection, "sha256": viewed["sha256"]}).json()
+    assert (sent["state"], sent["offer_issue_form"], sent["error"]["detail"]) == ("refused", True, "3")
+    monkeypatch.setattr(skellytracker, "pending_reports", lambda include_handed_in=False: [
+        {"report_id": "quick-1", "kind": "quick", "created_utc": "2026-11-19T10:00:00Z", "has_failure": True,
+         "evidence_valid": False, "state": "covered", "reference": "https://evil.example/issues/7"}])
+    listed = client.get("/certify/hand_in").json()
+    assert listed["relay_enabled"] and listed["reports"][0]["reference"] is None
+    assert listed["outbox"][0]["last_error"]["error"] == "privacy-rule" and listed["outbox"][0]["offer_issue_form"]
+    opened = client.post("/certify/hand_in/opened", json={**selection, "sha256": viewed["sha256"]}).json()
+    assert opened["outbox"] == [] and fake_relay.marks[-1] == (["quick-1"], "opened", None)

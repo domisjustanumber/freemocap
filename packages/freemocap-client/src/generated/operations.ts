@@ -295,6 +295,26 @@ export const operationDefinitions = {
     "path": "/freemocap/onnx/system_information",
     "asset": false
   },
+  "get_hand_in_freemocap_certify_hand_in_get": {
+    "method": "GET",
+    "path": "/freemocap/certify/hand_in",
+    "asset": false
+  },
+  "get_hand_in_file_freemocap_certify_hand_in_file_post": {
+    "method": "POST",
+    "path": "/freemocap/certify/hand_in/file",
+    "asset": false
+  },
+  "send_hand_in_freemocap_certify_hand_in_send_post": {
+    "method": "POST",
+    "path": "/freemocap/certify/hand_in/send",
+    "asset": false
+  },
+  "mark_hand_in_opened_freemocap_certify_hand_in_opened_post": {
+    "method": "POST",
+    "path": "/freemocap/certify/hand_in/opened",
+    "asset": false
+  },
   "track_telemetry_event_freemocap_telemetry_track_post": {
     "method": "POST",
     "path": "/freemocap/telemetry/track",

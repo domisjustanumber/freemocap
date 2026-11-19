@@ -1050,6 +1050,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/freemocap/certify/hand_in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Hand In
+         * @description Every certify report on this host with its hand-in state, the files waiting in the outbox, and whether the
+         *     relay is on (when it is off, only the issue form is offered).
+         */
+        get: operations["get_hand_in_freemocap_certify_hand_in_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/freemocap/certify/hand_in/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Hand In File
+         * @description The exact report file that "send" or the issue form hands in for these reports and this note.
+         */
+        post: operations["get_hand_in_file_freemocap_certify_hand_in_file_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/freemocap/certify/hand_in/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Hand In
+         * @description The person's "send" of the file they viewed: it is kept in the outbox, then sent to the relay.
+         */
+        post: operations["send_hand_in_freemocap_certify_hand_in_send_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/freemocap/certify/hand_in/opened": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Hand In Opened
+         * @description The person saved the file they viewed and opened the issue form: its reports count as handed in.
+         */
+        post: operations["mark_hand_in_opened_freemocap_certify_hand_in_opened_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/freemocap/telemetry/track": {
         parameters: {
             query?: never;
@@ -4463,6 +4544,138 @@ export interface components {
             /** Probe Errors */
             probe_errors: string[];
         };
+        /** AcceptedHandIn */
+        AcceptedHandIn: {
+            /** Report Ids */
+            report_ids: string[];
+            /**
+             * Note
+             * @description The person's note; paths and this host's names are removed.
+             */
+            note?: string | null;
+            /**
+             * Sha256
+             * @description The SHA-256 of the file the person viewed.
+             */
+            sha256: string;
+        };
+        /** HandInList */
+        HandInList: {
+            /** Relay Enabled */
+            relay_enabled: boolean;
+            /** Reports */
+            reports: components["schemas"]["HandInReport"][];
+            /** Outbox */
+            outbox: components["schemas"]["OutboxEntry"][];
+        };
+        /**
+         * HandInReport
+         * @description One report of skellytracker's hand-in list, in every state.
+         */
+        HandInReport: {
+            /** Report Id */
+            report_id: string;
+            /** Kind */
+            kind: string | null;
+            /** Created Utc */
+            created_utc: string | null;
+            /** Has Failure */
+            has_failure: boolean;
+            /** Evidence Valid */
+            evidence_valid: boolean;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "pending" | "opened" | "covered";
+            /**
+             * Reference
+             * @description The issue address, only when it is an issue of the relay's repository.
+             */
+            reference: string | null;
+        };
+        /** HandInSelection */
+        HandInSelection: {
+            /** Report Ids */
+            report_ids: string[];
+            /**
+             * Note
+             * @description The person's note; paths and this host's names are removed.
+             */
+            note?: string | null;
+        };
+        /**
+         * OutboxEntry
+         * @description A file the person chose to send that the relay has not accepted yet.
+         */
+        OutboxEntry: {
+            /** Sha256 */
+            sha256: string;
+            /** File Name */
+            file_name: string;
+            /** Report Ids */
+            report_ids: string[];
+            /** Failed Attempts */
+            failed_attempts: number;
+            last_error: components["schemas"]["RelayError"] | null;
+            /**
+             * Retry Pending
+             * @description Sent again at the next backend start.
+             */
+            retry_pending: boolean;
+            /**
+             * Offer Issue Form
+             * @description The relay refused it for good, or the first send and 3 retries failed.
+             */
+            offer_issue_form: boolean;
+        };
+        /**
+         * RelayError
+         * @description The relay's error, or `network`, `bad-response` or `too-large` from this backend.
+         */
+        RelayError: {
+            /** Status */
+            status: number | null;
+            /** Error */
+            error: string;
+            /** Retry */
+            retry: boolean;
+            /**
+             * Detail
+             * @description Plain text from the relay: show it as text, never as markup.
+             */
+            detail: string | null;
+        };
+        /** ReportFile */
+        ReportFile: {
+            /** File Name */
+            file_name: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Fits Relay */
+            fits_relay: boolean;
+            /** Content */
+            content: string;
+        };
+        /** SendOutcome */
+        SendOutcome: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "covered" | "kept" | "refused";
+            /** Issue Url */
+            issue_url: string | null;
+            /** Issue Number */
+            issue_number: number | null;
+            /** Duplicate */
+            duplicate: boolean;
+            error: components["schemas"]["RelayError"] | null;
+            /** Offer Issue Form */
+            offer_issue_form: boolean;
+        };
     };
     responses: never;
     parameters: never;
@@ -6565,6 +6778,125 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SystemInformationResponse"];
+                };
+            };
+        };
+    };
+    get_hand_in_freemocap_certify_hand_in_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandInList"];
+                };
+            };
+        };
+    };
+    get_hand_in_file_freemocap_certify_hand_in_file_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HandInSelection"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportFile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_hand_in_freemocap_certify_hand_in_send_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptedHandIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendOutcome"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_hand_in_opened_freemocap_certify_hand_in_opened_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptedHandIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandInList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

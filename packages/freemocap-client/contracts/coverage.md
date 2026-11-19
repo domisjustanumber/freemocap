@@ -61,6 +61,10 @@ errors, aborts, cancellation and asset ownership; compatibility records list act
 | GET | `/freemocap/onnx/execution_providers/suggestion` | `get_execution_provider_suggestion_freemocap_onnx_execution_providers_suggestion_get` | Core integration |
 | GET | `/freemocap/onnx/session_providers` | `get_session_providers_freemocap_onnx_session_providers_get` | Core integration |
 | GET | `/freemocap/onnx/system_information` | `get_system_information_freemocap_onnx_system_information_get` | Core integration |
+| GET | `/freemocap/certify/hand_in` | `get_hand_in_freemocap_certify_hand_in_get` | Core integration |
+| POST | `/freemocap/certify/hand_in/file` | `get_hand_in_file_freemocap_certify_hand_in_file_post` | Core integration |
+| POST | `/freemocap/certify/hand_in/send` | `send_hand_in_freemocap_certify_hand_in_send_post` | Core integration |
+| POST | `/freemocap/certify/hand_in/opened` | `mark_hand_in_opened_freemocap_certify_hand_in_opened_post` | Core integration |
 | POST | `/freemocap/telemetry/track` | `track_telemetry_event_freemocap_telemetry_track_post` | Core integration |
 | POST | `/skellycam/camera/detect` | `cameras_detect_endpoint_skellycam_camera_detect_post` | SkellyCam |
 | GET | `/skellycam/camera/microphone/detect` | `microphone_detect_endpoint_skellycam_camera_microphone_detect_get` | SkellyCam |

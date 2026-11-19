@@ -2999,6 +2999,154 @@
         }
       }
     },
+    "/freemocap/certify/hand_in": {
+      "get": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Get Hand In",
+        "description": "Every certify report on this host with its hand-in state, the files waiting in the outbox, and whether the\nrelay is on (when it is off, only the issue form is offered).",
+        "operationId": "get_hand_in_freemocap_certify_hand_in_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandInList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/freemocap/certify/hand_in/file": {
+      "post": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Get Hand In File",
+        "description": "The exact report file that \"send\" or the issue form hands in for these reports and this note.",
+        "operationId": "get_hand_in_file_freemocap_certify_hand_in_file_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandInSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportFile"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/freemocap/certify/hand_in/send": {
+      "post": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Send Hand In",
+        "description": "The person's \"send\" of the file they viewed: it is kept in the outbox, then sent to the relay.",
+        "operationId": "send_hand_in_freemocap_certify_hand_in_send_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptedHandIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendOutcome"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/freemocap/certify/hand_in/opened": {
+      "post": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Mark Hand In Opened",
+        "description": "The person saved the file they viewed and opened the issue form: its reports count as handed in.",
+        "operationId": "mark_hand_in_opened_freemocap_certify_hand_in_opened_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptedHandIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandInList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/freemocap/telemetry/track": {
       "post": {
         "tags": [
@@ -10791,6 +10939,366 @@
           "probe_errors"
         ],
         "title": "SystemRuntime"
+      },
+      "AcceptedHandIn": {
+        "properties": {
+          "report_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Report Ids"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "The person's note; paths and this host's names are removed."
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "description": "The SHA-256 of the file the person viewed."
+          }
+        },
+        "type": "object",
+        "required": [
+          "report_ids",
+          "sha256"
+        ],
+        "title": "AcceptedHandIn"
+      },
+      "HandInList": {
+        "properties": {
+          "relay_enabled": {
+            "type": "boolean",
+            "title": "Relay Enabled"
+          },
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/HandInReport"
+            },
+            "type": "array",
+            "title": "Reports"
+          },
+          "outbox": {
+            "items": {
+              "$ref": "#/components/schemas/OutboxEntry"
+            },
+            "type": "array",
+            "title": "Outbox"
+          }
+        },
+        "type": "object",
+        "required": [
+          "relay_enabled",
+          "reports",
+          "outbox"
+        ],
+        "title": "HandInList"
+      },
+      "HandInReport": {
+        "properties": {
+          "report_id": {
+            "type": "string",
+            "title": "Report Id"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "created_utc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created Utc"
+          },
+          "has_failure": {
+            "type": "boolean",
+            "title": "Has Failure"
+          },
+          "evidence_valid": {
+            "type": "boolean",
+            "title": "Evidence Valid"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "opened",
+              "covered"
+            ],
+            "title": "State"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference",
+            "description": "The issue address, only when it is an issue of the relay's repository."
+          }
+        },
+        "type": "object",
+        "required": [
+          "report_id",
+          "kind",
+          "created_utc",
+          "has_failure",
+          "evidence_valid",
+          "state",
+          "reference"
+        ],
+        "title": "HandInReport",
+        "description": "One report of skellytracker's hand-in list, in every state."
+      },
+      "HandInSelection": {
+        "properties": {
+          "report_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Report Ids"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "The person's note; paths and this host's names are removed."
+          }
+        },
+        "type": "object",
+        "required": [
+          "report_ids"
+        ],
+        "title": "HandInSelection"
+      },
+      "OutboxEntry": {
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "file_name": {
+            "type": "string",
+            "title": "File Name"
+          },
+          "report_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Report Ids"
+          },
+          "failed_attempts": {
+            "type": "integer",
+            "title": "Failed Attempts"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RelayError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retry_pending": {
+            "type": "boolean",
+            "title": "Retry Pending",
+            "description": "Sent again at the next backend start."
+          },
+          "offer_issue_form": {
+            "type": "boolean",
+            "title": "Offer Issue Form",
+            "description": "The relay refused it for good, or the first send and 3 retries failed."
+          }
+        },
+        "type": "object",
+        "required": [
+          "sha256",
+          "file_name",
+          "report_ids",
+          "failed_attempts",
+          "last_error",
+          "retry_pending",
+          "offer_issue_form"
+        ],
+        "title": "OutboxEntry",
+        "description": "A file the person chose to send that the relay has not accepted yet."
+      },
+      "RelayError": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error"
+          },
+          "retry": {
+            "type": "boolean",
+            "title": "Retry"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail",
+            "description": "Plain text from the relay: show it as text, never as markup."
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "error",
+          "retry",
+          "detail"
+        ],
+        "title": "RelayError",
+        "description": "The relay's error, or `network`, `bad-response` or `too-large` from this backend."
+      },
+      "ReportFile": {
+        "properties": {
+          "file_name": {
+            "type": "string",
+            "title": "File Name"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "fits_relay": {
+            "type": "boolean",
+            "title": "Fits Relay"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_name",
+          "sha256",
+          "size_bytes",
+          "fits_relay",
+          "content"
+        ],
+        "title": "ReportFile"
+      },
+      "SendOutcome": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "covered",
+              "kept",
+              "refused"
+            ],
+            "title": "State"
+          },
+          "issue_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue Url"
+          },
+          "issue_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue Number"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "title": "Duplicate"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RelayError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "offer_issue_form": {
+            "type": "boolean",
+            "title": "Offer Issue Form"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "issue_url",
+          "issue_number",
+          "duplicate",
+          "error",
+          "offer_issue_form"
+        ],
+        "title": "SendOutcome"
       }
     }
   },
@@ -10862,6 +11370,10 @@
     {
       "name": "ONNX",
       "description": "Advertised execution providers and loaded inference-session diagnostics."
+    },
+    {
+      "name": "Certification",
+      "description": "Hand-in of certify reports through the relay or the issue form."
     },
     {
       "name": "FFmpeg",

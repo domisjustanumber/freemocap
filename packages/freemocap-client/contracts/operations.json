@@ -727,6 +727,58 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/freemocap/certify/hand_in",
+      "operation_id": "get_hand_in_freemocap_certify_hand_in_get",
+      "handler": "get_hand_in",
+      "source": "freemocap/api/http/certify/certify_router.py",
+      "owner": "Core integration",
+      "validation": [
+        "request path/query/body serialization matches declared aliases and optionality",
+        "response and error bodies retain contract distinctions",
+        "network failure and request abort surfaced without blind mutation retry"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/freemocap/certify/hand_in/file",
+      "operation_id": "get_hand_in_file_freemocap_certify_hand_in_file_post",
+      "handler": "get_hand_in_file",
+      "source": "freemocap/api/http/certify/certify_router.py",
+      "owner": "Core integration",
+      "validation": [
+        "request path/query/body serialization matches declared aliases and optionality",
+        "response and error bodies retain contract distinctions",
+        "network failure and request abort surfaced without blind mutation retry"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/freemocap/certify/hand_in/send",
+      "operation_id": "send_hand_in_freemocap_certify_hand_in_send_post",
+      "handler": "send_hand_in",
+      "source": "freemocap/api/http/certify/certify_router.py",
+      "owner": "Core integration",
+      "validation": [
+        "request path/query/body serialization matches declared aliases and optionality",
+        "response and error bodies retain contract distinctions",
+        "network failure and request abort surfaced without blind mutation retry"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/freemocap/certify/hand_in/opened",
+      "operation_id": "mark_hand_in_opened_freemocap_certify_hand_in_opened_post",
+      "handler": "mark_hand_in_opened",
+      "source": "freemocap/api/http/certify/certify_router.py",
+      "owner": "Core integration",
+      "validation": [
+        "request path/query/body serialization matches declared aliases and optionality",
+        "response and error bodies retain contract distinctions",
+        "network failure and request abort surfaced without blind mutation retry"
+      ]
+    },
+    {
       "method": "POST",
       "path": "/freemocap/telemetry/track",
       "operation_id": "track_telemetry_event_freemocap_telemetry_track_post",

@@ -25,3 +25,8 @@ test('frame contents replace stale definitions despite an unchanged model revisi
     assert.deepEqual(service.getModels(), []);
     assert.equal(updates, 3);
 });
+
+test('the app-state golden with its certification field passes the transport validation', () => {
+    const message = decodeMessage(readFileSync('src/services/server/transport/__fixtures__/message_app_state_golden.bin'));
+    assert.equal(message?.kind, 'app_state');
+});

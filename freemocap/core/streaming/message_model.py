@@ -760,6 +760,8 @@ class CertificationSnapshot:
 class AppStateSnapshot:
     camera_groups: dict[CameraGroupIdString, CameraGroupSnapshot] = field(default_factory=dict)
     realtime_pipelines: tuple[RealtimePipelineSnapshot, ...] = ()
+    certification: CertificationSnapshot | None = None
+    """None until the backend has read skellytracker's status once."""
 
     @classmethod
     def from_state_dict(cls, state: dict[str, Any]) -> "AppStateSnapshot":
@@ -784,7 +786,8 @@ class AppStateSnapshot:
             )
             for pipeline in state.get("realtime_pipelines", [])
         )
-        return cls(camera_groups=camera_groups, realtime_pipelines=realtime_pipelines)
+        return cls(camera_groups=camera_groups, realtime_pipelines=realtime_pipelines,
+                   certification=state.get("certification"))
 
 
 @dataclass(frozen=True, slots=True)

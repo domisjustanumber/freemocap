@@ -6,6 +6,7 @@ import time
 import types
 from types import SimpleNamespace
 
+import cbor2
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -16,8 +17,10 @@ from freemocap.app.freemocap_application import FreemocapApplication
 from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
 from freemocap.core.tasks.calibration.calibration_task_config import PosthocCalibrationPipelineConfig
 from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
-from freemocap.core.streaming.message_model import CertificationPair, CertificationRun, PipelineHold
-from freemocap.system.certify.quick_check import QuickCheckManager, StartRefused
+from freemocap.core.streaming.message_model import (
+    AppStateMessage, CertificationPair, CertificationRun, PipelineHold, encode_message,
+)
+from freemocap.system.certify.quick_check import QuickCheckManager, StartRefused, status_parts
 
 EP, DEVICE = "fake-ep", "gpu:10de:2484:0"
 LABEL = "fake-ep@10de-2484-0"
@@ -229,3 +232,51 @@ def test_pipeline_holds_name_every_running_pipeline():
     assert FreemocapApplication.pipeline_holds(app, cameras) == (
         PipelineHold("realtime", "rt1"), PipelineHold("realtime", "startup:1"),
         PipelineHold("recording", "g1"), PipelineHold("posthoc", "ph1"))
+
+
+# - The `certification` field -
+
+def _status():
+    check = lambda key, **facts: SimpleNamespace(device_key=key, name="GPU " + key, **{
+        "certified": False, "local_result": None, "local_cause": None, "usable": False, **facts})
+    rows = (
+        SimpleNamespace(key=EP, label="Fake EP", reason_code=None, reason=None,
+                        checks=(check(DEVICE, certified=True, usable=True),)),
+        SimpleNamespace(key="other-ep", label="Other EP", reason_code="quick-check-failed", reason="its last quick check failed",
+                        checks=(check(DEVICE, local_result="failed", local_cause="unclean-exits"),)),
+        SimpleNamespace(key="cpu-like", label="CPU", reason_code=None, reason=None, checks=()),
+    )
+    performance = SimpleNamespace(chosen=SimpleNamespace(ep_key=EP, device_key=DEVICE), skipped=(
+        SimpleNamespace(ep_key="new-ep", device_key=DEVICE, needs_check=True),
+        SimpleNamespace(ep_key="other-ep", device_key=DEVICE, needs_check=False)))
+    return SimpleNamespace(eps=rows, performance=performance, host=SimpleNamespace(os_label="Windows 11", os_name="Windows"))
+
+
+def test_the_certification_field_is_facts_only_and_decodes_on_its_own():
+    checks = _checks(read_status=lambda: status_parts(_status(), [{"report_id": "r1", "has_failure": True}]))
+    assert checks.snapshot(()) is None  # nothing is claimed before the first status read
+    checks.refresh()
+    checks.job, checks.run = object(), CertificationRun(items=(CertificationPair(EP, DEVICE),), done=1, total=5,
+                                                        seconds_estimate=30)
+    snapshot = checks.snapshot((PipelineHold("recording", "g1"),))
+    message = cbor2.loads(encode_message(AppStateMessage.from_state_dict(server_pid=7, state={"certification": snapshot})))
+    certification = message["state"]["certification"]
+    assert certification["host"]["os"] == "Windows 11"
+    assert certification["run"] == {"level": "quick", "items": [{"execution_provider": EP, "device_key": DEVICE}],
+                                    "state": "starting", "done": 1, "total": 5, "seconds_estimate": 30}
+    assert certification["items"] == [
+        {"execution_provider": EP, "label": "Fake EP", "device_key": DEVICE, "device_name": "GPU " + DEVICE,
+         "certified": True, "usable": True},
+        {"execution_provider": "other-ep", "label": "Other EP", "device_key": DEVICE, "device_name": "GPU " + DEVICE,
+         "certified": False, "local_result": "failed", "local_cause": "unclean-exits", "usable": False,
+         "reason_code": "quick-check-failed", "reason": "its last quick check failed"}]
+    assert certification["auto"] == {"execution_provider": EP, "device_key": DEVICE,
+                                     "needs_check": [{"execution_provider": "new-ep", "device_key": DEVICE}]}
+    assert certification["gpu_held_by"] == [{"kind": "recording", "id": "g1"}]
+    assert certification["pending_reports"] == [{"report_id": "r1", "has_failure": True}]
+    assert "install_hint" not in str(certification) and "last_result" not in certification
+
+
+def test_an_app_state_without_certification_still_encodes():
+    message = cbor2.loads(encode_message(AppStateMessage.from_state_dict(server_pid=7, state={})))
+    assert "certification" not in message["state"]

@@ -425,7 +425,7 @@ so the quick check is the only way in.
   hiding built in `4a5d3da2` is reversed for it).
 - F2. A pair that failed here stays visible with its reason; choosing it offers the check again.
 - F3. On Auto the app runs what `recommend()` chose and, when a skipped candidate has `needs_check`, shows a
-  non-blocking notice beside the EP setting ("A faster option needs a quick check on this device") with a
+  non-blocking notice beside the EP setting ("A faster option needs a quick check on this machine" (G1)) with a
   "Run quick check" button. F11: that notice has no dismiss; it follows the server's observation.
 - F4. A saved EP and GPU that skellytracker refuses makes the start fail visibly, with the reason and the
   quick-check offer. No automatic switch to CPU.
@@ -441,9 +441,9 @@ so the quick check is the only way in.
 - F10. Progress is checks done of total with a one-off "up to about N seconds"; no ticking countdown
   (skellytracker's `seconds_left` is a sum of uncalibrated ceilings). The button suffix of decision 25
   becomes `· quick check 1 of 3`.
-- F12. Five states, worded with "device", never "PC" (user: Mac users): reviewed = no marker; "passed on
-  this device, not yet reviewed"; "not checked on this device"; "check failed on this device"; "exited
-  uncleanly twice". No marker for field-test. Text already built with "PC" changes too.
+- F12. Five states, worded with "machine", never "PC" or "device" for the computer (user: Mac users; G1):
+  reviewed = no marker; "passed on this machine, not yet reviewed" (G1); "not checked on this machine" (G1);
+  "check failed on this machine" (G1); "exited uncleanly twice". No marker for field-test. Text already built with "PC" changes too.
 - F13. The full-check controls (the start box checkbox, "Run full check") are left out until skellytracker's
   full level exists.
 - F14. Decision 18 (evidence from normal use) is deferred as a whole; nothing is asked after a quick pass.
@@ -466,7 +466,7 @@ so the quick check is the only way in.
   `unknown-report`), then deletes every outbox entry (`.md` and `.json`, waiting to retry or given up) holding one of them, under
   the send lock. A covered report may be un-covered (decision 24). The route addresses reports, not entries: for a kept file the UI
   passes its `report_ids`. The test guard (`2f178809`): `freemocap/tests/conftest.py` sets `FREEMOCAP_CERTIFY_RELAY_URL` to empty in
-  `pytest_configure`; `relay_url()` reads it at each call. F12 wording (`e4082308`): "passed on this device, not yet reviewed".
+  `pytest_configure`; `relay_url()` reads it at each call. F12 wording (`e4082308`): "passed on this machine, not yet reviewed" (G1; built as "device", changed to "machine" after the third grilling).
   Also `92f22855`: `report_file_for` orders modules by `created_utc`, then report id, so the same reports give the same bytes.
 
 ## Environment on the dev PC
@@ -589,7 +589,7 @@ To do next, in order:
 1. When step 1 lands: run the full fast suite (`uv run --frozen pytest freemocap/tests/ --timeout=120
    --timeout-method=thread -m "not e2e and not slow"`; last result 1634 passed, 7 failed = the old baseline,
    20 skipped) against `../skellytracker` at `e90245cefb7330ce33d9f1d395674b4ff3eaed7f`, then record the pin
-   move to that commit in decision 1 (pushed fork commit; all its CI is green on macOS, Windows and Ubuntu,
+   move in decision 1 (G11 supersedes the commit: move to `03e5b3bb`, falling back to this one) (pushed fork commit; all its CI is green on macOS, Windows and Ubuntu,
    fast tests included; it holds the check rule, `needs_check`, the exit notice, `local_cause` and the
    `unclean-exits` reason code, CoreML, pruning, the Windows ML controls and the PyInstaller hook).
 2. Done (`bf6e9e9f`; see [Relay follow-up](#relay-follow-up-spec-110-and-the-switched-off-relay)).
@@ -604,23 +604,55 @@ To do next, in order:
    optional `id` key per module; the relay is OFF now and stays off until the GitHub App is set up; the
    `app` block gets no tree-modified flag. The approved single connection test was run before the switch-off:
    422 `wrong-schema`, classified refused, nothing made on GitHub. This PC's store has 13 pending reports
-   with old ids; what happens to them is skellytracker's and the user's.
+   with old ids; they pass through unchanged (G4).
 3. F15 step 2: menu markers, the two-choice prompt and the background check in the UI, briefed from the
    message shape step 1 recorded. Then steps 3 to 5 in parallel.
 
-Open with the user: freemocap's markers say "on this device" (F12) while skellytracker's reason texts,
-shown beside them unchanged, say "on this machine" (the user's ruling there, because device means a GPU in
-skellytracker; freemocap also has a Device row). Asked whether freemocap should say "machine" too; no answer
-yet, so "device" stands.
-
-Waiting for the user's manual check: the dependency bumps on branch `dom/dependency-bumps`, worktree
-`../freemocap-dep-bumps`, checklist `current-work-plans/02-pipeline/dependency-bumps-verification.md` on that
-branch; it needs a rebase onto this branch before a merge.
+Settled by the third grilling (see below): freemocap says "machine" for the computer (G1); dependency bumps are
+out of this plan (G8), so there is nothing to wait for from the user except the F15 step 2 checklist (G7).
 
 Known gaps, not being worked on: development worker processes still print the cp1252 logging errors (the
 fix point is in skellycam's worker setup; skellycam-18 is told); a frozen backend cannot start from this
 workspace's editable installs (`skellylogs`, `skellycam` are invisible to PyInstaller); the committed
 `openapi.json` lags the app in about 7 unrelated schemas, so every change adds only its own hunks.
+
+## Decisions of the third grilling, 2026-11-19
+
+The user confirmed all of these.
+
+- G1 Wording: "machine" for the computer in all of freemocap's user-facing text; "device" only for a GPU or a
+  camera; never "PC". Applies to the certification texts now, to other screens only when they are touched
+  anyway. Replaces "device" in F12 and in the other quoted texts (updated in place above).
+- G2 Relay health check: only a clear `enabled: false` means "relay is off"; a failed or unclear health check
+  goes on to the normal send. As built in `bf6e9e9f`.
+- G3 The hand-in dialog makes no health call on open; the user learns the relay is off on Send.
+- G4 Old pending reports with old-style ids pass through unchanged; freemocap never rewrites a report.
+- G5 API contract: after the quick-check job (F15 step 1) lands, one catch-up commit regenerates the whole
+  `packages/freemocap-client` contract and client, then the fast suite and the UI type check run.
+- G6 The frozen backend not starting from local editable installs (skellylogs, skellycam invisible to
+  PyInstaller) is deferred; it blocks release builds.
+- G7 After F15 step 2 the user gets a manual checklist; steps 3 to 5 start without waiting for it.
+- G8 Dependency bumps are out of this plan's scope: no more work, no rebase, no merge, no manual check asked.
+  Branch `dom/dependency-bumps` and worktree `../freemocap-dep-bumps` stay on disk untouched.
+- G9 `SHUTDOWN_GRACE_MS` stays 10 s until the user measures a shutdown with cameras attached. The idle
+  measurement (`01be103b`: 1353, 1313, 1351 ms) was `POST /shutdown` to process exit, three runs; no script
+  exists. To repeat it with cameras: (1) start the backend, connect and start the cameras (and a pipeline if
+  wanted); (2) run in PowerShell `$t=Get-Date; Invoke-RestMethod -Method Post http://localhost:<port>/shutdown;
+  while(Get-Process -Id <backend pid> -EA 0){Start-Sleep -Milliseconds 50}; ((Get-Date)-$t).TotalMilliseconds`
+  (port and pid from the backend's startup log); (3) repeat three times and tell the session the numbers.
+- G10 The stale-backend shutdown request at start (`ce160407`, up to about 10 s extra after a crash) and the
+  preparation worker's stop file (`60787afe`; an orphaned worker runs to its end) stay as built.
+- G11 skellytracker pin: move once, to fork commit `03e5b3bbeee1e42cc4b9eaef2913c1c96f3cd7e1`, if its CI is
+  green and freemocap's fast suite passes against it; otherwise stay on
+  `e90245cefb7330ce33d9f1d395674b4ff3eaed7f` and report why. Facts about `03e5b3bb`: report ids are v4 UUIDs,
+  never parse an id; report schema 1.1.0 with top-level `id`; `certify("full")` and `certify_plan("full")` run
+  for real (about 80 s on DirectML on an RTX 3070, estimates not calibrated); new check names
+  `cpu:pipeline-1|3|6`, `cpu:jpeg`, `cpu:jpeg:<name>`, and per pair `<label>:pipeline-1|3|6`, `<label>:jpeg`,
+  `<label>:jpeg:<name>`; a name with no `:` is still the EP row; about 70 JPEG rows per target, to be grouped
+  by prefix in a view; the old stub check `full`/`not-built` is gone; `details.eps.<label>.pack_version` is new
+  at both levels.
+- G12 Full-check controls stay out of F15 steps 2 to 5; they come as their own step afterwards with its own
+  short grilling.
 
 ## Next actions
 

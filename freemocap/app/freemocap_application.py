@@ -346,10 +346,11 @@ class FreemocapApplication:
         """Serializable snapshot of observed server state for the websocket APP_STATE message.
 
         Superset of skellycam's camera-group state plus the realtime pipelines this app
-        owns. The websocket relay adds `server_pid` to the envelope.
+        owns, and the certification state. The websocket relay adds `server_pid` to the envelope.
         """
+        cameras = self.camera_group_manager.to_state_dict()
         return {
-            **self.camera_group_manager.to_state_dict(),
+            **cameras,
             "realtime_pipelines": [
                 {
                     "id": pipeline.id,
@@ -360,6 +361,7 @@ class FreemocapApplication:
                 }
                 for pipeline in self.realtime_pipeline_manager.pipelines.values()
             ],
+            "certification": self.quick_checks.snapshot(self.pipeline_holds(cameras)),
         }
 
     def pipeline_holds(self, cameras: dict | None = None) -> tuple[PipelineHold, ...]:

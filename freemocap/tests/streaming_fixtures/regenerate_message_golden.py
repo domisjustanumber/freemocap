@@ -20,6 +20,17 @@ import cbor2
 
 from freemocap.core.streaming.message_model import (
     STANDARD_HUMAN_MODEL_ID,
+    AppStateMessage,
+    AppStateSnapshot,
+    CertificationAuto,
+    CertificationHost,
+    CertificationItem,
+    CertificationPair,
+    CertificationResult,
+    CertificationRun,
+    CertificationSnapshot,
+    PendingReport,
+    PipelineHold,
     CalibratedCamera,
     CameraCalibrationMatch,
     CameraExtrinsicsMessage,
@@ -152,10 +163,35 @@ def build_frame_message() -> bytes:
     return encode_message(frame)
 
 
+def build_app_state_message() -> bytes:
+    # The `certification` field: a running quick check of one EP on one GPU, the latest result, one item per EP per
+    # GPU with skellytracker's facts, Auto's choice with a candidate that needs a check, what runs, the hand-in list.
+    pair = CertificationPair(execution_provider="golden-ep", device_key="gpu:10de:2484:0")
+    certification = CertificationSnapshot(
+        host=CertificationHost(name="golden-host", os="Windows 11 Home 26H2"),
+        run=CertificationRun(level="quick", items=(pair,), state="running", done=2, total=5, seconds_estimate=45),
+        last_result=CertificationResult(execution_provider="other-ep", device_key="gpu:10de:2484:0",
+                                        result="fail", reason="probe-l3-failed"),
+        items=(
+            CertificationItem(execution_provider="golden-ep", label="Golden EP", device_key="gpu:10de:2484:0",
+                              device_name="NVIDIA GeForce RTX 3070", certified=False, usable=False,
+                              reason_code="quick-check-needed", reason="no reviewed result and no quick check"),
+            CertificationItem(execution_provider="other-ep", label="Other EP", device_key="gpu:10de:2484:0",
+                              device_name="NVIDIA GeForce RTX 3070", certified=True, local_result="failed",
+                              local_cause="unclean-exits", usable=False),
+        ),
+        auto=CertificationAuto(execution_provider="cpu-ep", device_key=None, needs_check=(pair,)),
+        gpu_held_by=(PipelineHold(kind="posthoc", id="abc123"),),
+        pending_reports=(PendingReport(report_id="quick-20261119T120000Z", has_failure=True),),
+    )
+    return encode_message(AppStateMessage(server_pid=4242, state=AppStateSnapshot(certification=certification)))
+
+
 MESSAGES = {
     "message_convention_golden.bin": build_convention_message,
     "message_model_golden.bin": build_model_message,
     "message_frame_golden.bin": build_frame_message,
+    "message_app_state_golden.bin": build_app_state_message,
 }
 
 

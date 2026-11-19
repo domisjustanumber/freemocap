@@ -72,7 +72,12 @@ the OS on this PC, and lets the person hand in certify reports. It does this thr
    only part of a level makes the report `partial-run` (not evidence) unless the package's rules call that
    part complete for one item. skellytracker's planned options (names may change):
    `execution_providers=["cuda"]` and `pipeline=<the user's pipeline config or catalog key>`; that call is the
-   quick check of decision 16.
+   quick check of decision 16. skellytracker's rule (wording confirmed with the built shape): that one-EP call
+   is complete for item X, so its report is evidence when version, commit, unmodified tree and not-cancelled
+   hold; it is not `partial-run`. A `quick` report never yields a reviewed row by itself. Until skellytracker
+   has a SemVer version and a commit readable in a frozen app, reports carry `no-version` and possibly
+   `no-commit` in `evidence.reasons`; the UI shows "not valid as evidence" as the expected state of development
+   builds, not as a failed check.
 10. freemocap merges the module reports into one Markdown file (`certify-report-<yyyymmddThhmmssZ>.md`,
     `{schema, app {name, version, commit}, modules, note}`) and keeps it on the server host under
     `<base data folder>/certify/`. skellytracker's `certify()` also saves its own module report in the EP

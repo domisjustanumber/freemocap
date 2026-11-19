@@ -293,7 +293,16 @@ PYTHONPATH, so the shutdown time stays unmeasured until the workspace is set up.
 
 ## Waiting on the user
 
-- Deploying the relay (Cloudflare) and the test address, for decision R5.
+- Done 2026-11-19 (user confirmed the address in this session): the relay is deployed at
+  `https://skellycertify-relay.dom-dd0.workers.dev`, the value of the R5 constant. Per skellytracker-6c (from a
+  skellycertify session; not checked here): test mode is OFF, so an accepted report files a real issue; test
+  only with `GET /health` or a refused-format sample unless the user approves; the address may still change.
+- Which skellycam freemocap builds against. `../skellycam-native-jpeg` (`dom/native-jpeg`, the new pins) lacks
+  the `upstream/sfn26` camera-group API this branch imports (`close_camera_groups`, `camera_errors`,
+  `rust_camera_group`, `camera_backend_manager`, `ipc.shared_memory`, `ImagePayloadFrame`); the branches split
+  at `6b9ebe171`. With it the lock resolves (`5ad9efd6`, `baef6d20`) but `freemocap.app.app` fails to import and
+  36 test files do not collect (fast suite 1359 passed, 13 failed: 7 baseline, 6 from the same imports; no
+  failure from the new versions among what ran). `../skellycam` (`dom/research`) pins OpenCV 4.12.
 
 ## Waiting on skellytracker
 

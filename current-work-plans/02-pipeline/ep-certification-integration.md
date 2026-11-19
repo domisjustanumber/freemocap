@@ -335,6 +335,12 @@ All as local commits on `sidecar-implementation`, in this order:
    candidates; librosa 0.10.1 kept, not run under numpy 2). Open: freemocap still sources skelly_synchronize
    from upstream `philip/rewrite` (Python <3.13), so its lock cannot resolve until the source points at the
    new branch (needs a push or a path source). The Blender addon, skellylogs and skellypings need no change.
+   Later the same day: skellytracker moved to skellycam's numpy 2.5.5, opencv-contrib-python 5.1.0.95 and
+   platformdirs 4.14.7 (its local `e7ce3409`, ADR-F9QR, read on disk), so that conflict is closed; freemocap
+   pins OpenCV 5.1.0.95 (`a4e27293`), skellyforge numpy (`18c77d8`), skellysync both with its lock (`4f17591`).
+   freemocap sources skelly_synchronize from `../skellysync` for now (`558a765c`, user); CI has no such path.
+   Platform fact (skellytracker-6c, not checked here): the macOS wheel of OpenCV 5.1.0.95 is
+   `macosx_15_0_arm64`, so macOS 13 and 14 get no wheel.
 3. When skellytracker's CI on `55fabf4a` is green, macOS included: pin it and regenerate `uv.lock` (decision 1).
    Right after the pin: the preprocess benchmark ([migration state](skellytracker-2-migration.md) item 9),
    and the EP menu switches from `PackStatus.usable` to the per-GPU `checks[n].usable` (decision 17):

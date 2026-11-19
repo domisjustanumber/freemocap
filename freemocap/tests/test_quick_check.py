@@ -20,6 +20,7 @@ from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineCon
 from freemocap.core.streaming.message_model import (
     AppStateMessage, CertificationPair, CertificationRun, PipelineHold, encode_message,
 )
+from freemocap.system.certify import quick_check
 from freemocap.system.certify.quick_check import QuickCheckManager, StartRefused, status_parts
 
 EP, DEVICE = "fake-ep", "gpu:10de:2484:0"
@@ -345,3 +346,47 @@ def test_routes_plan_start_refuse_and_cancel(route_client):
     assert started[0]["detector_type"] == "rtmpose" and started[0]["rtmpose_model_name"] == "rtmw-x-l_256x192"
     assert client.post("/certify/quick_check", json=body).json()["detail"]["code"] == "quick-check-running"
     assert client.delete("/certify/quick_check").json()["run"]["items"] == [{"execution_provider": EP, "device_key": DEVICE}]
+
+
+# - F4: a chosen EP and GPU that skellytracker refuses fails the start with the facts the UI needs -
+
+def _refusing_eps(monkeypatch):
+    from skellytracker.core import eps
+    from skellytracker.core.errors import EpUnavailableError
+
+    def check_start(execution_provider, ep_options=None, device=None):
+        raise EpUnavailableError(f"The EP '{execution_provider}' cannot run on 'GPU': no quick check passed.",
+                                 "Run `skellytracker-eps certify KEY --quick`.")
+
+    row = SimpleNamespace(key=EP, reason_code="quick-check-needed", checks=(SimpleNamespace(
+        device_key=DEVICE, certified=False, local_result=None, local_cause=None, usable=False),))
+    monkeypatch.setattr(eps, "check_start", check_start)
+    monkeypatch.setattr(eps, "status", lambda: SimpleNamespace(eps=(row,)))
+
+
+def test_a_refused_ep_and_gpu_carries_the_ep_device_and_reason_code(monkeypatch):
+    _refusing_eps(monkeypatch)
+    quick_check.refuse_unavailable_execution_provider(None, None)  # Auto runs only what can start
+    with pytest.raises(StartRefused) as refused:
+        quick_check.refuse_unavailable_execution_provider(EP, DEVICE)
+    assert refused.value.detail == {
+        "code": "execution-provider-unavailable",
+        "message": f"The EP '{EP}' cannot run on 'GPU': no quick check passed.",
+        "execution_provider": EP, "device_key": DEVICE, "reason_code": "quick-check-needed",
+        "check": {"certified": False, "local_result": None, "local_cause": None, "usable": False}}
+    assert "skellytracker-eps" not in str(refused.value.detail)  # the CLI hint stays out of the UI
+
+
+async def test_the_realtime_and_posthoc_starts_refuse_a_saved_ep_that_skellytracker_refuses(monkeypatch):
+    _refusing_eps(monkeypatch)
+    app = SimpleNamespace(quick_checks=_checks())
+    realtime = RealtimePipelineConfig()
+    realtime.skeleton_inference_node_config.execution_provider = EP
+    realtime.skeleton_inference_node_config.execution_device = DEVICE
+    with pytest.raises(StartRefused) as refused:
+        await FreemocapApplication.create_or_update_realtime_pipeline(app, camera_configs={}, pipeline_config=realtime)
+    assert refused.value.detail["execution_provider"] == EP
+    posthoc = PosthocMocapPipelineConfig(execution_provider=EP, execution_device=DEVICE)
+    with pytest.raises(StartRefused) as refused:
+        await FreemocapApplication.create_posthoc_mocap_pipeline(app, recording_info=_take(), mocap_config=posthoc)
+    assert refused.value.detail["device_key"] == DEVICE

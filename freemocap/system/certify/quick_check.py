@@ -51,6 +51,33 @@ class StartRefused(Exception):
         self.detail = detail
 
 
+def refuse_unavailable_execution_provider(execution_provider: str | None, device_key: str | None) -> None:
+    """F4: refuse a run start on a chosen EP and GPU that skellytracker refuses (`EpUnavailableError`), with the EP key,
+    the device key, the EP row's reason code and the pair's check facts, so the UI can offer the quick check. Auto
+    (None) is not checked here: it runs only what can start. Nothing switches to CPU.
+
+    `reason_code` is the EP row's (`PackStatus.reason_code`); it is None when the EP can run on another GPU, and then
+    `check` holds the facts of the refused GPU. An unknown key is left to the run, as before.
+    """
+    if execution_provider in (None, "auto"):
+        return
+    from skellytracker.core import eps
+    from skellytracker.core.errors import EpRequestError, EpUnavailableError
+    try:
+        eps.check_start(execution_provider, device=device_key)
+    except EpRequestError:
+        return
+    except EpUnavailableError as error:
+        row = next((row for row in eps.status().eps if row.key == execution_provider), None)
+        check = next((check for check in row.checks if check.device_key == device_key), None) if row else None
+        raise StartRefused(409, {
+            "code": "execution-provider-unavailable", "message": error.message,
+            "execution_provider": execution_provider, "device_key": device_key,
+            "reason_code": row.reason_code if row else None,
+            "check": None if check is None else {"certified": check.certified, "local_result": check.local_result,
+                                                 "local_cause": check.local_cause, "usable": check.usable}}) from None
+
+
 def _report_result(report: dict) -> tuple[str, str | None]:
     """The EP check's result and reason: the one check whose name has no `:` (decision 9's reader rule)."""
     row = next((row for row in report.get("checks", ()) if ":" not in str(row.get("name"))), None)

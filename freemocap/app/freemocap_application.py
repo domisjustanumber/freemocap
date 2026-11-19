@@ -38,7 +38,7 @@ from skelly_synchronize.core.models import SyncRequest
 from freemocap.core.streaming.outputs.manager import StreamingOutputManager
 from freemocap.core.streaming.pipeline_timing_relay import PipelineTimingRelay
 from freemocap.core.streaming.message_model import PipelineHold
-from freemocap.system.certify.quick_check import QuickCheckManager
+from freemocap.system.certify.quick_check import QuickCheckManager, refuse_unavailable_execution_provider
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +149,11 @@ class FreemocapApplication:
             realtime_camera_ids: list[CameraIdString] | None = None,
     ) -> RealtimePipeline:
         self.quick_checks.refuse_pipeline_start("realtime")
+        node = pipeline_config.skeleton_inference_node_config
+        if pipeline_config.camera_node_config.skeleton_tracking_enabled and not node.legacy_tracker_benchmark:  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark): keep only the first condition.
+            from freemocap.core.tracking.pipeline_runs import detector_takes_execution_provider
+            if detector_takes_execution_provider(pipeline_config.camera_node_config.detector_type):
+                await asyncio.to_thread(refuse_unavailable_execution_provider, node.execution_provider, node.execution_device)
         # Keep the lock until a cancelled caller's actual operation has drained.
         # Cancelling to_thread's await does not stop its native work.
         if self._realtime_stop_task is not None:
@@ -305,6 +310,10 @@ class FreemocapApplication:
             mocap_config: PosthocMocapPipelineConfig,
     ) -> MocapPipeline:
         self.quick_checks.refuse_pipeline_start("posthoc")
+        if mocap_config.start_stage == "observations":  # only a tracking run starts an EP
+            from freemocap.core.pipeline.dataflow.application_pipeline import resolve_tracking_provider
+            await asyncio.to_thread(refuse_unavailable_execution_provider, resolve_tracking_provider(mocap_config),
+                                    mocap_config.execution_device)
         pipeline = self.posthoc_pipeline_manager.create_mocap_pipeline(
             recording_info=recording_info,
             mocap_config=mocap_config,

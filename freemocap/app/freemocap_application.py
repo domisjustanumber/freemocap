@@ -37,6 +37,7 @@ from freemocap.pubsub.pubsub_topics import AggregationNodeOutputMessage  # noqa:
 from skelly_synchronize.core.models import SyncRequest
 from freemocap.core.streaming.outputs.manager import StreamingOutputManager
 from freemocap.core.streaming.pipeline_timing_relay import PipelineTimingRelay
+from freemocap.system.certify.quick_check import QuickCheckManager
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +69,7 @@ class FreemocapApplication:
     posthoc_pipeline_manager: PosthocPipelineManager
     sync_job_manager: SyncJobManager
     camera_group_manager: CameraBackendManager
+    quick_checks: QuickCheckManager
     streaming_outputs: StreamingOutputManager = field(init=False)
     pipeline_timing_relay: PipelineTimingRelay = field(default_factory=PipelineTimingRelay, init=False)
     startup_status: RealtimeStartupStatus = field(default_factory=RealtimeStartupStatus, init=False)
@@ -108,6 +110,7 @@ class FreemocapApplication:
                 worker_registry=worker_registry,
             ),
             camera_group_manager=get_or_create_camera_group_manager(app=fastapi_app),
+            quick_checks=QuickCheckManager(global_kill_flag=global_kill_flag, worker_registry=worker_registry),
         )
 
     @property
@@ -359,6 +362,7 @@ class FreemocapApplication:
     # ------------------------------------------------------------------
 
     def shutdown_all_processing(self) -> None:
+        self.quick_checks.shutdown()
         self.realtime_pipeline_manager.shutdown()
         self.posthoc_pipeline_manager.shutdown()
         self.sync_job_manager.shutdown()

@@ -23,6 +23,7 @@ def test_application_closes_outputs_before_capture_and_still_cleans_up_on_error(
     app = object.__new__(FreemocapApplication)
     app.global_kill_flag = SimpleNamespace(value=False)
     app.streaming_outputs = SimpleNamespace(close=stop_outputs)
+    app.quick_checks = SimpleNamespace(shutdown=lambda: calls.append("quick_check"))
     app.realtime_pipeline_manager = SimpleNamespace(shutdown=lambda: calls.append("realtime"))
     app.posthoc_pipeline_manager = SimpleNamespace(shutdown=lambda: calls.append("posthoc"))
     app.sync_job_manager = SimpleNamespace(shutdown=lambda: calls.append("sync"))
@@ -32,5 +33,5 @@ def test_application_closes_outputs_before_capture_and_still_cleans_up_on_error(
             app.close()
     else:
         app.close()
-    assert calls == ["outputs", "realtime", "posthoc", "sync", "inference"]
+    assert calls == ["outputs", "quick_check", "realtime", "posthoc", "sync", "inference"]
     assert app.global_kill_flag.value is True

@@ -91,6 +91,7 @@ async def collect_task_progress(app: FastAPI) -> None:
         while not app.state.global_kill_flag.value:
             await asyncio.to_thread(get_freemocap_app().posthoc_pipeline_manager.refresh_progress)
             await asyncio.to_thread(get_freemocap_app().sync_job_manager.refresh_progress)
+            await asyncio.to_thread(get_freemocap_app().quick_checks.refresh)
             await asyncio.sleep(0.5)
     except Exception as error:
         app.state.fatal_error = error

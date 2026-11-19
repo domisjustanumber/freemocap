@@ -670,6 +670,93 @@ class RealtimePipelineSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class CertificationHost:
+    name: str = ""
+    os: str = ""
+    """skellytracker's OS label of the backend host, for example "Windows 11 Home 26H2"."""
+
+
+@dataclass(frozen=True, slots=True)
+class CertificationPair:
+    """One EP on one GPU, by skellytracker's EP key and device key (None: the EP selects no GPU)."""
+    execution_provider: str = ""
+    device_key: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CertificationRun:
+    """The running check: skellytracker's latest progress, checks done of total, and the plan's one-off estimate."""
+    level: str = "quick"
+    items: tuple[CertificationPair, ...] = ()
+    state: str = "starting"
+    """skellytracker's progress state: starting, running, cleaning-up or done."""
+    done: int = 0
+    total: int | None = None
+    """None until the first progress message."""
+    seconds_estimate: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CertificationResult:
+    """How the latest check of this server session ended: the EP check's `result` and `reason` from skellytracker's
+    report (`pass`, `fail` or `not-run`, which a cancel gives), or `crashed` / `error` when no report came back."""
+    execution_provider: str = ""
+    device_key: str | None = None
+    result: str = ""
+    reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CertificationItem:
+    """One EP on one GPU as skellytracker's status gives it (`PackStatus` row and its `DeviceCheck`). Facts only:
+    the UI words the state. `reason_code` and `reason` are the EP row's."""
+    execution_provider: str = ""
+    label: str = ""
+    device_key: str = ""
+    device_name: str | None = None
+    certified: bool = False
+    local_result: str | None = None
+    local_cause: str | None = None
+    usable: bool = False
+    reason_code: str | None = None
+    reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CertificationAuto:
+    """skellytracker's performance recommendation (what Auto runs) and the skipped candidates that need a check."""
+    execution_provider: str = ""
+    device_key: str | None = None
+    needs_check: tuple[CertificationPair, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class PipelineHold:
+    """A running pipeline: `kind` is realtime, recording or posthoc."""
+    kind: str = ""
+    id: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class PendingReport:
+    report_id: str = ""
+    has_failure: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class CertificationSnapshot:
+    host: CertificationHost = field(default_factory=CertificationHost)
+    run: CertificationRun | None = None
+    last_result: CertificationResult | None = None
+    items: tuple[CertificationItem, ...] = ()
+    auto: CertificationAuto | None = None
+    gpu_held_by: tuple[PipelineHold, ...] = ()
+    """Every running pipeline, CPU ones too: a check is refused while any runs."""
+    pending_reports: tuple[PendingReport, ...] = ()
+    """skellytracker's hand-in list, pending reports only."""
+
+
+@dataclass(frozen=True, slots=True)
 class AppStateSnapshot:
     camera_groups: dict[CameraGroupIdString, CameraGroupSnapshot] = field(default_factory=dict)
     realtime_pipelines: tuple[RealtimePipelineSnapshot, ...] = ()

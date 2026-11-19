@@ -183,6 +183,10 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
     PC; two GPUs of one model share one local result; skellytracker itself will refuse a run on an EP and
     GPU with no reviewed row and no local pass (not built; the quick check keeps a way through). When that
     is built the limit above is gone and freemocap's menu filter only hides what would be refused.
+    Built (`4a5d3da2`): the EP route carries `checks` (device key, certified, local result, usable); the menu and
+    `usable_execution_providers()` offer an EP and GPU only from `checks[n].usable`, an EP with no checks from
+    `usable`; the EP explanation says "passed on this PC, not yet reviewed" per GPU. skellytracker's local
+    `669d9676` (after the pin) already makes `usable` and `devices` obey the rule (ADR-ER5X).
 18. Evidence from normal use: asked once, right after a quick pass, off until yes, with a toggle in Settings.
     When Record waited on that quick check, the question waits until the recording and its processing end.
     After each recording, at idle, up to 30 frames from the saved videos run on the EP and on CPU and are
@@ -402,9 +406,7 @@ All as local commits on `sidecar-implementation`, in this order:
 3. When skellytracker's CI on `55fabf4a` is green, macOS included: pin it and regenerate `uv.lock` (decision 1).
    Right after the pin: the preprocess benchmark ([migration state](skellytracker-2-migration.md) item 9),
    and the EP menu switches from `PackStatus.usable` to the per-GPU `checks[n].usable` (decision 17):
-   `usable_execution_providers()` in `freemocap/core/tracking/execution_providers.py` and
-   `executionProviderOptions` in `freemocap-ui/src/services/server/execution-providers.ts` filter on
-   `row.usable` today, which ignores local failures and uncertified pairs.
+   done in `4a5d3da2`, built on the pin `4dcf2a66` shape.
 4. Done (`61f68980`): `__version__` is `2.0.0-alpha.25`; bumpver writes it with the `package.json` pattern
    (dry run checked; `current_version` and git tags keep the `v`); the client contract and building.mdx
    follow. The telemetry `app_version` now arrives without the `v`, so dashboards see two spellings across

@@ -1489,6 +1489,7 @@ wheels = [
 name = "skelly-synchronize"
 source = { editable = "../skellysync" }
 dependencies = [
+    { name = "audioread" },
     { name = "deffcode" },
     { name = "librosa" },
     { name = "matplotlib" },
@@ -1502,6 +1503,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "audioread", specifier = ">=3.1.0" },
     { name = "black", marker = "extra == 'dev'" },
     { name = "bumpver", marker = "extra == 'dev'" },
     { name = "deffcode", specifier = "==0.2.6" },
@@ -1624,7 +1626,7 @@ dev = [
     { name = "pip-tools" },
     { name = "poethepoet" },
     { name = "pytest", specifier = ">=9.1.1" },
-    { name = "scipy" },
+    { name = "scipy", specifier = "==1.18.1" },
 ]
 
 [[package]]

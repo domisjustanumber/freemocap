@@ -49,3 +49,57 @@ test('graceful child exit clears ownership and cannot kill a stale PID later', a
     assert.equal(PythonServer.getCurrentExecutablePath(), 'test-server.exe');
     children[1].emit('exit', 0);
 });
+
+function loadServer({fetchImpl, exitOnShutdown}) {
+    const children = [];
+    const killed = [];
+    const requests = [];
+    const module = {exports: {}};
+    const stubs = {
+        child_process: {exec() {
+            const child = Object.assign(new EventEmitter(), {
+                pid: 2000 + children.length, killed: false, exitCode: null, stdout: new EventEmitter(),
+            });
+            child.kill = () => { child.killed = true; };
+            children.push(child);
+            setImmediate(() => child.stdout.emit('data', 'FREEMOCAP_PORT=54330\n'));
+            return child;
+        }},
+        'node:fs': {existsSync: () => true, statSync: () => ({isFile: () => true}),
+            accessSync() {}, constants: {F_OK: 0, R_OK: 4, X_OK: 1}},
+        './logger': {LifecycleLogger: {logPythonProcess() {}}},
+        '../app-paths': {PYTHON_EXECUTABLE_CANDIDATES: []},
+        '../base-folder': {getBaseDataFolder: () => 'test-data', FREEMOCAP_BASE_FOLDER_ENV_VAR: 'FREEMOCAP_BASE_FOLDER'},
+        'tree-kill': (pid, callback) => {killed.push(pid); callback();},
+    };
+    const fetch = async (url, options) => {
+        requests.push({url, method: options.method});
+        if (exitOnShutdown) setImmediate(() => { children.at(-1).exitCode = 0; children.at(-1).emit('exit', 0); });
+        return fetchImpl();
+    };
+    // The shutdown grace and settle delays run instantly; port discovery keeps its real timeout.
+    const fastTimeout = (callback, ms) => setTimeout(callback, ms <= 10_000 ? 0 : ms);
+    vm.runInNewContext(code, {module, exports: module.exports, process, console, fetch, AbortSignal,
+        setTimeout: fastTimeout, clearTimeout, require: name => stubs[name] ?? require(name)});
+    return {PythonServer: module.exports.PythonServer, children, killed, requests};
+}
+
+test('shutdown asks the backend to exit and kills nothing when it does', async () => {
+    const {PythonServer, killed, requests} = loadServer({fetchImpl: async () => ({ok: true}), exitOnShutdown: true});
+    await PythonServer.start('test-server.exe');
+    // Window close and quit both ask; one request, one shutdown.
+    await Promise.all([PythonServer.shutdown(), PythonServer.shutdown()]);
+    assert.deepEqual(requests, [{url: 'http://127.0.0.1:54330/shutdown', method: 'POST'}]);
+    assert.deepEqual(killed, []);
+    assert.equal(PythonServer.isRunning(), false);
+});
+
+test('shutdown kills the process tree only when the backend does not exit', async () => {
+    const {PythonServer, children, killed, requests} = loadServer({
+        fetchImpl: async () => { throw new Error('connection refused'); }, exitOnShutdown: false});
+    await PythonServer.start('test-server.exe');
+    await PythonServer.shutdown();
+    assert.equal(requests.length, 1);
+    assert.deepEqual(killed, [children[0].pid]);
+    assert.equal(PythonServer.isRunning(), false);
+});

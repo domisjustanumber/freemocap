@@ -13,6 +13,9 @@ let pythonProcess: ReturnType<typeof exec> | null = null;
 const PORT_SENTINEL = "FREEMOCAP_PORT";
 const DEFAULT_PORT = 53117;
 const PORT_DISCOVERY_TIMEOUT_MS = 30_000;
+const SHUTDOWN_REQUEST_TIMEOUT_MS = 5_000;
+// shortcut: 10 s is unmeasured (no working env on the dev PC, 2026-11-19); set it from a measured POST /shutdown.
+const SHUTDOWN_GRACE_MS = 10_000;
 
 export interface ExecutableCandidate {
     name: string;
@@ -27,6 +30,7 @@ export class PythonServer {
     private static currentExecutablePath: string | null = null;
     private static validatedCandidates: ExecutableCandidate[] = [];
     private static discoveredPort: number | null = null;
+    private static shutdownInFlight: Promise<void> | null = null;
 
     /**
      * Start the Python server and wait for it to report which port it bound to.
@@ -147,21 +151,51 @@ export class PythonServer {
         });
     }
 
-    static async shutdown() {
+    /** One shutdown per close: concurrent callers (window close, quit, restart) share it. */
+    static shutdown(): Promise<void> {
+        this.shutdownInFlight ??= this.stopOwnedProcess().finally(() => {
+            this.shutdownInFlight = null;
+        });
+        return this.shutdownInFlight;
+    }
+
+    private static async stopOwnedProcess() {
         if (!pythonProcess || !pythonProcess.pid) {
             console.log('No Python server process to shutdown');
             return;
         }
 
-        console.log(`Shutting down Python server (PID: ${pythonProcess.pid})`);
+        const ownedProcess = pythonProcess;
+        const pid = pythonProcess.pid;
+        console.log(`Shutting down Python server (PID: ${pid})`);
+        const exited = new Promise<void>(resolve => ownedProcess.once('exit', () => resolve()));
+        try {
+            // The backend closes cameras, pipelines and telemetry itself; killing skips all of that.
+            await fetch(`http://127.0.0.1:${this.getPort()}/shutdown`, {
+                method: 'POST',
+                signal: AbortSignal.timeout(SHUTDOWN_REQUEST_TIMEOUT_MS),
+            });
+        } catch (error) {
+            console.warn('Shutdown request failed; waiting for exit, then killing:', error);
+        }
+        const exitedInTime = await Promise.race([
+            exited.then(() => true),
+            new Promise<boolean>(resolve => setTimeout(() => resolve(false), SHUTDOWN_GRACE_MS)),
+        ]);
+        if (exitedInTime || ownedProcess.exitCode !== null) {
+            console.log('✔ Python server exited after the shutdown request');
+            this.clearProcess(ownedProcess);
+            return;
+        }
+        console.warn(`Python server still running ${SHUTDOWN_GRACE_MS} ms after the shutdown request; killing it`);
 
         try {
-            await treeKillAsync(pythonProcess.pid);
+            await treeKillAsync(pid);
             console.log('✔ Python server process tree terminated');
         } catch (error) {
             console.error('Error killing process tree:', error);
             try {
-                pythonProcess?.kill('SIGKILL');
+                ownedProcess.kill('SIGKILL');
                 console.log('✔ Python server force-killed as fallback');
             } catch (killError) {
                 console.error('Failed to force-kill Python server:', killError);
@@ -170,14 +204,19 @@ export class PythonServer {
 
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        if (pythonProcess && !pythonProcess.killed) {
+        if (!ownedProcess.killed && ownedProcess.exitCode === null) {
             console.warn('Python server may not have exited cleanly');
         }
 
+        this.clearProcess(ownedProcess);
+        console.log('✔ Python server shutdown complete');
+    }
+
+    private static clearProcess(ownedProcess: ReturnType<typeof exec>) {
+        if (pythonProcess !== ownedProcess) return;
         pythonProcess = null;
         this.currentExecutablePath = null;
         this.discoveredPort = null;
-        console.log('✔ Python server shutdown complete');
     }
 
     /**

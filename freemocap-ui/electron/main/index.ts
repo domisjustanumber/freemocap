@@ -56,10 +56,9 @@ if (!gotTheLock) {
 
     });
 
-    app.on('window-all-closed', async () => {
-        console.log('All windows closed, shutting down...');
-        await PythonServer.shutdown();
-        app.quit();
+    app.on('window-all-closed', () => {
+        console.log('All windows closed, quitting...');
+        app.quit(); // before-quit shuts the server down
     });
 
     app.on('activate', () => {

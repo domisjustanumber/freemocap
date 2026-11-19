@@ -67,6 +67,12 @@ the OS on this PC, and lets the person hand in certify reports. It does this thr
    `spawn` child (no `sys.executable` with a script path; `freeze_support()` is already in `__main__`),
    passes `progress` through a queue and `cancel` as a `multiprocessing.Event`, and keeps the latest
    full-state progress message as the job state for the UI.
+   A package may add keyword-only options with defaults after these three; `certify(level)` always works and
+   `certify_plan` takes the same options (skellycertify `25b9631b`, report-format.md 2.2). An option that runs
+   only part of a level makes the report `partial-run` (not evidence) unless the package's rules call that
+   part complete for one item. skellytracker's planned options (names may change):
+   `execution_providers=["cuda"]` and `pipeline=<the user's pipeline config or catalog key>`; that call is the
+   quick check of decision 16.
 10. freemocap merges the module reports into one Markdown file (`certify-report-<yyyymmddThhmmssZ>.md`,
     `{schema, app {name, version, commit}, modules, note}`) and keeps it on the server host under
     `<base data folder>/certify/`. skellytracker's `certify()` also saves its own module report in the EP
@@ -126,7 +132,7 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
     ask again"; these choices exist only here), then runs the quick check in the background: a tiny probe,
     then one image through the person's selected pipeline on the EP and on CPU, in a child process, with no
     model download. Record waits for a running check, shows the seconds left (an estimate: 30-60 s on a first
-    run, about 10 s warm) and a "Cancel check" button, with a note that the EP is not usable until a check
+    run, about 10 s warm; measured warm on the RTX 3070 by skellytracker-6c: trt-rtx 9.2 s, cuda 10.7 s) and a "Cancel check" button, with a note that the EP is not usable until a check
     passes. Only a pass of the whole quick check (probe and comparison) makes an EP with no reviewed row
     usable, for every EP including cuda and trt-rtx (user ruling relayed by skellytracker-6c, confirmed here
     2026-11-19). A pass makes the EP usable on that PC at once, shown as "passed on this PC, not yet reviewed".

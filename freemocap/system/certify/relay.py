@@ -71,10 +71,13 @@ def report_file_for(report_ids: list[str], note: str | None) -> tuple[str, bytes
     modules = []
     for report_id in dict.fromkeys(report_ids):
         try:
-            modules.append(skellytracker.read_report(report_id))
+            module = skellytracker.read_report(report_id)
+            modules.append((str(module.get("created_utc") or ""), report_id, module))
         except ValueError:
             raise HandInError("unknown-report", f"{report_id!r} is not a report of this host") from None
-    return build_report_file(modules, scrub_note(note), app_block())
+    # The relay finds duplicates by the file's SHA-256: the same reports give the same bytes in any caller order.
+    modules.sort(key=lambda row: row[:2])
+    return build_report_file([row[2] for row in modules], scrub_note(note), app_block())
 
 
 def _write(path: Path, data: bytes) -> None:

@@ -102,6 +102,10 @@ def test_a_200_marks_the_reports_covered_after_the_exact_viewed_bytes_went_out(f
     assert (tmp_path / "certify" / "certify-report-20261119T100000Z.md").read_bytes() == body
 
 
+def test_the_same_reports_in_any_order_give_the_same_file(fake_relay):
+    assert relay.report_file_for(["quick-1", "quick-2"], "n") == relay.report_file_for(["quick-2", "quick-1"], "n")
+
+
 def test_a_duplicate_is_covered_too(fake_relay):
     fake_relay.answer(200, {"issue_url": ISSUE, "issue_number": 7, "file_path": "inbox/2026/x.md", "duplicate": True})
     outcome = relay.send_report(*_viewed()[:3])

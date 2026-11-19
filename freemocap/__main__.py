@@ -6,6 +6,16 @@ import signal
 import sys
 from threading import Event
 
+
+def force_utf8_output() -> None:
+    # A piped stdout on Windows defaults to cp1252, which cannot encode skellylogs' "└>>" prefix; frozen apps ignore PYTHON* variables.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
+
+force_utf8_output()
+
 from freemocap.app.serve_application import serve_application
 
 # Ensure sys.stdout/sys.stderr are valid — PyInstaller frozen subprocesses

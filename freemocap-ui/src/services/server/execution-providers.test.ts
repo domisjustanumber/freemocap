@@ -50,8 +50,8 @@ test('the explanation marks a pair that passed here and has no reviewed row, and
     const text = (providers: ReturnType<typeof ep>[]) => renderToStaticMarkup(executionProviderInfo(providers).text)
         .replace(/<[^>]+>/g, '').replace(/\s+/g, ' ');
     assert.match(text([ep([pair(null, true, true), pair('passed', false, true, 'gpu:1')])]),
-        /Runs on a GPU\. Second GPU: passed on this PC, not yet reviewed\./);
-    assert.doesNotMatch(text([ep([pair(null, true, true)])]), /passed on this PC|Not usable/);
+        /Runs on a GPU\. Second GPU: passed on this device, not yet reviewed\./);
+    assert.doesNotMatch(text([ep([pair(null, true, true)])]), /passed on this device|Not usable/);
     assert.match(text([ep([pair('failed', true, false)])]), /Runs on a GPU\. Not usable here\./);
 });
 

@@ -8,6 +8,7 @@ import {type DetectorType, RTMPOSE_MODELS, type RTMPoseModelName} from '@/store/
 import type {ExecutionProviderName} from '@/types/execution-provider';
 import type {ExecutionProviderChoices} from '@/hooks/useExecutionProviderOptions';
 import {AutoOffersNote} from './execution-provider-info';
+import {QuickCheckPanel} from './quick-check-panel';
 
 export const DETECTOR_INFO = {
     title: "Skeleton detector",
@@ -23,9 +24,9 @@ export const DEVICE_INFO = {
     text: <p>The GPU that the chosen execution provider runs on. <strong>Auto</strong> lets SkellyTracker choose.</p>,
 };
 
-/** A device as the select shows it: its name and VRAM, as skellytracker gives them. */
-const deviceLabel = ({key, name, vram_total_bytes}: {key: string; name: string | null; vram_total_bytes: number | null}) =>
-    `${name ?? key}${vram_total_bytes === null ? '' : ` (${(vram_total_bytes / 2 ** 30).toFixed(1)} GiB)`}`;
+/** A device as the select shows it: its name and VRAM, as skellytracker gives them, and the marker of its state (F9). */
+const deviceLabel = ({key, name, vram_total_bytes, marker}: {key: string; name: string | null; vram_total_bytes: number | null; marker?: string}) =>
+    `${name ?? key}${vram_total_bytes === null ? '' : ` (${(vram_total_bytes / 2 ** 30).toFixed(1)} GiB)`}${marker ? ` (${marker})` : ''}`;
 
 export const MODEL_INFO = {
     title: "Model",
@@ -109,24 +110,42 @@ export function DetectorSettingRows({value, onChange, detectors, providers, cont
     const detectorInfo = (realtime && REALTIME_DETECTOR_INFO.get(detector)) || DETECTOR_INFO;
     const takesProvider = all && providers.takesExecutionProvider(detector);
     const devices = takesProvider ? providers.devicesOf(value.provider) : [];
+    const {quickCheck} = providers;
+    /** An EP or device choice: one that needs a check opens the prompt and leaves the selection as it is (F1, F6, F9). */
+    const choose = (provider: ExecutionProviderName | null, device: string | null, change: Partial<DetectorSettingsValue>) => {
+        const pair = providers.pairToCheck(provider, device);
+        quickCheck.choose(pair && provider !== null ? {pair, change: {provider, device}} : null);
+        if (!pair) onChange(change);
+    };
 
     return <>
         {/* In the posthoc section the detector reframes every row beneath it, so it leads the section. */}
         <SettingRow promoted={context === 'posthoc'} inactive={inactive} label="Skeleton detector" info={detectorInfo}
             control={<SettingSelectInput label="Skeleton detector" value={detector} options={detectors}
-                onChange={(selected: DetectorType) => onChange({detector: selected})}/>}/>
+                onChange={(selected: DetectorType) => {
+                    quickCheck.choose();
+                    onChange({detector: selected});
+                }}/>}/>
 
         {takesProvider && <SettingRow inactive={inactive} label="Execution provider" info={providers.info}
             control={<SettingSelectInput label="Execution provider" value={value.provider ?? 'auto'}
                 options={providers.options.map(option => ({...option, value: option.value ?? 'auto' as const}))}
-                onChange={(provider: ExecutionProviderName | 'auto') => onChange({provider: provider === 'auto' ? null : provider, device: null})}/>}/>}
+                onChange={(provider: ExecutionProviderName | 'auto') => {
+                    const chosen = provider === 'auto' ? null : provider;
+                    choose(chosen, null, {provider: chosen, device: null});
+                }}/>}/>}
 
         {takesProvider && value.provider === null && <AutoOffersNote offers={providers.autoOffers} providers={providers.providers}/>}
 
         {devices.length > 1 && <SettingRow inactive={inactive} label="Device" info={DEVICE_INFO}
             control={<SettingSelectInput label="Device" value={value.device ?? 'auto'}
                 options={[{label: 'Auto', value: 'auto'}, ...devices.map(device => ({label: deviceLabel(device), value: device.key}))]}
-                onChange={(device: string) => onChange({device: device === 'auto' ? null : device})}/>}/>}
+                onChange={(device: string) => {
+                    const chosen = device === 'auto' ? null : device;
+                    choose(value.provider, chosen, {device: chosen});
+                }}/>}/>}
+
+        {takesProvider && <QuickCheckPanel value={value} onChange={onChange} providers={providers}/>}
 
         {rtmw && <SettingRow inactive={inactive} label="Model" info={MODEL_INFO}
             control={<SettingSelectInput label="RTMPose model" value={value.model}

@@ -1,5 +1,10 @@
 import {createHttpClient} from '@freemocap/client/http';
+import type {Certification} from '@freemocap/client';
 import type {ExecutionProviderCatalog, ExecutionProviderDevice, ExecutionProviderName, ExecutionProviderOption} from '@/types/execution-provider';
+import {describeError} from '@/store/slices/thunk-helpers';
+
+export type CertificationItem = Certification['items'][number];
+export type CertificationRun = NonNullable<Certification['run']>;
 
 const isDevice = (device: Record<string, unknown> | null) => typeof device?.key === 'string'
     && (device.name === null || typeof device.name === 'string')
@@ -42,13 +47,164 @@ export function offeredDevices(provider: ExecutionProviderOption | undefined): E
 /** Whether the menu offers an EP: usable, and for an EP with GPU checks usable on at least one GPU. */
 export const isOffered = ({usable, checks}: ExecutionProviderOption) => usable && (!checks.length || checks.some(check => check.usable));
 
-/** Auto, then the server's offered EPs in its order; a saved key that is not offered stays visible as itself. */
+/**
+ * Auto, then the server's offered EPs in its order; a saved key that is not offered stays visible as itself.
+ * With the server's certification items (F1, F2), an EP with GPU checks is offered from its menu pairs instead, its
+ * label marked with the state of the pair that a device choice of Auto would take.
+ */
 export function executionProviderOptions(selected: ExecutionProviderName | null,
-    providers: readonly ExecutionProviderOption[]): {label: string; value: ExecutionProviderName | null}[] {
-    const usable = providers.filter(isOffered);
-    const options = [{label: 'Auto', value: null}, ...usable.map(({key, label}) => ({label, value: key}))];
-    return selected === null || usable.some(({key}) => key === selected)
+    providers: readonly ExecutionProviderOption[], items?: readonly CertificationItem[]): {label: string; value: ExecutionProviderName | null}[] {
+    const byPairs = (provider: ExecutionProviderOption) => items !== undefined && provider.checks.length > 0;
+    const shown = providers.filter(provider => byPairs(provider) ? menuPairs(provider, items).length > 0 : isOffered(provider));
+    const label = (provider: ExecutionProviderOption) => {
+        const marker = byPairs(provider) ? PAIR_MARKERS[autoPair(menuPairs(provider, items))?.state ?? 'reviewed'] : '';
+        return marker ? `${provider.label} (${marker})` : provider.label;
+    };
+    const options = [{label: 'Auto', value: null}, ...shown.map(provider => ({label: label(provider), value: provider.key}))];
+    return selected === null || shown.some(({key}) => key === selected)
         ? options : [...options, {label: providers.find(({key}) => key === selected)?.label ?? selected, value: selected}];
+}
+
+/** F12's five states of one EP on one GPU, worded with "machine" for the computer (G1). A reviewed pair has no marker. */
+export const PAIR_MARKERS = {
+    'reviewed': '',
+    'passed-here': 'passed on this machine, not yet reviewed',
+    'not-checked': 'not checked on this machine',
+    'failed': 'check failed on this machine',
+    'unclean-exits': 'exited uncleanly twice',
+} as const;
+export type PairState = keyof typeof PAIR_MARKERS;
+
+/** The state of a pair from skellytracker's facts (`DeviceCheck`). */
+export function pairState({certified, local_result, local_cause, usable}: {
+    certified: boolean; local_result?: string | null; local_cause?: string | null; usable: boolean;
+}): PairState {
+    if (usable) return certified ? 'reviewed' : 'passed-here';
+    if (local_result === 'failed') return local_cause === 'unclean-exits' ? 'unclean-exits' : 'failed';
+    return 'not-checked';
+}
+
+// skellytracker's reason codes of an EP that is ready but refused by its check rule (ADR-ER5X).
+const CHECK_RULE_CODES: ReadonlySet<string> = new Set(['quick-check-needed', 'quick-check-failed', 'unclean-exits']);
+
+/** One EP on one GPU as the menu shows it. `needsCheck`: choosing it opens the quick-check prompt. */
+export interface MenuPair {execution_provider: string; device_key: string; name: string; state: PairState; needsCheck: boolean}
+
+/**
+ * The pairs of an EP that the menu shows, in skellytracker's order (most VRAM first): the usable ones and, from the
+ * server's certification items, the ones a quick check would let run (unchecked or failed here; F1, F2). A pair of an
+ * EP that is not installed or not ready stays hidden. Without the items (before the first status read): the usable
+ * checks. The EP row's reason code is absent when the EP runs on another GPU; a pair that is not usable then waits
+ * for a check.
+ */
+export function menuPairs(provider: ExecutionProviderOption, items?: readonly CertificationItem[]): MenuPair[] {
+    const name = (key: string, given?: string) => given ?? provider.devices.find(device => device.key === key)?.name ?? key;
+    if (!items) {
+        return provider.checks.filter(check => check.usable).map(check => ({execution_provider: provider.key,
+            device_key: check.device_key, name: name(check.device_key), state: pairState(check), needsCheck: false}));
+    }
+    return items.filter(item => item.execution_provider === provider.key
+        && (item.usable || item.reason_code === undefined || CHECK_RULE_CODES.has(item.reason_code)))
+        .map(item => ({execution_provider: provider.key, device_key: item.device_key, name: name(item.device_key, item.device_name),
+            state: pairState(item), needsCheck: !item.usable}));
+}
+
+/** The pair a device choice of Auto runs on: the first usable one, else the first one shown. */
+const autoPair = (pairs: readonly MenuPair[]): MenuPair | undefined => pairs.find(pair => !pair.needsCheck) ?? pairs[0];
+
+/** The Device row's GPUs of an EP, each with its marker; without the items, or for an EP with no checks, `offeredDevices`. */
+export function menuDevices(provider: ExecutionProviderOption | undefined,
+    items?: readonly CertificationItem[]): (ExecutionProviderDevice & {marker?: string})[] {
+    if (!provider || !items || !provider.checks.length) return offeredDevices(provider);
+    return menuPairs(provider, items).map(pair => ({key: pair.device_key, name: pair.name, marker: PAIR_MARKERS[pair.state],
+        vram_total_bytes: provider.devices.find(device => device.key === pair.device_key)?.vram_total_bytes ?? null}));
+}
+
+/**
+ * The pair whose quick check a choice asks for (F1, F9): with no device (Auto), the EP's pair when none of its pairs
+ * is usable; with a device, that pair when it is not usable. Undefined when the choice can run now.
+ */
+export function pairToCheck(provider: ExecutionProviderOption | undefined, device: string | null,
+    items?: readonly CertificationItem[]): MenuPair | undefined {
+    if (!provider) return undefined;
+    const pairs = menuPairs(provider, items);
+    const pair = device === null ? autoPair(pairs) : pairs.find(({device_key}) => device_key === device);
+    return pair?.needsCheck ? pair : undefined;
+}
+
+/** "<EP> on <GPU>" by the server's item names, else by the keys. */
+export function pairLabel(pair: {execution_provider: string; device_key?: string}, items: readonly CertificationItem[] = []): string {
+    const item = items.find(({execution_provider, device_key}) => execution_provider === pair.execution_provider && device_key === pair.device_key);
+    return `${item?.label ?? pair.execution_provider} on ${item?.device_name ?? pair.device_key ?? 'its device'}`;
+}
+
+/** The running check as F10 words it: checks done of total, and the plan's one-off estimate; no countdown. */
+export function quickCheckProgressText(run: CertificationRun, items?: readonly CertificationItem[]): string {
+    const done = run.total === undefined ? 'starting' : `${run.done} of ${run.total} checks done`;
+    const estimate = run.seconds_estimate === undefined ? '' : `, up to about ${run.seconds_estimate} seconds`;
+    return `Quick check of ${run.items[0] ? pairLabel(run.items[0], items) : 'an execution provider'}: ${done}${estimate}.`;
+}
+
+/** The six lines saying how a quick check ended (user-confirmed wording, 2026-11-19), in one place. */
+export const QUICK_CHECK_TEXT = {
+    passed: 'Quick check passed',
+    failed: 'Quick check failed: ',
+    notRun: 'Quick check did not run: ',
+    crashed: 'Quick check stopped unexpectedly',
+    couldNotStart: 'Quick check could not start: ',
+    cancelled: 'Quick check cancelled',
+} as const;
+
+/**
+ * How the last check ended, from `certification.last_result`. A cancel is skellytracker's `not-run` with the reason
+ * `cancelled`; `error` (certify() raised; the reason is the exception class) and any new result say it could not start.
+ */
+export function quickCheckResultText({result, reason}: {result: string; reason?: string}): string {
+    if (result === 'pass') return QUICK_CHECK_TEXT.passed;
+    if (result === 'fail') return QUICK_CHECK_TEXT.failed + (reason ?? result);
+    if (result === 'not-run') return reason === 'cancelled' ? QUICK_CHECK_TEXT.cancelled : QUICK_CHECK_TEXT.notRun + (reason ?? result);
+    if (result === 'crashed') return QUICK_CHECK_TEXT.crashed;
+    return QUICK_CHECK_TEXT.couldNotStart + (reason ?? result);
+}
+
+/** A check this window started for a choice, and the choice that a pass makes the selection (F6). */
+export interface CheckIntent {
+    pair: {execution_provider: string; device_key: string};
+    change: {provider: ExecutionProviderName; device: string | null};
+    /** `last_result` as the server gave it when the start was accepted, to tell the end of this check from it. */
+    before: string | undefined;
+    /** The server has shown this check running. */
+    sawRun: boolean;
+}
+
+/**
+ * Where a started check stands, from the server's current state only: running; passed for its pair (the choice becomes
+ * the selection); or ended any other way, also when the server is gone (the selection stays what it was: F6).
+ */
+export function checkIntentOutcome(intent: CheckIntent, certification: Certification | null): 'running' | 'passed' | 'ended' {
+    if (!certification) return 'ended';
+    const {run, last_result: result} = certification;
+    if (run) return 'running';
+    if (!intent.sawRun && JSON.stringify(result) === intent.before) return 'running'; // accepted, not yet in a state message
+    return result?.result === 'pass' && result.execution_provider === intent.pair.execution_provider
+        && result.device_key === intent.pair.device_key ? 'passed' : 'ended';
+}
+
+/** Start the quick check of one pair with the person's detector (F9). Null when accepted, else the server's reason. */
+export async function requestQuickCheck(baseUrl: string, pair: {execution_provider: string; device_key: string},
+    detector: {detector_type: 'rtmpose' | 'mediapipe'; rtmpose_model_name: 'rtmw-x-l_256x192' | 'rtmw-x-l_384x288' | 'rtmw-l-m_256x192'},
+    signal?: AbortSignal, request: typeof fetch = fetch): Promise<string | null> {
+    const response = await createHttpClient({baseUrl, fetch: request}).responses
+        .start_quick_check_freemocap_certify_quick_check_post({body: {...pair, ...detector}, signal});
+    if (response.ok) return null;
+    const body: unknown = await response.json().catch(() => null);
+    return describeError(body) || `HTTP ${response.status}`;
+}
+
+/** Ask the running check to stop; the server's state shows when and how it ended. */
+export async function requestQuickCheckCancel(baseUrl: string, request: typeof fetch = fetch): Promise<void> {
+    const response = await createHttpClient({baseUrl, fetch: request}).responses.cancel_quick_check_freemocap_certify_quick_check_delete({});
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 }
 
 /** Whether a detector shows the Execution provider row: the server's flag once it has answered; before that (also

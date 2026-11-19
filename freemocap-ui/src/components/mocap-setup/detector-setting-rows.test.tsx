@@ -6,8 +6,9 @@ import {renderToStaticMarkup} from 'react-dom/server';
 // The store import follows the application entry order: the detector rows take their model list from the mocap slice.
 import '@/store';
 import type {DetectorType, TriangulationConfig} from '@/store/slices/mocap';
-import {executionProviderOptions} from '@/services/server/execution-providers';
+import {executionProviderOptions, menuDevices, pairToCheck} from '@/services/server/execution-providers';
 import type {ExecutionProviderChoices} from '@/hooks/useExecutionProviderOptions';
+import type {QuickCheckControls} from '@/hooks/useQuickCheck';
 import {DETECTOR_OPTIONS} from './detector-options';
 import {
     CONFIDENCE_INFO, DETECTOR_INFO, DetectorSettingRows, type DetectorSettingsValue, MODEL_INFO, REALTIME_DETECTOR_NOTES,
@@ -33,10 +34,17 @@ const OUTLIER_LIMITS = ['Minimum cameras for triangulation', 'Maximum cameras to
 const CPU = {key: 'cpu', label: 'CPU', description: 'Runs on the processor.', usable: true, install_hint: null, uses_gpu: false, devices: [], checks: []};
 const GPU = {key: 'gpu-ep', label: 'GPU EP', description: 'Runs on a GPU.', usable: false,
     install_hint: 'Run `install gpu-ep`.', uses_gpu: true, devices: [], checks: []};
+/** The quick-check controls of the hook with nothing asked; each call is recorded. */
+function quickCheckStub(more: Partial<QuickCheckControls> = {}, calls: unknown[][] = []): QuickCheckControls {
+    const record = (name: string) => (...args: unknown[]) => {calls.push([name, ...args]);};
+    return {prompt: null, refusal: null, showsResult: false, passed: null, settle: record('settle'), choose: record('choose'),
+        notNow: record('notNow'), run: async (...args: unknown[]) => {calls.push(['run', ...args]);}, cancel: record('cancel'), ...more};
+}
 /** The server's answer as the hook gives it: here only RTMW takes an EP. */
 const PROVIDERS: ExecutionProviderChoices = {
     providers: [CPU, GPU], autoOffers: [], options: executionProviderOptions(null, [CPU, GPU]), info: executionProviderInfo([CPU, GPU]),
     takesExecutionProvider: detector => detector === 'rtmpose', devicesOf: () => [], providerOf: () => undefined,
+    pairToCheck: () => undefined, certification: null, quickCheck: quickCheckStub(),
 };
 
 /** The detector rows' props as the realtime controls pass them, for one detector. */
@@ -274,4 +282,121 @@ test('posthoc explanations are unchanged', () => {
         // The very objects posthoc had before the rows were shared.
         for (const label of shown) assert.equal(infoOf(rows, label), POSTHOC_INFO[label], `${detector} ${label}`);
     }
+});
+
+// ── The uncertified-EP flow (F15 step 2) ────────────────────────────────────────────────────────────────────────────
+type Certification = NonNullable<ExecutionProviderChoices['certification']>;
+const CHECKED = {...GPU, usable: false, install_hint: null, devices: [], checks: [
+    {device_key: 'gpu:0', certified: false, local_result: null, usable: false, local_cause: null},
+    {device_key: 'gpu:1', certified: false, local_result: 'failed' as const, usable: false, local_cause: null}]};
+const ITEMS: Certification['items'] = [
+    {execution_provider: 'gpu-ep', label: 'GPU EP', device_key: 'gpu:0', device_name: 'Big GPU', certified: false, usable: false,
+        reason_code: 'quick-check-needed', reason: 'no reviewed result'},
+    {execution_provider: 'gpu-ep', label: 'GPU EP', device_key: 'gpu:1', device_name: 'Small GPU', certified: false,
+        local_result: 'failed', usable: false, reason_code: 'quick-check-needed', reason: 'no reviewed result'},
+];
+const CERTIFICATION: Certification = {host: {name: 'host', os: 'Windows 11'}, items: ITEMS, gpu_held_by: [], pending_reports: [],
+    auto: {execution_provider: 'cpu', needs_check: [{execution_provider: 'gpu-ep', device_key: 'gpu:0'}]}};
+
+/** The hook's answer for a server with an unchecked GPU EP, built as `useExecutionProviderOptions` builds it. */
+function checkedProviders(certification: Certification | null, quickCheck: QuickCheckControls, selected: string | null = null): ExecutionProviderChoices {
+    const items = certification?.items;
+    const providerOf = (key: string | null) => [CPU, CHECKED].find(provider => provider.key === key);
+    return {...PROVIDERS, providers: [CPU, CHECKED], options: executionProviderOptions(selected, [CPU, CHECKED], items),
+        devicesOf: key => menuDevices(providerOf(key), items), providerOf,
+        pairToCheck: (key, device) => pairToCheck(providerOf(key), device, items), certification, quickCheck};
+}
+const plain = (markup: string) => markup.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+/** The text of each button that is not a row's explanation or a stepper. */
+const actions = (markup: string) => [...markup.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/g)].map(match => plain(match[1]))
+    .filter(text => text !== '' && !/^(Decrease|Increase) /.test(text));
+
+test('an unchecked EP is in the menu, marked; choosing it opens the prompt and keeps the selection (F1, F6)', () => {
+    const calls: unknown[][] = [], changes: Partial<DetectorSettingsValue>[] = [];
+    const providers = checkedProviders(CERTIFICATION, quickCheckStub({}, calls));
+    const html = detectorRows('rtmpose', 'all', {providers});
+    assert.deepEqual(optionsOf(rowLabelled(html, 'Execution provider')), ['auto', 'cpu', 'gpu-ep']);
+    assert.match(rowLabelled(html, 'Execution provider'), />GPU EP \(not checked on this machine\)</);
+    const rows = DetectorSettingRows(detectorProps('rtmpose', 'all', {providers, onChange: change => changes.push(change)}));
+    handlerOf(rows, 'Execution provider')('gpu-ep');
+    assert.deepEqual(changes, [], 'the selection stays until a pass');
+    assert.deepEqual(calls, [['choose', {pair: {execution_provider: 'gpu-ep', device_key: 'gpu:0', name: 'Big GPU', state: 'not-checked',
+        needsCheck: true}, change: {provider: 'gpu-ep', device: null}}]]);
+    // A choice that can run now changes the selection and closes any prompt.
+    handlerOf(rows, 'Execution provider')('cpu');
+    assert.deepEqual(changes, [{provider: 'cpu', device: null}]);
+    assert.deepEqual(calls.at(-1), ['choose', null]);
+});
+
+test('the Device row marks each GPU with its own state and asks for that pair (F2, F9)', () => {
+    const calls: unknown[][] = [], changes: Partial<DetectorSettingsValue>[] = [];
+    const providers = checkedProviders(CERTIFICATION, quickCheckStub({}, calls), 'gpu-ep');
+    const value = {...VALUE, provider: 'gpu-ep'};
+    const row = rowLabelled(detectorRows('rtmpose', 'all', {providers, value}), 'Device');
+    assert.deepEqual(optionsOf(row), ['auto', 'gpu:0', 'gpu:1']);
+    assert.match(row, />Big GPU \(not checked on this machine\)</);
+    assert.match(row, />Small GPU \(check failed on this machine\)</);
+    handlerOf(DetectorSettingRows(detectorProps('rtmpose', 'all', {providers, value, onChange: change => changes.push(change)})), 'Device')('gpu:1');
+    assert.deepEqual(changes, []);
+    assert.deepEqual((calls[0][1] as {change: unknown}).change, {provider: 'gpu-ep', device: 'gpu:1'});
+});
+
+test('before the first certification state the menu offers only usable pairs, as before', () => {
+    const html = detectorRows('rtmpose', 'all', {providers: checkedProviders(null, quickCheckStub())});
+    assert.deepEqual(optionsOf(rowLabelled(html, 'Execution provider')), ['auto', 'cpu']);
+    assert.deepEqual(actions(html), []);
+});
+
+test('the prompt has exactly two choices, never disabled (F5)', () => {
+    const prompt = {pair: {execution_provider: 'gpu-ep', device_key: 'gpu:0', name: 'Big GPU', state: 'not-checked' as const, needsCheck: true},
+        change: {provider: 'gpu-ep', device: null}};
+    const html = detectorRows('rtmpose', 'all', {providers: checkedProviders({...CERTIFICATION, auto: undefined}, quickCheckStub({prompt}))});
+    assert.match(plain(html), /GPU EP on Big GPU : not checked on this machine\. A quick check on this machine decides whether it can run here\./);
+    assert.deepEqual(actions(html), ['Run quick check', 'Not now']);
+    assert.doesNotMatch(html, /<button[^>]*disabled/);
+});
+
+test('a running check shows done of total, the one-off estimate and a cancel; no countdown (F10)', () => {
+    const run = {level: 'quick', items: [{execution_provider: 'gpu-ep', device_key: 'gpu:0'}], state: 'running', done: 2, total: 5,
+        seconds_estimate: 50};
+    const html = detectorRows('rtmpose', 'all', {providers: checkedProviders({...CERTIFICATION, auto: undefined, run}, quickCheckStub())});
+    assert.match(plain(html), /Quick check of GPU EP on Big GPU: 2 of 5 checks done, up to about 50 seconds\./);
+    assert.deepEqual(actions(html), ['Cancel check']);
+    const starting = plain(detectorRows('rtmpose', 'all', {providers: checkedProviders({...CERTIFICATION,
+        run: {...run, state: 'starting', done: 0, total: undefined}}, quickCheckStub())}));
+    assert.match(starting, /Quick check of GPU EP on Big GPU: starting, up to about 50 seconds\./);
+});
+
+test('Auto shows the notice with Run quick check and no dismiss while the server reports a pair needing a check (F3, F11)', () => {
+    const html = detectorRows('rtmpose', 'all', {providers: checkedProviders(CERTIFICATION, quickCheckStub())});
+    assert.match(plain(html), /A faster option needs a quick check on this machine: GPU EP on Big GPU\./);
+    assert.deepEqual(actions(html), ['Run quick check']);
+    const none = detectorRows('rtmpose', 'all', {providers: checkedProviders({...CERTIFICATION, auto: {execution_provider: 'cpu', needs_check: []}},
+        quickCheckStub())});
+    assert.doesNotMatch(none, /faster option/);
+    assert.doesNotMatch(detectorRows('rtmpose', 'all', {providers: checkedProviders(CERTIFICATION, quickCheckStub()),
+        value: {...VALUE, provider: 'cpu'}}), /faster option/);
+});
+
+test('a saved choice that needs a check offers it from the server state, not from a past error (F4)', () => {
+    const value = {...VALUE, provider: 'gpu-ep', device: 'gpu:1'};
+    const html = detectorRows('rtmpose', 'all', {providers: checkedProviders(CERTIFICATION, quickCheckStub(), 'gpu-ep'), value});
+    assert.match(plain(html), /GPU EP on Small GPU : check failed on this machine\. A start with it is refused until a quick check passes\./);
+    assert.deepEqual(actions(html), ['Run quick check']);
+    // The same pair once the server reports it usable: no offer.
+    const passed = {...CERTIFICATION, items: ITEMS.map(item => ({...item, usable: true, local_result: 'passed'}))};
+    assert.deepEqual(actions(detectorRows('rtmpose', 'all', {providers: checkedProviders(passed, quickCheckStub(), 'gpu-ep'), value})), []);
+});
+
+test('a refused start shows the server\'s reason with the button unchanged; the last result shows its line', () => {
+    const refused = detectorRows('rtmpose', 'all', {providers: checkedProviders(CERTIFICATION, quickCheckStub({
+        refusal: 'A quick check cannot start while a pipeline runs: realtime abc. Stop it first.'}))});
+    assert.match(plain(refused), /Quick check could not start: A quick check cannot start while a pipeline runs: realtime abc\. Stop it first\./);
+    assert.deepEqual(actions(refused), ['Run quick check']);
+    assert.doesNotMatch(refused, /<button[^>]*disabled/);
+    const last_result = {execution_provider: 'gpu-ep', device_key: 'gpu:0', result: 'not-run', reason: 'cancelled'};
+    const ended = (showsResult: boolean) => plain(detectorRows('rtmpose', 'all', {providers: checkedProviders({...CERTIFICATION, last_result},
+        quickCheckStub({showsResult}))}));
+    assert.match(ended(true), /GPU EP on Big GPU: Quick check cancelled/);
+    assert.doesNotMatch(ended(false), /Quick check cancelled/);
 });

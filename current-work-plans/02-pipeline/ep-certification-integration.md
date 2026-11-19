@@ -1,6 +1,6 @@
 # EP management, certification and report hand-in
 
-**State (2026-11-19): APPROVED PLAN, nothing built.** The user settled every decision below in a grilling
+**State (2026-11-19): APPROVED PLAN; the Electron shutdown fix (decision 31) is built, the rest is not.** The user settled every decision below in a grilling
 round in this session and in the skellytracker session (`skellytracker-6c`, the session that owns
 ONNX Runtime, EP packs and EP certification). The skellytracker interfaces this plan needs do not exist yet;
 do not code against their names until that session sends the built shapes. The work that needs no new
@@ -127,7 +127,9 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
     then one image through the person's selected pipeline on the EP and on CPU, in a child process, with no
     model download. Record waits for a running check, shows the seconds left (an estimate: 30-60 s on a first
     run, about 10 s warm) and a "Cancel check" button, with a note that the EP is not usable until a check
-    completes. A pass makes the EP usable on that PC at once, shown as "passed on this PC, not yet reviewed".
+    passes. Only a pass of the whole quick check (probe and comparison) makes an EP with no reviewed row
+    usable, for every EP including cuda and trt-rtx (user ruling relayed by skellytracker-6c, confirmed here
+    2026-11-19). A pass makes the EP usable on that PC at once, shown as "passed on this PC, not yet reviewed".
 17. A field-test EP (`directml`, `amdgpu`, `migraphx`) is usable only after an explicit opt-in recorded in
     the EP store; `recommend()` never returns one and the app does not offer it as a normal choice.
 18. Evidence from normal use: asked once, right after a quick pass, off until yes, with a toggle in Settings.
@@ -139,8 +141,9 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
     The EP never changes during a recording.
 20. A certify run is refused while any pipeline holds the GPU (live, recording or posthoc); the app offers to
     stop it first.
-21. "Do not ask again" for an EP lives in the EP store (`dismiss_certification`); "later" lasts for the UI
-    session.
+21. "Do not ask again" for an EP lives in the EP store (`dismiss_certification`); after "later" the prompt
+    comes back the next time that EP is selected (changed from "lasts for the UI session"; user ruling relayed by
+    skellytracker-6c, confirmed here 2026-11-19).
 
 ### Hand-in
 
@@ -191,8 +194,12 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
 31. Defect today: Electron tree-kills the backend on every close, and the shutdown runs twice
     (`electron/main/index.ts:59-62` and `:71-76`, `electron/main/services/python-server.ts:150-175`).
     The fix: close sends `POST /shutdown` (it exists: `freemocap/api/http/app/shutdown.py`), waits N seconds,
-    tree-kills only as the fallback, once per close. Measure the real shutdown time first to set N (10 s is an
-    unmeasured guess).
+    tree-kills only as the fallback, once per close. **Built in `2a4c130d`** with N = 10 s as
+    `SHUTDOWN_GRACE_MS`, marked unmeasured: the user chose "fix now, measure later" because no environment on
+    the dev PC runs current freemocap (see [Environment on the dev PC](#environment-on-the-dev-pc)). Covered by
+    `freemocap-ui/electron/main/services/python-server.test.cjs` (graceful exit with two concurrent calls; kill
+    fallback). The installed September build is no reference: its `GET /shutdown` kills its own process
+    (exit code 15, about 0.14 s, connection reset, 5 runs).
 32. The backend's first act on a requested exit is `skellytracker.core.eps.note_exit_requested()` (working
     name; synchronous, under the store lock, no onnxruntime import, a no-op without an opened EP session),
     called via `to_thread` in `/shutdown` before cameras close, on SIGINT/SIGTERM (Ctrl+C) and on the dev
@@ -200,9 +207,18 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
     an exit as unclean only when an EP session was open and no notice arrived; "requested, then killed" is its
     own fact.
 
+## Environment on the dev PC
+
+Found 2026-11-19 while measuring decision 31; nothing was changed. `freemocap/.venv` dates from August 2026
+(non-editable skellycam `main@777b058`, skellytracker 2024.9.1019, no `platformdirs`), `../skellycam` is on
+`dom/research` (`close_camera_groups` exists only on upstream `sfn26`), and `../freemocap_blender_addon` is not
+cloned, so `uv lock --check` fails. benchmarks/README.md forbids changing shared environments or setting
+PYTHONPATH, so the shutdown time stays unmeasured until the workspace is set up.
+
 ## Waiting on skellytracker
 
-- CI result of `55fabf4a`, then the pin.
+- CI result of `55fabf4a`, then the pin. Windows and Linux are green; the macOS job never got a runner. The
+  user ruled: wait for the macOS re-run before pinning.
 - Package-wide `certify()` and `certify_plan()` with the quick level.
 - Status-row flags for uncertified, failed on this PC and field-test.
 - Windows ML catalog install progress and cancel, and a remove call.
@@ -214,10 +230,11 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
 
 All as local commits on `sidecar-implementation`, in this order:
 
-1. Measure the backend shutdown time through `POST /shutdown`; fix Electron's close (decision 31). The
-   skellytracker call (32) follows when it exists.
+1. Done: Electron's close (decision 31, `2a4c130d`). Still open: measure `POST /shutdown` to exit once an
+   environment runs current freemocap, then set `SHUTDOWN_GRACE_MS`. The skellytracker call (32) follows when
+   it exists.
 2. The hardware cleanup (decisions 6 to 8).
-3. When skellytracker's CI on `55fabf4a` is green: pin it and regenerate `uv.lock` (decision 1).
+3. When skellytracker's CI on `55fabf4a` is green, macOS included: pin it and regenerate `uv.lock` (decision 1).
 4. The `__version__` change (decision 4) and `BUILD_TREE_MODIFIED` (decision 11).
 5. Everything else waits for the skellytracker shapes.
 

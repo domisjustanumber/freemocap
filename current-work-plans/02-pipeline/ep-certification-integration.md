@@ -78,6 +78,17 @@ the OS on this PC, and lets the person hand in certify reports. It does this thr
    has a SemVer version and a commit readable in a frozen app, reports carry `no-version` and possibly
    `no-commit` in `evidence.reasons`; the UI shows "not valid as evidence" as the expected state of development
    builds, not as a failed check.
+   skellytracker check names (skellytracker-6c, 2026-11-19, local commit): each EP on each GPU gives `<ep>`,
+   `<ep>:probe` and `<ep>:image`, with `<ep>` = `<key>@<device>` (device key without `gpu:`, `-` for `:`, e.g.
+   `cuda@10de-2484-0`); `<key>` alone only when the EP has no GPU (`cpu`, a not-run row). Reader rule: a name
+   with no `:` is the EP row; the EP key is the text before `@`; `details.eps.<ep>.device` is the real device
+   key and `.gpu` the PCI id. Option `device=<device key or list>` (a named EP that cannot use a named GPU is
+   not-run, `gpu-not-usable`), so decision 16 calls
+   `certify("quick", ..., execution_providers=[key], device=<the run's device>, pipeline=P)`. With no EP named,
+   `certify("quick")` checks every GPU EP with no reviewed row, `directml` and Windows ML catalog EPs included,
+   on each GPU it can use (user ruling there; 11.9 s for directml on two GPUs on the RTX 3070 PC); this is
+   what the start dialog's "Run quick check" runs for skellytracker. `certify_plan("quick")["details"]` has
+   `checks` (the `<ep>` names), `execution_providers` (unique keys) and `not_run` (keyed by `<ep>`).
 10. freemocap merges the module reports into one Markdown file (`certify-report-<yyyymmddThhmmssZ>.md`,
     `{schema, app {name, version, commit}, modules, note}`) and keeps it on the server host under
     `<base data folder>/certify/`. skellytracker's `certify()` also saves its own module report in the EP
@@ -226,7 +237,8 @@ R5. The relay address is one constant in freemocap with an environment-variable 
     is dropped. Record's waiting line stays at Record and reads the same `run` field.
 28. Assumed server field (not built): `certification` in `app_state` (`AppStateSnapshot`,
     `freemocap/core/streaming/message_model.py`): `host {id, name, os}`, `run: null | {level, item_keys,
-    seconds_left}`, `items[] {key, package, label, local_status, reviewed, hand_in, is_failure}`,
+    seconds_left}`, `items[] {key, package, label, local_status, reviewed, hand_in, is_failure}` (for
+    skellytracker, `key` is the `<ep>` check name, one item per EP per GPU),
     `start_required`, `gpu_held_by[]`, `normal_use {consent, notice_due}`. Requests are keyed on endpoint +
     serverPid. Whether `seconds_left` rides `app_state` or the existing progress message is freemocap's
     choice (one message per second otherwise).

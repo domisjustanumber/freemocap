@@ -251,6 +251,7 @@ All as local commits on `sidecar-implementation`, in this order:
    venv and match the old psutil/platform values; `test_machine_benchmarks.py` gives 9 passed, 4 failed both
    before and after the change, all four from the stale freemocap venv.
 3. When skellytracker's CI on `55fabf4a` is green, macOS included: pin it and regenerate `uv.lock` (decision 1).
+   Right after the pin: the preprocess benchmark ([migration state](skellytracker-2-migration.md) item 9).
 4. Done (`61f68980`): `__version__` is `2.0.0-alpha.25`; bumpver writes it with the `package.json` pattern
    (dry run checked; `current_version` and git tags keep the `v`); the client contract and building.mdx
    follow. The telemetry `app_version` now arrives without the `v`, so dashboards see two spellings across

@@ -305,6 +305,28 @@ Backend only, 2026-11-19: `208ae320` (file builder), `4e152100` (sender, outbox,
   for each package" (the relay accepts it); whether "Not sent" should also drop a kept outbox file; whether a
   kept file can be cancelled before its retries end.
 
+#### Relay follow-up: spec 1.1.0 and the switched-off relay
+
+User-confirmed 2026-11-19, relayed from the skellycertify session (skellycertify-34):
+- Several module reports of one package in one file are valid (spec 1.1.0, skellycertify main `56ad18e`).
+  This closes the first open point above.
+- skellytracker report ids become v4 UUIDs, with an optional `id` key per module.
+- The relay is OFF now and stays off until the GitHub App is set up.
+- The `app` block gets no tree-modified flag.
+
+Built (`bf6e9e9f`): `send_report` reads `enabled` from `GET /health` after the file checks and before the
+outbox copy. `enabled: false`, or a POST answer with error `relay-off` (503, `retry: true`), raises
+`HandInError("relay-off")`, which `POST .../hand_in/send` answers as 409 `{"code": "relay-off", "detail":
+"the relay is off; use the issue form"}`, the same answer as an empty address. No outbox copy is kept (a copy
+made for this send is deleted) and no retry is counted. An unreachable health check or an unclear answer is
+not "off": the send goes ahead and a failure counts as before. `retry_outbox` checks health once when an entry
+waits and stops at `relay-off` with every entry and count unchanged. `GET .../hand_in` `relay_enabled` still
+means only "an address is set"; it does not call the relay. The file declares `skellycertify.report/1.1.0`
+once any module has an `id`, else 1.0.0; modules pass through unchanged. No code read a `quick-` prefix; the
+relay tests now use UUID ids. Fixture `freemocap/tests/fixtures/certify/valid-quick.md` is the sample at
+skellycertify `3609369`; the relay's own validator accepts the built file and refuses a non-UUID id
+(`bad-value`).
+
 ### UI: one place (Fable design, accepted)
 
 25. A "Certification" button at the top right of the main navigation strip
@@ -570,7 +592,8 @@ To do next, in order:
    move to that commit in decision 1 (pushed fork commit; all its CI is green on macOS, Windows and Ubuntu,
    fast tests included; it holds the check rule, `needs_check`, the exit notice, `local_cause` and the
    `unclean-exits` reason code, CoreML, pruning, the Windows ML controls and the PyInstaller hook).
-2. Relay follow-up (user confirmed 2026-11-19; one sub-agent; fake relay only in tests): before a send, read
+2. Done (`bf6e9e9f`; see [Relay follow-up](#relay-follow-up-spec-110-and-the-switched-off-relay)).
+   Relay follow-up (user confirmed 2026-11-19; one sub-agent; fake relay only in tests): before a send, read
    `enabled` from `GET /health`; when the relay is off, tell the user so and offer the issue form at once,
    with no outbox copy and no retry used. Declare `skellycertify.report/1.1.0` at the top of the file once
    any module carries an `id`; pass each module through unchanged. Tests: skellycertify's

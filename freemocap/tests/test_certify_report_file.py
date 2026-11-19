@@ -1,7 +1,7 @@
-"""The certify report file against skellycertify's contract (report format 1.0.0, section 4).
+"""The certify report file against skellycertify's contract (report format 1.1.0, section 4).
 
-`fixtures/certify/*.md` are copies of skellycertify `relay/samples/` at `33c6c19` (`valid-quick.md` at `56ad18e`). When the skellycertify checkout
-and node are present, the relay's own validator (`relay/src/report.js`, `relay/src/privacy.js`) checks the built file.
+`fixtures/certify/*.md` are copies of skellycertify `relay/samples/` at `33c6c19` (`valid-quick.md` at `3609369`).
+When the skellycertify checkout and node are present, the relay's own validator (`relay/src/report.js`, `relay/src/privacy.js`) checks the built file.
 """
 
 import copy

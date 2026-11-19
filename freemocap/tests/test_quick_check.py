@@ -3,12 +3,20 @@ the busy rule both ways, the `certification` field of `app_state`, the routes an
 import multiprocessing
 import os
 import time
+import types
+from types import SimpleNamespace
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from skellycam.core.ipc.process_management.managed_worker import WorkerMode
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 
-from freemocap.core.streaming.message_model import CertificationPair
+from freemocap.app.freemocap_application import FreemocapApplication
+from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
+from freemocap.core.tasks.calibration.calibration_task_config import PosthocCalibrationPipelineConfig
+from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
+from freemocap.core.streaming.message_model import CertificationPair, CertificationRun, PipelineHold
 from freemocap.system.certify.quick_check import QuickCheckManager, StartRefused
 
 EP, DEVICE = "fake-ep", "gpu:10de:2484:0"
@@ -73,10 +81,10 @@ def manager():
     created.shutdown()
 
 
-def _start(manager, certify):
+def _start(manager, certify, holds=()):
     manager.certify = certify
     return manager.start(pair=CertificationPair(EP, DEVICE), detector_type="rtmpose", rtmpose_model_name=None,
-                         seconds_estimate=42)
+                         seconds_estimate=42, holds=holds)
 
 
 def _until_ended(manager, timeout=60.0):
@@ -146,3 +154,78 @@ def test_backend_shutdown_ends_the_check_and_its_process(manager):
     worker = manager.job.worker
     manager.shutdown()
     assert not worker.is_alive() and not manager.running and manager.run is None
+
+
+# - The busy rule: no check while a pipeline runs, and every pipeline start is refused while a check runs -
+
+def test_a_check_is_refused_while_a_pipeline_runs_and_names_it(manager):
+    with pytest.raises(StartRefused) as refused:
+        _start(manager, certify_fail, holds=(PipelineHold("posthoc", "abc123"),))
+    assert refused.value.status == 409 and refused.value.detail["code"] == "pipelines-running"
+    assert refused.value.detail["gpu_held_by"] == [{"kind": "posthoc", "id": "abc123"}]
+    assert not manager.running
+
+
+def _app_with_running_check():
+    checks = _checks()
+    checks.job, checks.run = object(), CertificationRun(items=(CertificationPair(EP, DEVICE),), done=2, total=5)
+    return SimpleNamespace(quick_checks=checks)
+
+
+def _take():
+    from skellycam.core.recorders.videos.recording_info import RecordingInfo
+    return RecordingInfo(recording_directory="C:/recordings", recording_name="take", mic_device_index=-1)
+
+
+@pytest.mark.parametrize("start, kind", [
+    (lambda app: FreemocapApplication.start_recording_all(app, recording_info=_take()), "recording"),
+    (lambda app: FreemocapApplication.create_or_update_realtime_pipeline(
+        app, camera_configs={}, pipeline_config=RealtimePipelineConfig()), "realtime"),
+    (lambda app: FreemocapApplication.create_posthoc_calibration_pipeline(
+        app, recording_info=_take(), calibration_config=PosthocCalibrationPipelineConfig()), "posthoc"),
+    (lambda app: FreemocapApplication.create_posthoc_mocap_pipeline(
+        app, recording_info=_take(), mocap_config=PosthocMocapPipelineConfig()), "posthoc"),
+])
+async def test_each_pipeline_start_is_refused_while_a_check_runs(start, kind):
+    with pytest.raises(StartRefused) as refused:
+        await start(_app_with_running_check())
+    detail = refused.value.detail
+    assert refused.value.status == 409 and detail["code"] == "quick-check-running"
+    assert detail["run"] == {"execution_provider": EP, "device_key": DEVICE, "done": 2, "total": 5}
+    assert kind in detail["message"]
+
+
+@pytest.mark.parametrize("path, body", [
+    ("/realtime/apply", {"cameraConfigs": {"cam": {}}}),
+    ("/mocap/recording/start", {"mocapRecordingDirectory": "C:/recordings/take", "mocapTaskConfig": {}}),
+    ("/calibration/recording/calibrate", {"calibrationRecordingDirectory": "C:/recordings/take"}),
+])
+def test_the_start_routes_answer_the_refusal_with_its_reason(monkeypatch, path, body):
+    from freemocap.api.http.calibration import calibration_router
+    from freemocap.api.http.mocap import mocap_router
+    from freemocap.api.http.realtime import realtime_router
+    application = _app_with_running_check()
+    for name in ("start_recording_all", "create_or_update_realtime_pipeline", "create_posthoc_calibration_pipeline"):
+        setattr(application, name, types.MethodType(getattr(FreemocapApplication, name), application))
+    application.camera_group_manager = SimpleNamespace(camera_groups={})
+    app = FastAPI()
+    for module in (calibration_router, mocap_router, realtime_router):
+        monkeypatch.setattr(module, "get_freemocap_app", lambda: application)
+        monkeypatch.setattr(module.logger, "api", lambda *args: None, raising=False)
+        app.include_router(getattr(module, module.__name__.rsplit(".", 1)[1]))
+    response = TestClient(app).post(path, json=body)
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "quick-check-running"
+
+
+def test_pipeline_holds_name_every_running_pipeline():
+    alive, dead = SimpleNamespace(id="rt1", alive=True), SimpleNamespace(id="rt0", alive=False)
+    app = SimpleNamespace(
+        realtime_pipeline_manager=SimpleNamespace(pipelines={"rt1": alive, "rt0": dead}),
+        startup_status=SimpleNamespace(snapshot=lambda: {"status": "running", "pipeline_id": None}, task_id="startup:1"),
+        posthoc_pipeline_manager=SimpleNamespace(pipelines={"ph1": SimpleNamespace(alive=True), "ph0": SimpleNamespace(alive=False)}),
+    )
+    cameras = {"camera_groups": {"g1": {"recording_in_progress": True}, "g2": {"recording_in_progress": False}}}
+    assert FreemocapApplication.pipeline_holds(app, cameras) == (
+        PipelineHold("realtime", "rt1"), PipelineHold("realtime", "startup:1"),
+        PipelineHold("recording", "g1"), PipelineHold("posthoc", "ph1"))

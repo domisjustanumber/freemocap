@@ -15,6 +15,7 @@ from skellycam.core.recorders.videos.video_filename import VIDEO_EXTENSIONS
 from skellycam.core.recorders.videos.recording_info import RecordingInfo
 
 from freemocap.app.freemocap_application import get_freemocap_app
+from freemocap.system.certify.quick_check import StartRefused
 from freemocap.core.tasks.calibration.calibration_task_config import PosthocCalibrationPipelineConfig
 from freemocap.core.tasks.calibration.shared.calibration_paths import find_recording_calibration, get_last_successful_calibration_toml_path
 from freemocap.core.tasks.calibration.shared.loaded_calibration import LoadedCalibration
@@ -257,6 +258,8 @@ async def start_calibration_recording(
                     )
 
         return StartCalibrationRecordingResponse(success=True, message="Recording started")
+    except StartRefused as error:
+        raise HTTPException(status_code=error.status, detail=error.detail) from None
     except HTTPException:
         raise
     except CameraStateConflict as error:
@@ -303,6 +306,8 @@ async def stop_calibration_recording(
         )
         logger.info("Calibration recording stopped, posthoc calibration pipeline launched")
         return LegacyCaptureStopped.completed(recording_info=recording_info, pipeline_id=pipeline.id)
+    except StartRefused as error:
+        raise HTTPException(status_code=error.status, detail=error.detail) from None
     except RecordingBusyError as error:
         raise HTTPException(status_code=409, detail=error.owner.model_dump(mode='json')) from error
     except CameraStateConflict as error:
@@ -330,6 +335,8 @@ async def calibrate_recording(request: CalibrateRecordingRequest) -> CalibrateRe
             results={},
             pipeline_id=pipeline.id,
         )
+    except StartRefused as error:
+        raise HTTPException(status_code=error.status, detail=error.detail) from None
     except RecordingBusyError as error:
         raise HTTPException(status_code=409, detail=error.owner.model_dump(mode='json')) from error
     except Exception as e:

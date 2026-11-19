@@ -37,6 +37,7 @@ from freemocap.pubsub.pubsub_topics import AggregationNodeOutputMessage  # noqa:
 from skelly_synchronize.core.models import SyncRequest
 from freemocap.core.streaming.outputs.manager import StreamingOutputManager
 from freemocap.core.streaming.pipeline_timing_relay import PipelineTimingRelay
+from freemocap.core.streaming.message_model import PipelineHold
 from freemocap.system.certify.quick_check import QuickCheckManager
 
 logger = logging.getLogger(__name__)
@@ -121,6 +122,7 @@ class FreemocapApplication:
     # ------------------------------------------------------------------
 
     async def start_recording_all(self, recording_info: RecordingInfo) -> None:
+        self.quick_checks.refuse_pipeline_start("recording")
         await self.camera_group_manager.start_recording_all_groups(
             recording_info=recording_info,
         )
@@ -146,6 +148,7 @@ class FreemocapApplication:
             pipeline_config: RealtimePipelineConfig,
             realtime_camera_ids: list[CameraIdString] | None = None,
     ) -> RealtimePipeline:
+        self.quick_checks.refuse_pipeline_start("realtime")
         # Keep the lock until a cancelled caller's actual operation has drained.
         # Cancelling to_thread's await does not stop its native work.
         if self._realtime_stop_task is not None:
@@ -289,6 +292,7 @@ class FreemocapApplication:
             recording_info: RecordingInfo,
             calibration_config: PosthocCalibrationPipelineConfig,
     ) -> CalibrationPipeline:
+        self.quick_checks.refuse_pipeline_start("posthoc")
         pipeline = self.posthoc_pipeline_manager.create_calibration_pipeline(
             recording_info=recording_info,
             calibration_config=calibration_config,
@@ -300,6 +304,7 @@ class FreemocapApplication:
             recording_info: RecordingInfo,
             mocap_config: PosthocMocapPipelineConfig,
     ) -> MocapPipeline:
+        self.quick_checks.refuse_pipeline_start("posthoc")
         pipeline = self.posthoc_pipeline_manager.create_mocap_pipeline(
             recording_info=recording_info,
             mocap_config=mocap_config,
@@ -356,6 +361,20 @@ class FreemocapApplication:
                 for pipeline in self.realtime_pipeline_manager.pipelines.values()
             ],
         }
+
+    def pipeline_holds(self, cameras: dict | None = None) -> tuple[PipelineHold, ...]:
+        """Every running pipeline (realtime, including a startup in progress; recording; posthoc), CPU ones too."""
+        holds = [PipelineHold("realtime", pipeline.id)
+                 for pipeline in list(self.realtime_pipeline_manager.pipelines.values()) if pipeline.alive]
+        startup = self.startup_status.snapshot()
+        if startup["status"] in ("running", "stopping") and startup["pipeline_id"] not in {hold.id for hold in holds}:
+            holds.append(PipelineHold("realtime", startup["pipeline_id"] or self.startup_status.task_id or ""))
+        groups = (cameras or self.camera_group_manager.to_state_dict()).get("camera_groups", {})
+        holds += [PipelineHold("recording", str(group_id)) for group_id, group in groups.items()
+                  if group.get("recording_in_progress")]
+        holds += [PipelineHold("posthoc", str(pipeline_id))
+                  for pipeline_id, pipeline in list(self.posthoc_pipeline_manager.pipelines.items()) if pipeline.alive]
+        return tuple(holds)
 
     # ------------------------------------------------------------------
     # Lifecycle

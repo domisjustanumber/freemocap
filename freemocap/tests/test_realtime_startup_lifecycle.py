@@ -27,6 +27,7 @@ def application():
     app._realtime_startup_operation = None
     app._realtime_stop_task = None
     app._startup_pipeline_owned = False
+    app.quick_checks = SimpleNamespace(refuse_pipeline_start=lambda kind: None)  # no quick check runs
     app.realtime_pipeline_manager = Mock(spec=RealtimePipelineManager)
     app.realtime_pipeline_manager.pipelines = {}
     app.camera_group_manager = SimpleNamespace(

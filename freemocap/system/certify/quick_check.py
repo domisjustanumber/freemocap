@@ -33,6 +33,7 @@ from freemocap.core.streaming.message_model import (
     CertificationRun,
     CertificationSnapshot,
     PendingReport,
+    PipelineHold,
 )
 
 logger = logging.getLogger(__name__)
@@ -188,8 +189,20 @@ class QuickCheckManager:
     def running(self) -> bool:
         return self.job is not None
 
+    def refuse_pipeline_start(self, kind: str) -> None:
+        """F7: a pipeline start is refused while a check runs. The refusal is this request's answer, not a stored gate."""
+        run = self.run
+        if run is not None:
+            item = run.items[0]
+            raise StartRefused(409, {
+                "code": "quick-check-running",
+                "message": f"A quick check of {item.execution_provider} on {item.device_key} is running; the {kind} start "
+                           "was refused. Start again when the check ends.",
+                "run": {"execution_provider": item.execution_provider, "device_key": item.device_key,
+                        "done": run.done, "total": run.total}})
+
     def start(self, *, pair: CertificationPair, detector_type: str, rtmpose_model_name: str | None,
-              seconds_estimate: int | None) -> CertificationRun:
+              seconds_estimate: int | None, holds: tuple[PipelineHold, ...]) -> CertificationRun:
         with self.lock:
             if self.job is not None:
                 running = self.run.items[0]
@@ -197,6 +210,12 @@ class QuickCheckManager:
                     "code": "quick-check-running",
                     "message": f"A quick check of {running.execution_provider} on {running.device_key} is already running.",
                     "run": {"execution_provider": running.execution_provider, "device_key": running.device_key}})
+            if holds:
+                raise StartRefused(409, {
+                    "code": "pipelines-running",
+                    "message": "A quick check cannot start while a pipeline runs: "
+                               + ", ".join(f"{hold.kind} {hold.id}" for hold in holds) + ". Stop it first.",
+                    "gpu_held_by": [{"kind": hold.kind, "id": hold.id} for hold in holds]})
             job = QuickCheckJob.create(pair=pair, detector_type=detector_type, rtmpose_model_name=rtmpose_model_name,
                                        worker_registry=self.worker_registry, global_kill_flag=self.global_kill_flag,
                                        certify=self.certify)
@@ -243,7 +262,7 @@ class QuickCheckManager:
             else:
                 self._parts, self._parts_read_at = parts, time.monotonic()
 
-    def snapshot(self, holds: tuple = ()) -> CertificationSnapshot | None:
+    def snapshot(self, holds: tuple[PipelineHold, ...]) -> CertificationSnapshot | None:
         parts = self._parts
         if parts is None:
             return None

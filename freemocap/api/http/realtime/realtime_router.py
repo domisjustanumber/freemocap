@@ -2,6 +2,7 @@ import logging
 from typing import Literal
 
 from fastapi import APIRouter, Body, HTTPException, status
+from freemocap.system.certify.quick_check import StartRefused
 from pydantic import BaseModel, ConfigDict, Field
 from skellycam.core.camera_group.camera_group import CameraConfigs
 from skellycam.core.types.type_overloads import CameraGroupIdString, CameraIdString
@@ -173,6 +174,8 @@ async def pipeline_apply_endpoint(
         response = RealtimePipelineCreateResponse.from_pipeline(pipeline=pipeline)
         logger.api("Applied realtime pipeline %s to camera group %s", response.pipeline_id, response.camera_group_id)
         return response
+    except StartRefused as error:
+        raise HTTPException(status_code=error.status, detail=error.detail) from None
     except RealtimeStartupConfigurationError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     except RealtimeStartupStopped as error:

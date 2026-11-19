@@ -17,6 +17,7 @@ from skelly_synchronize.core.config import synced_video_filename
 from skelly_synchronize.core.models import SyncMethod, SyncRequest, SyncResult, VideoBackendKind
 
 from freemocap.app.freemocap_application import get_freemocap_app
+from freemocap.system.certify.quick_check import StartRefused
 from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
 from freemocap.system.default_paths import FREEMOCAP_TEST_DATA_PATH, default_recording_name, get_default_freemocap_recordings_path
 
@@ -193,6 +194,8 @@ async def start_mocap_recording(
         await get_freemocap_app().start_recording_all(recording_info=recording_info)
         logger.info(f"Starting mocap recording: {recording_info}")
         return StartMocapRecordingResponse(success=True, message="Mocap recording started")
+    except StartRefused as error:
+        raise HTTPException(status_code=error.status, detail=error.detail) from None
     except CameraStateConflict as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     except Exception as e:
@@ -214,6 +217,8 @@ async def stop_mocap_recording(request: StopMocapRecordingRequest) -> LegacyCapt
         )
         logger.info("Mocap recording stopped, posthoc mocap pipeline launched")
         return LegacyCaptureStopped.completed(recording_info=recording_info, pipeline_id=pipeline.id)
+    except StartRefused as error:
+        raise HTTPException(status_code=error.status, detail=error.detail) from None
     except RecordingBusyError as error:
         raise HTTPException(status_code=409, detail=error.owner.model_dump(mode='json')) from error
     except CameraStateConflict as error:
@@ -421,6 +426,8 @@ async def process_mocap_recording(request: ProcessMocapRecordingRequest, http_re
             results={},
             pipeline_id=pipeline.id,
         )
+    except StartRefused as error:
+        raise HTTPException(status_code=error.status, detail=error.detail) from None
     except RecordingBusyError as error:
         raise HTTPException(status_code=409, detail=error.owner.model_dump(mode='json')) from error
     except HTTPException:

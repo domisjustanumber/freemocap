@@ -1,5 +1,9 @@
 # Current Work Plans
 
+2026-11-19: [EP management, certification and report hand-in](02-pipeline/ep-certification-integration.md)
+records the approved decisions with skellytracker and skellycertify: freemocap's certify checks, the start
+check, the single Certification place in the UI, hand-in and the shutdown fix. Approved plan; nothing built.
+
 2026-10-31: [recording API organization and terminology cleanup](03-transport/recording-api-and-terminology-plan.md)
 maps the agreed recording-resource direction to existing handlers, UI callers,
 Swagger categories, compatibility contracts, and independently reviewable work

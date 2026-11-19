@@ -685,6 +685,10 @@ frames, each with `rtmpose` and with `mediapipe`.
          (result form: `outputs` with `wholebody`/`holistic`/`boxes`; `crop_box`/`detector_box` go; changes
          `pipeline_runs.py`). Do not start them before the go.
 
+8. **EP management, certification and hand-in (2026-11-19; APPROVED PLAN, nothing built).** The decisions,
+   the work that waits on skellytracker and the next actions are in
+   [ep-certification-integration.md](ep-certification-integration.md).
+
 ### 0.3 Decisions of the user (all 2026-11-16, through the supervisor)
 
 - Base on `upstream/sfn26` at its tip `ca0c17cc`.

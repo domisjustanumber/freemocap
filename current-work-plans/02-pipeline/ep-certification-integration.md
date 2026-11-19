@@ -152,8 +152,16 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
     passes. Only a pass of the whole quick check (probe and comparison) makes an EP with no reviewed row
     usable, for every EP including cuda and trt-rtx (user ruling relayed by skellytracker-6c, confirmed here
     2026-11-19). A pass makes the EP usable on that PC at once, shown as "passed on this PC, not yet reviewed".
-17. A field-test EP (`directml`, `amdgpu`, `migraphx`) is usable only after an explicit opt-in recorded in
-    the EP store; `recommend()` never returns one and the app does not offer it as a normal choice.
+17. A field-test EP (`directml`, `amdgpu`, `migraphx`) becomes usable through a passed quick check, which is
+    its opt-in (user ruling, skellytracker ADR-21BK item 2): the check gives a temporary opt-in that stays only
+    on a pass. The start check's "Run quick check" includes it, so after a pass it is selectable, shown as
+    "passed on this PC, not yet reviewed"; freemocap adds no extra click and follows the store (user,
+    2026-11-19; replaces "only after an explicit opt-in"). `recommend()` never returns one, so Auto never
+    uses it. The opt-in is one flag per EP key; usability per GPU comes only from the per-pair status flags
+    (EP key, device key), never from the EP state alone. skellytracker stores one local result per `key |
+    pack version | OS | GPU PCI id`, so two GPUs of the same model share a result, as a reviewed row does.
+    The flags (uncertified, passed on this PC, failed on this PC, field-test) are skellytracker's next item;
+    their field names come with the build.
 18. Evidence from normal use: asked once, right after a quick pass, off until yes, with a toggle in Settings.
     When Record waited on that quick check, the question waits until the recording and its processing end.
     After each recording, at idle, up to 30 frames from the saved videos run on the EP and on CPU and are

@@ -65,7 +65,7 @@ async def _run_application(force_preferred_port, log_relay, producers_stopped, *
     import uvicorn
     from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
     from skellycam.core.ipc.process_management.managed_worker import WorkerMode
-    from skellycam.utilities.kill_process_on_port import kill_process_on_port
+    from freemocap.utilities.kill_process_on_port import kill_process_on_port
     from skellycam.utilities.wait_functions import await_1s
 
     from freemocap.api.server_constants import (

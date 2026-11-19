@@ -11,10 +11,7 @@ separately).
 """
 
 import logging
-import platform
 from pathlib import Path
-
-import psutil
 
 import freemocap
 from freemocap.build_info import SKELLYPINGS_SECRET, SKELLYPINGS_SERVER_URL
@@ -32,17 +29,18 @@ def _get_user_id_file() -> Path:
 
 
 def _collect_system_specs() -> dict[str, object]:
-    """Collect anonymous system specifications."""
-    mem = psutil.virtual_memory()
+    """Collect anonymous system specifications from skellytracker's host and environment facts."""
+    from skellytracker.core.system import probe_environment, probe_host
+    host = probe_host()
     return {
-        "os": platform.system(),
-        "os_version": platform.version(),
-        "os_release": platform.release(),
-        "architecture": platform.machine(),
-        "python_version": platform.python_version(),
-        "cpu_count_physical": psutil.cpu_count(logical=False),
-        "cpu_count_logical": psutil.cpu_count(logical=True),
-        "ram_total_gb": round(mem.total / (1024 ** 3), 1),
+        "os": host.os_name,
+        "os_version": host.os_version,
+        "os_release": host.os_release,
+        "architecture": host.arch,
+        "python_version": probe_environment().python.version,
+        "cpu_count_physical": host.cpu_physical_cores,
+        "cpu_count_logical": host.cpu_logical_cores,
+        "ram_total_gb": round(host.memory_total_bytes / (1024 ** 3), 1),
     }
 
 

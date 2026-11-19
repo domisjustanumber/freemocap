@@ -1,4 +1,3 @@
-import os from 'node:os';
 import {initTRPC} from '@trpc/server';
 import {z} from 'zod';
 import superjson from 'superjson';
@@ -133,7 +132,6 @@ export const api = t.router({
         openFolder: t.procedure.input(z.object({path: z.string().min(1)}))
             .mutation(({input}) => openFolderInVSCode(input.path)),
     }),
-    memoryInfo: t.procedure.query(() => ({totalBytes: os.totalmem(), availableBytes: os.freemem()})),
     // Python Server Management
     pythonServer: t.router({
         start: t.procedure

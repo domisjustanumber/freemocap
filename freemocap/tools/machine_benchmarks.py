@@ -17,8 +17,6 @@ import subprocess
 import sys
 import time
 
-import psutil
-
 from freemocap.tools.hardware_validation.provenance import capture_provenance
 from freemocap.tools.datasets.reporting import cell, normalized_stages, parse_performance
 
@@ -43,9 +41,14 @@ def machine_info(label: str) -> dict:
 
 
 def load_snapshot():
-    memory = psutil.virtual_memory()
-    return dict(available_memory_bytes=memory.available, system_cpu_percent=psutil.cpu_percent(interval=0.2),
-                load_average=list(os.getloadavg()) if hasattr(os, 'getloadavg') else None)
+    from skellytracker.core.metrics import LiveSampler
+    sampler = LiveSampler()
+    sampler.sample()  # the first sample has no CPU window
+    time.sleep(0.2)
+    live = sampler.sample()
+    return dict(available_memory_bytes=live.memory_available_bytes,
+                system_cpu_percent=None if live.cpu_utilization is None else 100 * live.cpu_utilization,
+                load_average_1m=live.load_average_1m)
 
 
 def portable(value):

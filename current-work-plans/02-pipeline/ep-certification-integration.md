@@ -726,7 +726,13 @@ out of this plan (G8), so there is nothing to wait for from the user except the 
 Known gaps, not being worked on: development worker processes still print the cp1252 logging errors (the
 fix point is in skellycam's worker setup; skellycam-18 is told); a frozen backend cannot start from this
 workspace's editable installs (`skellylogs`, `skellycam` are invisible to PyInstaller); the committed
-`openapi.json` lags the app in about 7 unrelated schemas, so every change adds only its own hunks.
+`openapi.json` lagged the app; that is fixed (G5, below).
+Suite, 2026-11-19 late: 1672 passed, 7 failed (exactly the known baseline), 20 skipped, with the relay URL empty;
+skellytracker was at `03e5b3bb`, dirty (certification.py, core/eps/installer.py, core/eps/store.py,
+tools/certify_eps.py modified; .gitattributes modified; .editorconfig untracked).
+G5 done in `e6ee3d78`: openapi.json and generated schema.ts regenerated from the app; no operation added or removed
+(78 bindings verified), only CaptureMode, CameraDeviceInfo supported_modes/usb_version and route descriptions.
+
 
 ## Decisions of the third grilling, 2026-11-19
 

@@ -274,3 +274,48 @@ def test_the_routes_view_send_and_list_the_hand_in(fake_relay, monkeypatch):
     assert listed["outbox"][0]["last_error"]["error"] == "privacy-rule" and listed["outbox"][0]["offer_issue_form"]
     opened = client.post("/certify/hand_in/opened", json={**selection, "sha256": viewed["sha256"]}).json()
     assert opened["outbox"] == [] and fake_relay.marks[-1] == (["quick-1"], "opened", None)
+
+
+def test_not_sent_makes_reports_pending_again_and_deletes_the_kept_files(fake_relay, tmp_path):
+    fake_relay.answer(200, {"issue_url": ISSUE, "issue_number": 7, "duplicate": False})
+    relay.send_report(*_viewed()[:3])  # covered, outbox already empty
+    relay.mark_not_sent(["quick-1"])  # decision 24: also from covered
+    assert fake_relay.marks[-1] == (["quick-1"], "pending", None)
+    fake_relay.answer(429, {"error": "busy", "retry": True, "detail": "the relay is busy"})
+    relay.send_report(*_viewed(("quick-2",))[:3])
+    [entry] = relay.outbox_entries()
+    assert entry["retry_pending"]
+    relay.mark_not_sent(["quick-2"])
+    assert fake_relay.marks[-1] == (["quick-2"], "pending", None)
+    assert relay.outbox_entries() == [] and not list((tmp_path / "certify" / "outbox").iterdir())
+    relay.retry_outbox()
+    assert len(fake_relay.received) == 2  # the first send and the one that failed; nothing after "not sent"
+
+
+def test_not_sent_with_an_unknown_id_changes_nothing_and_the_route_lists_the_state(fake_relay, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from freemocap.api.http.certify.certify_router import certify_router
+
+    fake_relay.answer(429, {"error": "busy", "retry": True, "detail": "the relay is busy"})
+    relay.send_report(*_viewed()[:3])
+    real_mark = skellytracker.mark_reports
+
+    def mark(ids, state, *, reference=None):
+        if "quick-9" in ids:
+            raise ValueError("quick-9")
+        real_mark(ids, state, reference=reference)
+
+    monkeypatch.setattr(skellytracker, "mark_reports", mark)
+    monkeypatch.setattr(skellytracker, "pending_reports", lambda include_handed_in=False: [
+        {"report_id": "quick-1", "kind": "quick", "created_utc": None, "has_failure": True, "evidence_valid": False,
+         "state": "pending", "reference": None}])
+    app = FastAPI()
+    app.include_router(certify_router)
+    client = TestClient(app)
+    refused = client.post("/certify/hand_in/not_sent", json={"report_ids": ["quick-1", "quick-9"]})
+    assert (refused.status_code, refused.json()["detail"]["code"]) == (422, "unknown-report")
+    assert len(relay.outbox_entries()) == 1
+    listed = client.post("/certify/hand_in/not_sent", json={"report_ids": ["quick-1"]}).json()
+    assert listed["outbox"] == [] and fake_relay.marks[-1] == (["quick-1"], "pending", None)

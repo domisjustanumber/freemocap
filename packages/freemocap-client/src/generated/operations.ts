@@ -315,6 +315,11 @@ export const operationDefinitions = {
     "path": "/freemocap/certify/hand_in/opened",
     "asset": false
   },
+  "mark_hand_in_not_sent_freemocap_certify_hand_in_not_sent_post": {
+    "method": "POST",
+    "path": "/freemocap/certify/hand_in/not_sent",
+    "asset": false
+  },
   "track_telemetry_event_freemocap_telemetry_track_post": {
     "method": "POST",
     "path": "/freemocap/telemetry/track",

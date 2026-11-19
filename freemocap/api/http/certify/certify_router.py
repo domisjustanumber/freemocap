@@ -59,6 +59,10 @@ class HandInSelection(BaseModel):
     note: str | None = Field(default=None, description="The person's note; paths and this host's names are removed.")
 
 
+class ReportIds(BaseModel):
+    report_ids: list[str] = Field(min_length=1)
+
+
 class AcceptedHandIn(HandInSelection):
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$", description="The SHA-256 of the file the person viewed.")
 
@@ -123,5 +127,16 @@ def mark_hand_in_opened(accepted: AcceptedHandIn) -> HandInList:
     try:
         relay.mark_opened(accepted.report_ids, accepted.note, accepted.sha256)
     except (HandInError, ReportFileError) as error:
+        raise _refused(error) from None
+    return get_hand_in()
+
+
+@certify_router.post("/hand_in/not_sent")
+def mark_hand_in_not_sent(selection: ReportIds) -> HandInList:
+    """"Not sent": these reports are pending again (also when opened or covered, which clears the issue address)
+    and any kept outbox file that holds them, waiting to retry or not, is deleted."""
+    try:
+        relay.mark_not_sent(selection.report_ids)
+    except HandInError as error:
         raise _refused(error) from None
     return get_hand_in()

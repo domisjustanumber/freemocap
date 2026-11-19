@@ -231,6 +231,20 @@ def mark_opened(report_ids: list[str], note: str | None, sha256: str) -> None:
     skellytracker.mark_reports(ids, "opened")
 
 
+def mark_not_sent(report_ids: list[str]) -> None:
+    """"Not sent" (decisions 22 to 24, F19, F20): the reports are pending again, from opened or covered, with no
+    reference, and every kept outbox entry that holds one of them is deleted so that nothing is retried."""
+    import skellytracker
+
+    ids = list(dict.fromkeys(report_ids))
+    with _send_lock:  # an answer in flight must not mark them covered after this
+        try:
+            skellytracker.mark_reports(ids, "pending")
+        except ValueError:
+            raise HandInError("unknown-report", "one of these is not a report of this host") from None
+        _drop_entries(ids)
+
+
 def retry_outbox() -> None:
     """At backend start: send each kept file again, as it was accepted (R1, R3)."""
     if not relay_url():

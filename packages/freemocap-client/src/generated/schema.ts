@@ -1131,6 +1131,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/freemocap/certify/hand_in/not_sent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Hand In Not Sent
+         * @description "Not sent": these reports are pending again (also when opened or covered, which clears the issue address)
+         *     and any kept outbox file that holds them, waiting to retry or not, is deleted.
+         */
+        post: operations["mark_hand_in_not_sent_freemocap_certify_hand_in_not_sent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/freemocap/telemetry/track": {
         parameters: {
             query?: never;
@@ -4659,6 +4680,11 @@ export interface components {
             /** Content */
             content: string;
         };
+        /** ReportIds */
+        ReportIds: {
+            /** Report Ids */
+            report_ids: string[];
+        };
         /** SendOutcome */
         SendOutcome: {
             /**
@@ -6878,6 +6904,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AcceptedHandIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HandInList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_hand_in_not_sent_freemocap_certify_hand_in_not_sent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportIds"];
             };
         };
         responses: {

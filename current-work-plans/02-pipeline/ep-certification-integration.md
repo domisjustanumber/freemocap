@@ -328,6 +328,13 @@ All as local commits on `sidecar-implementation`, in this order:
    opencv-contrib-python (skellytracker 5.0.0.93, skellycam 5.1.0.95) and numpy (2.4.6 against 2.5.5), so
    OpenCV stays unpinned here and `uv.lock` cannot resolve; and which skellycam branch freemocap builds
    against. The pin target of action 3 is a pushed skellytracker commit at or after `77e38399`, not `55fabf4a`.
+   Siblings done the same day, each on a new local branch `dom/sidecar-implementation` of a new fork
+   (`origin` = the user's fork, nothing pushed): `../skellyforge` `5dd7ab5` from `sfn26` (Python ==3.13.18,
+   pyyaml, beartype; its `uv lock` fails, `../utils/skellylogs` is not cloned) and `../skellysync` `b4e129c`
+   from `philip/rewrite` (Python ==3.13.18, pydantic, scipy, extras; resolves with both numpy/OpenCV
+   candidates; librosa 0.10.1 kept, not run under numpy 2). Open: freemocap still sources skelly_synchronize
+   from upstream `philip/rewrite` (Python <3.13), so its lock cannot resolve until the source points at the
+   new branch (needs a push or a path source). The Blender addon, skellylogs and skellypings need no change.
 3. When skellytracker's CI on `55fabf4a` is green, macOS included: pin it and regenerate `uv.lock` (decision 1).
    Right after the pin: the preprocess benchmark ([migration state](skellytracker-2-migration.md) item 9),
    and the EP menu switches from `PackStatus.usable` to the per-GPU `checks[n].usable` (decision 17):

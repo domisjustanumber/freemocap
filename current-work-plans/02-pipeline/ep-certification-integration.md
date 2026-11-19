@@ -194,6 +194,10 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
 19. A hard failure (non-finite output, crash, hang, two unclean exits in a row) marks the EP failed on that
     PC and Auto skips it. A high disagreement rate only warns after the recording and offers a CPU re-run.
     The EP never changes during a recording.
+    Built (`efcd4774`), the unclean-exit part only: the EP route's check row carries skellytracker's
+    `DeviceCheck.local_cause` (`"unclean-exits"` or null) through the contract to the UI type. The UI says
+    nothing of its own about a failed check (only "Not usable here." and skellytracker's `install_hint`), so the
+    sentence "exited uncleanly twice" is not added yet; it belongs wherever a failed pair is first explained.
 20. A certify run is refused while any pipeline holds the GPU (live, recording or posthoc); the app offers to
     stop it first.
 21. "Do not ask again" for an EP lives in the EP store (`dismiss_certification`); after "later" the prompt
@@ -299,6 +303,14 @@ R5. The relay address is one constant in freemocap with an environment-variable 
     reload stop (`serve_application.py:22`), not on the fatal-error path (`app.py:95-96`). skellytracker counts
     an exit as unclean only when an EP session was open and no notice arrived; "requested, then killed" is its
     own fact.
+    **Built in `efcd4774`** as `skellytracker.note_exit_requested()` (the code's name; `skellytracker.core.eps`
+    does not export it): first in `POST /shutdown`, via `to_thread`, before `close_camera_groups()`; in
+    `serve_application` when the reload stop is first seen and no fatal error set the kill flag; and in
+    `__main__`'s SIGINT/SIGTERM handler. While uvicorn serves it captures those signals and re-raises them after
+    its own shutdown, so on Ctrl+C the notice comes after the cameras close but before the process ends (which
+    always ends with `os._exit`, so skellytracker's `atexit` clean exit never runs). Inference runs only on the
+    `SharedInference` thread of the backend process, so no worker process needs the notice. Not verified with a
+    real GPU session held at close.
 
 ## Environment on the dev PC
 
@@ -405,8 +417,8 @@ Nothing below is still missing except a package-wide `certify()` / `certify_plan
 All as local commits on `sidecar-implementation`, in this order:
 
 1. Done: Electron's close (decision 31, `2a4c130d`). Still open: measure `POST /shutdown` to exit once an
-   environment runs current freemocap, then set `SHUTDOWN_GRACE_MS`. The skellytracker call (32) follows when
-   it exists.
+   environment runs current freemocap, then set `SHUTDOWN_GRACE_MS`. The skellytracker call (32) is built
+   (`efcd4774`).
 2. Done: the hardware cleanup (decisions 6 to 8, `3cdf672f`). The ping keeps its payload keys; the benchmark
    snapshot keeps `available_memory_bytes` and `system_cpu_percent` (percent) and replaces the `load_average`
    list with `load_average_1m`; `psutil>=7.0.0` as skellycam declares it. `uv.lock` is not regenerated (it

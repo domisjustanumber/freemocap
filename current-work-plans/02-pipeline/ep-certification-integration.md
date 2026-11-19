@@ -318,8 +318,14 @@ pass, 1 skip) and `../skellysync` (59 pass) have their own environments. Decisio
   `29eca818`, exact pins, no Rust: the user said to drop the Rust backend there after the crate would not
   link without the Windows SDK). That repo's rules: no AI attribution in commits, no push. freemocap moves
   to skellycam's frame-ring API after its phase 4 and rewrites its camera code once, then.
-- Sibling sources stay local paths until the app starts and tests collect; then push the branches and
-  switch to git sources (CI cannot build before that).
+- Sibling sources stay local paths, and nothing is pushed (user, 2026-11-19, after the app started again):
+  the skellycam stopgap stays local, so CI stays unbuildable until freemocap moves to the frame-ring API; the
+  skellyforge and skellysync branches stay local too.
+- Open design tension for decision 16 (found when the per-GPU menu filter was built): the menu now hides an
+  uncertified, unchecked EP and GPU, but decision 16 shows it with an icon and offers the quick check when it
+  is chosen. Settle with the user when decision 16 is built. Also found: the committed `openapi.json` is
+  behind the app's routes in 7 schemas, and `../skellytracker` moved to local `669d9676` (after the pin),
+  where `PackStatus.usable`, `.devices` and `check_start()` already obey the per-GPU check rule (ADR-ER5X).
 - macOS 15 is the minimum supported macOS: the only macOS wheels of opencv-contrib-python 5.1.0.95 are
   `macosx_15_0` (arm64 and x86_64; read from PyPI).
 - After the app imports: re-measure the ChArUco corner counts and the seeded numerical calibration on

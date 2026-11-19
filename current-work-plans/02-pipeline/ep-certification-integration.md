@@ -401,7 +401,10 @@ so the quick check is the only way in.
   dialog with the hand-in UI, (4) the start check and freemocap's own checks, (5) the Windows ML controls.
 - F16. Install and remove of a Windows ML EP are refused while a pipeline or a check runs; remove asks first.
 - F17. The cp1252 logging errors are fixed on freemocap's side by forcing UTF-8 output, once a sub-agent has
-  shown what works in a frozen app; skellylogs stays untouched; skellycam-18 is told.
+  shown what works in a frozen app; skellylogs stays untouched; skellycam-18 is told. Built 2026-11-19
+  (`fa3bd57c`): `freemocap/__main__.py` reconfigures stdout/stderr to UTF-8 before any import, since a frozen
+  app ignores `PYTHONUTF8`/`PYTHONIOENCODING`; dev `python -m` workers still use cp1252 (they configure
+  logging in skellycam's `managed_worker.py`).
 - F18. One hand-in file may hold several reports of one package; the spec wording ("one for each package")
   is raised with the skellycertify session.
 - F19 and F20. "Not sent" marks the reports pending again and deletes any kept outbox file for them; it is

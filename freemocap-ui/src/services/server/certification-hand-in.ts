@@ -1,0 +1,180 @@
+import {createHttpClient} from '@freemocap/client/http';
+import type {Certification, components} from '@freemocap/client';
+import {describeError} from '@/store/slices/thunk-helpers';
+
+export type HandInList = components['schemas']['HandInList'];
+export type HandInReport = components['schemas']['HandInReport'];
+export type ReportFile = components['schemas']['ReportFile'];
+type RelayError = components['schemas']['RelayError'];
+type SendOutcome = components['schemas']['SendOutcome'];
+export type PendingReport = Certification['pending_reports'][number];
+
+/** skellycertify's issue form (its README, "Send a report in 3 steps"); the permanent fallback for a hand-in. */
+export const ISSUE_FORM_URL = 'https://github.com/domisjustanumber/skellycertify/issues/new?template=certify-report.yml';
+const ISSUE_URL = /^https:\/\/github\.com\/domisjustanumber\/skellycertify\/issues\/[1-9][0-9]*$/;
+
+/** Every text of the Certification button and dialog, in one place ("machine" for the computer, G1). */
+export const CERTIFICATION_TEXT = {
+    button: 'Certification',
+    reports: 'Reports to hand in',
+    nothingPending: 'No reports to hand in.',
+    noteLabel: 'Note (optional)',
+    privacy: 'The note becomes part of the report, which is public. Do not write your name, contact details or other '
+        + 'personal details. Paths and this machine\'s user and host names are removed.',
+    viewReport: 'View report',
+    sendReport: 'Send report',
+    issueForm: 'Save file and open issue form',
+    issueFormHelp: 'Attach the saved file to the issue form. If GitHub does not accept the .md file, rename it to .txt.',
+    relayNotSetUp: 'Sending is not set up in this build; use the issue form.',
+    tooLarge: 'The report is too large to send; use the issue form.',
+    relayOff: 'The relay is off. Use the issue form.',
+    fileChanged: 'The report changed after you viewed it. View it again.',
+    couldNotView: 'Could not build the report: ',
+    couldNotSend: 'Could not send: ',
+    couldNotMark: 'Could not record the hand-in: ',
+    issueFormOpened: 'Issue form opened',
+    openIssueFormAgain: 'Open the issue form again',
+    notSent: 'Not sent',
+    runningCheck: 'Running check',
+    cancelCheck: 'Cancel check',
+    fileReport: 'File report',
+    recordWaits: 'A recording can start once the quick check ends. ',
+    close: 'Close',
+} as const;
+
+/** Opens the Certification dialog from anywhere (the button, a failed check's "File report"; decisions 23, 25 to 27). */
+export const openCertification = () => window.dispatchEvent(new CustomEvent('open-certification'));
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+/** Whether the backend runs on this machine; a remote one is named on the button (decision 25). */
+export const isLocalHost = (host: string) => ['localhost', '127.0.0.1', '::1', '[::1]'].includes(host.toLowerCase());
+
+/**
+ * The button's suffix from the current server state only (decisions 25, F10): the running check's progress, else
+ * the reports to file (failures named first), and `@ <host>` for a remote backend. Empty while nothing is known.
+ */
+export function certificationButtonSuffix(certification: Certification | null, remote: boolean): string {
+    if (!certification) return '';
+    const {run, pending_reports: pending, host} = certification;
+    const failures = pending.filter(report => report.has_failure).length;
+    const parts = [run ? `· quick check${run.total === undefined ? '' : ` ${run.done} of ${run.total}`}`
+        : failures ? `· ${plural(failures, 'failure')} to file` : pending.length ? `· ${pending.length} to file` : ''];
+    if (remote) parts.push(`@ ${host.name}`);
+    return parts.filter(Boolean).join(' ');
+}
+
+/** "N reports to hand in, F with a failure". */
+export function pendingSummary(pending: readonly PendingReport[]): string {
+    const failures = pending.filter(report => report.has_failure).length;
+    return `${plural(pending.length, 'report')} to hand in${failures ? `, ${failures} with a failure` : ''}`;
+}
+
+/** The pending reports, failures first, each with the facts the hand-in list gives (kind, time) when it has them. */
+export function pendingRows(pending: readonly PendingReport[], list: HandInList | null): (PendingReport & {text: string})[] {
+    const facts = new Map(list?.reports.map(report => [report.report_id, report]));
+    return [...pending].sort((a, b) => Number(b.has_failure) - Number(a.has_failure)).map(report => {
+        const row = facts.get(report.report_id);
+        return {...report, text: [row?.created_utc ?? report.report_id, row?.kind, report.has_failure ? 'with a failure' : 'no failure']
+            .filter(Boolean).join(' · ')};
+    });
+}
+
+/** The hand-ins already made, one per issue (covered) or one for every report handed in through the issue form. */
+export function handedIn(list: HandInList | null): {issueUrl: string | null; reportIds: string[]}[] {
+    const groups = new Map<string, string[]>();
+    for (const report of list?.reports ?? []) {
+        if (report.state === 'pending') continue;
+        const key = report.state === 'covered' && report.reference ? report.reference : '';
+        groups.set(key, [...groups.get(key) ?? [], report.report_id]);
+    }
+    return [...groups].map(([url, reportIds]) => ({issueUrl: safeIssueUrl(url), reportIds}));
+}
+
+/** The address only when it is an issue of skellycertify on github.com; a link is never made from anything else. */
+export const safeIssueUrl = (url: string | null | undefined) => url && ISSUE_URL.test(url) ? url : null;
+
+const issueNumber = (url: string) => url.slice(url.lastIndexOf('/') + 1);
+export const issueLabel = (url: string) => `issue #${issueNumber(url)}`;
+
+const relayErrorText = (error: RelayError | null) => !error ? 'unknown error'
+    : error.error === 'privacy-rule' ? `privacy rule ${error.detail ?? '?'}`
+        : `${error.error}${error.detail ? ` (${error.detail})` : ''}`;
+
+/** A kept file's line (F20): waiting to be sent again, or given up with the issue form offered. */
+export function outboxLine(entry: HandInList['outbox'][number]): string {
+    const error = relayErrorText(entry.last_error);
+    return entry.offer_issue_form ? `Not handed in: ${entry.file_name} (${error}). Use the issue form.`
+        : `Waiting to be sent again at the next backend start: ${entry.file_name} (${plural(entry.failed_attempts, 'failed attempt')}; last: ${error}).`;
+}
+
+/** The answer to one request of this window, shown until the next view, a new server or a closed dialog. */
+export interface HandInMessage {text: string; issueUrl?: string; error: boolean; offerIssueForm: boolean; viewAgain?: boolean}
+
+/** The message for the backend's answer to "send" (R1, R2, relay off): accepted with its link, kept, refused, or not sent. */
+export function sendAnswerMessage(status: number, body: unknown): HandInMessage {
+    if (status === 200 && body !== null && typeof body === 'object') {
+        const outcome = body as SendOutcome;
+        const url = safeIssueUrl(outcome.issue_url);
+        if (outcome.state === 'covered') {
+            const text = `${outcome.duplicate ? 'Already handed in' : 'Handed in'}${url ? ` as ${issueLabel(url)}` : ''}`;
+            return {text, issueUrl: url ?? undefined, error: false, offerIssueForm: false};
+        }
+        const error = relayErrorText(outcome.error);
+        if (outcome.state === 'refused') {
+            return {text: `The relay refused the report: ${error}. Use the issue form.`, error: true, offerIssueForm: true};
+        }
+        return outcome.offer_issue_form
+            ? {text: `Not handed in: ${error}. Use the issue form.`, error: true, offerIssueForm: true}
+            : {text: `Not handed in yet: ${error}. The file is kept and sent again at the next backend start.`, error: true,
+                offerIssueForm: false};
+    }
+    const code = (body as {detail?: {code?: unknown}} | null)?.detail?.code;
+    if (code === 'relay-off') return {text: CERTIFICATION_TEXT.relayOff, error: true, offerIssueForm: true};
+    if (code === 'file-changed') return {text: CERTIFICATION_TEXT.fileChanged, error: true, offerIssueForm: false, viewAgain: true};
+    return {text: CERTIFICATION_TEXT.couldNotSend + (describeError(body) || `HTTP ${status}`), error: true, offerIssueForm: false};
+}
+
+/** The file the person viewed, for these reports and this note; a send or the issue form uses only this file (R1). */
+export interface ViewedReport {reportIds: string[]; note: string; file: ReportFile}
+
+/** Whether the viewed file is still everything pending with the current note; otherwise it must be viewed again. */
+export const viewIsCurrent = (view: ViewedReport | null, pending: readonly PendingReport[], note: string): view is ViewedReport =>
+    view !== null && view.note === note && view.reportIds.join('\n') === pending.map(report => report.report_id).join('\n');
+
+/** The issue form is the main choice when the relay cannot take this file (R1, R5, decision 26). */
+export function issueFormProminent(list: HandInList | null, message: HandInMessage | null, view: ViewedReport | null): boolean {
+    return Boolean(message?.offerIssueForm || list?.relay_enabled === false || (view && !view.file.fits_relay)
+        || list?.outbox.some(entry => entry.offer_issue_form));
+}
+
+const client = (baseUrl: string, request: typeof fetch) => createHttpClient({baseUrl, fetch: request}).responses;
+
+async function json<T>(response: Response): Promise<T> {
+    const body: unknown = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(describeError(body) || `HTTP ${response.status}`);
+    return body as T;
+}
+
+export const requestHandIn = async (baseUrl: string, signal?: AbortSignal, request: typeof fetch = fetch) =>
+    json<HandInList>(await client(baseUrl, request).get_hand_in_freemocap_certify_hand_in_get({signal}));
+
+const noteOrNull = (note: string) => note.trim() ? note : null;
+
+export const requestReportFile = async (baseUrl: string, reportIds: string[], note: string, request: typeof fetch = fetch) =>
+    json<ReportFile>(await client(baseUrl, request).get_hand_in_file_freemocap_certify_hand_in_file_post(
+        {body: {report_ids: reportIds, note: noteOrNull(note)}}));
+
+const accepted = ({reportIds, note, file}: ViewedReport) => ({report_ids: reportIds, note: noteOrNull(note), sha256: file.sha256});
+
+export async function requestSend(baseUrl: string, view: ViewedReport, request: typeof fetch = fetch): Promise<HandInMessage> {
+    const response = await client(baseUrl, request).send_hand_in_freemocap_certify_hand_in_send_post({body: accepted(view)});
+    return sendAnswerMessage(response.status, await response.json().catch(() => null));
+}
+
+export const requestOpened = async (baseUrl: string, view: ViewedReport, request: typeof fetch = fetch) =>
+    json<HandInList>(await client(baseUrl, request).mark_hand_in_opened_freemocap_certify_hand_in_opened_post({body: accepted(view)}));
+
+export const requestNotSent = async (baseUrl: string, reportIds: string[], request: typeof fetch = fetch) =>
+    json<HandInList>(await client(baseUrl, request).mark_hand_in_not_sent_freemocap_certify_hand_in_not_sent_post(
+        {body: {report_ids: reportIds}}));

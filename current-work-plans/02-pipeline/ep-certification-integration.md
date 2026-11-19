@@ -311,7 +311,8 @@ User-confirmed 2026-11-19, relayed from the skellycertify session (skellycertify
 - Several module reports of one package in one file are valid (spec 1.1.0, skellycertify main `56ad18e`).
   This closes the first open point above.
 - skellytracker report ids become v4 UUIDs, with an optional `id` key per module.
-- The relay is OFF now and stays off until the GitHub App is set up.
+- The relay is OFF now and stays off until the GitHub App is set up. (Superseded 2026-11-19: the relay is ON
+  again; see "Decisions after step 1".)
 - The `app` block gets no tree-modified flag.
 
 Built (`bf6e9e9f`): `send_report` reads `enabled` from `GET /health` after the file checks and before the
@@ -434,7 +435,7 @@ so the quick check is the only way in.
 - F6. "Not now", cancel and failure revert the EP setting to what it was; a pass makes the new EP the
   selection. Choosing the EP again asks again.
 - F7. Every pipeline start (realtime, recording, posthoc; CPU ones too) waits while any quick check runs, and
-  a check is refused while any pipeline runs (extends 16 and 20).
+  a check is refused while any pipeline runs (extends 16 and 20). Widened to all work by H1.
 - F8. Nothing is queued: after a pass the user presses Record or Start again.
 - F9. One prompt checks one pair: `certify("quick", execution_providers=[key], device=<the GPU chosen in the
   Device row>, pipeline=P)`. The Device row marks each GPU with its own state and opens the same prompt.
@@ -801,7 +802,7 @@ To do next, in order:
    the 422 `bad-value` for a module id that is not a v4 UUID, and that nothing assumes a `quick-` id prefix.
    Facts (skellycertify-34, confirmed by the user): several module reports of one package in one file are
    valid (spec 1.1.0 on skellycertify main `56ad18e`); skellytracker report ids become v4 UUIDs with an
-   optional `id` key per module; the relay is OFF now and stays off until the GitHub App is set up; the
+   optional `id` key per module; the relay is OFF now (superseded: ON again, see "Decisions after step 1"); the
    `app` block gets no tree-modified flag. The approved single connection test was run before the switch-off:
    422 `wrong-schema`, classified refused, nothing made on GitHub. This PC's store has 13 pending reports
    with old ids; they pass through unchanged (G4).
@@ -860,6 +861,50 @@ The user confirmed all of these.
   at both levels.
 - G12 Full-check controls stay out of F15 steps 2 to 5; they come as their own step afterwards with its own
   short grilling.
+
+## Decisions after step 1, 2026-11-19
+
+- H1 (user: "nothing runs while the check is running"). The busy rule covers everything that does work, both
+  ways. A quick check is refused (409 `pipelines-running`, holders in `gpu_held_by`) while any of these runs:
+  a realtime pipeline or its startup (`realtime`), recording (`recording`), a connected camera group with no
+  realtime pipeline (`cameras`), a posthoc mocap or calibration pipeline (`posthoc`), a sync job (`sync`), an
+  export job of any kind, Blender included (`export`). While a check runs, each of those starts is refused with
+  409 `quick-check-running` and the run facts. The names `pipelines-running`, `gpu_held_by` and `PipelineHold`
+  are historical: they now cover all work, CPU work and cameras included, not only pipelines or the GPU.
+  `kind` is an open string in the message model and the client Zod schema, so no fixture changed.
+  Built (`bed3da15`): `FreemocapApplication.pipeline_holds()` is the one list of what runs, read by the check's
+  admission and by `certification.gpu_held_by`. Admission points: the app's realtime, recording and both posthoc
+  starts (`quick_checks.admit(kind)`); route dependency `admitted(kind)` (`quick_check_router.py`) on
+  `POST /mocap/recording/synchronize`, `POST /recording-import/synchronize`, `POST /recordings/{id}/exports`,
+  the deprecated `POST /exports/scientific`, `POST /exports/tall-csv` and `POST /blender/export`; and
+  `camera_starts_admitted` on skellycam's router in `app.py` for `POST /skellycam/camera/group/apply`
+  (`cameras`) and `POST /skellycam/camera/group/all/record/start` (`recording`). The last one was a gap: the
+  UI starts recording through that skellycam route, which bypassed the app's recording admission. Always
+  allowed: reads, cancelling a check, shutdown, closing and pausing cameras, camera detection, stopping
+  recordings, cancelling pipelines, sync and export jobs. Not covered, as not work of the app's own: opening a
+  .blend in Blender, installing the Blender add-on, video import's file copy, calibration transform saves,
+  streaming outputs (they only relay a realtime pipeline). The new 409 on the sync, export and camera routes
+  is not declared in OpenAPI, like the existing ones on the realtime, recording and posthoc routes; only the
+  quick-check route's texts changed in the contract.
+- H2 (user). One lock closes the race where a start and a check admitted in the same instant both get
+  through. Built (`bed3da15`): `QuickCheckManager.admission_lock` (a `threading.Lock`: the check starts in a
+  thread-pool route, other starts on the event loop or in threads). The check reads `holds` and sets its run
+  under it, then spawns its child outside it; every other start checks for a run and registers a claim
+  (`PipelineHold(kind, "starting")`, listed by `pipeline_holds()` until that start returns) under it. The lock
+  is never held across a long start. Test: `test_a_start_and_a_check_admitted_at_once_cannot_both_get_through`
+  (fails with both admitted when the lock is removed from `claim`).
+- H3 (user confirmed). The six result texts stay as built: "Quick check passed", "Quick check failed:
+  <reason>", "Quick check cancelled", "Quick check did not run: <reason>", "Quick check stopped unexpectedly",
+  "Quick check could not start: <reason>". Each is shown by the EP in the menu until the next check or a
+  selection change.
+- H4 (user). skellytracker stays installed from the `../skellytracker` folder for now, with no separate pinned
+  clone. The user is about to make proper version numbers, so the pin move of G11 waits for those.
+- Fact, reported by the skellycertify session on 2026-11-19 (not a user ruling): the relay is switched ON
+  again and files issues as the GitHub App (bot account `skellycertify-relay[bot]`). `GET /health` gives
+  `enabled: true`, `test_mode: false`; a valid report sent to it files a real issue; request and answer are
+  unchanged. This supersedes "the relay is OFF now". The rule stands and matters more now: tests and agents use
+  a fake relay only, with `FREEMOCAP_CERTIFY_RELAY_URL` empty for anything run; the first real send is the
+  user's, from the hand-in UI. No agent contacts the real relay.
 
 ## Next actions
 

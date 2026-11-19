@@ -160,8 +160,16 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
     uses it. The opt-in is one flag per EP key; usability per GPU comes only from the per-pair status flags
     (EP key, device key), never from the EP state alone. skellytracker stores one local result per `key |
     pack version | OS | GPU PCI id`, so two GPUs of the same model share a result, as a reviewed row does.
-    The flags (uncertified, passed on this PC, failed on this PC, field-test) are skellytracker's next item;
-    their field names come with the build.
+    The flags are built (skellytracker-6c, local on `dom/sidecar-implementation`, not pushed): each
+    `status().eps` row has `checks`, a tuple of `DeviceCheck {device_key, name, certified, local_result
+    ("passed" | "failed" | None), usable}`, one per GPU that passes the EP's floors, in `run_devices(key)`
+    order, also for an EP not installed; `()` for cpu and for an EP no GPU here can use. `usable` = ready
+    (installed, opted in when field-test) and no local failure and (certified or passed here); a local failure
+    wins over a reviewed row. Labels: uncertified = not `certified`; passed on this PC = `local_result ==
+    "passed"` and not certified; failed on this PC = `local_result == "failed"`; field-test =
+    `PackStatus.catalog_status == "field-test"`. `recommend()` skips a pair that failed here (`skipped`,
+    `failed_locally: true`). Limit: `PackStatus.usable`, `PackStatus.devices`, `check_start()` and a run do not
+    read the quick checks, so freemocap offers a GPU only from `checks[n].usable`.
 18. Evidence from normal use: asked once, right after a quick pass, off until yes, with a toggle in Settings.
     When Record waited on that quick check, the question waits until the recording and its processing end.
     After each recording, at idle, up to 30 frames from the saved videos run on the EP and on CPU and are
@@ -292,7 +300,7 @@ PYTHONPATH, so the shutdown time stays unmeasured until the workspace is set up.
 - CI result of `55fabf4a`, then the pin. Windows and Linux are green; the macOS job never got a runner. The
   user ruled: wait for the macOS re-run before pinning.
 - Package-wide `certify()` and `certify_plan()` with the quick level.
-- Status-row flags for uncertified, failed on this PC and field-test.
+- Status-row flags: built locally as `PackStatus.checks` (decision 17); waiting for the push and the pin.
 - Windows ML catalog install progress and cancel, and a remove call.
 - `note_exit_requested()`.
 - `pending_reports()` and `mark_reports()`.
@@ -312,7 +320,11 @@ All as local commits on `sidecar-implementation`, in this order:
    venv and match the old psutil/platform values; `test_machine_benchmarks.py` gives 9 passed, 4 failed both
    before and after the change, all four from the stale freemocap venv.
 3. When skellytracker's CI on `55fabf4a` is green, macOS included: pin it and regenerate `uv.lock` (decision 1).
-   Right after the pin: the preprocess benchmark ([migration state](skellytracker-2-migration.md) item 9).
+   Right after the pin: the preprocess benchmark ([migration state](skellytracker-2-migration.md) item 9),
+   and the EP menu switches from `PackStatus.usable` to the per-GPU `checks[n].usable` (decision 17):
+   `usable_execution_providers()` in `freemocap/core/tracking/execution_providers.py` and
+   `executionProviderOptions` in `freemocap-ui/src/services/server/execution-providers.ts` filter on
+   `row.usable` today, which ignores local failures and uncertified pairs.
 4. Done (`61f68980`): `__version__` is `2.0.0-alpha.25`; bumpver writes it with the `package.json` pattern
    (dry run checked; `current_version` and git tags keep the `v`); the client contract and building.mdx
    follow. The telemetry `app_version` now arrives without the `v`, so dashboards see two spellings across

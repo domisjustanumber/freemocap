@@ -5,7 +5,9 @@ reports, the note and the SHA-256 of the file the person saw, and the file is re
 accepted bytes go to `<base data folder>/certify/outbox/` before the network call, and only those bytes are ever
 sent. A relay error with `retry: true` keeps the file for the next backend start; after the first send and 3
 retries failed, or on `retry: false` (413, 422 and the app-bug codes), the issue form is offered instead. A 200
-marks the reports covered in skellytracker with the issue address and deletes the outbox copy.
+marks the reports covered in skellytracker with the issue address and deletes the outbox copy. A relay that is
+switched off (`GET /health` gives `enabled: false`, or the POST answers `relay-off`) is `HandInError("relay-off")`:
+the issue form at once, no new outbox copy, and no retry counted.
 """
 
 import hashlib
@@ -33,6 +35,7 @@ ISSUE_URL = re.compile(rf"^https://github\.com/{re.escape(RELAY_REPOSITORY)}/iss
 ERROR_CODE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 DETAIL_MAX_CHARS = 200
+RELAY_OFF_DETAIL = "the relay is off; use the issue form"
 
 _send_lock = threading.Lock()  # one POST at a time: the start-up retry and a send route never race on one entry
 
@@ -142,6 +145,16 @@ def _relay_error(response: requests.Response) -> dict:
     return {"status": response.status_code, "error": "bad-response", "retry": True, "detail": None}
 
 
+def _switched_off(url: str) -> bool:
+    """True only when the relay's `GET /health` answers `enabled: false`. An unreachable relay or an unclear answer
+    is not "off": the send goes ahead and a failure counts as today."""
+    try:
+        body = requests.get(f"{url}/health", timeout=TIMEOUT_SECONDS, allow_redirects=False).json()
+    except (requests.RequestException, ValueError):
+        return False
+    return isinstance(body, dict) and body.get("enabled") is False
+
+
 def _accepted(response: requests.Response) -> dict | None:
     """The relay's 200 body when its issue address is an issue of the expected repository, else None."""
     try:
@@ -174,7 +187,7 @@ def send_entry(sha256: str) -> dict:
             raise HandInError("unknown-report", "that file is not in the outbox")
         url = relay_url()
         if not url:
-            raise HandInError("relay-off", "the relay is off; use the issue form")
+            raise HandInError("relay-off", RELAY_OFF_DETAIL)
         body = (outbox_folder() / f"{sha256}.md").read_bytes()
         try:
             response = requests.post(f"{url}/reports", data=body, timeout=TIMEOUT_SECONDS, allow_redirects=False,
@@ -194,6 +207,8 @@ def send_entry(sha256: str) -> dict:
                 return _outcome("covered", accepted=accepted)
             failure = _relay_error(response) if response.status_code != 200 else \
                 {"status": 200, "error": "bad-response", "retry": True, "detail": None}
+            if failure["error"] == "relay-off":  # switched off after the health check: count nothing
+                raise HandInError("relay-off", RELAY_OFF_DETAIL)
         meta["failed_attempts"] = int(meta.get("failed_attempts") or 0) + 1
         meta["last_error"] = failure
         _write(outbox_folder() / f"{sha256}.json", json.dumps(meta, indent=1).encode("utf-8"))
@@ -205,20 +220,30 @@ def send_entry(sha256: str) -> dict:
 
 def send_report(report_ids: list[str], note: str | None, sha256: str) -> dict:
     """The person's "send": keep the accepted file in the outbox, then send it."""
-    if not relay_url():
-        raise HandInError("relay-off", "the relay is off; use the issue form")
+    url = relay_url()
+    if not url:
+        raise HandInError("relay-off", RELAY_OFF_DETAIL)
     name, body = _accept(report_ids, note, sha256)
     if len(body) > RELAY_MAX_BYTES:
         return _outcome("refused", offer=True, error={"status": None, "error": "too-large", "retry": False,
                                                       "detail": f"the limit is {RELAY_MAX_BYTES} bytes"})
+    if _switched_off(url):
+        raise HandInError("relay-off", RELAY_OFF_DETAIL)
     ids = list(dict.fromkeys(report_ids))
     _drop_entries(ids, keep=sha256)
-    if _read_entry(sha256) is None:
+    created = _read_entry(sha256) is None
+    if created:
         _write(outbox_folder() / f"{sha256}.md", body)
         _write(outbox_folder() / f"{sha256}.json",
                json.dumps({"file_name": name, "report_ids": ids, "failed_attempts": 0, "last_error": None},
                           indent=1).encode("utf-8"))
-    return send_entry(sha256)
+    try:
+        return send_entry(sha256)
+    except HandInError as error:
+        if error.code == "relay-off" and created:  # the relay went off after the health check: keep no copy
+            for path in (outbox_folder() / f"{sha256}.json", outbox_folder() / f"{sha256}.md"):
+                path.unlink(missing_ok=True)
+        raise
 
 
 def mark_opened(report_ids: list[str], note: str | None, sha256: str) -> None:
@@ -246,14 +271,19 @@ def mark_not_sent(report_ids: list[str]) -> None:
 
 
 def retry_outbox() -> None:
-    """At backend start: send each kept file again, as it was accepted (R1, R3)."""
-    if not relay_url():
+    """At backend start: send each kept file again, as it was accepted (R1, R3). While the relay is switched off
+    nothing is sent and no retry is counted."""
+    url = relay_url()
+    if not url or not any(entry["retry_pending"] for entry in outbox_entries()) or _switched_off(url):
         return
     for entry in outbox_entries():
         if entry["retry_pending"]:
             try:
                 send_entry(entry["sha256"])
-            except Exception:  # one entry must not stop the others or the backend
+            except Exception as error:  # one entry must not stop the others or the backend
+                if isinstance(error, HandInError) and error.code == "relay-off":
+                    logger.info("The certify relay is off; kept reports wait for a later start")
+                    return
                 logger.exception("A kept certify report could not be sent again")
 
 

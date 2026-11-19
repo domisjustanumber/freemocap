@@ -1,6 +1,6 @@
 """The certify report file against skellycertify's contract (report format 1.0.0, section 4).
 
-`fixtures/certify/*.md` are copies of skellycertify `relay/samples/` at `33c6c19`. When the skellycertify checkout
+`fixtures/certify/*.md` are copies of skellycertify `relay/samples/` at `33c6c19` (`valid-quick.md` at `56ad18e`). When the skellycertify checkout
 and node are present, the relay's own validator (`relay/src/report.js`, `relay/src/privacy.js`) checks the built file.
 """
 
@@ -91,3 +91,17 @@ def test_the_relay_validator_accepts_the_built_file():
     _, body = build_report_file([data["modules"][0], module], "two runs | `ticks`", report_file.app_block())
     assert _relay_verdict(body) == {"rule": 0}
     assert _relay_verdict(body.replace(b"Windows 11 Home 26H2", b"C:\\\\Users\\\\x"))["rule"] == 1
+
+
+def test_modules_with_ids_declare_1_1_0_and_pass_through_unchanged():
+    _, data = _sample("valid-quick.md")  # two quick reports of one package, each with a v4 UUID id
+    modules = copy.deepcopy(data["modules"])
+    _, body = build_report_file(modules, data["note"], data["app"])
+    text = body.decode("utf-8")
+    assert "Schema `skellycertify.report/1.1.0`, app freemocap 2.0.0, created 2026-11-19T10:00:00Z (UTC)." in text
+    built = json.loads(text.split("```json\n")[1].rsplit("```", 1)[0])
+    assert built["schema"] == "skellycertify.report/1.1.0" and built["modules"] == data["modules"]
+    if RELAY_SRC.is_dir() and shutil.which("node") is not None:
+        assert _relay_verdict(body) == {"rule": 0}
+        bad_id = body.replace(b"3f2b8c1e-9a4d-4e7b-b6a1-0c5d2e8f7a90", b"quick-20261119T100000Z")
+        assert _relay_verdict(bad_id)["refused"] == "bad-value"

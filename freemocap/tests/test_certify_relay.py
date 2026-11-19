@@ -25,6 +25,10 @@ MODULE = {"schema": "skellycertify.report/1.0.0",
           "checks": [{"name": "cuda@10de-2484-0", "result": "fail", "reason": "probe-L3-failed"}],
           "evidence": {"valid": False, "reasons": ["no-version", "no-commit"]}}
 ISSUE = "https://github.com/domisjustanumber/skellycertify/issues/7"
+# Report ids are opaque (skellytracker gives v4 UUIDs): nothing may read a `quick-` prefix into them.
+ID_1, ID_2, ID_9 = ("3f2b8c1e-9a4d-4e7b-b6a1-0c5d2e8f7a90", "c1d2e3f4-5a6b-4c7d-8e9f-a0b1c2d3e4f5",
+                    "0d9e8f7a-6b5c-4d3e-9f2a-1b0c9d8e7f6a")
+OFF = {"error": "relay-off", "retry": True, "detail": "the relay is switched off"}
 
 
 class FakeRelay(ThreadingHTTPServer):
@@ -32,6 +36,8 @@ class FakeRelay(ThreadingHTTPServer):
         super().__init__(("127.0.0.1", 0), FakeRelayHandler)
         self.answers: list[tuple[int, bytes, float]] = []
         self.received: list[tuple[str, dict, bytes]] = []
+        self.health: object = {"enabled": True, "test_mode": False, "schema_major": 1}
+        self.health_checks = 0
 
     def answer(self, status: int, body: object, delay: float = 0.0) -> None:
         self.answers.append((status, body if isinstance(body, bytes) else json.dumps(body).encode(), delay))
@@ -49,6 +55,15 @@ class FakeRelayHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(answer)
 
+    def do_GET(self):
+        self.server.health_checks += 1
+        answer = json.dumps(self.server.health).encode() if self.path == "/health" else b"{}"
+        self.send_response(200 if self.path == "/health" else 404)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(answer)))
+        self.end_headers()
+        self.wfile.write(answer)
+
     def log_message(self, *args):
         pass
 
@@ -58,7 +73,7 @@ def fake_relay(tmp_path, monkeypatch):
     server = FakeRelay()
     threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True).start()
     fake_url = f"http://127.0.0.1:{server.server_port}"
-    real_connect, real_post = urllib3.util.connection.create_connection, requests.post
+    real_connect, real_post, real_get = urllib3.util.connection.create_connection, requests.post, requests.get
 
     def local_only(address, *args, **kwargs):
         assert address[0] == "127.0.0.1", f"a test tried to reach {address[0]}"
@@ -68,11 +83,16 @@ def fake_relay(tmp_path, monkeypatch):
         assert url.startswith("http://127.0.0.1:"), f"a test tried to POST to {url}"
         return real_post(url, *args, **kwargs)
 
+    def guarded_get(url, *args, **kwargs):
+        assert url.startswith("http://127.0.0.1:"), f"a test tried to GET {url}"
+        return real_get(url, *args, **kwargs)
+
     monkeypatch.setattr(urllib3.util.connection, "create_connection", local_only)
     monkeypatch.setattr(relay.requests, "post", guarded_post)
+    monkeypatch.setattr(relay.requests, "get", guarded_get)
     monkeypatch.setenv(relay.RELAY_URL_ENV_VAR, fake_url)
     monkeypatch.setenv("FREEMOCAP_BASE_FOLDER", str(tmp_path))
-    store = {"quick-1": dict(MODULE), "quick-2": dict(MODULE, created_utc="2026-11-20T10:00:00Z")}
+    store = {ID_1: dict(MODULE), ID_2: dict(MODULE, created_utc="2026-11-20T10:00:00Z")}
     server.marks = []
     monkeypatch.setattr(skellytracker, "read_report", lambda report_id: dict(store[report_id]) if report_id in store
                         else (_ for _ in ()).throw(ValueError(report_id)))
@@ -84,33 +104,33 @@ def fake_relay(tmp_path, monkeypatch):
     server.server_close()
 
 
-def _viewed(ids=("quick-1",), note=None) -> tuple[list[str], str | None, str, bytes]:
+def _viewed(ids=(ID_1,), note=None) -> tuple[list[str], str | None, str, bytes]:
     _, body = relay.report_file_for(list(ids), note)
     return list(ids), note, hashlib.sha256(body).hexdigest(), body
 
 
 def test_a_200_marks_the_reports_covered_after_the_exact_viewed_bytes_went_out(fake_relay, tmp_path):
-    ids, note, sha, body = _viewed(("quick-1", "quick-2"), "first try")
+    ids, note, sha, body = _viewed((ID_1, ID_2), "first try")
     fake_relay.answer(200, {"issue_url": ISSUE, "issue_number": 7, "file_path": "inbox/2026/x.md", "duplicate": False})
     outcome = relay.send_report(ids, note, sha)
     assert outcome == {"state": "covered", "issue_url": ISSUE, "issue_number": 7, "duplicate": False, "error": None,
                        "offer_issue_form": False}
     path, headers, sent = fake_relay.received[0]
     assert (path, headers["Content-Type"], sent) == ("/reports", "text/markdown; charset=utf-8", body)
-    assert fake_relay.marks == [(["quick-1", "quick-2"], "covered", ISSUE)]
+    assert fake_relay.marks == [([ID_1, ID_2], "covered", ISSUE)]
     assert relay.outbox_entries() == [] and not list((tmp_path / "certify" / "outbox").iterdir())
     assert (tmp_path / "certify" / "certify-report-20261119T100000Z.md").read_bytes() == body
 
 
 def test_the_same_reports_in_any_order_give_the_same_file(fake_relay):
-    assert relay.report_file_for(["quick-1", "quick-2"], "n") == relay.report_file_for(["quick-2", "quick-1"], "n")
+    assert relay.report_file_for([ID_1, ID_2], "n") == relay.report_file_for([ID_2, ID_1], "n")
 
 
 def test_a_duplicate_is_covered_too(fake_relay):
     fake_relay.answer(200, {"issue_url": ISSUE, "issue_number": 7, "file_path": "inbox/2026/x.md", "duplicate": True})
     outcome = relay.send_report(*_viewed()[:3])
     assert (outcome["state"], outcome["duplicate"]) == ("covered", True)
-    assert fake_relay.marks == [(["quick-1"], "covered", ISSUE)]
+    assert fake_relay.marks == [([ID_1], "covered", ISSUE)]
 
 
 @pytest.mark.parametrize(("status", "error", "retry", "detail"), [
@@ -120,9 +140,9 @@ def test_a_duplicate_is_covered_too(fake_relay):
     (415, "wrong-type", False, "send text/markdown or text/plain in UTF-8"),
     (422, "missing-field", False, "report.modules[0].kind"),
     (422, "privacy-rule", False, 5),
+    (422, "bad-value", False, "report.modules[0]"),  # e.g. a module id that is not a v4 UUID
     (429, "rate-limited", True, "too many reports from this address"),
     (429, "busy", True, "the relay is busy"),
-    (503, "relay-off", True, "the relay is switched off"),
     (503, "daily-cap", True, "the relay daily limit is reached"),
     (503, "credential-rejected", True, "GitHub refused the relay credential"),
     (503, "github-rate-limited", True, "GitHub rate limit; try again later"),
@@ -198,7 +218,7 @@ def test_the_outbox_copy_survives_a_crash_between_write_and_send(fake_relay, mon
     fake_relay.answer(200, {"issue_url": ISSUE, "issue_number": 7, "duplicate": False})
     relay.retry_outbox()  # the next backend start
     assert fake_relay.received[0][2] == body
-    assert fake_relay.marks == [(["quick-1"], "covered", ISSUE)] and relay.outbox_entries() == []
+    assert fake_relay.marks == [([ID_1], "covered", ISSUE)] and relay.outbox_entries() == []
 
 
 def test_a_changed_file_too_large_file_or_relay_off_sends_nothing(fake_relay, monkeypatch):
@@ -216,25 +236,68 @@ def test_a_changed_file_too_large_file_or_relay_off_sends_nothing(fake_relay, mo
     relay.retry_outbox()
     assert fake_relay.received == [] and relay.outbox_entries() == []
     with pytest.raises(HandInError) as unknown:
-        relay.report_file_for(["quick-9"], None)
+        relay.report_file_for([ID_9], None)
     assert unknown.value.code == "unknown-report"
+
+
+def test_a_relay_switched_off_offers_the_issue_form_and_keeps_no_copy_and_counts_no_retry(fake_relay):
+    ids, note, sha, _ = _viewed()
+    fake_relay.health = {"enabled": False, "test_mode": False, "schema_major": 1}
+    with pytest.raises(HandInError) as off:
+        relay.send_report(ids, note, sha)
+    assert (off.value.code, off.value.detail) == ("relay-off", relay.RELAY_OFF_DETAIL)
+    assert fake_relay.received == [] and relay.outbox_entries() == [] and fake_relay.marks == []
+    fake_relay.health = {"enabled": True, "test_mode": False, "schema_major": 1}
+    fake_relay.answer(503, OFF)  # switched off between the health check and the POST
+    with pytest.raises(HandInError) as off_at_post:
+        relay.send_report(ids, note, sha)
+    assert off_at_post.value.code == "relay-off"
+    assert len(fake_relay.received) == 1 and relay.outbox_entries() == [] and fake_relay.marks == []
+
+
+def test_the_start_up_retry_counts_no_retry_while_the_relay_is_off(fake_relay):
+    fake_relay.answer(429, {"error": "busy", "retry": True, "detail": "the relay is busy"})
+    relay.send_report(*_viewed()[:3])
+    fake_relay.health = {"enabled": False, "test_mode": False, "schema_major": 1}
+    relay.retry_outbox()
+    fake_relay.health = {"enabled": True, "test_mode": False, "schema_major": 1}
+    fake_relay.answer(503, OFF)
+    relay.retry_outbox()
+    assert len(fake_relay.received) == 2  # the first send and the POST answered relay-off
+    [entry] = relay.outbox_entries()
+    assert (entry["failed_attempts"], entry["last_error"]["error"], entry["retry_pending"]) == (1, "busy", True)
+
+
+def test_the_send_route_answers_relay_off_as_409(fake_relay):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from freemocap.api.http.certify.certify_router import certify_router
+
+    app = FastAPI()
+    app.include_router(certify_router)
+    ids, note, sha, _ = _viewed()
+    fake_relay.health = {"enabled": False, "test_mode": False, "schema_major": 1}
+    refused = TestClient(app).post("/certify/hand_in/send", json={"report_ids": ids, "note": note, "sha256": sha})
+    assert (refused.status_code, refused.json()["detail"]) == (409, {"code": "relay-off",
+                                                                      "detail": relay.RELAY_OFF_DETAIL})
 
 
 def test_a_new_choice_replaces_the_kept_file_and_the_issue_form_drops_it(fake_relay):
     fake_relay.answer(429, {"error": "busy", "retry": True, "detail": "the relay is busy"})
     relay.send_report(*_viewed()[:3])
     fake_relay.answer(429, {"error": "busy", "retry": True, "detail": "the relay is busy"})
-    ids, note, sha, _ = _viewed(("quick-1", "quick-2"), "with both")
+    ids, note, sha, _ = _viewed((ID_1, ID_2), "with both")
     relay.send_report(ids, note, sha)
     assert [entry["sha256"] for entry in relay.outbox_entries()] == [sha]
     relay.mark_opened(ids, note, sha)
-    assert relay.outbox_entries() == [] and fake_relay.marks == [(["quick-1", "quick-2"], "opened", None)]
+    assert relay.outbox_entries() == [] and fake_relay.marks == [([ID_1, ID_2], "opened", None)]
 
 
 def test_the_default_address_is_the_real_relay_and_the_guard_refuses_it(fake_relay, monkeypatch):
     monkeypatch.delenv(relay.RELAY_URL_ENV_VAR)
     assert relay.relay_url() == relay.RELAY_URL == "https://skellycertify-relay.dom-dd0.workers.dev"
-    with pytest.raises(AssertionError, match="tried to POST"):
+    with pytest.raises(AssertionError, match="tried to GET"):  # the health check comes first
         relay.send_report(*_viewed()[:3])
     assert fake_relay.received == [] and fake_relay.marks == []
 
@@ -255,7 +318,7 @@ def test_the_routes_view_send_and_list_the_hand_in(fake_relay, monkeypatch):
     app = FastAPI()
     app.include_router(certify_router)
     client = TestClient(app)
-    selection = {"report_ids": ["quick-1"], "note": "it failed twice"}
+    selection = {"report_ids": [ID_1], "note": "it failed twice"}
     viewed = client.post("/certify/hand_in/file", json=selection).json()
     assert viewed["file_name"] == "certify-report-20261119T100000Z.md" and viewed["fits_relay"]
     assert hashlib.sha256(viewed["content"].encode()).hexdigest() == viewed["sha256"]
@@ -267,26 +330,26 @@ def test_the_routes_view_send_and_list_the_hand_in(fake_relay, monkeypatch):
     sent = client.post("/certify/hand_in/send", json={**selection, "sha256": viewed["sha256"]}).json()
     assert (sent["state"], sent["offer_issue_form"], sent["error"]["detail"]) == ("refused", True, "3")
     monkeypatch.setattr(skellytracker, "pending_reports", lambda include_handed_in=False: [
-        {"report_id": "quick-1", "kind": "quick", "created_utc": "2026-11-19T10:00:00Z", "has_failure": True,
+        {"report_id": ID_1, "kind": "quick", "created_utc": "2026-11-19T10:00:00Z", "has_failure": True,
          "evidence_valid": False, "state": "covered", "reference": "https://evil.example/issues/7"}])
     listed = client.get("/certify/hand_in").json()
     assert listed["relay_enabled"] and listed["reports"][0]["reference"] is None
     assert listed["outbox"][0]["last_error"]["error"] == "privacy-rule" and listed["outbox"][0]["offer_issue_form"]
     opened = client.post("/certify/hand_in/opened", json={**selection, "sha256": viewed["sha256"]}).json()
-    assert opened["outbox"] == [] and fake_relay.marks[-1] == (["quick-1"], "opened", None)
+    assert opened["outbox"] == [] and fake_relay.marks[-1] == ([ID_1], "opened", None)
 
 
 def test_not_sent_makes_reports_pending_again_and_deletes_the_kept_files(fake_relay, tmp_path):
     fake_relay.answer(200, {"issue_url": ISSUE, "issue_number": 7, "duplicate": False})
     relay.send_report(*_viewed()[:3])  # covered, outbox already empty
-    relay.mark_not_sent(["quick-1"])  # decision 24: also from covered
-    assert fake_relay.marks[-1] == (["quick-1"], "pending", None)
+    relay.mark_not_sent([ID_1])  # decision 24: also from covered
+    assert fake_relay.marks[-1] == ([ID_1], "pending", None)
     fake_relay.answer(429, {"error": "busy", "retry": True, "detail": "the relay is busy"})
-    relay.send_report(*_viewed(("quick-2",))[:3])
+    relay.send_report(*_viewed((ID_2,))[:3])
     [entry] = relay.outbox_entries()
     assert entry["retry_pending"]
-    relay.mark_not_sent(["quick-2"])
-    assert fake_relay.marks[-1] == (["quick-2"], "pending", None)
+    relay.mark_not_sent([ID_2])
+    assert fake_relay.marks[-1] == ([ID_2], "pending", None)
     assert relay.outbox_entries() == [] and not list((tmp_path / "certify" / "outbox").iterdir())
     relay.retry_outbox()
     assert len(fake_relay.received) == 2  # the first send and the one that failed; nothing after "not sent"
@@ -303,22 +366,22 @@ def test_not_sent_with_an_unknown_id_changes_nothing_and_the_route_lists_the_sta
     real_mark = skellytracker.mark_reports
 
     def mark(ids, state, *, reference=None):
-        if "quick-9" in ids:
-            raise ValueError("quick-9")
+        if ID_9 in ids:
+            raise ValueError(ID_9)
         real_mark(ids, state, reference=reference)
 
     monkeypatch.setattr(skellytracker, "mark_reports", mark)
     monkeypatch.setattr(skellytracker, "pending_reports", lambda include_handed_in=False: [
-        {"report_id": "quick-1", "kind": "quick", "created_utc": None, "has_failure": True, "evidence_valid": False,
+        {"report_id": ID_1, "kind": "quick", "created_utc": None, "has_failure": True, "evidence_valid": False,
          "state": "pending", "reference": None}])
     app = FastAPI()
     app.include_router(certify_router)
     client = TestClient(app)
-    refused = client.post("/certify/hand_in/not_sent", json={"report_ids": ["quick-1", "quick-9"]})
+    refused = client.post("/certify/hand_in/not_sent", json={"report_ids": [ID_1, ID_9]})
     assert (refused.status_code, refused.json()["detail"]["code"]) == (422, "unknown-report")
     assert len(relay.outbox_entries()) == 1
-    listed = client.post("/certify/hand_in/not_sent", json={"report_ids": ["quick-1"]}).json()
-    assert listed["outbox"] == [] and fake_relay.marks[-1] == (["quick-1"], "pending", None)
+    listed = client.post("/certify/hand_in/not_sent", json={"report_ids": [ID_1]}).json()
+    assert listed["outbox"] == [] and fake_relay.marks[-1] == ([ID_1], "pending", None)
 
 
 def test_the_test_session_has_the_relay_off_and_the_start_up_retry_makes_no_call(tmp_path, monkeypatch):
@@ -328,7 +391,7 @@ def test_the_test_session_has_the_relay_off_and_the_start_up_retry_makes_no_call
     (tmp_path / "certify" / "outbox").mkdir(parents=True)
     (tmp_path / "certify" / "outbox" / ("a" * 64 + ".md")).write_bytes(b"kept")
     (tmp_path / "certify" / "outbox" / ("a" * 64 + ".json")).write_text(
-        json.dumps({"file_name": "x.md", "report_ids": ["quick-1"], "failed_attempts": 0, "last_error": None}))
+        json.dumps({"file_name": "x.md", "report_ids": [ID_1], "failed_attempts": 0, "last_error": None}))
     calls = []
     monkeypatch.setattr(relay.requests, "post", lambda *args, **kwargs: calls.append(args))
     assert len(relay.outbox_entries()) == 1

@@ -1,4 +1,4 @@
-"""The certify report file: one Markdown file that merges module reports (skellycertify report format 1.0.0, section 4).
+"""The certify report file: one Markdown file that merges module reports (skellycertify report format 1.1.0, section 4).
 
 `build_report_file()` is pure: the same module reports, note and app block give the same bytes, so the file the
 person views is the file that is sent. It refuses a file that breaks privacy rules 1 to 11 of section 6, the rules
@@ -17,6 +17,7 @@ import freemocap
 from freemocap.build_info import BUILD_GIT_SHA
 
 SCHEMA = "skellycertify.report/1.0.0"
+SCHEMA_WITH_IDS = "skellycertify.report/1.1.0"  # 1.1.0 adds the optional module `id` (a v4 UUID)
 NOTE_MAX_CHARS = 2000
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
 CREATED_UTC = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$")
@@ -144,8 +145,9 @@ def build_report_file(modules: list[dict], note: str | None, app: dict | None) -
     if not all(isinstance(time, str) and CREATED_UTC.match(time) for time in times):
         raise ReportFileError("bad-module", "each module report needs created_utc as YYYY-MM-DDTHH:MM:SSZ")
     created = min(times)
+    schema = SCHEMA_WITH_IDS if any("id" in module for module in modules) else SCHEMA
     lines = ["# Certify report", "",
-             f"Schema `{SCHEMA}`, " + (f"app {_cell(app['name'])} {_cell(app['version'])}, " if app else "")
+             f"Schema `{schema}`, " + (f"app {_cell(app['name'])} {_cell(app['version'])}, " if app else "")
              + f"created {created} (UTC).", ""]
     for module in modules:
         package, evidence = module.get("package") or {}, module.get("evidence") or {}
@@ -160,7 +162,7 @@ def build_report_file(modules: list[dict], note: str | None, app: dict | None) -
             label = f"{row.get('id')}. {row.get('name')}" if "sections" in module else row.get("name")
             cells = (name, _cell(label), _cell(row.get("result")), _cell(row.get("reason")))
             lines.append("|" + "|".join(f" {cell} " if cell else " " for cell in cells) + "|")
-    data = {"schema": SCHEMA, "app": app, "modules": modules, "note": note}
+    data = {"schema": schema, "app": app, "modules": modules, "note": note}
     rule = privacy_rule(lines, data)
     if rule:
         raise ReportFileError("privacy-rule", str(rule))

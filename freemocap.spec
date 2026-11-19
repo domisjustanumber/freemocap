@@ -45,19 +45,12 @@ for runtime_package in ('_polars_runtime_32', '_polars_runtime_64', '_polars_run
         binaries.extend(collect_dynamic_libs(runtime_package))
         hiddenimports.extend(collect_submodules(runtime_package))
 
-# ── mediapipe (needs .tflite model files at runtime; only solutions/vision/formats) ──
+# ── mediapipe (needs .tflite model files at runtime; only the tasks vision API) ──
 import mediapipe
 mp_path = os.path.dirname(mediapipe.__file__)
 datas.append((os.path.join(mp_path, 'modules'), 'mediapipe/modules'))
 hiddenimports.extend([
     'mediapipe',
-    'mediapipe.python.solutions',
-    'mediapipe.python.solutions.holistic',
-    'mediapipe.python.solutions.drawing_utils',
-    'mediapipe.python.solutions.face_mesh',
-    'mediapipe.python.solutions.face_mesh_connections',
-    'mediapipe.framework.formats',
-    'mediapipe.framework.formats.landmark_pb2',
     'mediapipe.tasks.python',
     'mediapipe.tasks.python.vision',
 ])
@@ -85,19 +78,10 @@ sf_path = os.path.dirname(skellyforge.__file__)
 # definitions tree must ship with the frozen build.
 datas.append((os.path.join(sf_path, 'definitions'), 'skellyforge/definitions'))
 
-# ── skellytracker: its PyInstaller hook (entry point pyinstaller40) collects its data files ──
+# ── skellytracker: its PyInstaller hooks (entry point pyinstaller40) collect its data files and ONNX Runtime ──
+# GPU execution providers are EP packs that skellytracker downloads at run time; none is bundled.
 # freemocap owns the tracker→standard-human mapping YAML files.
 datas.extend(collect_data_files('freemocap', includes=['core/mapping/yaml/*.yaml']))
-
-# GPU execution providers come from skellytracker's EP packs, not from bundled NVIDIA wheels:
-# onnxruntime is the CPU build, and no nvidia.* package is installed.
-
-# ── onnxruntime (only DLLs + capi bindings; exclude dev tools) ──
-binaries.extend(collect_dynamic_libs('onnxruntime'))
-hiddenimports.extend(['onnxruntime', 'onnxruntime.capi'])
-
-# ── onnx (used by rtmpose_session for model loading; separate from onnxruntime) ──
-hiddenimports.append('onnx')
 
 # ── setuptools (_vendor only — jaraco, packaging, etc. needed by vendored deps) ──
 hiddenimports.extend(collect_submodules('setuptools._vendor'))
@@ -147,13 +131,6 @@ a = Analysis(
         'sass',
         'sklearn',
         'numpydantic',
-
-        # ── onnxruntime dev tools (not needed at runtime) ──
-        'onnxruntime.transformers',
-        'onnxruntime.tools',
-        'onnxruntime.quantization',
-        'onnxruntime.backend',
-        'onnxruntime.datasets',
 
         # ── mediapipe dev/bundled tools ──
         'mediapipe.tasks.python.test',

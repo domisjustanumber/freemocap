@@ -312,7 +312,15 @@ PYTHONPATH, so the shutdown time stays unmeasured until the workspace is set up.
 - Status-row flags: built locally as `PackStatus.checks` (decision 17); waiting for the push and the pin.
 - Windows ML catalog install progress and cancel, and a remove call.
 - `note_exit_requested()`.
-- `pending_reports()` and `mark_reports()`.
+- `pending_reports()` and `mark_reports()`: built 2026-11-19 (skellytracker-6c; one local commit on top of
+  `e7ce3409`, not pushed, not read here). `skellytracker.pending_reports(include_handed_in=False)` gives rows
+  `{report_id, kind, created_utc, has_failure, evidence_valid, state, reference}`, oldest first; with
+  `include_handed_in=True` every state, so a "sent" line survives a restart. `read_report(report_id)` gives
+  the module report as `certify()` returned it. `mark_reports` as in decision 24; `ValueError` with nothing
+  changed also for a plain string in place of the list and for a reference with "pending". A report is
+  listed only when a check ended pass or fail; `has_failure` is the "always offer a failure report" case;
+  `report_id` is opaque; state is in `hand-in.json` in the EP store root; skellytracker never sends and never
+  builds the Markdown file (freemocap builds it from `read_report()`); reports are never deleted.
 - The ONNX Runtime PyInstaller hook.
 
 ## Next actions

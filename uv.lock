@@ -445,7 +445,7 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.7.2" },
     { name = "scipy-stubs", specifier = "~=1.18.1" },
     { name = "skelly-synchronize", editable = "../skellysync" },
-    { name = "skellycam", editable = "../skellycam-native-jpeg" },
+    { name = "skellycam", editable = "../skellycam-sfn26-pins" },
     { name = "skellyforge", editable = "../skellyforge" },
     { name = "skellylogs", editable = "../utils/skellylogs" },
     { name = "skellypings", editable = "../utils/skellypings" },
@@ -516,6 +516,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f5/08/8eea9d4b8302028f3abb2c0813953f7aec26d33b7a8960ed760e65ff29fa/idna-3.20.tar.gz", hash = "sha256:a7db850025b95ded1eae8a46181a1a6c56c92c96f0e2b005d9ff8dc0210cab44", size = 216463, upload-time = "2026-09-17T14:11:04.752Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl", hash = "sha256:ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c", size = 69583, upload-time = "2026-09-17T14:11:03.168Z" },
+]
+
+[[package]]
+name = "imageio-ffmpeg"
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/ee/e3e0753f1054da1f115ee5d113307ed58faf4e31fa90d5d31739db15d125/imageio_ffmpeg-0.7.0.tar.gz", hash = "sha256:eec1f8b9bd873a2f179c994c653d5970ad560e245faf1a777e971933228b829a", size = 26037, upload-time = "2026-10-28T08:50:00.328Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f1/ef/e006996ba8735c1605b05fc931b7b49297cbdf11603259701bd0d62e17e1/imageio_ffmpeg-0.7.0-py3-none-macosx_10_9_intel.macosx_10_9_x86_64.whl", hash = "sha256:fafa399433b571e8963471487cd7a7bb3ee7b532af42e6342145add6379f479b", size = 24933149, upload-time = "2026-10-28T08:48:39.709Z" },
+    { url = "https://files.pythonhosted.org/packages/24/d3/be06b86c75acc49113aaf869b8c3d1e721ee01e1d1d7fa12cfc7d9708ea3/imageio_ffmpeg-0.7.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:5cb5c37d3c19aa8e7cd95b9f4833e6a3d9fd33e4b1d126a42995b14aef9fef02", size = 21114068, upload-time = "2026-10-28T08:49:58.132Z" },
+    { url = "https://files.pythonhosted.org/packages/04/96/15fe7ef562f7494c358cbd9b521d2da82d7a331b5513703756166478bd5f/imageio_ffmpeg-0.7.0-py3-none-manylinux2014_x86_64.whl", hash = "sha256:4e1f36bef7bedd4bc5dc25f60a8345d88f57133fa1e754f09b411ac61b854408", size = 29498414, upload-time = "2026-10-28T08:49:37.544Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/55/1d50cdd78d862a30c2ce44f01cea387f77b364b21fa2fecf1590258b215b/imageio_ffmpeg-0.7.0-py3-none-win_amd64.whl", hash = "sha256:7a22b45f60321d4172bdf2bc61f716bce4c81b85727bd59c7c7e371055a6a440", size = 31247004, upload-time = "2026-10-28T08:49:09.115Z" },
 ]
 
 [[package]]
@@ -1531,13 +1543,14 @@ provides-extras = ["api", "dev", "packaging"]
 [[package]]
 name = "skellycam"
 version = "2.0.0a6"
-source = { editable = "../skellycam-native-jpeg" }
+source = { editable = "../skellycam-sfn26-pins" }
 dependencies = [
     { name = "av" },
     { name = "beartype" },
     { name = "cv2-enumerate-cameras" },
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "imageio-ffmpeg" },
     { name = "msgspec" },
     { name = "numpy" },
     { name = "numpydantic" },
@@ -1564,6 +1577,7 @@ requires-dist = [
     { name = "cv2-enumerate-cameras", specifier = "==1.4.0" },
     { name = "fastapi", specifier = "==0.163.2" },
     { name = "httpx", specifier = "==0.28.1" },
+    { name = "imageio-ffmpeg", specifier = "==0.7.0" },
     { name = "msgspec", specifier = "==0.22.0" },
     { name = "numpy", specifier = "==2.5.5" },
     { name = "numpydantic", specifier = "==2.0.0" },
@@ -1585,14 +1599,13 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "bumpver", specifier = "==2026.1132" },
-    { name = "pip-tools", specifier = "==7.7.0" },
-    { name = "poethepoet", specifier = "==0.49.0" },
-    { name = "pre-commit", specifier = "==4.6.2" },
-    { name = "pyinstaller", specifier = "==6.22.3" },
-    { name = "pytest", specifier = "==9.2.0" },
-    { name = "pytest-asyncio", specifier = "==1.5.0" },
-    { name = "ruff", specifier = "==0.17.5" },
+    { name = "bumpver" },
+    { name = "pip-tools" },
+    { name = "poethepoet", specifier = ">=0.32.0" },
+    { name = "pyinstaller", specifier = ">=6.15.0" },
+    { name = "pytest", specifier = ">=8.4.0" },
+    { name = "pytest-asyncio", specifier = ">=0.24.0" },
+    { name = "ruff", specifier = ">=0.9.0" },
 ]
 
 [[package]]

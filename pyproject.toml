@@ -40,8 +40,8 @@ dependencies = [
 
 [tool.uv.sources]
 # Development uses the sibling checkouts managed by the project workspace.
-# Local for now (2026-11-19): the dom/native-jpeg worktree holds the pins skellytracker matched; ../skellycam is on another branch.
-skellycam = { path = "../skellycam-native-jpeg", editable = true }
+# Local stopgap (2026-11-19): upstream sfn26 with the shared pins and no Rust backend, until freemocap moves to skellycam's frame-ring API.
+skellycam = { path = "../skellycam-sfn26-pins", editable = true }
 skellytracker = { path = "../skellytracker", editable = true }
 skellyforge = { path = "../skellyforge", editable = true }
 freemocap_blender_addon = { path = "../freemocap_blender_addon", editable = true }

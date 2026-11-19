@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       # ── Windows code-signing prereqs ──
       - name: Validate code signing prerequisites
@@ -152,17 +152,17 @@ jobs:
 
       # ── Common setup ──
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v6
         with:
           python-version-file: ".python-version"
 
       - name: Install uv and enable cache
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57
         with:
           enable-cache: false
 
@@ -233,13 +233,13 @@ jobs:
       # ── Windows code signing (server binary) ──
       - name: Sign freemocap_server.exe with Trusted Signing
         if: matrix.platform == 'windows'
-        uses: azure/trusted-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        uses: azure/trusted-signing-action@b443cf8ea4124818d2ea9f043cba29fc3ec47b16
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
           endpoint: https://eus.codesigning.azure.net/
-          signing-account-name: freemocap
+          trusted-signing-account-name: freemocap
           certificate-profile-name: freemocap
           files: ${{ github.workspace }}\freemocap-ui\freemocap_server\freemocap_server.exe
           file-digest: SHA256
@@ -396,13 +396,13 @@ jobs:
       # ── Windows installer signing ──
       - name: Sign Electron installer with Trusted Signing
         if: matrix.platform == 'windows'
-        uses: azure/trusted-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
+        uses: azure/trusted-signing-action@b443cf8ea4124818d2ea9f043cba29fc3ec47b16
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
           endpoint: https://eus.codesigning.azure.net/
-          signing-account-name: freemocap
+          trusted-signing-account-name: freemocap
           certificate-profile-name: freemocap
           files-folder: ${{ github.workspace }}\freemocap-ui\release
           files-folder-filter: "*.exe"
@@ -496,7 +496,7 @@ jobs:
       contents: write
     steps:
       - name: Check out the release scripts
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           sparse-checkout: .github/scripts
 

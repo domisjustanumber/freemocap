@@ -169,7 +169,11 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
     notice per UI session; never during a recording or post-processing. "Do not remind me" is one switch per
     person in localStorage (`freemocap:` prefix); the indicator stays.
 24. skellytracker provides `pending_reports()` and `mark_reports()` (pending, opened, covered); the pending
-    list reaches the UI as a full-state field of a server message.
+    list reaches the UI as a full-state field of a server message. Planned shape (skellytracker-6c, not built):
+    `mark_reports(report_ids, *, reference=None)`; `reference` is one opaque string stored and returned
+    unchanged through `pending_reports()` and the status after a restart (freemocap passes the issue URL after
+    a relay 200; none for the issue-form path). How "opened" and "not sent" reach the store was asked
+    2026-11-19.
 
 ### Relay hand-in (skellycertify `1fc984d`, relay/README.md "Answers for the app developers", report-format.md 4.1)
 

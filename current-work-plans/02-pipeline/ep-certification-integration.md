@@ -518,6 +518,58 @@ Nothing below is still missing except a package-wide `certify()` / `certify_plan
   `report_id` is opaque; state is in `hand-in.json` in the EP store root; skellytracker never sends and never
   builds the Markdown file (freemocap builds it from `read_report()`); reports are never deleted.
 
+## Handoff note, 2026-11-19 late evening (read this first after a compaction)
+
+The coordinating session works through sub-agents (opus/sonnet/haiku, never fable unless the user names it).
+All work is local commits on `sidecar-implementation`; nothing is pushed; CI stays unbuildable until the
+frame-ring move. Sub-agents stage by explicit path because several edit this checkout at once.
+
+Running when this was written (their reports arrive as messages; act on them):
+- F15 step 1: the `certification` state, the quick-check job (`freemocap/system/certify/quick_check.py`), its
+  routes in a new router, and the busy rule in both directions. It ends with one real quick check and a
+  checkpoint commit that writes down the final message shape.
+- A hard-exit audit (rule from skellytracker-6c: a process that held a GPU EP session and ends by `os._exit`,
+  terminate or kill must call `skellytracker.note_exit_requested()` first). Suspects: the tools
+  `tools/hardware_validation/server_session.py` and `tools/sdk_live_validation.py`, which terminate a backend
+  they started; `tools/datasets/preparation.py`; `utilities/kill_process_on_port.py`; tests that end a real
+  backend. It also answers whether killing the quick-check child can leave a marker.
+
+To do next, in order:
+1. When step 1 lands: run the full fast suite (`uv run --frozen pytest freemocap/tests/ --timeout=120
+   --timeout-method=thread -m "not e2e and not slow"`; last result 1634 passed, 7 failed = the old baseline,
+   20 skipped) against `../skellytracker` at `e90245cefb7330ce33d9f1d395674b4ff3eaed7f`, then record the pin
+   move to that commit in decision 1 (pushed fork commit; all its CI is green on macOS, Windows and Ubuntu,
+   fast tests included; it holds the check rule, `needs_check`, the exit notice, `local_cause` and the
+   `unclean-exits` reason code, CoreML, pruning, the Windows ML controls and the PyInstaller hook).
+2. Relay follow-up (user confirmed 2026-11-19; one sub-agent; fake relay only in tests): before a send, read
+   `enabled` from `GET /health`; when the relay is off, tell the user so and offer the issue form at once,
+   with no outbox copy and no retry used. Declare `skellycertify.report/1.1.0` at the top of the file once
+   any module carries an `id`; pass each module through unchanged. Tests: skellycertify's
+   `relay/samples/valid-quick.md` (two quick modules with ids), the 503 `relay-off` answer (`retry: true`),
+   the 422 `bad-value` for a module id that is not a v4 UUID, and that nothing assumes a `quick-` id prefix.
+   Facts (skellycertify-34, confirmed by the user): several module reports of one package in one file are
+   valid (spec 1.1.0 on skellycertify main `56ad18e`); skellytracker report ids become v4 UUIDs with an
+   optional `id` key per module; the relay is OFF now and stays off until the GitHub App is set up; the
+   `app` block gets no tree-modified flag. The approved single connection test was run before the switch-off:
+   422 `wrong-schema`, classified refused, nothing made on GitHub. This PC's store has 13 pending reports
+   with old ids; what happens to them is skellytracker's and the user's.
+3. F15 step 2: menu markers, the two-choice prompt and the background check in the UI, briefed from the
+   message shape step 1 recorded. Then steps 3 to 5 in parallel.
+
+Open with the user: freemocap's markers say "on this device" (F12) while skellytracker's reason texts,
+shown beside them unchanged, say "on this machine" (the user's ruling there, because device means a GPU in
+skellytracker; freemocap also has a Device row). Asked whether freemocap should say "machine" too; no answer
+yet, so "device" stands.
+
+Waiting for the user's manual check: the dependency bumps on branch `dom/dependency-bumps`, worktree
+`../freemocap-dep-bumps`, checklist `current-work-plans/02-pipeline/dependency-bumps-verification.md` on that
+branch; it needs a rebase onto this branch before a merge.
+
+Known gaps, not being worked on: development worker processes still print the cp1252 logging errors (the
+fix point is in skellycam's worker setup; skellycam-18 is told); a frozen backend cannot start from this
+workspace's editable installs (`skellylogs`, `skellycam` are invisible to PyInstaller); the committed
+`openapi.json` lags the app in about 7 unrelated schemas, so every change adds only its own hunks.
+
 ## Next actions
 
 All as local commits on `sidecar-implementation`, in this order:

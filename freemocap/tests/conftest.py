@@ -4,6 +4,8 @@ Lives at the test-package root so every test gets it, including ones that never 
 the pipeline fixtures.
 """
 
+import os
+
 import pytest
 from tempfile import mkdtemp
 from skellylogs.handlers.websocket_log_queue_handler import create_websocket_log_queue
@@ -11,6 +13,9 @@ from skellylogs.handlers.websocket_log_queue_handler import create_websocket_log
 
 def pytest_configure(config):
     """Use fresh scratch space instead of a Windows temp root shared across users."""
+    # The certify relay files a real public issue and the start-up retry sends any kept outbox file:
+    # no test may reach it. `relay_url()` reads this at each call; the relay tests set the fake address themselves.
+    os.environ["FREEMOCAP_CERTIFY_RELAY_URL"] = ""
     if config.option.basetemp is not None:
         return
     # Keep video paths below Windows limits; avoid pytest's shared per-user root.

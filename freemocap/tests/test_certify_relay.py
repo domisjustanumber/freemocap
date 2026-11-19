@@ -319,3 +319,22 @@ def test_not_sent_with_an_unknown_id_changes_nothing_and_the_route_lists_the_sta
     assert len(relay.outbox_entries()) == 1
     listed = client.post("/certify/hand_in/not_sent", json={"report_ids": ["quick-1"]}).json()
     assert listed["outbox"] == [] and fake_relay.marks[-1] == (["quick-1"], "pending", None)
+
+
+def test_the_test_session_has_the_relay_off_and_the_start_up_retry_makes_no_call(tmp_path, monkeypatch):
+    """The guard of freemocap/tests/conftest.py: no test can post to the real relay."""
+    assert relay.relay_url() == ""
+    monkeypatch.setenv("FREEMOCAP_BASE_FOLDER", str(tmp_path))
+    (tmp_path / "certify" / "outbox").mkdir(parents=True)
+    (tmp_path / "certify" / "outbox" / ("a" * 64 + ".md")).write_bytes(b"kept")
+    (tmp_path / "certify" / "outbox" / ("a" * 64 + ".json")).write_text(
+        json.dumps({"file_name": "x.md", "report_ids": ["quick-1"], "failed_attempts": 0, "last_error": None}))
+    calls = []
+    monkeypatch.setattr(relay.requests, "post", lambda *args, **kwargs: calls.append(args))
+    assert len(relay.outbox_entries()) == 1
+    relay.retry_outbox()
+    relay.start_outbox_retry()
+    for thread in threading.enumerate():
+        if thread.name == "CertifyOutboxRetry":
+            thread.join(5)
+    assert calls == []

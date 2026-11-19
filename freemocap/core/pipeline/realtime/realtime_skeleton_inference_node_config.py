@@ -1,4 +1,6 @@
 """Config for the centralized RealtimeSkeletonInferenceNode."""
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -17,6 +19,9 @@ class RealtimeSkeletonInferenceNodeConfig(BaseModel):
 
     # The old skellytracker Tracker (YOLOX + RTMW x-l 256x192) on cpu or cuda, to compare it with 2.0; realtime only.  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
     legacy_tracker_benchmark: bool = False  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    # skellytracker's `start_pipeline(preprocess=...)`, for a benchmark of where the frame preprocessing runs:
+    # "auto" its default, "cpu" all frame work on the CPU, "gpu" the GPU preprocess on each EP that has it.
+    preprocess: Literal["auto", "cpu", "gpu"] = "auto"
 
     # When True, writes debug frames with bbox overlays to
     # {freemocap_data}/debug_bboxes/. (requires GPU mode)

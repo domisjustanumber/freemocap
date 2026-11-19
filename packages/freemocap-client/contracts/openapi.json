@@ -7835,6 +7835,16 @@
             "title": "Legacy Tracker Benchmark",
             "default": false
           },
+          "preprocess": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "cpu",
+              "gpu"
+            ],
+            "title": "Preprocess",
+            "default": "auto"
+          },
           "debug_draw_bboxes": {
             "type": "boolean",
             "title": "Debug Draw Bboxes",

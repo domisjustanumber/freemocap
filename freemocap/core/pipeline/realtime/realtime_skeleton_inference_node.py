@@ -173,6 +173,7 @@ class RealtimeSkeletonInferenceNode(SourceNode):
                 shutdown_flag=ipc.pipeline_shutdown_flag,
                 timing_sink=timing_records.append if timing_records is not None else None,
                 legacy_tracker_benchmark=pipeline_config.skeleton_inference_node_config.legacy_tracker_benchmark,  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+                preprocess=pipeline_config.skeleton_inference_node_config.preprocess,
             ))
 
             frame_recarrays: dict[CameraIdString, np.recarray | None] = {

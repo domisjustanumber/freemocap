@@ -44,6 +44,8 @@ class InferenceRegistration:
     timing_sink: Callable[[dict], None] | None = None
     """Gets the run's skellytracker timing header and span events on the inference thread, inside `pipeline.run`; keep it cheap."""
     legacy_tracker_benchmark: bool = False  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    preprocess: str = "auto"
+    """skellytracker's `start_pipeline(preprocess=...)`: `auto`, `cpu` or `gpu`; skellytracker refuses another value."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,7 +174,8 @@ class InferenceService:
             detector_type=registration.detector_type, camera_ids=registration.camera_ids,
             running_mode=RUNNING_MODES[registration.mode.value],
             rtmpose_model_name=registration.rtmpose_model_name, execution_provider=registration.execution_provider,
-            execution_device=registration.execution_device, timing_sink=registration.timing_sink)
+            execution_device=registration.execution_device, timing_sink=registration.timing_sink,
+            preprocess=registration.preprocess)
         models = {node: dict(model) for node, model in run.models.items()}
         return run, tuple({"node": node, **model} for node, model in models.items()), {**record, "models": models}
 

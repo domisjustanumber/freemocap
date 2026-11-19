@@ -51,8 +51,19 @@ def test_auto_passes_the_options_and_device_of_the_recommendation_to_the_run(mon
     monkeypatch.setattr(pipelines, "export_pipeline", lambda config, resolved: {"exported": config, "resolved": resolved})
     run, record = pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0"], running_mode="live")
     assert run == "run" and record["execution"] == {"selected": None, "selected_device": None, "requested": "gpu-ep",
-                                                    "options": {"prefer_nhwc": "1"}, "device": "gpu:0"}
+                                                    "options": {"prefer_nhwc": "1"}, "device": "gpu:0", "preprocess": "auto"}
     assert (started["execution_provider"], started["ep_options"], started["device"]) == ("gpu-ep", {"prefer_nhwc": "1"}, "gpu:0")
+
+
+def test_the_preprocess_choice_reaches_the_run_and_the_record(monkeypatch):
+    import skellytracker.core.pipelines as pipelines
+    started = {}
+    monkeypatch.setattr(pipelines, "start_pipeline", lambda config, **kwargs: started.update(kwargs) or "run")
+    monkeypatch.setattr(pipeline_runs, "run_ep_choice", lambda requested, device=None: ("cpu", None, None))
+    _, record = pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0"], running_mode="live")
+    assert started["preprocess"] == record["execution"]["preprocess"] == "auto"
+    _, record = pipeline_runs.start_detector_run(detector_type="rtmpose", camera_ids=["0"], running_mode="live", preprocess="gpu")
+    assert started["preprocess"] == record["execution"]["preprocess"] == "gpu"
 
 
 @pytest.fixture(scope="module")
@@ -190,7 +201,8 @@ def test_the_record_of_a_real_run_is_the_exported_pipeline_and_the_ep_choice_as_
     nodes = {node["id"]: node for node in record["pipeline"]["nodes"]}
     assert all(nodes[node]["params"]["sidecar_sha256"] == model["sidecar_sha256"] for node, model in models.items())
     assert nodes[pipeline_runs.RTMW_NODE]["params"]["size"] == pipeline_runs.RTMW_SIZES["rtmw-l-m_256x192"]
-    assert record["execution"] == {"selected": "cpu", "selected_device": None, "requested": "cpu", "options": None, "device": None}
+    assert record["execution"] == {"selected": "cpu", "selected_device": None, "requested": "cpu", "options": None, "device": None,
+                                   "preprocess": "auto"}
 
 
 def test_the_stored_confidence_is_the_score_after_the_gate_and_raw_score_is_not_stored(rtmw_schema):

@@ -3363,6 +3363,12 @@ export interface components {
              */
             legacy_tracker_benchmark?: boolean;
             /**
+             * Preprocess
+             * @default auto
+             * @enum {string}
+             */
+            preprocess?: "auto" | "cpu" | "gpu";
+            /**
              * Debug Draw Bboxes
              * @default false
              */

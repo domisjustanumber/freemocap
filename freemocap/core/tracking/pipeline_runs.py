@@ -75,7 +75,8 @@ def _with_every_timing_span(config):
 
 def start_detector_run(*, detector_type: str, camera_ids: Sequence[str], running_mode: str,
                        rtmpose_model_name: str | None = None, execution_provider: str | None = None,
-                       execution_device: str | None = None, timing_sink: Callable[[dict], None] | None = None):
+                       execution_device: str | None = None, timing_sink: Callable[[dict], None] | None = None,
+                       preprocess: str = "auto"):
     """Start the run of a detector choice; return it with its record. Give an EP only when the pipeline needs one.
 
     Auto passes the recommendation's EP options and device too (a precision such as fp16 can need its options).
@@ -83,6 +84,7 @@ def start_detector_run(*, detector_type: str, camera_ids: Sequence[str], running
     `export_pipeline` writes it, the running mode, and the EP the user selected with what the run was asked for.
     A `timing_sink` gets skellytracker's timing header and each span event, on the calling thread after each call;
     with one, every span is on for the whole run, and the record keeps the config without the spans.
+    `preprocess` is skellytracker's place of the frame preprocessing (`auto`, `cpu` or `gpu`); the record keeps it.
     """
     from skellytracker.core.pipelines import check_pipeline, export_pipeline, start_pipeline
     config = load_detector_pipeline(detector_type, rtmpose_model_name)
@@ -90,10 +92,10 @@ def start_detector_run(*, detector_type: str, camera_ids: Sequence[str], running
                                  else (None, None, None))
     run = start_pipeline(config if timing_sink is None else _with_every_timing_span(config), camera_ids=list(camera_ids),
                          running_mode=running_mode, execution_provider=provider, ep_options=options, device=device,
-                         timing_sink=timing_sink)
+                         preprocess=preprocess, timing_sink=timing_sink)
     record = {"pipeline": export_pipeline(config, resolved=True), "running_mode": running_mode,
               "execution": {"selected": execution_provider, "selected_device": execution_device,
-                            "requested": provider, "options": options, "device": device}}
+                            "requested": provider, "options": options, "device": device, "preprocess": preprocess}}
     return run, record
 
 

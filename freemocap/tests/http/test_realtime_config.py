@@ -74,3 +74,25 @@ def test_removed_filter_settings_are_rejected_at_request_boundary() -> None:
             'camera_node_config': {'enable_keypoint_filter': True},
         }})
         assert response.status_code == 422
+
+
+def test_preprocess_round_trips_through_the_contract_and_an_unknown_value_is_rejected() -> None:
+    import json
+    from pathlib import Path
+    import pytest
+    from pydantic import ValidationError
+    from freemocap.core.pipeline.realtime.realtime_skeleton_inference_node_config import RealtimeSkeletonInferenceNodeConfig
+    contract = json.loads((Path(__file__).parents[3] / 'packages/freemocap-client/contracts/openapi.json').read_text(encoding='utf-8'))
+    published = contract['components']['schemas']['RealtimeSkeletonInferenceNodeConfig']['properties']['preprocess']
+    assert published == RealtimeSkeletonInferenceNodeConfig.model_json_schema()['properties']['preprocess']
+    assert RealtimeSkeletonInferenceNodeConfig().preprocess == 'auto'
+    for value in ('auto', 'cpu', 'gpu'):
+        config = RealtimeSkeletonInferenceNodeConfig.model_validate({'preprocess': value})
+        assert RealtimeSkeletonInferenceNodeConfig.model_validate(config.model_dump(mode='json')).preprocess == value
+    with pytest.raises(ValidationError):
+        RealtimeSkeletonInferenceNodeConfig.model_validate({'preprocess': 'GPU'})
+    app = FastAPI()
+    app.include_router(realtime_router)
+    with TestClient(app) as client:
+        response = client.post('/realtime/apply', json={'realtimeConfig': {'skeleton_inference_node_config': {'preprocess': 'npu'}}})
+        assert response.status_code == 422

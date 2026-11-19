@@ -11,12 +11,14 @@ import type {ProcessingSection} from '@/components/mocap-setup/processing-sectio
 import SkeletonAnchorSetting from '@/components/mocap-setup/skeleton-anchor-setting';
 import SettingRow from '@/components/common/settings-layout/setting-row';
 import SettingToggleSwitch from '@/components/common/settings-layout/setting-toggle-switch';
+import SettingSelectInput from '@/components/common/settings-layout/setting-select-input';
 import {TemporalFilterControls} from '@/components/control-panels/realtime-panel/TemporalFilterControls';
 import {StreamingOutputsPanel} from '@/components/control-panels/streaming-outputs/StreamingOutputsPanel';
 import './realtime-processing.css';
 import '@/components/mocap-setup/mocap-processing.css';
 
 type Section = 'tracking' | 'triangulation' | 'filtering' | 'reconstruction' | 'outputs';
+const PREPROCESS_OPTIONS = [{value: 'auto', label: 'Auto'}, {value: 'cpu', label: 'CPU'}, {value: 'gpu', label: 'GPU'}] as const;
 
 /** Presentation reuses posthoc sections; all commands and observations use the existing realtime interfaces. */
 export default function RealtimeProcessingSettings({onClose}: {onClose: () => void}) {
@@ -52,6 +54,11 @@ export default function RealtimeProcessingSettings({onClose}: {onClose: () => vo
                     text: 'Development only. Run the old skellytracker Tracker (YOLOX and RTMW x-l 256x192) instead of the 2.0 pipeline, to compare their timing in the pipeline metrics window. It runs on CPU or CUDA: Auto and TensorRT RTX use CUDA when it is usable, else CPU. Its scores are the old raw scores: points below 0.0025 are dropped, not the RTMW confidence threshold of 2.0 runs.'}} // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
                     control={toggle('Legacy tracker (benchmark)', pipelineConfig.skeleton_inference_node_config.legacy_tracker_benchmark ?? false, enabled => applyOrUpdatePipelineConfig({ // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
                         ...pipelineConfig, skeleton_inference_node_config: {...pipelineConfig.skeleton_inference_node_config, legacy_tracker_benchmark: enabled}}))}/>} {/* Deleted at skellytracker stage 2.4 (legacy tracker benchmark). */}
+                {import.meta.env.DEV && value.detector === 'rtmpose' && <SettingRow label="Preprocess (benchmark)" info={{title: 'Preprocess (benchmark)',
+                    text: 'Development only. Where skellytracker 2.0 prepares the frames for the models, to compare their timing in the pipeline metrics window. Auto: on the GPU with CUDA and TensorRT RTX, else on the CPU. CPU: all frame work on the CPU; only the models run on the execution provider. GPU: on the GPU with every execution provider that has it, else on the CPU with a warning. It does not change the legacy tracker.'}}
+                    control={<SettingSelectInput label="Preprocess (benchmark)" value={pipelineConfig.skeleton_inference_node_config.preprocess ?? 'auto'}
+                        options={PREPROCESS_OPTIONS} onChange={preprocess => applyOrUpdatePipelineConfig({
+                            ...pipelineConfig, skeleton_inference_node_config: {...pipelineConfig.skeleton_inference_node_config, preprocess}})}/>}/>}
                 <SettingRow label="Track Charuco board" info={{title: 'Track Charuco board', text: 'Detect the configured Charuco board alongside the person tracker.'}} control={toggle('Track Charuco board', camera.charuco_tracking_enabled,
                     enabled => applyOrUpdatePipelineConfig({...pipelineConfig, camera_node_config: {...camera, charuco_tracking_enabled: enabled}}))}/>
             </>},

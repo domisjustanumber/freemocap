@@ -160,15 +160,44 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
 
 22. A passed quick check alone gets no hand-in prompt. A failure report is always offered, also for an EP
     with a reviewed row. One hand-in is one file and one issue with everything not yet covered on that
-    backend host. "Open issue form" counts as handed in; "open again" and "not sent" stay available. The
-    backend returns the file as it is; the UI saves it on the UI machine and opens the issue form. Nothing is
-    sent automatically.
+    backend host. Hand-in goes through the certify relay (decisions R1 to R5); the issue form stays as the
+    fallback. "Open issue form" counts as handed in; "open again" and "not sent" stay available. For the
+    issue form the backend returns the file as it is and the UI saves it on the UI machine. Nothing is sent
+    automatically: a run sends nothing, and a file goes out only after the person read it and chose "send".
 23. Timing: nothing at close or start; a "File report" button in a failure message; one non-modal notice at
     the first idle moment after a recording when the normal-use record reaches its minimum; at most one
     notice per UI session; never during a recording or post-processing. "Do not remind me" is one switch per
     person in localStorage (`freemocap:` prefix); the indicator stays.
 24. skellytracker provides `pending_reports()` and `mark_reports()` (pending, opened, covered); the pending
     list reaches the UI as a full-state field of a server message.
+
+### Relay hand-in (skellycertify `1fc984d`, relay/README.md "Answers for the app developers", report-format.md 4.1)
+
+The relay is a Cloudflare Worker that files a report as an issue in `domisjustanumber/skellycertify`, so
+the person needs no GitHub account. Not deployed yet; the user does the Cloudflare steps. Test address:
+`https://skellycertify-relay.<subdomain>.workers.dev`; issues from the test relay carry the label `relay-test`.
+Routes: `POST /reports` with the file as body, `Content-Type: text/markdown; charset=utf-8`, at most 262,144
+bytes; `GET /health` gives `{enabled, test_mode, schema_major}`. It allows any origin (CORS `*`).
+
+R1. User rulings in the contract (2026-11-19): show the person the exact file and get a clear "send"
+     before a send; keep the accepted file and retry only it, byte for byte, never with data added later (a
+     resend is safe, the relay finds the earlier issue by SHA-256); on a failure with `retry: true`, keep
+     the file and retry at the next app start; after 3 failed retries offer the issue form. 413 and 422 are
+     permanent: never retry, offer the issue form at once; for 422 `privacy-rule` tell the person the rule
+     number from `detail`. 400, 404 and 415 are app bugs.
+R2. The app acts on the `retry` flag of the JSON error body `{error, retry, detail}`, never on the status
+     number. 200 gives `{issue_url, issue_number, file_path, duplicate}`: show the link, mark the hand-in
+     covered, delete the outbox copy.
+R3. The backend sends and retries (user, 2026-11-19): the accepted file and its retry count live on the
+     backend host beside the pending list and the shared state of decision 29; retry at the next backend
+     start. A backend host without internet reaches the issue form after 3 retries.
+R4. On "send" the exact accepted bytes go to `<base data folder>/certify/outbox/` with a retry count; only
+     that file is ever sent. On 200 the outbox copy is deleted and the issue link recorded; the merged
+     report stays as the local record (decision 10). The optional note is written before the person views
+     the file, because it is part of the file.
+R5. The relay address is one constant in freemocap with an environment-variable override, no UI (user,
+     2026-11-19). It is empty until the user deploys; empty means relay off and hand-in offers only the
+     issue form.
 
 ### UI: one place (Fable design, accepted)
 
@@ -178,8 +207,10 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
     `· quick check 12 s`, `· 1 failure to file`, dimmed when disconnected (state cleared), `@ <host>` for a
     remote backend.
 26. Clicking opens one Certification dialog (the `SettingsModal` pattern) with three parts: reports to hand in
-    (summary with failures first, "View report", optional note with the privacy warning, "Save report and
-    open issue form" with an unchanged label plus an "opened <date>" line, "Not sent", "Do not remind me");
+    (summary with failures first, optional note with the privacy warning, "View report" showing the exact
+    file with "Send report" under it (R1), the fixed secondary "Save file and open issue form", made prominent
+    after 3 failed retries or a 413/422 (user, 2026-11-19), a sent/opened line with the date and issue link,
+    "Not sent", "Do not remind me"; labels never change with history);
     the running check (progress, "Cancel check"); and Items. Items is the EP page: each EP with state and
     reason, install with progress and cancel, remove, certify, and Windows ML catalog EPs with as much
     information as possible, plus "Run quick check", "Run full check" and, while a pipeline holds the GPU,
@@ -226,6 +257,10 @@ Found 2026-11-19 while measuring decision 31; nothing was changed. `freemocap/.v
 cloned, so `uv lock --check` fails. benchmarks/README.md forbids changing shared environments or setting
 PYTHONPATH, so the shutdown time stays unmeasured until the workspace is set up.
 
+## Waiting on the user
+
+- Deploying the relay (Cloudflare) and the test address, for decision R5.
+
 ## Waiting on skellytracker
 
 - CI result of `55fabf4a`, then the pin. Windows and Linux are green; the macOS job never got a runner. The
@@ -266,6 +301,7 @@ All as local commits on `sidecar-implementation`, in this order:
 | `AGENTS.md`, section on self-describing transport | Which control rules every UI piece here must obey |
 | `current-work-plans/03-transport/message-protocol.md`, "Client recovery and stable controls" | How the indicator, dialog and greyed state reconcile after failure, reconnect and restart |
 | https://github.com/domisjustanumber/skellycertify `report-format.md` | The certify function, progress, cancel, runtime, report file, privacy and evidence rules |
+| skellycertify `relay/README.md`, "Answers for the app developers" | Relay routes, the error table with `retry`, limits and the send rules |
 | `freemocap/core/tracking/execution_providers.py`, `freemocap/api/http/onnx/onnx_router.py` | Today's EP calls and routes |
 | `freemocap-ui/src/hooks/useExecutionProviderOptions.ts`, `src/services/server/execution-providers.ts` | How the EP menu filters rows today (on `usable` only) |
 | `freemocap-ui/electron/main/services/python-server.ts`, `electron/main/index.ts` | The shutdown defect |

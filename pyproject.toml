@@ -17,7 +17,6 @@ dependencies = [
     "pyinstaller==6.22.3",  # the skellytracker pin (its pyinstaller extra)
     "requests==2.34.2",  # the skellytracker pin
     "pydantic==2.14.3",  # the skellycam and skellytracker pin
-    "numpydantic==2.0.0",  # the skellycam and skellytracker pin
     "scikit-learn>=1.7.2",
     "tomli-w>=1.2.0",
     "scipy-stubs~=1.18.1",  # matches the scipy==1.18.1 of skellycam and skellytracker

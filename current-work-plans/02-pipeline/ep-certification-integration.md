@@ -407,6 +407,13 @@ so the quick check is the only way in.
 - F19 and F20. "Not sent" marks the reports pending again and deletes any kept outbox file for them; it is
   also offered on a file waiting to retry.
 - Also: the test setup blanks the relay address for every test, so no test can post to the real relay.
+- Built 2026-11-19. F19 and F20 (`9b5ea74d`): `POST /freemocap/certify/hand_in/not_sent` with `{report_ids}` returns the hand-in list;
+  `relay.mark_not_sent` calls `mark_reports(ids, "pending")` (clears the reference; an unknown id raises and changes nothing, 422
+  `unknown-report`), then deletes every outbox entry (`.md` and `.json`, waiting to retry or given up) holding one of them, under
+  the send lock. A covered report may be un-covered (decision 24). The route addresses reports, not entries: for a kept file the UI
+  passes its `report_ids`. The test guard (`2f178809`): `freemocap/tests/conftest.py` sets `FREEMOCAP_CERTIFY_RELAY_URL` to empty in
+  `pytest_configure`; `relay_url()` reads it at each call. F12 wording (`e4082308`): "passed on this device, not yet reviewed".
+  Also `92f22855`: `report_file_for` orders modules by `created_utc`, then report id, so the same reports give the same bytes.
 
 ## Environment on the dev PC
 

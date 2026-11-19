@@ -5,27 +5,27 @@ description = "A free and open source markerless motion capture system for every
 readme = "README.md"
 requires-python = "==3.13.18"
 dependencies = [
-    "pyarrow>=26.0.1",
-    "polars==2.1.0",  # the skellytracker pin
-    "plotly>=7.1.0,<8",
-    "filelock>=4.2.12",
+    "pyarrow>=25.0.1",
+    "polars==2.1.0",  # the skellycam and skellytracker pin
+    "plotly>=6,<7",
+    "filelock>=3.0",
     "PyYAML==6.0.3",  # the skellytracker pin
     #    "aniposelib>=0.7.0",
-    "numba>=0.68.1",
+    "numba>=0.65.1",
     "libsass>=0.23.0",
-    "opencv-contrib-python==5.0.0.93",  # the skellytracker pin; tests/test_opencv_matches_skellytracker.py checks it
+    "opencv-contrib-python",#==4.10.*",
     "pyinstaller==6.22.3",  # the skellytracker pin (its pyinstaller extra)
     "requests==2.34.2",  # the skellytracker pin
-    "pydantic==2.14.3",  # the skellytracker pin
-    "numpydantic==2.0.0",  # the skellytracker pin
-    "scikit-learn>=1.9.1",
+    "pydantic==2.14.3",  # the skellycam and skellytracker pin
+    "numpydantic==2.0.0",  # the skellycam and skellytracker pin
+    "scikit-learn>=1.7.2",
     "tomli-w>=1.2.0",
-    "scipy-stubs~=1.18.1",  # matches skellytracker's scipy==1.18.1
+    "scipy-stubs~=1.18.1",  # matches the scipy==1.18.1 of skellycam and skellytracker
     "beartype==0.23.1",  # the skellytracker pin (ADR-M2C6); the 0.23.0 class-dictionary concern is retested
-    "msgspec>=0.22.0",
-    "psutil==7.2.2",  # the skellytracker pin (Windows-only there); freemocap imports it directly on every OS
-    "cbor2>=6.3.0",
-    "pylsl>=1.18.7,<2",
+    "msgspec==0.22.0",  # the skellycam pin
+    "psutil==7.2.2",  # the skellycam and skellytracker pin; freemocap imports it directly
+    "cbor2>=5.6.0",
+    "pylsl>=1.18.6,<2",
     #sub-skellies
     "freemocap_blender_addon",
     "skellycam",
@@ -143,16 +143,17 @@ push = true
 
 [dependency-groups]
 dev = [
-    "rich>=15.0.0",
-    "bumpver==2026.1132",  # the skellytracker pin
-    "pip-tools==7.7.0",  # latest; skellytracker pins 7.6.2 (dev tools share no runtime)
-    "pytest==9.2.0",  # the skellytracker pin
-    "pytest-asyncio>=1.5.0",
-    "pytest-timeout>=2.4.0",
-    "httpx>=0.28.1",
-    "ruff==0.17.6",  # latest; skellytracker pins 0.17.5 (dev tools share no runtime)
-    "poethepoet==0.49.0",  # the skellytracker pin
-    # The legacy tracker benchmark only (the old YOLOX dynamic batch); skellytracker's onnx pin (onnx 1.23 writes IR 14; ONNX Runtime 1.30 reads IR 13 or lower).
+    "rich>=14.1.0",
+    "bumpver",
+    "pip-tools",
+    "pytest>=8.4.0",
+    "pytest-asyncio>=1.0.0",
+    "pytest-timeout>=2.0.0",
+    "httpx==0.28.1",  # the skellycam pin
+    "pyinstaller==6.22.3",  # the skellytracker pin
+    "ruff>=0.9.0",
+    "poethepoet>=0.32.0",
+    # The legacy tracker benchmark only (the old YOLOX dynamic batch); the pin of skellytracker's onnx extra.
     # Deleted with the legacy tracker benchmark at skellytracker stage 2.4 (user ruling D1 a).
     "onnx==1.22.0",
 ]

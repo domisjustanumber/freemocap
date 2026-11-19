@@ -247,7 +247,7 @@ for V2 Parquet. It uses the selected run and data products, with Polars column s
 ordered NumPy arrays, interactive coordinate plots, and playable 3D points. It requires no CSV/NPY
 export and does not rerun processing. Notebook generation requires no Jupyter
 installation; execution in an analysis environment requires Python
-3.11+, Jupyter (or VS Code notebooks), polars>=2,<3, numpy and plotly>=7,<8.
+3.11+, Jupyter (or VS Code notebooks), polars>=2,<3, numpy and plotly>=6,<7.
 Polars and Plotly are direct core dependencies, so the notebook execution test
 runs in the normal development environment. Numerical assembly uses NumPy arrays
 in declared frame/name/component order, including a separate row-presence tensor.

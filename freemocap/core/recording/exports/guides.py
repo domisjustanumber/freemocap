@@ -122,7 +122,7 @@ The optional notebook beside the recording Parquet explores the selected display
 products through Polars and NumPy, with Plotly coordinate plots and 3D playback.
 It checks the source hash and uses that channel's saved timing. It does not add
 NumPy's static fits to the trajectory selector. Execution needs numpy,
-polars>=2,<3 and plotly>=7,<8; there are no installation cells. Keep the recording
+polars>=2,<3 and plotly>=6,<7; there are no installation cells. Keep the recording
 layout intact, and save edited notebooks under another name before regenerating.
 """
 
@@ -240,9 +240,7 @@ arrays directly for NPY/NPZ. Wide CSV and notebooks continue to use saved result
 PREVIOUS_GUIDE_HASHES = {
     'README.md': {'729f378de67cd168a65c5210823b2c026b02a826d6060597d56712299dcb65f2', 'c6a75276e59aa881d661c2396c9d505223720584b208b8dd6f831bbb7a37a86e',
                   'ca700e942eb671851c74c3ed68b23eb1b746b3568d152ce1a0e9e08fd1a57313',
-                  '26c3a86c02c3687a186cef151d350c07d3728840edcb765b6b30fd31c95c5de6',
-                  'be9fd5df7cb00c8540a389a6d2246b13c94707dccef8ae754603945d36ff8586',
-                  '18497b6275a7f3a36f864f46cd6fdc3b9a7266ff7fd537909e9bc16a1dc7035a'},
+                  '26c3a86c02c3687a186cef151d350c07d3728840edcb765b6b30fd31c95c5de6'},
     'csv/README.md': {'be634c685898666d99c0895f9dc4010597ff496e1b9eb123373d1eb571fb66b4', '2f138a08aa42cc464489ea82018be2c79466cc92f5939affde13007611c62e14',
                   'b39b6ba813ff036a8c82d958ed1f2f4fb65b0625f822df85d34bd6985b2ffe36',
                       '7a59bdde48c36eb450c79743a6f1661f94b68d5c0258fb5ef4a30e5ffae575e3'},

@@ -331,6 +331,13 @@ pass, 1 skip) and `../skellysync` (59 pass) have their own environments. Decisio
 - After the app imports: re-measure the ChArUco corner counts and the seeded numerical calibration on
   OpenCV 5.1.0.95 against the 5.0.0.93 figures of the migration plan (5.1 changed ArUco refinement and
   `warpAffine`/`remap` rounding); tell skellytracker-6c if they move.
+  DONE 2026-11-19 (test_data, cpu fp32, numerical profile, 3 identical repetitions; result files in
+  `%TEMP%mcal`): ChArUco corners 664 / 617 / 1089 bit-identical; seeded calibration error 0.314339 ->
+  0.314726 px (not OpenCV: the solver's cv2 calls served from 5.0.0.93 give the same; numpy 2.4.6 -> 2.5.5
+  suspected, untested); kept 2D points 97,425 -> 97,463 (RTMW part +38), caused by 5.1's `warpAffine` (only
+  that function from 5.0.0.93 restores 97,425); alignment still foot_support; all numeric gates pass (error
+  < 1.0 px, 666 observations, 0 rejected). The `reference-posthoc` check must use 97,463 / 0.314726 /
+  foot_support, or a shipped tolerance that admits these shifts. skellytracker-6c is told.
 - Done: CI installs Python from `.python-version` (`17c865d8`); `numpydantic` removed from freemocap's list
   (`2eb341f4`); skellyforge's beartype comment corrected (numpy >= 2.5 needs `beartype>=0.23`, no test
   notices otherwise); skellysync's librosa constraints recorded in its pyproject.

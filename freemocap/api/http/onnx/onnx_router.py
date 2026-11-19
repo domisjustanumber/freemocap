@@ -20,6 +20,7 @@ class ExecutionProviderCheck(BaseModel):
     certified: bool
     local_result: str | None  # "passed" or "failed": the last quick check here; None with none
     usable: bool
+    local_cause: str | None  # "unclean-exits": the failure is two unclean exits in a row, not a quick check; else None
 
 
 class ExecutionProviderOption(BaseModel):
@@ -66,7 +67,8 @@ def get_available_execution_providers() -> AvailableExecutionProvidersResponse:
                 devices=[ExecutionProviderDevice(key=device.device_key, name=device.name, vram_total_bytes=device.vram_total_bytes)
                          for device in row.devices],
                 checks=[ExecutionProviderCheck(device_key=check.device_key, certified=check.certified,
-                                               local_result=check.local_result, usable=check.usable)
+                                               local_result=check.local_result, usable=check.usable,
+                                               local_cause=check.local_cause)
                         for check in row.checks]) for row in status.eps],
             detector_takes_execution_provider={detector: detector_takes_execution_provider(detector) for detector in PIPELINE_KEYS},
             auto_offers=[ExecutionProviderOffer(kind=offer.kind, ep_key=offer.ep_key, download_bytes=offer.download_bytes,

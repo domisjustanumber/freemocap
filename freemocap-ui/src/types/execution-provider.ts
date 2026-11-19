@@ -15,6 +15,8 @@ export interface ExecutionProviderCheck {
     /** The last quick check of the EP on this GPU model here; null with none. */
     local_result: 'passed' | 'failed' | null;
     usable: boolean;
+    /** 'unclean-exits': the local failure is two unclean exits in a row, not a failed quick check; null otherwise. */
+    local_cause: 'unclean-exits' | null;
 }
 
 /** An EP of the server's host, as skellytracker gives it. */

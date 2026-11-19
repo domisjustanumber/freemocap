@@ -99,6 +99,8 @@ async def _run_application(force_preferred_port, log_relay, producers_stopped, *
     def handle_signal(signum: int, frame: object) -> None:
         """Handle shutdown signals."""
         logger.info(f"Received signal {signum}({signum_to_signal_name[signum]}), initiating shutdown...")
+        from skellytracker import note_exit_requested
+        note_exit_requested()  # cheap; uvicorn holds the signals while serving and re-raises them here after it stops
         global_kill_flag.value = True
         if server:
             server.should_exit = True

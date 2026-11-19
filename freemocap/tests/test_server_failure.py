@@ -56,6 +56,8 @@ async def test_disconnect_does_not_stop_app(app: FastAPI, monkeypatch: pytest.Mo
 
 
 async def test_fatal_flag_drives_uvicorn_exit(app: FastAPI, monkeypatch: pytest.MonkeyPatch) -> None:
+    notice = Mock()
+    monkeypatch.setattr("skellytracker.note_exit_requested", notice)
     server = Server(config=Config(app=app))
     server.started = True
     error = FileNotFoundError("human_skeleton.yaml")
@@ -71,6 +73,7 @@ async def test_fatal_flag_drives_uvicorn_exit(app: FastAPI, monkeypatch: pytest.
         await asyncio.wait_for(serve_application(server=server, app=app), timeout=2)
     assert raised.value.__cause__ is error
     assert server.should_exit
+    notice.assert_not_called()  # a crash still counts as an unclean exit of a GPU EP
 
 
 async def test_failed_startup_is_not_success(app: FastAPI, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -133,6 +136,8 @@ async def test_uvicorn_startup_failure_propagates(app: FastAPI, monkeypatch: pyt
 
 async def test_shutdown_request_returns_and_stops_server(app: FastAPI, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(shutdown, "logger", Mock())
+    monkeypatch.setattr(shutdown, "close_camera_groups", AsyncMock())
+    monkeypatch.setattr("skellytracker.note_exit_requested", Mock())
     response = await shutdown.shutdown_server(
         request=Request(scope={"type": "http", "app": app, "path": "/shutdown", "headers": []}),
     )
@@ -148,3 +153,31 @@ async def test_shutdown_request_returns_and_stops_server(app: FastAPI, monkeypat
     monkeypatch.setattr(server, "serve", serve)
     await asyncio.wait_for(serve_application(server=server, app=app), timeout=2)
     assert server.should_exit
+
+
+async def test_shutdown_signal_sends_the_exit_notice(monkeypatch: pytest.MonkeyPatch) -> None:
+    import signal
+    from threading import Event
+
+    import freemocap.__main__ as entry
+    from skellycam.core.ipc.process_management import worker_registry
+    from skellycam.utilities import wait_functions
+
+    handlers = {}
+    notice = Mock()
+    servers = []
+    monkeypatch.setattr("skellytracker.note_exit_requested", notice)
+    monkeypatch.setattr(entry, "logger", Mock())
+    monkeypatch.setattr(signal, "signal", lambda signum, handler: handlers.__setitem__(signum, handler))
+    monkeypatch.setattr(worker_registry, "WorkerRegistry", Mock())
+    monkeypatch.setattr(wait_functions, "await_1s", AsyncMock())
+    monkeypatch.setattr(app_module, "create_fastapi_app", Mock(return_value=FastAPI()))
+
+    async def serve_application(*, server: Server, app: FastAPI, reload_stop: object) -> None:
+        handlers[signal.SIGINT](signal.SIGINT, None)  # as uvicorn re-raises a captured Ctrl+C after it stops
+        servers.append(server)
+
+    monkeypatch.setattr(entry, "serve_application", serve_application)
+    await entry._run_application(False, Mock(), Event(), server_port=1)
+    notice.assert_called_once_with()
+    assert servers[0].should_exit

@@ -5384,13 +5384,25 @@
           "usable": {
             "title": "Usable",
             "type": "boolean"
+          },
+          "local_cause": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Local Cause"
           }
         },
         "required": [
           "device_key",
           "certified",
           "local_result",
-          "usable"
+          "usable",
+          "local_cause"
         ],
         "title": "ExecutionProviderCheck",
         "type": "object"

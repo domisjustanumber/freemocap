@@ -20,7 +20,9 @@ async def serve_application(*, server: Server, app: FastAPI, reload_stop=None) -
     server_task = asyncio.create_task(_serve(server=server, app=app), name="FreeMoCapServer")
     try:
         while not server_task.done():
-            if reload_stop is not None and reload_stop.is_set():
+            if reload_stop is not None and reload_stop.is_set() and not app.state.global_kill_flag.value:
+                from skellytracker import note_exit_requested
+                await asyncio.to_thread(note_exit_requested)  # a requested stop, not an unclean exit of a GPU EP
                 app.state.global_kill_flag.value = True
             relay = getattr(app.state, "log_relay", None)
             if relay is not None:

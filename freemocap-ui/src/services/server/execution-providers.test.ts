@@ -8,7 +8,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 const CPU = {key: 'cpu', label: 'CPU', description: 'Runs on the processor.', usable: true, install_hint: null, uses_gpu: false, devices: [], checks: []};
 const GPU = {key: 'gpu-ep', label: 'GPU EP', description: 'Runs on a GPU.', usable: true, install_hint: null, uses_gpu: true,
     devices: [{key: 'gpu:0', name: 'Some GPU', vram_total_bytes: 8 * 2 ** 30}],
-    checks: [{device_key: 'gpu:0', certified: true, local_result: null, usable: true}]};
+    checks: [{device_key: 'gpu:0', certified: true, local_result: null, usable: true, local_cause: null}]};
 const PACK = {key: 'pack-ep', label: 'Pack EP', description: 'Needs a pack.', usable: false,
     install_hint: 'Run `install pack-ep`.', uses_gpu: true, devices: [], checks: []};
 const TAKES = {rtmpose: true, mediapipe: false};
@@ -25,7 +25,7 @@ test('the options are Auto and the usable server rows in their order, with their
 // skellytracker's per-GPU checks (decision 17): a pair is offered only when its check is usable.
 const TWO = [{key: 'gpu:0', name: 'First GPU', vram_total_bytes: 8 * 2 ** 30}, {key: 'gpu:1', name: 'Second GPU', vram_total_bytes: 4 * 2 ** 30}];
 const pair = (local_result: 'passed' | 'failed' | null, certified: boolean, usable: boolean, device_key = 'gpu:0') =>
-    ({device_key, certified, local_result, usable});
+    ({device_key, certified, local_result, usable, local_cause: null});
 const ep = (checks: ReturnType<typeof pair>[]) => ({...GPU, devices: TWO.slice(0, checks.length), checks});
 
 test('an EP and GPU pair is offered from its own check, not from the EP-wide flag', () => {
@@ -84,11 +84,18 @@ test('reconnected or different servers are queried again and preserve abort sign
     assert.deepEqual(calls, ['http://first.invalid/freemocap/onnx/execution_providers', 'http://second.invalid/freemocap/onnx/execution_providers']);
 });
 
+test('a local failure from two unclean exits keeps its cause', async () => {
+    const failed = {...GPU, checks: [{device_key: 'gpu:0', certified: true, local_result: 'failed', usable: false, local_cause: 'unclean-exits'}]};
+    assert.deepEqual((await requestExecutionProviders('http://providers.invalid', undefined,
+        (async () => Response.json(answer([failed, CPU]))) as typeof fetch)).providers, [failed, CPU]);
+});
+
 test('HTTP failures and malformed provider lists are not advertised as support', async () => {
     for (const response of [new Response('', {status: 503}), Response.json({available: [CPU]}),
         Response.json(answer([{key: 'cpu', label: 'CPU'}])), Response.json({providers: [CPU]}),
         Response.json(answer([{...GPU, devices: [{key: 'gpu:0'}]}])), Response.json(answer([{...GPU, checks: undefined}])),
-        Response.json(answer([{...GPU, checks: [{device_key: 'gpu:0', certified: true, local_result: 'unknown', usable: true}]}])),
+        Response.json(answer([{...GPU, checks: [{device_key: 'gpu:0', certified: true, local_result: 'unknown', usable: true, local_cause: null}]}])),
+        Response.json(answer([{...GPU, checks: [{device_key: 'gpu:0', certified: true, local_result: 'failed', usable: false, local_cause: 'crash'}]}])),
         Response.json({providers: [CPU], detector_takes_execution_provider: TAKES}), Response.json(answer([CPU], [{kind: 'add-pack'}])), Response.json(answer([CPU], [{...OFFER, note: null}]))]) {
         await assert.rejects(requestExecutionProviders('http://providers.invalid', undefined, (async () => response) as typeof fetch));
     }

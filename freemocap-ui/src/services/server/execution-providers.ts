@@ -6,7 +6,8 @@ const isDevice = (device: Record<string, unknown> | null) => typeof device?.key 
     && (device.vram_total_bytes === null || typeof device.vram_total_bytes === 'number');
 const isCheck = (check: Record<string, unknown> | null) => typeof check?.device_key === 'string'
     && typeof check.certified === 'boolean' && typeof check.usable === 'boolean'
-    && (check.local_result === null || check.local_result === 'passed' || check.local_result === 'failed');
+    && (check.local_result === null || check.local_result === 'passed' || check.local_result === 'failed')
+    && (check.local_cause === null || check.local_cause === 'unclean-exits');
 const isProvider = (row: Record<string, unknown> | null) => typeof row?.key === 'string' && typeof row.label === 'string'
     && typeof row.description === 'string' && typeof row.usable === 'boolean' && typeof row.uses_gpu === 'boolean'
     && (row.install_hint === null || typeof row.install_hint === 'string')

@@ -8,6 +8,7 @@ from pathlib import Path
 from threading import Event, Thread
 import time
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 from fastapi import FastAPI
@@ -121,7 +122,9 @@ def test_snapshot_detects_add_delete_and_ignores_output(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_reload_requests_existing_graceful_shutdown():
+async def test_reload_requests_existing_graceful_shutdown(monkeypatch):
+    notice = Mock()
+    monkeypatch.setattr('skellytracker.note_exit_requested', notice)
     stop = Event()
     stop.set()
 
@@ -143,6 +146,7 @@ async def test_reload_requests_existing_graceful_shutdown():
     await asyncio.wait_for(serve_application(server=server, app=app, reload_stop=stop), timeout=2)
     assert app.state.global_kill_flag.value
     assert server.should_exit
+    notice.assert_called_once_with()
 
 
 def test_packaged_launch_rejects_reload(monkeypatch):

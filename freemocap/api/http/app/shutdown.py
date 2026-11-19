@@ -1,6 +1,7 @@
 """
 Clean shutdown endpoint with proper async handling.
 """
+import asyncio
 import logging
 
 from fastapi import APIRouter, Request
@@ -30,6 +31,9 @@ async def shutdown_server(
         JSON response confirming shutdown initiation
     """
     logger.info(f"Shutdown requested via API - {request.url}")
+    from skellytracker import note_exit_requested
+    # First act: an ordered close is then no unclean exit of a GPU EP, even if the process is killed later.
+    await asyncio.to_thread(note_exit_requested)
 
     # The server supervisor observes this flag and runs graceful shutdown.
     await close_camera_groups()

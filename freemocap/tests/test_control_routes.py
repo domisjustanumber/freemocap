@@ -96,14 +96,16 @@ def test_capture_stop_returns_recording_and_task(control, kind):
 
 def test_shutdown_requires_post(control, monkeypatch):
     client, _, _, app = control
-    close = AsyncMock()
+    order = []
+    close = AsyncMock(side_effect=lambda: order.append('close cameras'))
     monkeypatch.setattr(shutdown_module, 'close_camera_groups', close)
+    monkeypatch.setattr('skellytracker.note_exit_requested', lambda: order.append('exit notice'))
     assert client.get('/shutdown').status_code == 405
     assert app.state.global_kill_flag.value is False
-    close.assert_not_awaited()
+    assert order == []
     assert client.post('/shutdown').status_code == 200
     assert app.state.global_kill_flag.value is True
-    close.assert_awaited_once()
+    assert order == ['exit notice', 'close cameras']
 
 
 def test_realtime_stop_preserves_scope(control):

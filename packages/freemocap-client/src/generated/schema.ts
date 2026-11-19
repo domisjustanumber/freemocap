@@ -2180,6 +2180,8 @@ export interface components {
             local_result: string | null;
             /** Usable */
             usable: boolean;
+            /** Local Cause */
+            local_cause: string | null;
         };
         /** ExecutionProviderDevice */
         ExecutionProviderDevice: {

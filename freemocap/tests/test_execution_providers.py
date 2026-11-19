@@ -45,7 +45,8 @@ def test_provider_route_gives_each_ep_as_skellytracker_does_in_its_order_without
     app = FastAPI()
     app.include_router(onnx_router, prefix='/freemocap')
     device = SimpleNamespace(device_key='gpu:0', gpu_key='0000:01:00.0', name='Some GPU', vram_total_bytes=8 * 2**30)
-    check = SimpleNamespace(device_key='gpu:0', name='Some GPU', certified=False, local_result='passed', usable=True)
+    check = SimpleNamespace(device_key='gpu:0', name='Some GPU', certified=True, local_result='failed', usable=False,
+                            local_cause='unclean-exits')
     rows = (SimpleNamespace(key='gpu-ep', label='GPU EP', description='Runs on a GPU.', usable=True, install_hint=None,
                             uses_gpu=True, devices=(device,), checks=(check,)),
             SimpleNamespace(key='other-ep', label='Other EP', description='Needs a pack.', usable=False,
@@ -61,7 +62,8 @@ def test_provider_route_gives_each_ep_as_skellytracker_does_in_its_order_without
         'providers': [
             {'key': 'gpu-ep', 'label': 'GPU EP', 'description': 'Runs on a GPU.', 'usable': True, 'install_hint': None,
              'uses_gpu': True, 'devices': [{'key': 'gpu:0', 'name': 'Some GPU', 'vram_total_bytes': 8 * 2**30}],
-             'checks': [{'device_key': 'gpu:0', 'certified': False, 'local_result': 'passed', 'usable': True}]},
+             'checks': [{'device_key': 'gpu:0', 'certified': True, 'local_result': 'failed', 'usable': False,
+                         'local_cause': 'unclean-exits'}]},
             {'key': 'other-ep', 'label': 'Other EP', 'description': 'Needs a pack.', 'usable': False,
              'install_hint': 'Run `install other-ep`.', 'uses_gpu': True, 'devices': [], 'checks': []}],
         'detector_takes_execution_provider': {'rtmpose': True, 'mediapipe': False},

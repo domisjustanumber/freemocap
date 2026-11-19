@@ -833,3 +833,13 @@
   claim = {CompressionStream and DecompressionStream support "deflate", "deflate-raw" and "gzip"; "deflate" is the ZLIB Compressed Data Format of RFC 1950.},
   note = {Living Standard, last updated 19 October 2026; the introduction and the table of supported formats read. Source repository whatwg/compression at 94b42518d2c2f97e64bd5a483d6deb8c8f14c365.}
 }
+
+@misc{pyinstallerInterpreterOptions,
+  author = {{PyInstaller Development Team}},
+  title = {Using Spec Files: Specifying Python Interpreter Options},
+  url = {https://pyinstaller.org/en/stable/spec-files.html#specifying-python-interpreter-options},
+  urldate = {2026-11-19},
+  review = {excerpt},
+  claim = {A frozen app runs an isolated embedded interpreter that does not apply PYTHON* environment variables such as PYTHONUTF8; UTF-8 mode is set at build time with an EXE option ('X utf8', None, 'OPTION').},
+  note = {Stable docs read for PyInstaller 6.22.3; the same isolation is stated under "Environment Variables Used by Frozen Applications" in https://pyinstaller.org/en/stable/advanced-topics.html. The page's own option examples lack a closing quote. Confirmed by experiment on a minimal onedir console build on Windows 11: PYTHONUTF8 and PYTHONIOENCODING left stdout at cp1252.}
+}

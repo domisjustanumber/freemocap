@@ -8,7 +8,7 @@ from threading import Event
 
 
 def force_utf8_output() -> None:
-    # A piped stdout on Windows defaults to cp1252, which cannot encode skellylogs' "└>>" prefix; frozen apps ignore PYTHON* variables.
+    # A piped stdout on Windows defaults to cp1252, which cannot encode skellylogs' "└>>" prefix; frozen apps ignore PYTHON* variables [@pyinstallerInterpreterOptions].
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")

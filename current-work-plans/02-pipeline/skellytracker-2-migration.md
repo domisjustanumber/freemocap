@@ -689,7 +689,7 @@ frames, each with `rtmpose` and with `mediapipe`.
    version change built).** The decisions, the work that waits on skellytracker and the next actions are in
    [ep-certification-integration.md](ep-certification-integration.md).
 
-9. **Preprocess benchmark (2026-11-19; APPROVED, build after the pin).** skellytracker adds the run parameter
+9. **Preprocess benchmark (2026-11-19; APPROVED; BUILT `b89c8e11`).** skellytracker adds the run parameter
    `start_pipeline(..., preprocess="auto" | "cpu" | "gpu")` (not a pipeline config field; another value raises
    `ValueError`). "auto" is today's behaviour (GPU decode and preprocess on cuda and trt-rtx, CPU elsewhere);
    "cpu" keeps all frame work on the CPU and runs only the model on the EP; "gpu" uses the GPU preprocess on
@@ -705,6 +705,14 @@ frames, each with `rtmpose` and with `mediapipe`.
    - The legacy toggle stays the old `Tracker` (user, 2026-11-18). A CPU-against-GPU benchmark compares
      `preprocess="cpu"` with `"auto"`. When frames come from skellycam as JPEG, the legacy path reads the BGR
      ring so its timing has no JPEG decode.
+   - BUILT `b89c8e11` (ST 669d9676 = 4dcf2a66 + one EP commit, pipelines code equal): the record keeps it as
+     `execution.preprocess`; the config field is a `Literal` (another value gives 422 at `/realtime/apply`);
+     posthoc registrations keep `auto`. Contract: only the property was copied from the generated document
+     (the committed file is still behind the app elsewhere), `schema.ts` by `npm run generate`. Measured on the
+     RTX 3070, trt-rtx, test_data 3 x 222 at 720x1280, InferenceService, 3 fresh runs each, steady ms/frame
+     (median, range): auto 8.9 (8.3-10.2), cpu 11.9 (8.9-12.3), gpu 7.7 (7.0-10.3); first frame 3.6-5.3 s;
+     preprocess on TensorRT RTX for auto and gpu, on the host for cpu; a calibration run shared the GPU, so auto
+     against gpu (the same path on trt-rtx) is noise. JSON: `%TEMP%mpre\summary.json`.
 
 ### 0.3 Decisions of the user (all 2026-11-16, through the supervisor)
 

@@ -1,6 +1,6 @@
 # EP management, certification and report hand-in
 
-**State (2026-11-19): APPROVED PLAN; the Electron shutdown fix (decision 31) the hardware cleanup (6 to 8), the version change (4) and `BUILD_TREE_MODIFIED` (11) are built; the rest is not.** The user settled every decision below in a grilling
+**State (2026-11-19): APPROVED PLAN; the Electron shutdown fix (decision 31) the hardware cleanup (6 to 8), the version change (4), `BUILD_TREE_MODIFIED` (11) and the backend of the relay hand-in (10, 22 to 24, R1 to R5; see [Relay hand-in: built](#relay-hand-in-built)) are built; the rest is not.** The user settled every decision below in a grilling
 round in this session and in the skellytracker session (`skellytracker-6c`, the session that owns
 ONNX Runtime, EP packs and EP certification). The skellytracker interfaces this plan needs do not exist yet;
 do not code against their names until that session sends the built shapes. The work that needs no new
@@ -119,6 +119,9 @@ the OS on this PC, and lets the person hand in certify reports. It does this thr
     store; its pending hand-in entry carries that report's `created_utc` and `kind`, and freemocap finds its
     merged file by that pair. Passive records stay in the EP store; freemocap wraps them with the `app` block
     at hand-in.
+    Built for hand-in (`208ae320`): the file is made at hand-in from `read_report()` of the chosen reports, not
+    at run time, so no lookup by `created_utc`/`kind` exists. It is kept under `certify/` when it is accepted
+    ("send" or "opened"). freemocap's own module and skellycam's are not in it (their `certify()` is not built).
 11. freemocap's `package.commit` comes from `freemocap/build_info.py` (`BUILD_GIT_SHA`, written by the
     installer workflow); in a source tree it tries git, else `no-commit`. The workflow must compute a new
     `BUILD_TREE_MODIFIED` before it writes `build_info.py`, because writing that file dirties the tree.
@@ -239,6 +242,9 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
     opened or covered, and clears the reference. An unknown state or report id raises `ValueError` and changes
     nothing. `pending_reports()` gives the pending entries; the status gives each entry's state and reference,
     also after a restart. `reference` is opaque to skellytracker, which never contacts the relay or GitHub.
+    Backend built (22 to 24, `31381fb1`; skellytracker `4dcf2a66` shape, read in its code): routes list every
+    report with state and reference, return the exact file, send it and mark "opened". Not built: the pending
+    list as a server-message field (24, decision 28 `certification`), "Not sent", and everything in the UI (23).
 
 ### Relay hand-in (skellycertify `1fc984d`, relay/README.md "Answers for the app developers", report-format.md 4.1)
 
@@ -267,6 +273,37 @@ R4. On "send" the exact accepted bytes go to `<base data folder>/certify/outbox/
 R5. The relay address is one constant in freemocap with an environment-variable override, no UI (user,
      2026-11-19). It is empty until the user deploys; empty means relay off and hand-in offers only the
      issue form.
+
+#### Relay hand-in: built
+
+Backend only, 2026-11-19: `208ae320` (file builder), `4e152100` (sender, outbox, retry at start), `31381fb1`
+(routes and client contract). The relay answered one `GET /health` with `{"enabled":true,"test_mode":false,
+"schema_major":1}`; no POST was ever made to it (test mode is off), so a real 200 is unverified.
+- File: `freemocap/system/certify/report_file.py`, a pure function of module reports, note and `app` block;
+  reproduces `relay/samples/valid.md` byte for byte (minus its prose line) and passes the relay's own
+  `report.js`/`privacy.js` (run with node when `../skellycertify` exists). The file name and time line use the
+  earliest `created_utc`. It refuses a file that breaks privacy rules 1 to 11; the note is scrubbed first
+  (paths to `<path>`, this host's user and host names to `<private>`) and appears only in the JSON block.
+  The 13 real reports on the dev PC build into a 41,459-byte file the relay validator accepts.
+- Exactness (R1, R4): "send" and "opened" carry the report ids, the note and the SHA-256 of the file the
+  person viewed; the backend rebuilds it and answers 409 `file-changed` on a mismatch.
+- Sender (R2, R3): `freemocap/system/certify/relay.py`, `requests`, 5 s connect / 30 s read. Before the POST the
+  bytes and `{file_name, report_ids, failed_attempts, last_error}` go to `certify/outbox/<sha256>.md|.json`.
+  200 with an issue URL of `domisjustanumber/skellycertify` and a matching number: `mark_reports(ids still
+  listed, "covered", reference=url)`, then the outbox copy is deleted. Any other answer acts on `retry`;
+  timeout, refused connection, a non-JSON body and an untrusted 200 count as `retry: true`. Retry runs once per
+  backend start on a daemon thread; after 4 failed attempts (first send and 3 retries) or `retry: false` it
+  stops and `offer_issue_form` is true. A file over 262,144 bytes is refused locally. A newer accepted file
+  or "opened" removes the outbox entries that hold the same reports.
+- Address (R5): `RELAY_URL` = the deployed address; `FREEMOCAP_CERTIFY_RELAY_URL` overrides it, empty = off.
+- Routes (tag Certification): `GET /freemocap/certify/hand_in`, `POST .../hand_in/file`, `.../hand_in/send`,
+  `.../hand_in/opened`. A stored reference reaches the UI only when it is such an issue URL; relay `detail` is
+  plain text (max 200 characters) for the UI to show as text.
+- Tests: `freemocap/tests/test_certify_report_file.py` (5), `test_certify_relay.py` (32, a fake relay on
+  127.0.0.1; every non-local connection and every POST not to the fake raises).
+- Open, for the user: a hand-in file holds several modules of one package, while report-format 4.1 says "one
+  for each package" (the relay accepts it); whether "Not sent" should also drop a kept outbox file; whether a
+  kept file can be cancelled before its retries end.
 
 ### UI: one place (Fable design, accepted)
 
@@ -481,6 +518,7 @@ All as local commits on `sidecar-implementation`, in this order:
 | `current-work-plans/03-transport/message-protocol.md`, "Client recovery and stable controls" | How the indicator, dialog and greyed state reconcile after failure, reconnect and restart |
 | https://github.com/domisjustanumber/skellycertify `report-format.md` | The certify function, progress, cancel, runtime, report file, privacy and evidence rules |
 | skellycertify `relay/README.md`, "Answers for the app developers" | Relay routes, the error table with `retry`, limits and the send rules |
+| `freemocap/system/certify/relay.py`, `freemocap/api/http/certify/certify_router.py` | How a hand-in is built, kept, sent, retried and marked today |
 | `freemocap/core/tracking/execution_providers.py`, `freemocap/api/http/onnx/onnx_router.py` | Today's EP calls and routes |
 | `freemocap-ui/src/hooks/useExecutionProviderOptions.ts`, `src/services/server/execution-providers.ts` | How the EP menu filters rows today (on `usable` only) |
 | `freemocap-ui/electron/main/services/python-server.ts`, `electron/main/index.ts` | The shutdown defect |

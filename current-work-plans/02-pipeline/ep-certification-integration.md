@@ -1,6 +1,6 @@
 # EP management, certification and report hand-in
 
-**State (2026-11-19): APPROVED PLAN; the Electron shutdown fix (decision 31) the hardware cleanup (6 to 8), the version change (4), `BUILD_TREE_MODIFIED` (11) and the backend of the relay hand-in (10, 22 to 24, R1 to R5; see [Relay hand-in: built](#relay-hand-in-built)) are built; the rest is not.** The user settled every decision below in a grilling
+**State (2026-11-19): APPROVED PLAN; the Electron shutdown fix (decision 31) the hardware cleanup (6 to 8), the version change (4), `BUILD_TREE_MODIFIED` (11) and the backend of the relay hand-in (10, 22 to 24, R1 to R5; see [Relay hand-in: built](#relay-hand-in-built)) and F15 step 1 (see [F15 step 1: built](#f15-step-1-built)) are built; the rest is not.** The user settled every decision below in a grilling
 round in this session and in the skellytracker session (`skellytracker-6c`, the session that owns
 ONNX Runtime, EP packs and EP certification). The skellytracker interfaces this plan needs do not exist yet;
 do not code against their names until that session sends the built shapes. The work that needs no new
@@ -469,6 +469,120 @@ so the quick check is the only way in.
   `pytest_configure`; `relay_url()` reads it at each call. F12 wording (`e4082308`): "passed on this machine, not yet reviewed" (G1; built as "device", changed to "machine" after the third grilling).
   Also `92f22855`: `report_file_for` orders modules by `created_utc`, then report id, so the same reports give the same bytes.
 
+### F15 step 1: built
+
+Backend only, 2026-11-19, on skellytracker `b9660935` (local, after the pin). Commits: `b52ba94b` (job), `c0c71dc0`
+(busy rule), `b820aaa5` (routes and client contract), `e89324f9` (F4). The message field, its golden fixture and
+its tests landed inside `07f9ccf9` (another session committed while they were staged in the shared index; that
+commit's message is the plan's). Tests: `freemocap/tests/test_quick_check.py` (21; the job runs in a real spawn
+child with module-level stand-ins for `certify`).
+
+- Job (`freemocap/system/certify/quick_check.py`): `QuickCheckJob` is a `BaseNode` worker made through the
+  `WorkerRegistry`, like `SyncJob` (`freemocap/core/pipeline/posthoc/sync_job.py`), not daemonic because
+  `certify()` starts spawn children of its own. The child runs `certify("quick", queue.put, cancel,
+  execution_providers=[key], device=device_key, pipeline=load_detector_pipeline(detector_type, model))` and sends
+  back only the EP row's `(result, reason)` (the check whose name has no `:`), or `("error", <class name>)`. A
+  child watcher sets the cancel when the cross-process `multiprocessing.Event` is set, the job's stop flag or the
+  global kill flag is set, or the backend process is gone; certify() gets a `threading.Event` mirror (see the
+  interface differences). `QuickCheckManager` holds at most one job; `refresh()` runs in the backend's 0.5 s task
+  collector (`freemocap/app/app.py`), keeps only the newest progress message, reaps the job (no result and a dead
+  child = `crashed`, `exit-code-N`) and re-reads `eps.status()` and `pending_reports()` at once when a check ends
+  and every 5 s otherwise. `shutdown()` is first in `shutdown_all_processing()`, so `/shutdown` and every backend
+  exit cancel the check, wait up to 5 s, kill the child's process tree (psutil) and end the child; `/shutdown`
+  and `__main__` are unchanged. The saved EP selection is never changed (F6 is the UI's).
+- Busy rule (F7, decision 20): `FreemocapApplication.pipeline_holds()` = alive realtime pipelines, a realtime
+  startup in progress, camera groups recording, alive posthoc pipelines (CPU ones too; sync and export jobs are
+  not pipelines and do not count). A check start with any hold is refused 409 `pipelines-running` with
+  `gpu_held_by`. `refuse_pipeline_start(kind)` is called first in `create_or_update_realtime_pipeline`,
+  `start_recording_all`, `create_posthoc_calibration_pipeline` and `create_posthoc_mocap_pipeline` (every start
+  route reaches one of these); while a check runs they answer 409 `quick-check-running` with
+  `run {execution_provider, device_key, done, total}`, mapped in the realtime, mocap and calibration routes.
+  Nothing is stored or queued; the refusal is the answer to that request.
+- F4: before a realtime start or a posthoc tracking run, a chosen EP (not Auto) is checked with
+  `eps.check_start(key, device=...)`; `EpUnavailableError` is refused 409 `execution-provider-unavailable` with
+  `message` (skellytracker's text without the CLI hint), `execution_provider`, `device_key`, `reason_code` (the EP
+  row's `PackStatus.reason_code`, null when the EP can run on another GPU) and `check {certified, local_result,
+  local_cause, usable}` of that GPU. An unknown key is left to the run, as before. The late path (the inference
+  thread's start failure, a string in the realtime startup task) is unchanged.
+- Routes (`freemocap/api/http/certify/quick_check_router.py`, tag Certification):
+  `GET /freemocap/certify/quick_check/plan?execution_provider&device_key` (skellytracker's `certify_plan`:
+  `seconds_estimate`, `downloads`, `checks`, `not_run`); `POST /freemocap/certify/quick_check` with
+  `{execution_provider, device_key, detector_type, rtmpose_model_name}` (the detector fields default to the camera
+  node defaults) answers 202 with the run, or 400 `unknown-ep-or-device`, 409 `cannot-run` with skellytracker's
+  `reason_code` from the plan's `not_run` (for example `ep-not-installed`), 409 `pipelines-running`, 409
+  `quick-check-running`; `DELETE /freemocap/certify/quick_check` asks the check to stop and answers
+  `{run: <the run> | null}`. Every refusal body is `{code, message, ...facts}`. Contract: only these paths and
+  schemas were added to `contracts/openapi.json`, plus `operations.json`, `coverage.md` and the generated client.
+- Message (`app_state.state.certification`, `CertificationSnapshot` in `message_model.py`): progress rides
+  `app_state`, not the progress message. Reason: `app_state` is already sent once a second and only on change, so
+  skellytracker's up to 10 progress messages a second are coalesced twice (the manager keeps the newest every
+  0.5 s; the sender sends a changed state at most once a second), and the Certification button, the dialog and
+  Record's waiting line read one field. The progress message would need a new task type in the client's strict
+  task enum and is sent every 0.5 s regardless. Measured on the real check: 7 progress messages from
+  skellytracker in about 11 s, 6 `app_state` messages with a run. The client's Zod schema does not list the field
+  yet (it strips it; the transport accepts the golden), so step 2 adds the schema. Shape (a null value is left
+  out of the CBOR map, as everywhere in `app_state`; the field itself is absent until the first status read):
+
+  ```
+  certification: {
+    host: {name, os},                       // os = skellytracker's OS label, e.g. "Windows 11 Home 26H2"
+    run: {level: "quick", items: [{execution_provider, device_key}],
+          state,                            // skellytracker's: starting | running | cleaning-up | done
+          done, total,                      // total absent until the first progress message
+          seconds_estimate} | absent,       // certify_plan's one-off estimate
+    last_result: {execution_provider, device_key,
+                  result,                   // pass | fail | not-run (a cancel gives not-run, reason "cancelled") | crashed | error
+                  reason} | absent,         // skellytracker's reason code, exit-code-N, or an exception class name
+    items: [{execution_provider, label, device_key, device_name,
+             certified, local_result, local_cause, usable,   // DeviceCheck facts: the UI words F12's five states
+             reason_code, reason}],         // the EP row's PackStatus reason; one item per EP per GPU (PackStatus.checks)
+    auto: {execution_provider, device_key, needs_check: [{execution_provider, device_key}]},
+    gpu_held_by: [{kind: realtime | recording | posthoc, id}],
+    pending_reports: [{report_id, has_failure}]  // skellytracker's pending hand-in list (decision 24)
+  }
+  ```
+
+  Example (the golden `freemocap/tests/streaming_fixtures/message_app_state_golden.bin`, decoded):
+  `{"host": {"name": "golden-host", "os": "Windows 11 Home 26H2"}, "run": {"level": "quick", "items":
+  [{"execution_provider": "golden-ep", "device_key": "gpu:10de:2484:0"}], "state": "running", "done": 2,
+  "total": 5, "seconds_estimate": 45}, "last_result": {"execution_provider": "other-ep", "device_key":
+  "gpu:10de:2484:0", "result": "fail", "reason": "probe-l3-failed"}, "items": [{"execution_provider":
+  "golden-ep", "label": "Golden EP", "device_key": "gpu:10de:2484:0", "device_name": "NVIDIA GeForce RTX 3070",
+  "certified": false, "usable": false, "reason_code": "quick-check-needed", "reason": "no reviewed result and no
+  quick check"}, ...], "auto": {"execution_provider": "cpu-ep", "needs_check": [...]}, "gpu_held_by": [{"kind":
+  "posthoc", "id": "abc123"}], "pending_reports": [{"report_id": "quick-20261119T120000Z", "has_failure": true}]}`.
+
+  Changes from decision 28 and why: items are keyed by the pair `(execution_provider, device_key)`, not the
+  `<ep>` check name, which only skellytracker's private `_label()` builds; `run` carries `done`, `total`,
+  `seconds_estimate` and `state` instead of `seconds_left` (F10) and `items` instead of `item_keys`; items carry
+  skellytracker's facts instead of `local_status`, `reviewed`, `hand_in` and `is_failure`; `install_hint` is left
+  out (a CLI command; the EP route still carries it); `last_result` is new, so the UI can say why a check ended
+  without a change in the stored result (cancel, not-run with `models-missing`, crash); `host.id` is left out (no
+  stable host id exists; requests are keyed on endpoint + serverPid); `start_required` is left out (adding it
+  later is compatible, and a constant false would be a fake observation); `normal_use` is left out (F14); the
+  hand-in state beyond the pending ids stays in the hand-in routes.
+- Real check on this PC (RTX 3070, `cuda` on `gpu:10de:2484:0`, no pipeline, through the route): 202 in 0.26 s,
+  a second start 409 `quick-check-running`, `pass` 15.0 s after the POST (the child's run about 13.8 s; plan
+  estimate 50 s); `app_state` progress 0 (no total) -> 0/5 starting -> 0/5 running -> 1/5 -> 2/5 -> 5/5
+  cleaning-up -> run absent with `last_result` pass. The stored result stayed `passed` (new `created_utc`), and
+  the item's facts were identical before and after; skellytracker pruned repeated plain-pass reports, so this
+  PC's pending list went from 13 to 6. An earlier attempt the same hour ended `not-run` with
+  `BeartypeCallHintParamViolation` at the image step (the cancel type; fixed before `b52ba94b`); its probe ran
+  and its report is in the store, outside the pending list (no pass or fail).
+- Interface differences found in skellytracker (`b9660935` plus another session's uncommitted wording in
+  `gate.py`): certify()'s docstring says `cancel` is "an object with `is_set()`", but `certification._wide_run`
+  (and other inner functions) annotate `threading.Event`, and beartype refuses a `multiprocessing.Event` in a
+  source run, so freemocap passes a mirror (ask skellytracker to annotate a protocol). The progress message also
+  has `package`, `kind` and `step {name} | null`. `EpUnavailableError` carries only `message` and `hint`: no EP
+  key, device key or reason code, and `DeviceCheck` has no per-pair reason code (ask for one). `recommend()`
+  takes a form (`recommend("performance")`; `status().performance` is the same). `certify_plan` takes the same
+  options but ignores `pipeline`.
+- Open, for the user: whether sync and export jobs should also block a check (they are not pipelines today);
+  what the UI says for each `last_result` (not decided; the facts are sent); whether a check start should be
+  refused while the cameras only stream (today it is allowed). A small race is left: a pipeline admitted in the
+  same instant a check starts can slip through (no shared lock across the async starts). Linux runs the check in
+  the app's default start method (fork) until skellycam's `ManagedProcess` takes a context.
+
 ## Environment on the dev PC
 
 Found 2026-11-19 while measuring decision 31; nothing was changed. `freemocap/.venv` dates from August 2026
@@ -576,9 +690,7 @@ All work is local commits on `sidecar-implementation`; nothing is pushed; CI sta
 frame-ring move. Sub-agents stage by explicit path because several edit this checkout at once.
 
 Running when this was written (their reports arrive as messages; act on them):
-- F15 step 1: the `certification` state, the quick-check job (`freemocap/system/certify/quick_check.py`), its
-  routes in a new router, and the busy rule in both directions. It ends with one real quick check and a
-  checkpoint commit that writes down the final message shape.
+- F15 step 1: landed; see [F15 step 1: built](#f15-step-1-built) for the commits and the message shape.
 - A hard-exit audit (rule from skellytracker-6c: a process that held a GPU EP session and ends by `os._exit`,
   terminate or kill must call `skellytracker.note_exit_requested()` first). Suspects: the tools
   `tools/hardware_validation/server_session.py` and `tools/sdk_live_validation.py`, which terminate a backend

@@ -6,8 +6,8 @@ import '@/store';
 import {LegacyExecutionProviderNotice} from './legacy-execution-provider-notice';
 
 const PACK = {key: 'pack-ep', label: 'Pack EP', description: 'Needs a pack.', usable: false,
-    install_hint: 'Run `install pack-ep`.', uses_gpu: true, devices: []};
-const CPU = {key: 'cpu', label: 'CPU', description: 'Runs on the processor.', usable: true, install_hint: null, uses_gpu: false, devices: []};
+    install_hint: 'Run `install pack-ep`.', uses_gpu: true, devices: [], checks: []};
+const CPU = {key: 'cpu', label: 'CPU', description: 'Runs on the processor.', usable: true, install_hint: null, uses_gpu: false, devices: [], checks: []};
 const text = (html: string) => html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 const notice = (migration: Parameters<typeof LegacyExecutionProviderNotice>[0]['migration']) =>
     text(renderToStaticMarkup(<LegacyExecutionProviderNotice migration={migration} providers={[PACK, CPU]} onDismiss={() => {}}/>));

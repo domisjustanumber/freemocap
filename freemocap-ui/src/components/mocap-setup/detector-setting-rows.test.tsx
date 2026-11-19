@@ -30,9 +30,9 @@ const CONFIG: TriangulationConfig = {
     use_outlier_rejection: true, minimum_cameras_for_triangulation: 2, maximum_cameras_to_drop: 1, target_reprojection_error: 0.02,
 };
 const OUTLIER_LIMITS = ['Minimum cameras for triangulation', 'Maximum cameras to drop', 'Target reprojection error'];
-const CPU = {key: 'cpu', label: 'CPU', description: 'Runs on the processor.', usable: true, install_hint: null, uses_gpu: false, devices: []};
+const CPU = {key: 'cpu', label: 'CPU', description: 'Runs on the processor.', usable: true, install_hint: null, uses_gpu: false, devices: [], checks: []};
 const GPU = {key: 'gpu-ep', label: 'GPU EP', description: 'Runs on a GPU.', usable: false,
-    install_hint: 'Run `install gpu-ep`.', uses_gpu: true, devices: []};
+    install_hint: 'Run `install gpu-ep`.', uses_gpu: true, devices: [], checks: []};
 /** The server's answer as the hook gives it: here only RTMW takes an EP. */
 const PROVIDERS: ExecutionProviderChoices = {
     providers: [CPU, GPU], autoOffers: [], options: executionProviderOptions(null, [CPU, GPU]), info: executionProviderInfo([CPU, GPU]),

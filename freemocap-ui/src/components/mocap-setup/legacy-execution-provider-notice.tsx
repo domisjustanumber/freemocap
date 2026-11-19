@@ -1,6 +1,7 @@
 import ButtonSm from '@/components/ui-components/ButtonSm';
 import type {ExecutionProviderMigration} from '@/store/slices/mocap';
 import type {ExecutionProviderOption} from '@/types/execution-provider';
+import {isOffered} from '@/services/server/execution-providers';
 import {NotUsableNote} from './execution-provider-info';
 
 /**
@@ -20,7 +21,7 @@ export function LegacyExecutionProviderNotice({migration, providers, onDismiss}:
         <span>The execution provider <strong>{migration.saved}</strong> saved by an earlier FreeMoCap version was
             replaced by <strong>{replacement?.label ?? migration.replacement ?? 'Auto'}</strong>
             {migration.replacement === null ? ': SkellyTracker has no usable replacement on this computer' : ''}.
-            {replacement && !replacement.usable && <> <NotUsableNote provider={replacement}/></>}</span>
+            {replacement && !isOffered(replacement) && <> <NotUsableNote provider={replacement}/></>}</span>
         <ButtonSm text="Dismiss" className="setting-action-button" onClick={onDismiss}/>
     </div>;
 }

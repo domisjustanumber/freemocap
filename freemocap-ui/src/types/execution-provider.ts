@@ -8,6 +8,15 @@ export interface ExecutionProviderDevice {
     vram_total_bytes: number | null;
 }
 
+/** skellytracker's check of an EP on one GPU of the server's host. The menu offers the pair only when it is `usable`. */
+export interface ExecutionProviderCheck {
+    device_key: string;
+    certified: boolean;
+    /** The last quick check of the EP on this GPU model here; null with none. */
+    local_result: 'passed' | 'failed' | null;
+    usable: boolean;
+}
+
 /** An EP of the server's host, as skellytracker gives it. */
 export interface ExecutionProviderOption {
     key: ExecutionProviderName;
@@ -17,6 +26,8 @@ export interface ExecutionProviderOption {
     install_hint: string | null;
     uses_gpu: boolean;
     devices: ExecutionProviderDevice[];
+    /** One per GPU that passes the EP's floors; none for cpu and for an EP no GPU here can use. */
+    checks: ExecutionProviderCheck[];
 }
 
 /** An offer of skellytracker's Auto recommendation for the server's host (install a pack, update a driver), as it gives it. */

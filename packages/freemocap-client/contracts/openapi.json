@@ -5359,6 +5359,42 @@
         ],
         "title": "DetectedMicrophonesResponse"
       },
+      "ExecutionProviderCheck": {
+        "description": "skellytracker's `DeviceCheck` of an EP on one GPU of this host: the GPU is offered only when `usable`.",
+        "properties": {
+          "device_key": {
+            "title": "Device Key",
+            "type": "string"
+          },
+          "certified": {
+            "title": "Certified",
+            "type": "boolean"
+          },
+          "local_result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Local Result"
+          },
+          "usable": {
+            "title": "Usable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "device_key",
+          "certified",
+          "local_result",
+          "usable"
+        ],
+        "title": "ExecutionProviderCheck",
+        "type": "object"
+      },
       "ExecutionProviderDevice": {
         "properties": {
           "key": {
@@ -5435,6 +5471,13 @@
             },
             "title": "Devices",
             "type": "array"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionProviderCheck"
+            },
+            "title": "Checks",
+            "type": "array"
           }
         },
         "required": [
@@ -5444,7 +5487,8 @@
           "usable",
           "install_hint",
           "uses_gpu",
-          "devices"
+          "devices",
+          "checks"
         ],
         "title": "ExecutionProviderOption",
         "type": "object"

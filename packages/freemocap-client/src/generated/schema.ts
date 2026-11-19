@@ -2167,6 +2167,20 @@ export interface components {
                 [key: string]: string;
             };
         };
+        /**
+         * ExecutionProviderCheck
+         * @description skellytracker's `DeviceCheck` of an EP on one GPU of this host: the GPU is offered only when `usable`.
+         */
+        ExecutionProviderCheck: {
+            /** Device Key */
+            device_key: string;
+            /** Certified */
+            certified: boolean;
+            /** Local Result */
+            local_result: string | null;
+            /** Usable */
+            usable: boolean;
+        };
         /** ExecutionProviderDevice */
         ExecutionProviderDevice: {
             /** Key */
@@ -2192,6 +2206,8 @@ export interface components {
             uses_gpu: boolean;
             /** Devices */
             devices: components["schemas"]["ExecutionProviderDevice"][];
+            /** Checks */
+            checks: components["schemas"]["ExecutionProviderCheck"][];
         };
         /** ExecutionProviderSuggestion */
         ExecutionProviderSuggestion: {

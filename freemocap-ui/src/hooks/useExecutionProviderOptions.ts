@@ -2,7 +2,7 @@ import {useEffect, useMemo, useState} from "react";
 import {serverUrls} from "@/services";
 import {useAppSelector} from "@/store/hooks";
 import type {ExecutionProviderCatalog, ExecutionProviderName} from "@/types/execution-provider";
-import {detectorShowsExecutionProvider, requestExecutionProviders, executionProviderOptions} from "@/services/server/execution-providers";
+import {detectorShowsExecutionProvider, requestExecutionProviders, executionProviderOptions, offeredDevices} from "@/services/server/execution-providers";
 import {executionProviderInfo} from "@/components/mocap-setup/execution-provider-info";
 
 const NO_CATALOG: ExecutionProviderCatalog = {providers: [], detectorTakesExecutionProvider: {}, autoOffers: []};
@@ -38,8 +38,8 @@ export function useExecutionProviderOptions(selected: ExecutionProviderName | nu
         info,
         /** The server's row of an EP, as skellytracker gives it; undefined for Auto or a key it does not list. */
         providerOf: (provider: ExecutionProviderName | null) => catalog.providers.find(({key}) => key === provider),
-        /** The GPUs of an EP, most VRAM first, as skellytracker gives them; none for Auto or an unknown key. */
-        devicesOf: (provider: ExecutionProviderName | null) => catalog.providers.find(({key}) => key === provider)?.devices ?? [],
+        /** The GPUs of an EP that skellytracker's checks make usable, most VRAM first; none for Auto or an unknown key. */
+        devicesOf: (provider: ExecutionProviderName | null) => offeredDevices(catalog.providers.find(({key}) => key === provider)),
         /** The server's flag once it answers; before that, RTMW shows the row with Auto and the saved key. */
         takesExecutionProvider: (detector: string) =>
             detectorShowsExecutionProvider(loaded?.key === key ? catalog.detectorTakesExecutionProvider : null, detector),

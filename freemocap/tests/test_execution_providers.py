@@ -45,10 +45,11 @@ def test_provider_route_gives_each_ep_as_skellytracker_does_in_its_order_without
     app = FastAPI()
     app.include_router(onnx_router, prefix='/freemocap')
     device = SimpleNamespace(device_key='gpu:0', gpu_key='0000:01:00.0', name='Some GPU', vram_total_bytes=8 * 2**30)
+    check = SimpleNamespace(device_key='gpu:0', name='Some GPU', certified=False, local_result='passed', usable=True)
     rows = (SimpleNamespace(key='gpu-ep', label='GPU EP', description='Runs on a GPU.', usable=True, install_hint=None,
-                            uses_gpu=True, devices=(device,)),
+                            uses_gpu=True, devices=(device,), checks=(check,)),
             SimpleNamespace(key='other-ep', label='Other EP', description='Needs a pack.', usable=False,
-                            install_hint='Run `install other-ep`.', uses_gpu=True, devices=()))
+                            install_hint='Run `install other-ep`.', uses_gpu=True, devices=(), checks=()))
     offer = SimpleNamespace(kind='add-pack', ep_key='other-ep', pack_id='other-pack', download_bytes=100, disk_bytes=300,
                             licence_url='https://example.org/licence', note='Run `install other-ep`.')
     status = SimpleNamespace(eps=rows, performance=SimpleNamespace(offers=(offer,)))
@@ -59,13 +60,33 @@ def test_provider_route_gives_each_ep_as_skellytracker_does_in_its_order_without
     assert response.json() == {
         'providers': [
             {'key': 'gpu-ep', 'label': 'GPU EP', 'description': 'Runs on a GPU.', 'usable': True, 'install_hint': None,
-             'uses_gpu': True, 'devices': [{'key': 'gpu:0', 'name': 'Some GPU', 'vram_total_bytes': 8 * 2**30}]},
+             'uses_gpu': True, 'devices': [{'key': 'gpu:0', 'name': 'Some GPU', 'vram_total_bytes': 8 * 2**30}],
+             'checks': [{'device_key': 'gpu:0', 'certified': False, 'local_result': 'passed', 'usable': True}]},
             {'key': 'other-ep', 'label': 'Other EP', 'description': 'Needs a pack.', 'usable': False,
-             'install_hint': 'Run `install other-ep`.', 'uses_gpu': True, 'devices': []}],
+             'install_hint': 'Run `install other-ep`.', 'uses_gpu': True, 'devices': [], 'checks': []}],
         'detector_takes_execution_provider': {'rtmpose': True, 'mediapipe': False},
         'auto_offers': [{'kind': 'add-pack', 'ep_key': 'other-ep', 'download_bytes': 100, 'disk_bytes': 300,
                          'licence_url': 'https://example.org/licence', 'note': 'Run `install other-ep`.'}]}
     construct.assert_not_called()
+
+
+def _pair(local_result, certified, usable, device_key='gpu:0'):
+    return SimpleNamespace(device_key=device_key, name=None, certified=certified, local_result=local_result, usable=usable)
+
+
+@pytest.mark.parametrize('checks,offered', [
+    ((_pair(None, True, True),), True),  # certified
+    ((_pair('passed', False, True),), True),  # no reviewed row, passed here: the opt-in of a field-test EP
+    ((_pair(None, False, False),), False),  # no reviewed row, not checked here
+    ((_pair('failed', True, False),), False),  # a local failure wins over a reviewed row
+    ((_pair(None, False, False), _pair('passed', False, True, 'gpu:1')), True),  # two GPUs, one usable
+    ((), True),  # no device checks (cpu): the EP's own flag
+])
+def test_usable_eps_follow_the_per_gpu_checks_not_the_ep_wide_flag(checks, offered):
+    from freemocap.core.tracking.execution_providers import usable_execution_providers
+    rows = [SimpleNamespace(key='some-ep', usable=True, checks=checks), SimpleNamespace(key='off-ep', usable=False, checks=())]
+    with patch('freemocap.core.tracking.execution_providers.execution_provider_rows', return_value=rows):
+        assert usable_execution_providers() == (['some-ep'] if offered else [])
 
 
 @pytest.mark.parametrize('change', ['provider', 'model', 'filter', 'timing'])

@@ -14,6 +14,14 @@ class ExecutionProviderDevice(BaseModel):
     vram_total_bytes: int | None
 
 
+class ExecutionProviderCheck(BaseModel):
+    """skellytracker's `DeviceCheck` of an EP on one GPU of this host: the GPU is offered only when `usable`."""
+    device_key: str
+    certified: bool
+    local_result: str | None  # "passed" or "failed": the last quick check here; None with none
+    usable: bool
+
+
 class ExecutionProviderOption(BaseModel):
     key: str
     label: str
@@ -22,6 +30,7 @@ class ExecutionProviderOption(BaseModel):
     install_hint: str | None
     uses_gpu: bool
     devices: list[ExecutionProviderDevice]
+    checks: list[ExecutionProviderCheck]
 
 
 class ExecutionProviderOffer(BaseModel):
@@ -55,7 +64,10 @@ def get_available_execution_providers() -> AvailableExecutionProvidersResponse:
                 key=row.key, label=row.label, description=row.description, usable=row.usable,
                 install_hint=row.install_hint, uses_gpu=row.uses_gpu,
                 devices=[ExecutionProviderDevice(key=device.device_key, name=device.name, vram_total_bytes=device.vram_total_bytes)
-                         for device in row.devices]) for row in status.eps],
+                         for device in row.devices],
+                checks=[ExecutionProviderCheck(device_key=check.device_key, certified=check.certified,
+                                               local_result=check.local_result, usable=check.usable)
+                        for check in row.checks]) for row in status.eps],
             detector_takes_execution_provider={detector: detector_takes_execution_provider(detector) for detector in PIPELINE_KEYS},
             auto_offers=[ExecutionProviderOffer(kind=offer.kind, ep_key=offer.ep_key, download_bytes=offer.download_bytes,
                 disk_bytes=offer.disk_bytes, licence_url=offer.licence_url, note=offer.note)

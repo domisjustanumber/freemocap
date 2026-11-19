@@ -13,8 +13,10 @@ def execution_provider_rows() -> list:
 
 
 def usable_execution_providers() -> list[str]:
-    """The keys of the EPs that skellytracker says are usable on this host now."""
-    return [row.key for row in execution_provider_rows() if row.usable]
+    """The keys of the EPs that skellytracker says are usable on this host now: on one GPU or more by its per-GPU
+    flags `checks[n].usable`, which read the quick checks; an EP with no GPU check (cpu) by its own `usable`."""
+    return [row.key for row in execution_provider_rows()
+            if row.usable and (not row.checks or any(check.usable for check in row.checks))]
 
 
 def suggested_execution_provider(saved_key: str) -> str | None:

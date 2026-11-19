@@ -14,7 +14,8 @@ const PORT_SENTINEL = "FREEMOCAP_PORT";
 const DEFAULT_PORT = 53117;
 const PORT_DISCOVERY_TIMEOUT_MS = 30_000;
 const SHUTDOWN_REQUEST_TIMEOUT_MS = 5_000;
-// shortcut: 10 s is unmeasured (no working env on the dev PC, 2026-11-19); set it from a measured POST /shutdown.
+// shortcut: measured 1.3 s from POST /shutdown to exit on an idle backend (3 runs, 2026-11-19); cameras and a
+// running pipeline are unmeasured, so 10 s stays. Measure with cameras before lowering it.
 const SHUTDOWN_GRACE_MS = 10_000;
 
 export interface ExecutableCandidate {

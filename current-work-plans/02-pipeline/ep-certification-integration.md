@@ -38,6 +38,15 @@ the OS on this PC, and lets the person hand in certify reports. It does this thr
 1. Pin skellytracker to one exact commit of the fork branch `dom/sidecar-implementation` until semver exists
    (the user owns that scheme), and regenerate the stale `uv.lock` in the same change. Candidate: `55fabf4a`,
    once its CI is green.
+   PINNED 2026-11-19: `4dcf2a66e2b739e8b8b8165bf1ff4d937eba3501` (pushed fork commit; macOS CI waived by the
+   user). `uv.lock` is regenerated (`75781fa0`). The source stays the local path `../skellytracker` until the
+   sibling branches are pushed, so the pin is this record plus the checkout, not yet a git `rev`. Evidence, on
+   that commit PLUS 16 uncommitted skellytracker files (another session's work in `core/eps`, certification):
+   the app starts; fast suite 1588 passed, 7 failed (all the old baseline), 20 skipped, every file collects;
+   gate A rtmpose and mediapipe complete on cpu; gate B rtmpose (trt-rtx) and mediapipe pass. Shutdown from
+   `POST /shutdown` to exit on an idle backend: 1353, 1313, 1351 ms, no kill (decision 31; cameras unmeasured).
+   Seen, not fixed: with stdout piped the backend prints `UnicodeEncodeError` logging errors (cp1252, from
+   skellylogs' colored console handler); Electron pipes stdout too, the frozen app is unchecked.
 2. After the migration, freemocap declares neither `onnx` nor `onnxruntime`; both arrive through
    skellytracker. `freemocap.spec:96-97` (collection), `:99-100` (stale `onnx` hidden import) and the
    onnxruntime excludes at `:151-156` move to a skellytracker PyInstaller hook. The dev pin `onnx==1.22.0`

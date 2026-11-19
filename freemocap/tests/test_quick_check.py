@@ -280,3 +280,68 @@ def test_the_certification_field_is_facts_only_and_decodes_on_its_own():
 def test_an_app_state_without_certification_still_encodes():
     message = cbor2.loads(encode_message(AppStateMessage.from_state_dict(server_pid=7, state={})))
     assert "certification" not in message["state"]
+
+
+# - Routes -
+
+@pytest.fixture
+def route_client(monkeypatch):
+    import skellytracker
+    from freemocap.api.http.certify import quick_check_router as module
+    started = []
+    checks = _checks()
+
+    def start(**kwargs):
+        if checks.run is not None:
+            raise StartRefused(409, {"code": "quick-check-running", "message": "running"})
+        if kwargs["holds"]:
+            raise StartRefused(409, {"code": "pipelines-running", "message": "busy",
+                                     "gpu_held_by": [{"kind": h.kind, "id": h.id} for h in kwargs["holds"]]})
+        started.append(kwargs)
+        checks.job, checks.run = object(), CertificationRun(items=(kwargs["pair"],), seconds_estimate=kwargs["seconds_estimate"])
+        return checks.run
+
+    application = SimpleNamespace(holds=(), quick_checks=SimpleNamespace(start=start, cancel=lambda: checks.run))
+    application.pipeline_holds = lambda: application.holds
+    monkeypatch.setattr("freemocap.app.freemocap_application.get_freemocap_app", lambda: application)
+    plans = {"not_run": {}}
+
+    def certify_plan(level, *, execution_providers, device):
+        from skellytracker.core.errors import EpRequestError
+        if execution_providers != [EP]:
+            raise EpRequestError(f"{execution_providers[0]!r} is not an EP of the catalog")
+        return {"seconds_estimate": 30, "downloads": [],
+                "details": {"checks": [LABEL], "execution_providers": [EP], "not_run": plans["not_run"]}}
+
+    monkeypatch.setattr(skellytracker, "certify_plan", certify_plan)
+    app = FastAPI()
+    app.include_router(module.quick_check_router)
+    return TestClient(app), application, started, plans
+
+
+def test_routes_plan_start_refuse_and_cancel(route_client):
+    client, application, started, plans = route_client
+    body = {"execution_provider": EP, "device_key": DEVICE}
+    plan = client.get("/certify/quick_check/plan", params=body).json()
+    assert plan == {"seconds_estimate": 30, "downloads": [], "checks": [LABEL], "not_run": {}}
+    assert client.get("/certify/quick_check/plan", params={**body, "execution_provider": "nope"}).json()["detail"]["code"] \
+        == "unknown-ep-or-device"
+    assert client.delete("/certify/quick_check").json() == {"run": None}
+
+    application.holds = (PipelineHold("realtime", "rt1"),)
+    busy = client.post("/certify/quick_check", json=body)
+    assert busy.status_code == 409 and busy.json()["detail"]["gpu_held_by"] == [{"kind": "realtime", "id": "rt1"}]
+    application.holds = ()
+
+    plans["not_run"] = {LABEL: "ep-not-installed"}
+    refused = client.post("/certify/quick_check", json=body)
+    assert refused.status_code == 409 and refused.json()["detail"]["reason_code"] == "ep-not-installed"
+    plans["not_run"] = {}
+
+    accepted = client.post("/certify/quick_check", json=body)
+    assert accepted.status_code == 202
+    assert accepted.json() == {"level": "quick", "items": [{"execution_provider": EP, "device_key": DEVICE}],
+                               "state": "starting", "done": 0, "total": None, "seconds_estimate": 30}
+    assert started[0]["detector_type"] == "rtmpose" and started[0]["rtmpose_model_name"] == "rtmw-x-l_256x192"
+    assert client.post("/certify/quick_check", json=body).json()["detail"]["code"] == "quick-check-running"
+    assert client.delete("/certify/quick_check").json()["run"]["items"] == [{"execution_provider": EP, "device_key": DEVICE}]

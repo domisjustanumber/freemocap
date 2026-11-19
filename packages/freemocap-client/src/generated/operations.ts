@@ -320,6 +320,21 @@ export const operationDefinitions = {
     "path": "/freemocap/certify/hand_in/not_sent",
     "asset": false
   },
+  "get_quick_check_plan_freemocap_certify_quick_check_plan_get": {
+    "method": "GET",
+    "path": "/freemocap/certify/quick_check/plan",
+    "asset": false
+  },
+  "start_quick_check_freemocap_certify_quick_check_post": {
+    "method": "POST",
+    "path": "/freemocap/certify/quick_check",
+    "asset": false
+  },
+  "cancel_quick_check_freemocap_certify_quick_check_delete": {
+    "method": "DELETE",
+    "path": "/freemocap/certify/quick_check",
+    "asset": false
+  },
   "track_telemetry_event_freemocap_telemetry_track_post": {
     "method": "POST",
     "path": "/freemocap/telemetry/track",

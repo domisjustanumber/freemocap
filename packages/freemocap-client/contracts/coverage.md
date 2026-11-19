@@ -66,6 +66,9 @@ errors, aborts, cancellation and asset ownership; compatibility records list act
 | POST | `/freemocap/certify/hand_in/send` | `send_hand_in_freemocap_certify_hand_in_send_post` | Core integration |
 | POST | `/freemocap/certify/hand_in/opened` | `mark_hand_in_opened_freemocap_certify_hand_in_opened_post` | Core integration |
 | POST | `/freemocap/certify/hand_in/not_sent` | `mark_hand_in_not_sent_freemocap_certify_hand_in_not_sent_post` | Core integration |
+| GET | `/freemocap/certify/quick_check/plan` | `get_quick_check_plan_freemocap_certify_quick_check_plan_get` | Core integration |
+| POST | `/freemocap/certify/quick_check` | `start_quick_check_freemocap_certify_quick_check_post` | Core integration |
+| DELETE | `/freemocap/certify/quick_check` | `cancel_quick_check_freemocap_certify_quick_check_delete` | Core integration |
 | POST | `/freemocap/telemetry/track` | `track_telemetry_event_freemocap_telemetry_track_post` | Core integration |
 | POST | `/skellycam/camera/detect` | `cameras_detect_endpoint_skellycam_camera_detect_post` | SkellyCam |
 | GET | `/skellycam/camera/microphone/detect` | `microphone_detect_endpoint_skellycam_camera_microphone_detect_get` | SkellyCam |

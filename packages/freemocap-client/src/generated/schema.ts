@@ -1152,6 +1152,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/freemocap/certify/quick_check/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Quick Check Plan
+         * @description What the quick check of one EP on one GPU would run, its estimate, and why a part cannot run here.
+         */
+        get: operations["get_quick_check_plan_freemocap_certify_quick_check_plan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/freemocap/certify/quick_check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Quick Check
+         * @description Start the quick check of one EP on one GPU with the person's detector pipeline, in a child process.
+         *
+         *     Refused while any pipeline runs or another check runs; follow it in `app_state.certification.run`. When it ends,
+         *     `certification.items` shows skellytracker's stored result and `certification.last_result` how it ended.
+         */
+        post: operations["start_quick_check_freemocap_certify_quick_check_post"];
+        /**
+         * Cancel Quick Check
+         * @description Stop the running check; it ends within about a second, its report says `cancelled`, and the stored result of
+         *     the EP does not change.
+         */
+        delete: operations["cancel_quick_check_freemocap_certify_quick_check_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/freemocap/telemetry/track": {
         parameters: {
             query?: never;
@@ -4702,6 +4750,88 @@ export interface components {
             /** Offer Issue Form */
             offer_issue_form: boolean;
         };
+        /**
+         * QuickCheckPlan
+         * @description skellytracker's `certify_plan("quick")` for one EP on one GPU.
+         */
+        QuickCheckPlan: {
+            /**
+             * Seconds Estimate
+             * @description A one-off upper estimate of the whole check, in seconds.
+             */
+            seconds_estimate: number;
+            /** Downloads */
+            downloads: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Checks
+             * @description skellytracker's name of each EP check.
+             */
+            checks: string[];
+            /**
+             * Not Run
+             * @description The EP checks that cannot run, with skellytracker's reason code.
+             */
+            not_run: {
+                [key: string]: string;
+            };
+        };
+        /** QuickCheckRequest */
+        QuickCheckRequest: {
+            /**
+             * Execution Provider
+             * @description skellytracker's EP key.
+             */
+            execution_provider: string;
+            /**
+             * Device Key
+             * @description skellytracker's device key of the GPU (the Device row's choice).
+             */
+            device_key: string;
+            /**
+             * Detector Type
+             * @default rtmpose
+             * @enum {string}
+             */
+            detector_type?: "rtmpose" | "mediapipe";
+            /**
+             * Rtmpose Model Name
+             * @default rtmw-x-l_256x192
+             * @enum {string}
+             */
+            rtmpose_model_name?: "rtmw-x-l_256x192" | "rtmw-x-l_384x288" | "rtmw-l-m_256x192";
+        };
+        /** QuickCheckPairState */
+        QuickCheckPairState: {
+            /** Execution Provider */
+            execution_provider: string;
+            /** Device Key */
+            device_key: string | null;
+        };
+        /**
+         * QuickCheckRunState
+         * @description The running check, as the `certification.run` field of `app_state` carries it.
+         */
+        QuickCheckRunState: {
+            /** Level */
+            level: string;
+            /** Items */
+            items: components["schemas"]["QuickCheckPairState"][];
+            /** State */
+            state: string;
+            /** Done */
+            done: number;
+            /** Total */
+            total: number | null;
+            /** Seconds Estimate */
+            seconds_estimate: number | null;
+        };
+        /** QuickCheckCancel */
+        QuickCheckCancel: {
+            /** @description The check that was asked to stop; null when none was running. */
+            run: components["schemas"]["QuickCheckRunState"] | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -6956,6 +7086,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_quick_check_plan_freemocap_certify_quick_check_plan_get: {
+        parameters: {
+            query: {
+                execution_provider: string;
+                device_key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickCheckPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_quick_check_freemocap_certify_quick_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuickCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickCheckRunState"];
+                };
+            };
+            /** @description `unknown-ep-or-device` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `pipelines-running` (with `gpu_held_by`), `quick-check-running`, or `cannot-run` (with skellytracker's `reason_code`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_quick_check_freemocap_certify_quick_check_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickCheckCancel"];
                 };
             };
         };

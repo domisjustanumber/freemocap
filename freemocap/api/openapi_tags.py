@@ -18,7 +18,7 @@ OPENAPI_TAGS = [
     {'name': 'Blender', 'description': 'Blender executable and package operations.'},
     {'name': 'Cameras', 'description': 'Standalone SkellyCam camera and microphone control.'},
     {'name': 'ONNX', 'description': 'Advertised execution providers and loaded inference-session diagnostics.'},
-    {'name': 'Certification', 'description': 'Hand-in of certify reports through the relay or the issue form.'},
+    {'name': 'Certification', 'description': 'The quick check of an EP on a GPU, and hand-in of certify reports through the relay or the issue form.'},
     {'name': 'FFmpeg', 'description': 'FFmpeg executable discovery.'},
     {'name': 'Telemetry', 'description': 'Application telemetry events.'},
 ]

@@ -3189,6 +3189,126 @@
         }
       }
     },
+    "/freemocap/certify/quick_check/plan": {
+      "get": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Get Quick Check Plan",
+        "description": "What the quick check of one EP on one GPU would run, its estimate, and why a part cannot run here.",
+        "operationId": "get_quick_check_plan_freemocap_certify_quick_check_plan_get",
+        "parameters": [
+          {
+            "name": "execution_provider",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Execution Provider"
+            }
+          },
+          {
+            "name": "device_key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Device Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickCheckPlan"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/freemocap/certify/quick_check": {
+      "post": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Start Quick Check",
+        "description": "Start the quick check of one EP on one GPU with the person's detector pipeline, in a child process.\n\nRefused while any pipeline runs or another check runs; follow it in `app_state.certification.run`. When it ends,\n`certification.items` shows skellytracker's stored result and `certification.last_result` how it ended.",
+        "operationId": "start_quick_check_freemocap_certify_quick_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuickCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickCheckRunState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`unknown-ep-or-device`"
+          },
+          "409": {
+            "description": "`pipelines-running` (with `gpu_held_by`), `quick-check-running`, or `cannot-run` (with skellytracker's `reason_code`)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Cancel Quick Check",
+        "description": "Stop the running check; it ends within about a second, its report says `cancelled`, and the stored result of\nthe EP does not change.",
+        "operationId": "cancel_quick_check_freemocap_certify_quick_check_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickCheckCancel"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/freemocap/telemetry/track": {
       "post": {
         "tags": [
@@ -11358,6 +11478,188 @@
           "offer_issue_form"
         ],
         "title": "SendOutcome"
+      },
+      "QuickCheckPlan": {
+        "properties": {
+          "seconds_estimate": {
+            "type": "integer",
+            "title": "Seconds Estimate",
+            "description": "A one-off upper estimate of the whole check, in seconds."
+          },
+          "downloads": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Downloads"
+          },
+          "checks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Checks",
+            "description": "skellytracker's name of each EP check."
+          },
+          "not_run": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Not Run",
+            "description": "The EP checks that cannot run, with skellytracker's reason code."
+          }
+        },
+        "type": "object",
+        "required": [
+          "seconds_estimate",
+          "downloads",
+          "checks",
+          "not_run"
+        ],
+        "title": "QuickCheckPlan",
+        "description": "skellytracker's `certify_plan(\"quick\")` for one EP on one GPU."
+      },
+      "QuickCheckRequest": {
+        "properties": {
+          "execution_provider": {
+            "type": "string",
+            "title": "Execution Provider",
+            "description": "skellytracker's EP key."
+          },
+          "device_key": {
+            "type": "string",
+            "title": "Device Key",
+            "description": "skellytracker's device key of the GPU (the Device row's choice)."
+          },
+          "detector_type": {
+            "type": "string",
+            "enum": [
+              "rtmpose",
+              "mediapipe"
+            ],
+            "title": "Detector Type",
+            "default": "rtmpose"
+          },
+          "rtmpose_model_name": {
+            "type": "string",
+            "enum": [
+              "rtmw-x-l_256x192",
+              "rtmw-x-l_384x288",
+              "rtmw-l-m_256x192"
+            ],
+            "title": "Rtmpose Model Name",
+            "default": "rtmw-x-l_256x192"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_provider",
+          "device_key"
+        ],
+        "title": "QuickCheckRequest"
+      },
+      "QuickCheckPairState": {
+        "properties": {
+          "execution_provider": {
+            "type": "string",
+            "title": "Execution Provider"
+          },
+          "device_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "execution_provider",
+          "device_key"
+        ],
+        "title": "QuickCheckPairState"
+      },
+      "QuickCheckRunState": {
+        "properties": {
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/QuickCheckPairState"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "seconds_estimate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seconds Estimate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "level",
+          "items",
+          "state",
+          "done",
+          "total",
+          "seconds_estimate"
+        ],
+        "title": "QuickCheckRunState",
+        "description": "The running check, as the `certification.run` field of `app_state` carries it."
+      },
+      "QuickCheckCancel": {
+        "properties": {
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuickCheckRunState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The check that was asked to stop; null when none was running."
+          }
+        },
+        "type": "object",
+        "required": [
+          "run"
+        ],
+        "title": "QuickCheckCancel"
       }
     }
   },
@@ -11432,7 +11734,7 @@
     },
     {
       "name": "Certification",
-      "description": "Hand-in of certify reports through the relay or the issue form."
+      "description": "The quick check of an EP on a GPU, and hand-in of certify reports through the relay or the issue form."
     },
     {
       "name": "FFmpeg",

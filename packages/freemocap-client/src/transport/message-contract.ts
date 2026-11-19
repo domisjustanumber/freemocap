@@ -277,6 +277,48 @@ export const FramerateMessageSchema = z.object({
   frontend_framerate: DetailedFramerateSchema,
 });
 
+// EP certification state (F15). A null value is left out of the CBOR map, so nullable fields are optional here.
+// `kind`, `state`, `result` and the codes are open strings: the server adds values without a client change.
+const CertificationPairSchema = z.object({
+  execution_provider: z.string(),
+  device_key: z.string().optional(),
+});
+
+export const CertificationSchema = z.object({
+  host: z.object({ name: z.string(), os: z.string() }),
+  run: z.object({
+    level: z.string(),
+    items: z.array(CertificationPairSchema),
+    state: z.string(),
+    done: z.number().int(),
+    total: z.number().int().optional(),
+    seconds_estimate: z.number().optional(),
+  }).optional(),
+  last_result: CertificationPairSchema.extend({
+    result: z.string(),
+    reason: z.string().optional(),
+  }).optional(),
+  items: z.array(z.object({
+    execution_provider: z.string(),
+    label: z.string(),
+    device_key: z.string(),
+    device_name: z.string().optional(),
+    certified: z.boolean(),
+    local_result: z.string().optional(),
+    local_cause: z.string().optional(),
+    usable: z.boolean(),
+    reason_code: z.string().optional(),
+    reason: z.string().optional(),
+  })),
+  auto: z.object({
+    execution_provider: z.string(),
+    device_key: z.string().optional(),
+    needs_check: z.array(CertificationPairSchema),
+  }).optional(),
+  gpu_held_by: z.array(z.object({ kind: z.string(), id: z.string() })),
+  pending_reports: z.array(z.object({ report_id: z.string(), has_failure: z.boolean() })),
+});
+
 export const AppStateMessageSchema = z.object({
   kind: z.literal("app_state"),
   ...ENVELOPE,
@@ -302,6 +344,8 @@ export const AppStateMessageSchema = z.object({
         alive: z.boolean(),
       }),
     ),
+    /** Absent until the backend has read skellytracker's status once. */
+    certification: CertificationSchema.optional(),
   }),
 });
 
@@ -434,6 +478,7 @@ export type LogMessage = z.infer<typeof LogMessageSchema>;
 export type DetailedFramerate = z.infer<typeof DetailedFramerateSchema>;
 export type FramerateMessage = z.infer<typeof FramerateMessageSchema>;
 export type AppStateMessage = z.infer<typeof AppStateMessageSchema>;
+export type Certification = z.infer<typeof CertificationSchema>;
 export type ProgressMessage = z.infer<typeof ProgressMessageSchema>;
 
 // ── The union ───────────────────────────────────────────────────────────

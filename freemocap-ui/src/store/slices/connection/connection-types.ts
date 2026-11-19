@@ -1,3 +1,5 @@
+import type {Certification} from '@freemocap/client';
+
 /** One camera group as reported in the server's pushed APP_STATE snapshot. */
 export interface CameraGroupSnapshot {
     backend?: 'python' | 'rust';
@@ -21,6 +23,8 @@ export interface RealtimePipelineSnapshot {
 export interface AppStateSnapshot {
     camera_groups: Record<string, CameraGroupSnapshot>;
     realtime_pipelines: RealtimePipelineSnapshot[];
+    /** EP certification state; absent until the backend has read skellytracker's status once. */
+    certification?: Certification;
 }
 
 /** Full APP_STATE websocket message: the server's authoritative observed state,
@@ -37,4 +41,5 @@ export interface ConnectionState {
     serverPid: number | null;
     cameraGroups: CameraGroupSnapshot[];
     realtimePipelines: RealtimePipelineSnapshot[];
+    certification: Certification | null;
 }

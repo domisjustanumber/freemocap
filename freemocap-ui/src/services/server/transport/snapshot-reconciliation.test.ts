@@ -28,5 +28,16 @@ test('frame contents replace stale definitions despite an unchanged model revisi
 
 test('the app-state golden with its certification field passes the transport validation', () => {
     const message = decodeMessage(readFileSync('src/services/server/transport/__fixtures__/message_app_state_golden.bin'));
-    assert.equal(message?.kind, 'app_state');
+    assert.ok(message?.kind === 'app_state');
+    // The field is kept, not stripped, and a null value of the server is an absent key.
+    const certification = message.state.certification;
+    assert.ok(certification);
+    assert.deepEqual(certification.run, {level: 'quick', items: [{execution_provider: 'golden-ep', device_key: 'gpu:10de:2484:0'}],
+        state: 'running', done: 2, total: 5, seconds_estimate: 45});
+    assert.deepEqual(certification.last_result,
+        {execution_provider: 'other-ep', device_key: 'gpu:10de:2484:0', result: 'fail', reason: 'probe-l3-failed'});
+    assert.equal(certification.items[0].label, 'Golden EP');
+    assert.equal(certification.items[0].local_result, undefined);
+    assert.equal(certification.auto?.execution_provider, 'cpu-ep');
+    assert.deepEqual(certification.gpu_held_by, [{kind: 'posthoc', id: 'abc123'}]);
 });

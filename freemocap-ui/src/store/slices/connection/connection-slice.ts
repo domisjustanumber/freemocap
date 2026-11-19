@@ -7,6 +7,7 @@ const initialState: ConnectionState = {
     serverPid: null,
     cameraGroups: [],
     realtimePipelines: [],
+    certification: null,
 };
 
 export const connectionSlice = createSlice({
@@ -29,6 +30,7 @@ export const connectionSlice = createSlice({
             state.serverPid = action.payload.server_pid;
             state.cameraGroups = Object.values(action.payload.state.camera_groups);
             state.realtimePipelines = action.payload.state.realtime_pipelines ?? [];
+            state.certification = action.payload.state.certification ?? null;
         },
         // WebSocket dropped — clear server-derived state so nothing goes stale.
         serverDisconnected: (state) => {
@@ -36,6 +38,7 @@ export const connectionSlice = createSlice({
             state.serverPid = null;
             state.cameraGroups = [];
             state.realtimePipelines = [];
+            state.certification = null;
         },
     },
 });

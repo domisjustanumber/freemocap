@@ -245,3 +245,68 @@ def test_execute_worker_retains_full_log_and_propagates_failure(tmp_path):
                        environment=dict(os.environ), log_path=log, timeout=10.0)
     assert 'internal detail' in log.read_text()
     assert 'broken (failed)' in log.read_text()
+
+
+_WORKER = ("import sys, threading, time, skellytracker\n"
+           "skellytracker.note_exit_requested = lambda: open(sys.argv[1], 'w').close()\n"
+           "from freemocap.tools.datasets.preparation import end_on_stdin_eof\n"
+           "threading.Thread(target=end_on_stdin_eof, daemon=True).start()\n"
+           "time.sleep(60)\n")
+
+
+def _interrupt_first_wait(monkeypatch):
+    """The first wait of execute_worker raises KeyboardInterrupt, as Ctrl+C in the parent does."""
+    import subprocess
+    real_wait, seen = subprocess.Popen.wait, []
+
+    def wait(self, timeout=None):
+        if not seen:
+            seen.append(self)
+            raise KeyboardInterrupt
+        return real_wait(self, timeout)
+    monkeypatch.setattr(subprocess.Popen, 'wait', wait)
+    return seen
+
+
+def test_interrupted_worker_gets_exit_notice_before_it_ends(tmp_path, monkeypatch):
+    import os
+    import sys
+    from freemocap.tools.datasets import preparation
+
+    monkeypatch.setattr(preparation, 'WORKER_STOP_GRACE_SECONDS', 60.0)
+    seen = _interrupt_first_wait(monkeypatch)
+    notice = tmp_path / 'notice'
+    with pytest.raises(KeyboardInterrupt):
+        preparation.execute_worker([sys.executable, '-B', '-c', _WORKER, str(notice)], environment=dict(os.environ),
+                                   log_path=tmp_path / 'processing.log', timeout=30.0)
+    assert notice.exists()
+    assert seen[0].returncode == 130  # it ended itself after the notice, not by the fallback kill
+
+
+def test_worker_that_ignores_stop_is_killed_after_grace(tmp_path, monkeypatch):
+    import os
+    import sys
+    import time
+    from freemocap.tools.datasets import preparation
+
+    monkeypatch.setattr(preparation, 'WORKER_STOP_GRACE_SECONDS', 0.5)
+    seen = _interrupt_first_wait(monkeypatch)
+    started = time.monotonic()
+    with pytest.raises(KeyboardInterrupt):
+        preparation.execute_worker([sys.executable, '-B', '-c', 'import time; time.sleep(60)'],
+                                   environment=dict(os.environ), log_path=tmp_path / 'processing.log', timeout=30.0)
+    assert time.monotonic() - started < 20
+    assert seen[0].returncode not in (None, 0, 130)
+
+
+def test_timed_out_worker_is_killed_without_exit_notice(tmp_path):
+    import os
+    import subprocess
+    import sys
+    from freemocap.tools.datasets.preparation import execute_worker
+
+    notice = tmp_path / 'notice'
+    with pytest.raises(subprocess.TimeoutExpired):
+        execute_worker([sys.executable, '-B', '-c', _WORKER, str(notice)], environment=dict(os.environ),
+                       log_path=tmp_path / 'processing.log', timeout=3.0)
+    assert not notice.exists()  # a hang must still count as an unclean exit

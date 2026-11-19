@@ -14,21 +14,13 @@ permissions:
 
 jobs:
   backend-tests:
-    name: Backend Tests (fast, Python ${{ matrix.python-version }}, ${{ matrix.os }})
+    name: Backend Tests (fast, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        python-version: ["3.11"]
-        include:
-          - os: windows-latest
-            python-version: "3.11"
-          - os: macos-latest
-            python-version: "3.11"
-          - os: ubuntu-latest
-            python-version: "3.12"
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -55,8 +47,8 @@ jobs:
           version: "latest"
           enable-cache: true
 
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+      - name: Set up Python (from .python-version)
+        run: uv python install
 
       - name: Install dependencies
         run: uv sync --group dev

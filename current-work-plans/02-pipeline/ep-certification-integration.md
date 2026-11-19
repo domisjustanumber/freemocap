@@ -364,6 +364,50 @@ Backend only, 2026-11-19: `208ae320` (file builder), `4e152100` (sender, outbox,
     `SharedInference` thread of the backend process, so no worker process needs the notice. Not verified with a
     real GPU session held at close.
 
+## The uncertified-EP flow, as settled 2026-11-19 (second grilling; user confirmed)
+
+This section WINS over decisions 14, 16, 18, 21, 25 and 26 where they differ. Reason for most changes:
+skellytracker now refuses, with no override, an EP on a GPU with no reviewed row and no local pass (ADR-ER5X),
+so the quick check is the only way in.
+
+- F1. An unchecked EP and GPU is SHOWN in the EP menu, marked; choosing it opens the quick-check prompt (the
+  hiding built in `4a5d3da2` is reversed for it).
+- F2. A pair that failed here stays visible with its reason; choosing it offers the check again.
+- F3. On Auto the app runs what `recommend()` chose and, when a skipped candidate has `needs_check`, shows a
+  non-blocking notice beside the EP setting ("A faster option needs a quick check on this device") with a
+  "Run quick check" button. F11: that notice has no dismiss; it follows the server's observation.
+- F4. A saved EP and GPU that skellytracker refuses makes the start fail visibly, with the reason and the
+  quick-check offer. No automatic switch to CPU.
+- F5. The prompt has two choices: "Run quick check" and "Not now". "Do not ask again" is dropped and
+  freemocap does not call `dismiss_certification` (replaces that part of 16 and 21).
+- F6. "Not now", cancel and failure revert the EP setting to what it was; a pass makes the new EP the
+  selection. Choosing the EP again asks again.
+- F7. Every pipeline start (realtime, recording, posthoc; CPU ones too) waits while any quick check runs, and
+  a check is refused while any pipeline runs (extends 16 and 20).
+- F8. Nothing is queued: after a pass the user presses Record or Start again.
+- F9. One prompt checks one pair: `certify("quick", execution_providers=[key], device=<the GPU chosen in the
+  Device row>, pipeline=P)`. The Device row marks each GPU with its own state and opens the same prompt.
+- F10. Progress is checks done of total with a one-off "up to about N seconds"; no ticking countdown
+  (skellytracker's `seconds_left` is a sum of uncalibrated ceilings). The button suffix of decision 25
+  becomes `· quick check 1 of 3`.
+- F12. Five states, worded with "device", never "PC" (user: Mac users): reviewed = no marker; "passed on
+  this device, not yet reviewed"; "not checked on this device"; "check failed on this device"; "exited
+  uncleanly twice". No marker for field-test. Text already built with "PC" changes too.
+- F13. The full-check controls (the start box checkbox, "Run full check") are left out until skellytracker's
+  full level exists.
+- F14. Decision 18 (evidence from normal use) is deferred as a whole; nothing is asked after a quick pass.
+- F15. Build order: (1) the `certification` state of decision 28 with the check job, its routes and the busy
+  rule; (2) markers, prompt and background check in the UI; then in parallel (3) the Certification button and
+  dialog with the hand-in UI, (4) the start check and freemocap's own checks, (5) the Windows ML controls.
+- F16. Install and remove of a Windows ML EP are refused while a pipeline or a check runs; remove asks first.
+- F17. The cp1252 logging errors are fixed on freemocap's side by forcing UTF-8 output, once a sub-agent has
+  shown what works in a frozen app; skellylogs stays untouched; skellycam-18 is told.
+- F18. One hand-in file may hold several reports of one package; the spec wording ("one for each package")
+  is raised with the skellycertify session.
+- F19 and F20. "Not sent" marks the reports pending again and deletes any kept outbox file for them; it is
+  also offered on a file waiting to retry.
+- Also: the test setup blanks the relay address for every test, so no test can post to the real relay.
+
 ## Environment on the dev PC
 
 Found 2026-11-19 while measuring decision 31; nothing was changed. `freemocap/.venv` dates from August 2026

@@ -169,7 +169,11 @@ Windows ML catalog installs as non-admin, and MediaPipe loading.
     "passed"` and not certified; failed on this PC = `local_result == "failed"`; field-test =
     `PackStatus.catalog_status == "field-test"`. `recommend()` skips a pair that failed here (`skipped`,
     `failed_locally: true`). Limit: `PackStatus.usable`, `PackStatus.devices`, `check_start()` and a run do not
-    read the quick checks, so freemocap offers a GPU only from `checks[n].usable`.
+    read the quick checks, so freemocap offers a GPU only from `checks[n].usable`. User rulings 2026-11-19
+    (relayed by skellytracker-6c, confirmed by the user here): check names stay `<key>@<device>` on every
+    PC; two GPUs of one model share one local result; skellytracker itself will refuse a run on an EP and
+    GPU with no reviewed row and no local pass (not built; the quick check keeps a way through). When that
+    is built the limit above is gone and freemocap's menu filter only hides what would be refused.
 18. Evidence from normal use: asked once, right after a quick pass, off until yes, with a toggle in Settings.
     When Record waited on that quick check, the question waits until the recording and its processing end.
     After each recording, at idle, up to 30 frames from the saved videos run on the EP and on CPU and are
@@ -290,6 +294,34 @@ Found 2026-11-19 while measuring decision 31; nothing was changed. `freemocap/.v
 `dom/research` (`close_camera_groups` exists only on upstream `sfn26`), and `../freemocap_blender_addon` is not
 cloned, so `uv lock --check` fails. benchmarks/README.md forbids changing shared environments or setting
 PYTHONPATH, so the shutdown time stays unmeasured until the workspace is set up.
+
+Changed 2026-11-19 on the user's order ("set up all 3 envs, run tests, fix what's needed"): the missing
+siblings are cloned (`../freemocap_blender_addon` `sfn26`, `../utils/skellylogs`, `../utils/skellypings`),
+`freemocap/.venv` is rebuilt on Python 3.13.18 from the regenerated lock, and `../skellyforge` (931 tests
+pass, 1 skip) and `../skellysync` (59 pass) have their own environments. Decisions of that day's grilling:
+- skellytracker pin: the user waived the macOS CI pass ("use the certify process to validate on a real mac");
+  pin `4dcf2a66` (pushed fork commit with the hand-in list) after the fast suite reruns against it.
+- skellycam: a stopgap worktree `../skellycam-sfn26-pins` (branch `dom/sfn26-pins` from `upstream/sfn26`
+  `29eca818`, exact pins, no Rust: the user said to drop the Rust backend there after the crate would not
+  link without the Windows SDK). That repo's rules: no AI attribution in commits, no push. freemocap moves
+  to skellycam's frame-ring API after its phase 4 and rewrites its camera code once, then.
+- Sibling sources stay local paths until the app starts and tests collect; then push the branches and
+  switch to git sources (CI cannot build before that).
+- macOS 15 is the minimum supported macOS: the only macOS wheels of opencv-contrib-python 5.1.0.95 are
+  `macosx_15_0` (arm64 and x86_64; read from PyPI).
+- After the app imports: re-measure the ChArUco corner counts and the seeded numerical calibration on
+  OpenCV 5.1.0.95 against the 5.0.0.93 figures of the migration plan (5.1 changed ArUco refinement and
+  `warpAffine`/`remap` rounding); tell skellytracker-6c if they move.
+- Done: CI installs Python from `.python-version` (`17c865d8`); `numpydantic` removed from freemocap's list
+  (`2eb341f4`); skellyforge's beartype comment corrected (numpy >= 2.5 needs `beartype>=0.23`, no test
+  notices otherwise); skellysync's librosa constraints recorded in its pyproject.
+- Known, left alone: librosa stays 0.10.1 in skellysync (held up by `setuptools==75.8.0` and numpy <= 2.5;
+  its one use is a WAV read that soundfile could do); skellysync's synced videos lose inherited Windows
+  permissions (temp folder ACL since Python 3.12.4; the user fixes it later); freemocap lists `numba` but
+  imports it nowhere; the ONNX Runtime import warning "Init provider bridge failed" is normal for the
+  Windows ML build (skellytracker ADR-N6E8), and `get_available_providers()` never lists the plugin packs.
+- Open: the wider dependency bumps, evaluated on branch `dom/dependency-bumps` (worktree
+  `../freemocap-dep-bumps`); nothing of it is merged.
 
 ## Waiting on the user
 

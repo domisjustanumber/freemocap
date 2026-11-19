@@ -319,6 +319,15 @@ All as local commits on `sidecar-implementation`, in this order:
    cannot be on the dev PC); that happens with the pin. Checked: the new expressions run in skellytracker's
    venv and match the old psutil/platform values; `test_machine_benchmarks.py` gives 9 passed, 4 failed both
    before and after the change, all four from the stale freemocap venv.
+0. Dependency lockstep (user, 2026-11-19: before everything else, bump only what keeps freemocap in
+   lockstep with skellycam and skellytracker; a wider bump to latest was made and undone the same day).
+   Done in `69f2d2a5`, `pyproject.toml` only, not locked or run: exact pins polars 2.1.0, pydantic 2.14.3,
+   numpydantic 2.0.0, psutil 7.2.2 (both), PyYAML 6.0.3, requests 2.34.2, pyinstaller 6.22.3 (skellytracker),
+   msgspec 0.22.0, httpx 0.28.1 (skellycam), scipy-stubs ~=1.18.1. Sources: skellytracker `77e38399` (local),
+   skellycam `dom/native-jpeg` `b761d31e2` (pushed fork). Open with the user: the two siblings disagree on
+   opencv-contrib-python (skellytracker 5.0.0.93, skellycam 5.1.0.95) and numpy (2.4.6 against 2.5.5), so
+   OpenCV stays unpinned here and `uv.lock` cannot resolve; and which skellycam branch freemocap builds
+   against. The pin target of action 3 is a pushed skellytracker commit at or after `77e38399`, not `55fabf4a`.
 3. When skellytracker's CI on `55fabf4a` is green, macOS included: pin it and regenerate `uv.lock` (decision 1).
    Right after the pin: the preprocess benchmark ([migration state](skellytracker-2-migration.md) item 9),
    and the EP menu switches from `PackStatus.usable` to the per-GPU `checks[n].usable` (decision 17):

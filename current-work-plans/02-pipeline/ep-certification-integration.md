@@ -672,6 +672,88 @@ either.
 15. Restart: start a quick check, then quit and restart the backend (or the app). The page recovers without a
     refresh; no old progress or prompt stays; the menu shows the server's states again.
 
+### F15 step 3: built
+
+UI only, 2026-11-19. Commits: `9ea49626` (rules, texts, requests, tests), `ed12f948` (button, dialog, wiring). No backend or
+HTTP API change; the routes of "Relay hand-in: built" and F19/F20 were enough.
+
+- Rules and texts (`freemocap-ui/src/services/server/certification-hand-in.ts`): `CERTIFICATION_TEXT` (every text of
+  the button, the dialog, "File report" and Record's waiting line, in one place, G1 wording); `certificationButtonSuffix`
+  (decision 25 and F10: `· quick check 1 of 3` while a check runs, else `· N failure(s) to file` when any pending report
+  has a failure, else `· N to file`, plus `@ <host name>` when the backend address is not this machine); `pendingSummary`,
+  `pendingRows` (failures first, with kind and time from the hand-in list); `handedIn` (covered reports grouped by
+  issue link, issue-form reports together); `outboxLine` (F20: waiting to retry, or given up); `sendAnswerMessage`
+  (accepted with the issue link, already filed, kept for the next start, given up, refused with the relay's code or
+  privacy rule number, 409 `relay-off`, 409 `file-changed`, anything else); `viewIsCurrent` (the viewed file counts only
+  for the same pending ids and note, R1); `issueFormProminent` (relay off or refused, no relay address, file too large,
+  a kept file given up); `safeIssueUrl` (a link is made only from a skellycertify issue address); the five requests.
+- `freemocap-ui/src/hooks/useHandIn.ts`: keyed on endpoint + pid + connected like `useQuickCheck`; reads
+  `GET .../hand_in` while the dialog is open and again whenever the server's `pending_reports` change; keeps only the
+  note, the viewed file and the answer to this window's last request, and ignores answers from a server that is no
+  longer this one. "Save file and open issue form" saves the viewed file with a browser download (Electron shows its
+  save dialog, as the log terminal's "save" already does), opens the issue form (`window.open`, which Electron hands to
+  the system browser), then posts `opened`.
+- `freemocap-ui/src/components/certification/CertificationDialog.tsx`: `CertificationButton` at the top right of the
+  navigation strip (`BasePanelLayout.tsx`), fixed label, dimmed while disconnected; `CertificationDialog` in
+  `AppContent.tsx` beside `SettingsModal`, opened by the window event `open-certification` (the button, and "File report"
+  on a failed quick check's result line in `quick-check-panel.tsx`). Parts: the running check with "Cancel check"; the
+  reports: summary, list, note with the privacy warning, "View report" showing the exact file, "Send report" (hidden
+  only while the backend has no relay address, R5) and "Save file and open issue form" (highlighted per
+  `issueFormProminent`), the answer line, each kept file with "Not sent", each hand-in made (issue link, or "Issue form
+  opened" with a link to open the form again) with "Not sent". No health call on open (G3). Record's waiting line in
+  `RecordingControlPanel.tsx` reads the same `run`.
+- Tests: `certification-hand-in.test.ts` (8); UI unit suite (`node tools/test-sdk-integration.mjs`) 213 tests, 212
+  pass, 1 skipped (as before), plus its 10 and 46; `tsc --noEmit` clean; client `npm test` 141 pass. Live, read-only,
+  backend from this checkout with `FREEMOCAP_CERTIFY_RELAY_URL` empty: the real hand-in list (7 pending, 0 outbox, relay
+  off) parsed and listed; the file built (23,990 bytes, fits the relay); "send" answered 409 `relay-off`, worded "The
+  relay is off. Use the issue form." with the issue form highlighted. No `opened` or `not_sent` was posted (they would
+  change this machine's store). Backend stopped through `/shutdown`.
+- Not covered: the rendered dialog (no browser tool here; no DOM test renderer in the UI's dependencies), so the
+  hook's state changes are checked only through their pure rules; the manual checklist covers them. Never seen: a
+  relay 200, a kept or refused answer from a real relay, the `relay-off` answer to a send while an address is set.
+- Choices made (open for the user): the suffix counts failures when there are any, else all pending; the issue form
+  link is `issues/new?template=certify-report.yml` (straight to the form); a hand-in has no date in the backend's list,
+  so the hand-in line shows the issue link and the report count but no date; "open again" for an issue-form hand-in
+  opens the form, not the saved file; the saved file uses the browser download, not a new Electron IPC call (decision
+  30), because the log terminal's download already works in Electron; no "Do not remind me" and no idle notice
+  (decision 23's notice needs the normal-use record, deferred by F14); the dialog title carries the host name; the
+  Items part (decision 26) is step 5.
+
+#### MANUAL CHECKLIST (step 3)
+
+Do NOT click "Send report" before step 13. Every other step files nothing. Closing a GitHub tab without submitting it
+files nothing.
+
+1. Start the app. At the top right of the strip with "Streaming" and "Playback" you see "Certification". On the dev
+   machine (7 pending reports) it reads "Certification · 7 to file".
+2. Stop the backend. The button text turns dim and the suffix goes away. Start the backend again. The suffix comes back
+   without a page refresh.
+3. Click "Certification". A dialog opens with the machine's name in its title, "Reports to hand in", "7 reports to hand
+   in" and one line per report. The Escape key, the cross and "Close" each close it.
+4. Type a short note. Click "View report". You see the file name, its size and the whole file. Your note is in it.
+5. Change one letter of the note. The file disappears. Click "View report" again to see it.
+6. Click "Save file and open issue form". The machine asks where to save `certify-report-....md` (or the browser
+   downloads it). Your browser opens the GitHub "Certify report" form. Close that tab WITHOUT submitting it.
+7. Back in the dialog: a line says "Attach the saved file to the issue form...". Below it: "Issue form opened (Open the
+   issue form again) · 7 reports" with "Not sent". The button suffix is gone.
+8. Click "Not sent". That line goes away, the 7 reports are listed again, and the button reads "· 7 to file" again.
+9. Quit the app. Start the backend with the environment variable `FREEMOCAP_CERTIFY_RELAY_URL` set to an empty value
+   (PowerShell: `$env:FREEMOCAP_CERTIFY_RELAY_URL=''` before the start), then the app. Open the dialog, click "View
+   report". There is no "Send report"; a line says "Sending is not set up in this build; use the issue form." and
+   "Save file and open issue form" is the highlighted button. Quit and start normally again.
+10. Start a quick check (F15 step 2 checklist, step 5). The button reads "Certification · quick check 1 of 5" (and so on).
+    The dialog shows "Running check" with "Cancel check". The Record panel shows "A recording can start once the quick
+    check ends. ..." Click "Cancel check" in the dialog: the check stops and both lines go away.
+11. Only on a machine with a failed quick check: the result line "Quick check failed: ..." has "File report". Clicking it
+    opens the dialog. The button reads "· 1 failure to file".
+12. With the dialog open, restart the backend. The dialog recovers by itself; old answer lines are gone; the list is
+    read again. All buttons keep their labels and are never greyed out.
+13. REAL SEND (files a real public issue in `domisjustanumber/skellycertify`; do it once, last, only if you want that):
+    with the normal relay address, open the dialog, click "View report", read the file, click "Send report". You see
+    "Handed in as issue #N: <link>" and a line "Handed in as issue #N · 7 reports" with "Not sent". The button suffix
+    is gone. Clicking the link opens the issue. ("Not sent" afterwards only marks the reports pending here; the issue
+    stays on GitHub.)
+
 ## Environment on the dev PC
 
 Found 2026-11-19 while measuring decision 31; nothing was changed. `freemocap/.venv` dates from August 2026

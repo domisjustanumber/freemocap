@@ -30,6 +30,7 @@ from freemocap.core.skeletons.tracked_skeleton_set import build_tracked_skeleton
 from freemocap.system.default_paths import (
     get_default_freemocap_base_folder_path, FREEMOCAP_FAVICON_ICO_PATH
 )
+from freemocap.system.certify.relay import start_outbox_retry
 from freemocap.system.telemetry.telemetry import initialize_telemetry, shutdown_telemetry
 
 logger = logging.getLogger(__name__)
@@ -119,6 +120,9 @@ async def app_lifespan(
 
         # Start anonymous usage telemetry (no-op if the user opted out)
         initialize_telemetry()
+
+        # Send again each certify report kept after a failed hand-in (on its own thread)
+        start_outbox_retry()
 
         app_url = f"{PROTOCOL}://{HOSTNAME}:{app.state.port}"
 

@@ -5,6 +5,7 @@ import {
     PAIR_MARKERS, pairLabel, QUICK_CHECK_TEXT, quickCheckProgressText, quickCheckResultText,
 } from '@/services/server/execution-providers';
 import type {DetectorSettingsValue} from './detector-setting-rows';
+import {CERTIFICATION_TEXT, openCertification} from '@/services/server/certification-hand-in';
 
 /**
  * The quick check beside the EP setting (F3 to F10): the running check with its progress and cancel, the two-choice
@@ -56,7 +57,9 @@ export function QuickCheckPanel({value, onChange, providers}: {
         </div>}
         {quickCheck.refusal && <p className="settings-note settings-note-error" role="alert">
             {QUICK_CHECK_TEXT.couldNotStart}{quickCheck.refusal}</p>}
-        {result && quickCheck.showsResult && <p className="settings-note" role="status">
-            {pairLabel(result, items)}: {quickCheckResultText(result)}</p>}
+        {result && quickCheck.showsResult && <div className="settings-note settings-note-dismissable" role="status">
+            <span>{pairLabel(result, items)}: {quickCheckResultText(result)}</span>
+            {result.result === 'fail' && action(CERTIFICATION_TEXT.fileReport, openCertification)}
+        </div>}
     </>;
 }

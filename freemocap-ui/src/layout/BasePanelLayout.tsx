@@ -12,6 +12,7 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { RecordingCompleteDialog } from "@/components/control-panels/recording-info-panel/RecordingCompleteDialog";
 import { OperationErrorBanner } from "@/components/common/OperationErrorBanner";
 import { MainNavTabs } from "@/components/ui-components/MainNavTabs";
+import { CertificationButton } from "@/components/certification/CertificationDialog";
 
 // The camera views are the primary content: the sidebar and the console may grow
 // to at most these shares of the window, so they can never squeeze the views away.
@@ -99,6 +100,7 @@ export const BasePanelLayout = ({
             <Panel className="right-side-panel" defaultSize={76} minSize={100 - SIDEBAR_MAX_PCT}>
               <div className="flex flex-col h-full pos-rel bg-darkgray br-2">
                 <MainNavTabs />
+                <CertificationButton />
                 <div className="flex-1 min-h-0 mt-45 flex flex-col">
                   <OperationErrorBanner />
                   <div className="flex-1 min-h-0">{children}</div>

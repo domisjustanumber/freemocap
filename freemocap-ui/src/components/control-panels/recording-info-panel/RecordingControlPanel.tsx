@@ -17,10 +17,13 @@ import { StartStopRecordingButton } from "./recording-subcomponents/StartStopRec
 import ToggleComponent from "@/components/ui-components/ToggleComponent";
 import MocapSetupModal from "@/components/mocap-setup/mocap-setup-modal";
 import "@/components/common/settings-layout/settings-layout.css";
+import { CERTIFICATION_TEXT } from "@/services/server/certification-hand-in";
+import { quickCheckProgressText } from "@/services/server/execution-providers";
 
 export const RecordingControlPanel: React.FC = () => {
   const dispatch = useAppDispatch();
   const recordingInfo = useAppSelector((state) => state.recording);
+  const certification = useAppSelector((state) => state.connection.certification);
   const { config, pendingOperation, countdown } = recordingInfo;
   const {
     useDelayStart,
@@ -144,6 +147,12 @@ export const RecordingControlPanel: React.FC = () => {
             onClick={handleRecordButtonClick}
           />
         </div>
+        {/* Record's waiting line (decision 27, F7): a start is refused while a quick check runs. */}
+        {certification?.run && !recordingInfo.isRecording && (
+          <p className="settings-note" role="status">
+            {CERTIFICATION_TEXT.recordWaits}{quickCheckProgressText(certification.run, certification.items)}
+          </p>
+        )}
         {/* Secondary options start collapsed; Start Recording stays visible. */}
         <details className="settings-disclosure">
           <summary>Recording options</summary>

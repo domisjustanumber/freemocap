@@ -12,6 +12,7 @@ import { getLocaleDirection } from "@/i18n";
 import { fetchAllRecordings } from "@/store/slices/recording-status/recording-status-thunks";
 import { WelcomeModal } from "@/components/ui-components/WelcomeModal";
 import { SettingsModal } from "@/components/ui-components/SettingsModal";
+import { CertificationDialog } from "@/components/certification/CertificationDialog";
 import { TutorialProvider, TourController } from "@/components/tutorial";
 
 const WELCOME_SESSION_KEY = 'freemocap.welcomeShown';
@@ -30,6 +31,14 @@ export const AppContent = function () {
         window.addEventListener('open-settings', openSettings);
         return () => window.removeEventListener('open-settings', openSettings);
     }, []);
+    // The Certification button and a failure's "File report" fire this event (see openCertification).
+    const [certificationOpen, setCertificationOpen] = React.useState(false);
+    React.useEffect(() => {
+        const openCertification = () => setCertificationOpen(true);
+        window.addEventListener('open-certification', openCertification);
+        return () => window.removeEventListener('open-certification', openCertification);
+    }, []);
+    const closeCertification = React.useCallback(() => setCertificationOpen(false), []);
 
     React.useEffect(() => {
         document.documentElement.dir = direction;
@@ -50,6 +59,7 @@ export const AppContent = function () {
                         </BasePanelLayout>
                         <WelcomeModal open={welcomeOpen} onClose={() => setWelcomeOpen(false)} />
                         <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+                        <CertificationDialog open={certificationOpen} onClose={closeCertification} />
                         <TourController />
                     </PlaybackProvider>
                 </TutorialProvider>

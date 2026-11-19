@@ -1,6 +1,6 @@
 # EP management, certification and report hand-in
 
-**State (2026-11-19): APPROVED PLAN; the Electron shutdown fix (decision 31) and the hardware cleanup (6 to 8) are built, the rest is not.** The user settled every decision below in a grilling
+**State (2026-11-19): APPROVED PLAN; the Electron shutdown fix (decision 31) the hardware cleanup (6 to 8), the version change (4) and `BUILD_TREE_MODIFIED` (11) are built; the rest is not.** The user settled every decision below in a grilling
 round in this session and in the skellytracker session (`skellytracker-6c`, the session that owns
 ONNX Runtime, EP packs and EP certification). The skellytracker interfaces this plan needs do not exist yet;
 do not code against their names until that session sends the built shapes. The work that needs no new
@@ -240,7 +240,11 @@ All as local commits on `sidecar-implementation`, in this order:
    venv and match the old psutil/platform values; `test_machine_benchmarks.py` gives 9 passed, 4 failed both
    before and after the change, all four from the stale freemocap venv.
 3. When skellytracker's CI on `55fabf4a` is green, macOS included: pin it and regenerate `uv.lock` (decision 1).
-4. The `__version__` change (decision 4) and `BUILD_TREE_MODIFIED` (decision 11).
+4. Done (`61f68980`): `__version__` is `2.0.0-alpha.25`; bumpver writes it with the `package.json` pattern
+   (dry run checked; `current_version` and git tags keep the `v`); the client contract and building.mdx
+   follow. The telemetry `app_version` now arrives without the `v`, so dashboards see two spellings across
+   this change. `BUILD_TREE_MODIFIED` (`bool | None`, `None` outside CI) is computed from tracked files with
+   `git status --porcelain --untracked-files=no` before `build_info.py` is written; not yet run in CI.
 5. Everything else waits for the skellytracker shapes.
 
 ## Reading list

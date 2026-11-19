@@ -364,12 +364,32 @@ pass, 1 skip) and `../skellysync` (59 pass) have their own environments. Decisio
 
 ## Waiting on skellytracker
 
-- CI result of `55fabf4a`, then the pin. Windows and Linux are green; the macOS job never got a runner. The
-  user ruled: wait for the macOS re-run before pinning.
-- Package-wide `certify()` and `certify_plan()` with the quick level.
-- Status-row flags: built locally as `PackStatus.checks` (decision 17); waiting for the push and the pin.
-- Windows ML catalog install progress and cancel, and a remove call.
-- `note_exit_requested()`.
+State 2026-11-19 evening (skellytracker-6c's message; the commits are on disk in `../skellytracker`, local,
+not pushed: `669d9676`, `544521ed`, `cada7f91`, `5020037f` on top of the pin `4dcf2a66`; not read here yet).
+Nothing below is still missing except a package-wide `certify()` / `certify_plan()` confirmation and the push.
+
+- Pin: done at `4dcf2a66` (decision 1); it moves forward when these four commits are pushed.
+- Package-wide `certify()` and `certify_plan()` with the quick level: `certify()` exists (reports come from
+  it); confirm the exact signature and `certify_plan` against the code before the certify integration.
+- Check rule, enforced in the package (ADR-ER5X): `eps.check_start()` and `eps.build_session()` raise
+  `EpUnavailableError` ("Run `skellytracker-eps certify KEY --quick`.") for an EP on a GPU with no reviewed
+  row and no local pass, and after a local failure. No override. `certify()` always gets through.
+  `PackStatus.usable` and `.devices` obey the rule; `reason_code` is `quick-check-needed` or
+  `quick-check-failed`; `install_hint` holds the command. `eps.recommend()` names only an EP that can start
+  now; a skipped candidate has `needs_check: true` or `failed_locally: true`; a fresh PC gets cpu.
+- `skellytracker.note_exit_requested()`: built. Call it in the process that runs the pipelines when the user
+  asks the app to close, before ending that process. Without it an end with no clean interpreter exit while
+  a GPU EP session was held counts as one unclean exit; two in a row give `local_result "failed"` with
+  `DeviceCheck.local_cause == "unclean-exits"` (say "exited uncleanly twice", not "the check failed"). A
+  clean exit resets the count; a passed quick check clears the mark. `local_cause` is the new last field.
+- CoreML: check name `coreml` (no `@device`), in the default quick selection; its one `DeviceCheck` has a
+  chip id as `device_key` (for example `chip:apple-m2-pro`), which must not be passed as `device`. Fake Mac only.
+- Reports: a new quick report deletes each older plain-pass report it repeats that was not handed in.
+- Windows ML catalog: `eps.install(eps.plan_install([key]), progress=..., cancel=...)` with
+  `InstallProgress.fraction` (0 to 1 or None, no bytes); `eps.remove(execution_provider=key)` gives
+  `RemoveResult(removed, failed, was_present)`. Real download and cancel are not verified on hardware.
+- PyInstaller: skellytracker ships `hook-onnxruntime.py` (the installed ORT's libraries, data and metadata,
+  and windowsml on Windows; no GPU EP). Frozen on Windows only. beartype's checks are inactive when frozen.
 - `pending_reports()` and `mark_reports()`: built 2026-11-19 (skellytracker-6c; one local commit on top of
   `e7ce3409`, not pushed, not read here). `skellytracker.pending_reports(include_handed_in=False)` gives rows
   `{report_id, kind, created_utc, has_failure, evidence_valid, state, reference}`, oldest first; with
@@ -379,7 +399,6 @@ pass, 1 skip) and `../skellysync` (59 pass) have their own environments. Decisio
   listed only when a check ended pass or fail; `has_failure` is the "always offer a failure report" case;
   `report_id` is opaque; state is in `hand-in.json` in the EP store root; skellytracker never sends and never
   builds the Markdown file (freemocap builds it from `read_report()`); reports are never deleted.
-- The ONNX Runtime PyInstaller hook.
 
 ## Next actions
 

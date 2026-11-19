@@ -94,8 +94,7 @@ export interface MenuPair {execution_provider: string; device_key: string; name:
  * The pairs of an EP that the menu shows, in skellytracker's order (most VRAM first): the usable ones and, from the
  * server's certification items, the ones a quick check would let run (unchecked or failed here; F1, F2). A pair of an
  * EP that is not installed or not ready stays hidden. Without the items (before the first status read): the usable
- * checks. The EP row's reason code is absent when the EP runs on another GPU; a pair that is not usable then waits
- * for a check.
+ * checks. Each item's reason code is its GPU's (absent when usable).
  */
 export function menuPairs(provider: ExecutionProviderOption, items?: readonly CertificationItem[]): MenuPair[] {
     const name = (key: string, given?: string) => given ?? provider.devices.find(device => device.key === key)?.name ?? key;
@@ -104,7 +103,7 @@ export function menuPairs(provider: ExecutionProviderOption, items?: readonly Ce
             device_key: check.device_key, name: name(check.device_key), state: pairState(check), needsCheck: false}));
     }
     return items.filter(item => item.execution_provider === provider.key
-        && (item.usable || item.reason_code === undefined || CHECK_RULE_CODES.has(item.reason_code)))
+        && (item.usable || CHECK_RULE_CODES.has(item.reason_code ?? '')))
         .map(item => ({execution_provider: provider.key, device_key: item.device_key, name: name(item.device_key, item.device_name),
             state: pairState(item), needsCheck: !item.usable}));
 }

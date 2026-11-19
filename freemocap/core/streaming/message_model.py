@@ -709,7 +709,8 @@ class CertificationResult:
 @dataclass(frozen=True, slots=True)
 class CertificationItem:
     """One EP on one GPU as skellytracker's status gives it (`PackStatus` row and its `DeviceCheck`). Facts only:
-    the UI words the state. `reason_code` and `reason` are the EP row's."""
+    the UI words the state. `reason_code` is the GPU's (`DeviceCheck.reason_code`, None when usable); `reason` is
+    the EP row's text."""
     execution_provider: str = ""
     label: str = ""
     device_key: str = ""

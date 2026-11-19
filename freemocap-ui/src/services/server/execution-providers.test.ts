@@ -142,8 +142,8 @@ test('the menu shows usable pairs and the ones a check would let run; a pair of 
     assert.deepEqual(keys([item('gpu:0', {}), item('gpu:1', {local_result: 'failed', reason_code: 'quick-check-failed'})]),
         [['gpu:0', true], ['gpu:1', true]]);
     assert.deepEqual(keys([item('gpu:0', {reason_code: 'ep-not-installed'}), item('gpu:1', {reason_code: 'ep-not-installed'})]), [], 'not installed');
-    // The EP runs on one GPU (its row has no reason code): the other GPU waits for a check.
-    assert.deepEqual(keys([item('gpu:0', {usable: true, certified: true, reason_code: undefined}), item('gpu:1', {reason_code: undefined})]),
+    // The EP runs on one GPU: the other GPU, with its own check-rule code, waits for a check.
+    assert.deepEqual(keys([item('gpu:0', {usable: true, certified: true, reason_code: undefined}), item('gpu:1', {})]),
         [['gpu:0', false], ['gpu:1', true]]);
     assert.deepEqual(keys([item('gpu:0', {}), {...item('gpu:1', {}), execution_provider: 'other-ep'}]), [['gpu:0', true]], 'only its own items');
 });

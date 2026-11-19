@@ -56,11 +56,12 @@ class StartRefused(Exception):
 
 def refuse_unavailable_execution_provider(execution_provider: str | None, device_key: str | None) -> None:
     """F4: refuse a run start on a chosen EP and GPU that skellytracker refuses (`EpUnavailableError`), with the EP key,
-    the device key, the EP row's reason code and the pair's check facts, so the UI can offer the quick check. Auto
+    the device key of the refused GPU, its reason code and its check facts, so the UI can offer the quick check. Auto
     (None) is not checked here: it runs only what can start. Nothing switches to CPU.
 
-    `reason_code` is the EP row's (`PackStatus.reason_code`); it is None when the EP can run on another GPU, and then
-    `check` holds the facts of the refused GPU. An unknown key is left to the run, as before.
+    A refusal of the check rule names the GPU, also when no device was chosen; `reason_code` is that GPU's
+    (`DeviceCheck.reason_code`: the check rule's code, or the EP state's, e.g. `not-installed`), else the EP row's. An
+    unknown key is left to the run, as before.
     """
     if execution_provider in (None, "auto"):
         return
@@ -71,12 +72,13 @@ def refuse_unavailable_execution_provider(execution_provider: str | None, device
     except EpRequestError:
         return
     except EpUnavailableError as error:
+        device_key = error.device_key or device_key
         row = next((row for row in eps.status().eps if row.key == execution_provider), None)
         check = next((check for check in row.checks if check.device_key == device_key), None) if row else None
         raise StartRefused(409, {
             "code": "execution-provider-unavailable", "message": error.message,
             "execution_provider": execution_provider, "device_key": device_key,
-            "reason_code": row.reason_code if row else None,
+            "reason_code": error.reason_code or (check.reason_code if check else row.reason_code if row else None),
             "check": None if check is None else {"certified": check.certified, "local_result": check.local_result,
                                                  "local_cause": check.local_cause, "usable": check.usable}}) from None
 
@@ -121,18 +123,13 @@ class QuickCheckJob(BaseNode):
     def _run(*, ipc: PipelineIPC, execution_provider: str, device_key: str | None, detector_type: str,
              rtmpose_model_name: str | None, progress_pub, result_pub, cancel, shutdown_self_flag: Synchronized,
              certify=None) -> None:
-        # certify() gets a threading.Event that mirrors the cross-process one: skellytracker's inner functions are
-        # annotated `threading.Event` and its beartype checks refuse a multiprocessing.Event in a source run.
-        local_cancel = threading.Event()
-
-        def watch() -> None:  # a cancel, a stop, or the backend's exit or death ends certify() and its children
+        def watch() -> None:  # a stop, or the backend's exit or death, sets the cancel that certify() polls
             parent = multiprocessing.parent_process()
             # Poll, never `cancel.wait()`: a process that dies while waiting on a multiprocessing.Event makes the next
             # `set()` block forever (its Condition waits for the dead waiter to wake).
-            while not local_cancel.is_set():
-                if (cancel.is_set() or shutdown_self_flag.value or not ipc.should_continue
-                        or (parent is not None and not parent.is_alive())):
-                    local_cancel.set()
+            while not cancel.is_set():
+                if shutdown_self_flag.value or not ipc.should_continue or (parent is not None and not parent.is_alive()):
+                    cancel.set()
                 time.sleep(0.2)
 
         threading.Thread(target=watch, name="QuickCheckWatch", daemon=True).start()
@@ -140,7 +137,7 @@ class QuickCheckJob(BaseNode):
             if certify is None:
                 from skellytracker import certify
             from freemocap.core.tracking.pipeline_runs import load_detector_pipeline
-            report = certify("quick", progress_pub.put, local_cancel, execution_providers=[execution_provider],
+            report = certify("quick", progress_pub.put, cancel, execution_providers=[execution_provider],
                              device=device_key, pipeline=load_detector_pipeline(detector_type, rtmpose_model_name))
             result_pub.put(_report_result(report))
         except Exception as error:  # noqa: BLE001 - the class name only: an error text can hold a path
@@ -184,7 +181,7 @@ def status_parts(status, pending: list[dict]) -> tuple[CertificationHost, tuple[
     host = CertificationHost(name=socket.gethostname(), os=status.host.os_label or status.host.os_name)
     items = tuple(CertificationItem(execution_provider=row.key, label=row.label, device_key=check.device_key,
                                     device_name=check.name, certified=check.certified, local_result=check.local_result,
-                                    local_cause=check.local_cause, usable=check.usable, reason_code=row.reason_code,
+                                    local_cause=check.local_cause, usable=check.usable, reason_code=check.reason_code,
                                     reason=row.reason)
                   for row in status.eps for check in row.checks)
     performance = status.performance

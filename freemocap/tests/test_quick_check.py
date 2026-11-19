@@ -337,12 +337,12 @@ def test_the_routes_that_start_other_work_refuse_while_a_check_runs_and_stop_rou
 
 def _status():
     check = lambda key, **facts: SimpleNamespace(device_key=key, name="GPU " + key, **{
-        "certified": False, "local_result": None, "local_cause": None, "usable": False, **facts})
+        "certified": False, "local_result": None, "local_cause": None, "usable": False, "reason_code": None, **facts})
     rows = (
         SimpleNamespace(key=EP, label="Fake EP", reason_code=None, reason=None,
                         checks=(check(DEVICE, certified=True, usable=True),)),
         SimpleNamespace(key="other-ep", label="Other EP", reason_code="quick-check-failed", reason="its last quick check failed",
-                        checks=(check(DEVICE, local_result="failed", local_cause="unclean-exits"),)),
+                        checks=(check(DEVICE, local_result="failed", local_cause="unclean-exits", reason_code="unclean-exits"),)),
         SimpleNamespace(key="cpu-like", label="CPU", reason_code=None, reason=None, checks=()),
     )
     performance = SimpleNamespace(chosen=SimpleNamespace(ep_key=EP, device_key=DEVICE), skipped=(
@@ -368,7 +368,7 @@ def test_the_certification_field_is_facts_only_and_decodes_on_its_own():
          "certified": True, "usable": True},
         {"execution_provider": "other-ep", "label": "Other EP", "device_key": DEVICE, "device_name": "GPU " + DEVICE,
          "certified": False, "local_result": "failed", "local_cause": "unclean-exits", "usable": False,
-         "reason_code": "quick-check-failed", "reason": "its last quick check failed"}]
+         "reason_code": "unclean-exits", "reason": "its last quick check failed"}]  # the GPU's code, the row's text
     assert certification["auto"] == {"execution_provider": EP, "device_key": DEVICE,
                                      "needs_check": [{"execution_provider": "new-ep", "device_key": DEVICE}]}
     assert certification["gpu_held_by"] == [{"kind": "recording", "id": "g1"}]
@@ -454,10 +454,12 @@ def _refusing_eps(monkeypatch):
 
     def check_start(execution_provider, ep_options=None, device=None):
         raise EpUnavailableError(f"The EP '{execution_provider}' cannot run on 'GPU': no quick check passed.",
-                                 "Run `skellytracker-eps certify KEY --quick`.")
+                                 "Run `skellytracker-eps certify KEY --quick`.", execution_provider=execution_provider,
+                                 device_key=DEVICE, reason_code="quick-check-needed")  # the check rule names the GPU
 
-    row = SimpleNamespace(key=EP, reason_code="quick-check-needed", checks=(SimpleNamespace(
-        device_key=DEVICE, certified=False, local_result=None, local_cause=None, usable=False),))
+    row = SimpleNamespace(key=EP, reason_code=None, checks=(SimpleNamespace(
+        device_key=DEVICE, certified=False, local_result=None, local_cause=None, usable=False,
+        reason_code="quick-check-needed"),))
     monkeypatch.setattr(eps, "check_start", check_start)
     monkeypatch.setattr(eps, "status", lambda: SimpleNamespace(eps=(row,)))
 
@@ -473,6 +475,9 @@ def test_a_refused_ep_and_gpu_carries_the_ep_device_and_reason_code(monkeypatch)
         "execution_provider": EP, "device_key": DEVICE, "reason_code": "quick-check-needed",
         "check": {"certified": False, "local_result": None, "local_cause": None, "usable": False}}
     assert "skellytracker-eps" not in str(refused.value.detail)  # the CLI hint stays out of the UI
+    with pytest.raises(StartRefused) as refused:  # no device chosen: the refusal names the GPU the run would take
+        quick_check.refuse_unavailable_execution_provider(EP, None)
+    assert refused.value.detail["device_key"] == DEVICE and refused.value.detail["check"]["usable"] is False
 
 
 async def test_the_realtime_and_posthoc_starts_refuse_a_saved_ep_that_skellytracker_refuses(monkeypatch):

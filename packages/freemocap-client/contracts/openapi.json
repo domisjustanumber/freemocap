@@ -2891,7 +2891,7 @@
           "ONNX"
         ],
         "summary": "Get Available Execution Providers",
-        "description": "List providers advertised by this ONNX build; native library loading is checked at session startup.",
+        "description": "Each EP of this host as skellytracker gives it, in its order, whether each detector takes an EP, and the offers\nof skellytracker's Auto recommendation (install a pack, update a driver).\n\nThe run checks its EP again when it starts.",
         "operationId": "get_available_execution_providers_freemocap_onnx_execution_providers_get",
         "responses": {
           "200": {
@@ -2956,7 +2956,7 @@
           "ONNX"
         ],
         "summary": "Get Session Providers",
-        "description": "Actual loaded providers for shared live/post-hoc sessions; empty models means pending startup.\n\nPer-camera process sessions report the same diagnostics in their startup logs.",
+        "description": "For each live or posthoc run, the EP the user selected and each model node as skellytracker reports it:\nkey, version, sidecar_sha256, size, precision, the applied `execution_provider` and `device`. Empty models\nmeans the run has not started yet, or runs no model.",
         "operationId": "get_session_providers_freemocap_onnx_session_providers_get",
         "responses": {
           "200": {
@@ -4668,6 +4668,26 @@
             "type": "string",
             "title": "Camera Id",
             "readOnly": true
+          },
+          "supported_modes": {
+            "items": {
+              "$ref": "#/components/schemas/CaptureMode"
+            },
+            "type": "array",
+            "title": "Supported Modes",
+            "description": "MJPEG capture modes from native detection, largest resolution first. Empty when no natively detected device has this device's path."
+          },
+          "usb_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usb Version",
+            "description": "USB generation the camera is connected through ('USB 3', 'USB 2' or 'USB 1'); None when it cannot be determined (non-USB cameras, unsupported platforms)."
           }
         },
         "type": "object",
@@ -4686,8 +4706,7 @@
             },
             "type": "array",
             "maxItems": 4,
-            "minItems": 4,
-            "title": "Quaternion Wxyz"
+            "minItems": 4
           },
           "translation": {
             "items": {
@@ -4695,8 +4714,7 @@
             },
             "type": "array",
             "maxItems": 3,
-            "minItems": 3,
-            "title": "Translation"
+            "minItems": 3
           }
         },
         "additionalProperties": false,
@@ -4891,8 +4909,7 @@
             "items": {
               "type": "number"
             },
-            "type": "array",
-            "title": "World Position"
+            "type": "array"
           },
           "world_orientation": {
             "items": {
@@ -4901,8 +4918,7 @@
               },
               "type": "array"
             },
-            "type": "array",
-            "title": "World Orientation"
+            "type": "array"
           }
         },
         "additionalProperties": false,
@@ -11660,6 +11676,33 @@
           "run"
         ],
         "title": "QuickCheckCancel"
+      },
+      "CaptureMode": {
+        "properties": {
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          },
+          "height": {
+            "type": "integer",
+            "title": "Height"
+          },
+          "framerates": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Framerates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "width",
+          "height",
+          "framerates"
+        ],
+        "title": "CaptureMode",
+        "description": "One MJPEG capture resolution and every frame rate the camera reports for it."
       }
     }
   },

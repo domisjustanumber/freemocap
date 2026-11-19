@@ -972,7 +972,10 @@ export interface paths {
         };
         /**
          * Get Available Execution Providers
-         * @description List providers advertised by this ONNX build; native library loading is checked at session startup.
+         * @description Each EP of this host as skellytracker gives it, in its order, whether each detector takes an EP, and the offers
+         *     of skellytracker's Auto recommendation (install a pack, update a driver).
+         *
+         *     The run checks its EP again when it starts.
          */
         get: operations["get_available_execution_providers_freemocap_onnx_execution_providers_get"];
         put?: never;
@@ -1013,9 +1016,9 @@ export interface paths {
         };
         /**
          * Get Session Providers
-         * @description Actual loaded providers for shared live/post-hoc sessions; empty models means pending startup.
-         *
-         *     Per-camera process sessions report the same diagnostics in their startup logs.
+         * @description For each live or posthoc run, the EP the user selected and each model node as skellytracker reports it:
+         *     key, version, sidecar_sha256, size, precision, the applied `execution_provider` and `device`. Empty models
+         *     means the run has not started yet, or runs no model.
          */
         get: operations["get_session_providers_freemocap_onnx_session_providers_get"];
         put?: never;
@@ -1866,15 +1869,23 @@ export interface components {
             backend_name?: string | null;
             /** Camera Id */
             readonly camera_id: string;
+            /**
+             * Supported Modes
+             * @description MJPEG capture modes from native detection, largest resolution first. Empty when no natively detected device has this device's path.
+             */
+            supported_modes?: components["schemas"]["CaptureMode"][];
+            /**
+             * Usb Version
+             * @description USB generation the camera is connected through ('USB 3', 'USB 2' or 'USB 1'); None when it cannot be determined (non-USB cameras, unsupported platforms).
+             */
+            usb_version?: string | null;
         };
         /**
          * CameraExtrinsics
          * @description Camera extrinsic parameters: orientation (quaternion wxyz) + translation.
          */
         CameraExtrinsics: {
-            /** Quaternion Wxyz */
             quaternion_wxyz: number[];
-            /** Translation */
             translation: number[];
         };
         /** CameraGroupCreateRequest */
@@ -1995,9 +2006,7 @@ export interface components {
             ];
             intrinsics: components["schemas"]["CameraIntrinsics"];
             extrinsics: components["schemas"]["CameraExtrinsics"];
-            /** World Position */
             world_position?: number[];
-            /** World Orientation */
             world_orientation?: number[][];
         };
         /** CameraNodeConfig */
@@ -4831,6 +4840,18 @@ export interface components {
         QuickCheckCancel: {
             /** @description The check that was asked to stop; null when none was running. */
             run: components["schemas"]["QuickCheckRunState"] | null;
+        };
+        /**
+         * CaptureMode
+         * @description One MJPEG capture resolution and every frame rate the camera reports for it.
+         */
+        CaptureMode: {
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /** Framerates */
+            framerates: number[];
         };
     };
     responses: never;

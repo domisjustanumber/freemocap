@@ -685,9 +685,26 @@ frames, each with `rtmpose` and with `mediapipe`.
          (result form: `outputs` with `wholebody`/`holistic`/`boxes`; `crop_box`/`detector_box` go; changes
          `pipeline_runs.py`). Do not start them before the go.
 
-8. **EP management, certification and hand-in (2026-11-19; APPROVED PLAN, nothing built).** The decisions,
-   the work that waits on skellytracker and the next actions are in
+8. **EP management, certification and hand-in (2026-11-19; APPROVED PLAN; shutdown fix, hardware cleanup and
+   version change built).** The decisions, the work that waits on skellytracker and the next actions are in
    [ep-certification-integration.md](ep-certification-integration.md).
+
+9. **Preprocess benchmark (2026-11-19; APPROVED, build after the pin).** skellytracker adds the run parameter
+   `start_pipeline(..., preprocess="auto" | "cpu" | "gpu")` (not a pipeline config field; another value raises
+   `ValueError`). "auto" is today's behaviour (GPU decode and preprocess on cuda and trt-rtx, CPU elsewhere);
+   "cpu" keeps all frame work on the CPU and runs only the model on the EP; "gpu" uses the GPU preprocess on
+   every wired EP, confirmed or not, and warns `preprocessed_on_cpu` (`ep_not_wired`) elsewhere. It is on
+   skellytracker `dom/native-jpeg(-directml)`, merging into `dom/sidecar-implementation` (hand-over from
+   skellytracker-95). The user chose: build right after the pin brings it in, with all three values.
+   - Pass `preprocess` to `start_pipeline` in `freemocap/core/tracking/pipeline_runs.py` and keep it in the
+     run's `record`.
+   - A dev-only "Preprocess (benchmark)" select (`auto` default, `cpu`, `gpu`) beside "Legacy tracker
+     (benchmark)" in `RealtimeProcessingSettings.tsx`; its string field beside `legacy_tracker_benchmark` in
+     `RealtimeSkeletonInferenceNodeConfig`, passed through `realtime_skeleton_inference_node.py` and
+     `inference_service.py` the same way. Unlike the legacy toggle it is not deleted at stage 2.4.
+   - The legacy toggle stays the old `Tracker` (user, 2026-11-18). A CPU-against-GPU benchmark compares
+     `preprocess="cpu"` with `"auto"`. When frames come from skellycam as JPEG, the legacy path reads the BGR
+     ring so its timing has no JPEG decode.
 
 ### 0.3 Decisions of the user (all 2026-11-16, through the supervisor)
 

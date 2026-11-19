@@ -712,7 +712,7 @@ frames, each with `rtmpose` and with `mediapipe`.
      RTX 3070, trt-rtx, test_data 3 x 222 at 720x1280, InferenceService, 3 fresh runs each, steady ms/frame
      (median, range): auto 8.9 (8.3-10.2), cpu 11.9 (8.9-12.3), gpu 7.7 (7.0-10.3); first frame 3.6-5.3 s;
      preprocess on TensorRT RTX for auto and gpu, on the host for cpu; a calibration run shared the GPU, so auto
-     against gpu (the same path on trt-rtx) is noise. JSON: `%TEMP%mpre\summary.json`.
+     against gpu (the same path on trt-rtx) is noise. JSON: `C:\Users\Dom\AppData\Local\Temp\fmpre\summary.json`.
 
 ### 0.3 Decisions of the user (all 2026-11-16, through the supervisor)
 

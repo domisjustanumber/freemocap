@@ -26,6 +26,7 @@ from freemocap.tools.datasets.catalog import SAMPLE_DATA, TEST_DATA, acquire_rec
 logger = logging.getLogger(__name__)
 PREPARATION_VERSION = 1
 WORKER_STOP_GRACE_SECONDS = 10.0  # after the worker is asked to end, before it is killed
+STOP_FILE_VARIABLE = "FREEMOCAP_WORKER_STOP_FILE"
 WARNING_FILENAME = "FILES_IN_THIS_FOLDER_GET_DELETED_AUTOMATICALLY_DO_NOT_STORE_ANYTHING_YOU_CARE_ABOUT.txt"
 
 
@@ -334,10 +335,14 @@ def reuse_recording(root: Path, identity: dict, *, require_complete: bool = True
     return recording
 
 
-def end_on_stdin_eof() -> None:
-    """Run in the worker: end it when its parent closes stdin or dies. A requested end, so first the exit notice:
-    the worker may hold a GPU EP session, and a kill without the notice counts as an unclean exit of that EP."""
-    sys.stdin.buffer.read()
+def end_on_stop_file(path: Path) -> None:
+    """Run in the worker: end it once the parent creates `path`. A requested end, so first the exit notice: the
+    worker may hold a GPU EP session, and a kill without the notice counts as an unclean exit of that EP.
+    Not a read of stdin: on Windows a pending read of an inherited pipe blocks every subprocess the worker starts."""
+    from freemocap.app.dev_reload import ShutdownFile
+    stop = ShutdownFile(path)
+    while not stop.wait(3600):
+        pass
     from skellytracker import note_exit_requested
     note_exit_requested()
     os._exit(130)
@@ -345,10 +350,14 @@ def end_on_stdin_eof() -> None:
 
 def execute_worker(command: list[str], *, environment: dict, log_path: Path, timeout: float) -> None:
     """Keep the full log and stream task progress without separate log access."""
+    from freemocap.app.dev_reload import ShutdownFile
     from .progress import WorkerProgress
 
+    stop = ShutdownFile(log_path.with_name(log_path.name + ".stop"))
+    stop.path.unlink(missing_ok=True)
+    environment = {**environment, STOP_FILE_VARIABLE: str(stop.path)}
     with WorkerProgress(log_path) as display, log_path.open("w", encoding="utf-8") as log:
-        with subprocess.Popen(command, env=environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        with subprocess.Popen(command, env=environment, stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
                               creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0) as process:
             def relay():
@@ -362,7 +371,7 @@ def execute_worker(command: list[str], *, environment: dict, log_path: Path, tim
                 code = process.wait(timeout=timeout)
             except BaseException as error:
                 if not isinstance(error, subprocess.TimeoutExpired):  # a hang gets no exit notice
-                    process.stdin.close()  # the worker's end_on_stdin_eof() ends it
+                    stop.set()  # the worker's end_on_stop_file() ends it
                     try:
                         process.wait(timeout=WORKER_STOP_GRACE_SECONDS)
                     except subprocess.TimeoutExpired:
@@ -477,7 +486,9 @@ def main() -> None:
         parser.error("--timeout must be finite and positive")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     if arguments.worker:
-        threading.Thread(target=end_on_stdin_eof, name="EndOnStdinEof", daemon=True).start()
+        if STOP_FILE_VARIABLE in os.environ:
+            threading.Thread(target=end_on_stop_file, args=(Path(os.environ[STOP_FILE_VARIABLE]),),
+                             name="EndOnStopFile", daemon=True).start()
         run_worker(arguments.worker)
     else:
         print(prepare(TEST_DATA if arguments.dataset == "test" else SAMPLE_DATA,

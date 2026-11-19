@@ -247,21 +247,28 @@ def test_execute_worker_retains_full_log_and_propagates_failure(tmp_path):
     assert 'broken (failed)' in log.read_text()
 
 
-_WORKER = ("import sys, threading, time, skellytracker\n"
+_WORKER = ("import os, subprocess, sys, threading, time, skellytracker\n"
+           "from pathlib import Path\n"
            "skellytracker.note_exit_requested = lambda: open(sys.argv[1], 'w').close()\n"
-           "from freemocap.tools.datasets.preparation import end_on_stdin_eof\n"
-           "threading.Thread(target=end_on_stdin_eof, daemon=True).start()\n"
+           "from freemocap.tools.datasets.preparation import STOP_FILE_VARIABLE, end_on_stop_file\n"
+           "threading.Thread(target=end_on_stop_file, args=(Path(os.environ[STOP_FILE_VARIABLE]),), daemon=True).start()\n"
+           "subprocess.run([sys.executable, '-c', 'pass'], timeout=20)  # the watch must not block a subprocess\n"
+           "print('subprocess ran', flush=True)\n"
            "time.sleep(60)\n")
 
 
-def _interrupt_first_wait(monkeypatch):
-    """The first wait of execute_worker raises KeyboardInterrupt, as Ctrl+C in the parent does."""
+def _interrupt_first_wait(monkeypatch, until=lambda: True):
+    """The first wait of execute_worker raises KeyboardInterrupt, as Ctrl+C in the parent does, once `until()`."""
     import subprocess
+    import time
     real_wait, seen = subprocess.Popen.wait, []
 
     def wait(self, timeout=None):
         if not seen:
             seen.append(self)
+            deadline = time.monotonic() + 30
+            while not until() and time.monotonic() < deadline:
+                time.sleep(0.05)
             raise KeyboardInterrupt
         return real_wait(self, timeout)
     monkeypatch.setattr(subprocess.Popen, 'wait', wait)
@@ -274,12 +281,14 @@ def test_interrupted_worker_gets_exit_notice_before_it_ends(tmp_path, monkeypatc
     from freemocap.tools.datasets import preparation
 
     monkeypatch.setattr(preparation, 'WORKER_STOP_GRACE_SECONDS', 60.0)
-    seen = _interrupt_first_wait(monkeypatch)
+    log = tmp_path / 'processing.log'
+    seen = _interrupt_first_wait(monkeypatch, until=lambda: log.exists() and 'subprocess ran' in log.read_text())
     notice = tmp_path / 'notice'
     with pytest.raises(KeyboardInterrupt):
         preparation.execute_worker([sys.executable, '-B', '-c', _WORKER, str(notice)], environment=dict(os.environ),
-                                   log_path=tmp_path / 'processing.log', timeout=30.0)
+                                   log_path=log, timeout=30.0)
     assert notice.exists()
+    assert 'subprocess ran' in log.read_text()
     assert seen[0].returncode == 130  # it ended itself after the notice, not by the fallback kill
 
 

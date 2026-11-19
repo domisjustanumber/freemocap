@@ -583,6 +583,94 @@ child with module-level stand-ins for `certify`).
   same instant a check starts can slip through (no shared lock across the async starts). Linux runs the check in
   the app's default start method (fork) until skellycam's `ManagedProcess` takes a context.
 
+### F15 step 2: built
+
+UI only, 2026-11-19. Commits: `48e61bf3` (transport), `4df61357` (menu, prompt, check). No backend or HTTP API change.
+
+- Transport: `CertificationSchema` in `packages/freemocap-client/src/transport/message-contract.ts`, optional in
+  `app_state.state`; null fields are optional keys; `kind`, `state`, `result` and the codes are open strings (the
+  busy rule's new `kind` values pass). The connection slice keeps it as `certification` (null until known and while
+  disconnected; replaced by every `app_state`). Test: the golden in `snapshot-reconciliation.test.ts`.
+- Pure rules (`freemocap-ui/src/services/server/execution-providers.ts`): `pairState` and `PAIR_MARKERS` (F12's five
+  states); `menuPairs` (usable pairs plus pairs that skellytracker refuses only by its check rule, reason codes
+  `quick-check-needed`, `quick-check-failed`, `unclean-exits`, or none when the EP runs on another GPU; not-installed
+  and field-test pairs stay hidden); `executionProviderOptions(selected, providers, items)` marks an EP with the state
+  of the pair Auto's device would take; `menuDevices` (Device row, marked); `pairToCheck`; `quickCheckProgressText`
+  (F10); `QUICK_CHECK_TEXT` and `quickCheckResultText` (the six lines, in one place); `checkIntentOutcome` (F6);
+  `requestQuickCheck` and `requestQuickCheckCancel`. Before the first `certification` the menu works as before.
+- The menu and the panel: `detector-setting-rows.tsx` routes an EP or Device choice that needs a check to the prompt
+  and does not change the setting (so "Not now", a cancel and a failure leave it as it was, F6); a pass of a check this
+  window started makes the choice the selection, through the rows' current change handler. `quick-check-panel.tsx`
+  shows, from the server state: the running check with "Cancel check"; the prompt ("Run quick check" / "Not now"); for a
+  selection that needs a check (F4, a saved choice) a line with "Run quick check"; on Auto, the notice "A faster option
+  needs a quick check on this machine" with "Run quick check" and no dismiss (F3, F11); a refused start as "Quick check
+  could not start: <server message>"; and how the last check ended. `useQuickCheck.ts` holds only what the person
+  asked in this window (the prompt, the started check, the refusal, which result they moved on from), keyed on
+  endpoint + pid + connected, and ignores a start answered after a newer choice or by another server.
+- Cancel finding: a cancel shows in `last_result` as `result: "not-run", reason: "cancelled"` (skellytracker marks
+  every unfinished check row so and adds `cancelled` to the evidence reasons); seen on the RTX 3070 (cuda, cancelled
+  at 1 of 5: `last_result` not-run/cancelled about 1 s later). A cancel after the EP row already has its result keeps
+  that result. `error` (certify() raised; the reason is the class name) is worded "could not start".
+- Live run, this PC (backend from this checkout, relay URL empty, no UI window: no browser tool here): the real
+  `certification` parsed through the client schema; the menu logic gave Auto, TensorRT RTX, CUDA, CPU with no
+  markers (both GPU EPs reviewed; DirectML hidden as field-test); one quick check of cuda gave 202, a second start
+  "A quick check of cuda on gpu:10de:2484:0 is already running.", progress "starting" then "0 of 5" and "1 of 5,
+  up to about 50 seconds", then "Quick check cancelled". The backend was shut down through `/shutdown`.
+- Tests: `execution-providers.test.ts` (17), `detector-setting-rows.test.tsx` (8 new; its runner 46), the golden
+  test; the full UI unit suite passes (`node tools/test-sdk-integration.mjs`); `tsc --noEmit` clean.
+- Not covered by tests: the hook's state changes (no DOM or React test renderer in the UI's dependencies), so the
+  apply-on-pass, "Not now", the obsolete-answer rule and the server-change reset are checked only through their pure
+  rules and markup; the manual checklist covers them. Not seen: the rendered page, a pipeline start refused while a
+  check runs, a check refused while something runs, an unchecked or failed pair (none on this PC).
+- Known limits: the started check lives in the settings window; if the person closes it before a pass, the
+  selection does not change (choosing the EP again then needs no check). In the realtime settings a pass applies
+  the change as every change there does (the realtime apply). CoreML's chip key is sent as `device_key` (the
+  backend's concern; not seen on a Mac). The EP explanation popover still shows skellytracker's `install_hint` (a CLI
+  command) for an EP that needs a check. A field-test EP with no opt-in stays hidden (decision 17's check-as-opt-in
+  belongs to the start check, step 4). The Certification button's `· quick check 1 of 3` and Record's waiting line
+  are step 3.
+
+#### MANUAL CHECKLIST (G7)
+
+You need an EP and GPU that this machine has not checked (on the dev PC every GPU EP is reviewed, so use a machine
+with a GPU EP that has no reviewed result, or a fresh EP store). Start the app. The EP setting is in two places:
+"Processing settings" (real-time) and the mocap processing window's skeleton detector section. Steps 1 to 10 work in
+either.
+
+1. Open "Processing settings". Open the "Execution provider" menu. You see your unchecked EP, with "(not checked on
+   this machine)" after its name. A reviewed EP has nothing after its name.
+2. Select Auto. If Auto skipped a faster EP that needs a check, you see "A faster option needs a quick check on this
+   machine: <EP> on <GPU>." with a "Run quick check" button and no dismiss button. Leave it for now.
+3. Select the unchecked EP. The menu still shows the EP you had before. A box says "<EP> on <GPU>: not checked on
+   this machine." with two buttons: "Run quick check" and "Not now".
+4. Click "Not now". The box closes. The menu still shows the EP you had before.
+5. Select the unchecked EP again. The same box comes back. Click "Run quick check". A line says "Quick check of
+   <EP> on <GPU>: starting, up to about N seconds." and then "1 of 5 checks done" and so on, with "Cancel check".
+6. Click "Cancel check". Within a few seconds the line says "<EP> on <GPU>: Quick check cancelled". The menu still
+   shows the EP you had before.
+7. Select the unchecked EP again and click "Run quick check". Wait until it ends. If it passed, the menu now shows
+   that EP, and a line says "Quick check passed". If it failed, the menu shows the EP you had before, and the line
+   says "Quick check failed: <reason>"; the EP now shows "(check failed on this machine)".
+8. Select another EP. The result line goes away.
+9. If the machine has two GPUs for the EP: select the EP, open the "Device" menu. Each GPU shows its own state.
+   Choosing an unchecked GPU opens the same two-button box for that GPU only.
+10. Close and reopen the settings. The "Run quick check" and "Not now" buttons always have the same labels and are
+    never greyed out, also after a refusal.
+11. Busy rule, one way: start real-time processing (or a recording, or a posthoc run). Then try a quick check (step
+    5). A red line says "Quick check could not start: <the server's reason>". Stop the processing; click "Run quick
+    check" again; it starts.
+12. Busy rule, with cameras: with cameras streaming and nothing else, try a quick check. It is refused with the
+    server's reason (once the backend's wider busy rule is in).
+13. Busy rule, other way: start a quick check, then press "Real-time processing" or Record. The start is refused:
+    the error banner shows the server's reason ("A quick check of ... is running ..."). Nothing starts by itself when
+    the check ends; press it again.
+14. Refused saved choice: on a machine where your saved EP is not checked (or failed), start real-time processing.
+    It fails with the server's message in the error banner, and it does not switch to CPU. Under the EP setting you
+    see "<EP> on <GPU>: not checked on this machine. A start with it is refused until a quick check passes." with
+    "Run quick check".
+15. Restart: start a quick check, then quit and restart the backend (or the app). The page recovers without a
+    refresh; no old progress or prompt stays; the menu shows the server's states again.
+
 ## Environment on the dev PC
 
 Found 2026-11-19 while measuring decision 31; nothing was changed. `freemocap/.venv` dates from August 2026
@@ -717,7 +805,8 @@ To do next, in order:
    `app` block gets no tree-modified flag. The approved single connection test was run before the switch-off:
    422 `wrong-schema`, classified refused, nothing made on GitHub. This PC's store has 13 pending reports
    with old ids; they pass through unchanged (G4).
-3. F15 step 2: menu markers, the two-choice prompt and the background check in the UI, briefed from the
+3. Done (`48e61bf3`, `4df61357`; see [F15 step 2: built](#f15-step-2-built), with the user's manual checklist).
+   F15 step 2: menu markers, the two-choice prompt and the background check in the UI, briefed from the
    message shape step 1 recorded. Then steps 3 to 5 in parallel.
 
 Settled by the third grilling (see below): freemocap says "machine" for the computer (G1); dependency bumps are

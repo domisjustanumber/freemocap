@@ -45,7 +45,8 @@ skellycam = { path = "../skellycam", editable = true }
 skellytracker = { path = "../skellytracker", editable = true }
 skellyforge = { path = "../skellyforge", editable = true }
 freemocap_blender_addon = { path = "../freemocap_blender_addon", editable = true }
-skelly_synchronize = { git = "https://github.com/freemocap/skellysync", branch = "philip/rewrite" }
+# Local for now (user, 2026-11-19): the dom/sidecar-implementation branch with Python ==3.13.18 is not pushed.
+skelly_synchronize = { path = "../skellysync", editable = true }
 
 skellylogs = { path = "../utils/skellylogs", editable = true }
 skellypings = { path = "../utils/skellypings", editable = true }

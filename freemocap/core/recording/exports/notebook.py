@@ -177,7 +177,7 @@ def write_notebook(path: Path, *, snapshot: dict) -> None:
         cell('markdown', """## Load necessary libraries
 
 We'll use Polars to select saved columns, NumPy for data tensors, and Plotly for interactive plots.
-Your notebook environment needs numpy, polars>=2,<3, and plotly>=6,<7.
+Your notebook environment needs numpy, polars>=2,<3, and plotly>=7,<8.
 """),
         cell('code', IMPORTS),
         cell('markdown', """## Define variables

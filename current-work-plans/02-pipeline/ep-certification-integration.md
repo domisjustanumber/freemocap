@@ -51,9 +51,24 @@ the OS on this PC, and lets the person hand in certify reports. It does this thr
    skellytracker. `freemocap.spec:96-97` (collection), `:99-100` (stale `onnx` hidden import) and the
    onnxruntime excludes at `:151-156` move to a skellytracker PyInstaller hook. The dev pin `onnx==1.22.0`
    (`pyproject.toml:156`) goes with `legacy_tracker_run.py` at ST 2.4.
+   DONE 2026-11-19 (`f053be14`, Windows only): the spec drops those lines and the seven mediapipe hidden
+   imports that PyInstaller reported missing (migration plan "stale hidden imports"). PyInstaller loads
+   `hook-onnxruntime.py` from `../skellytracker/skellytracker/_pyinstaller` through the `pyinstaller40`
+   entry point, visible from the editable install. Payload before and after: the same 36 files, 78,610,666
+   bytes under `onnxruntime`, `windowsml`, `onnx` and their metadata (the manual collection added nothing).
+   `onnx` still arrives through skellytracker's imports. Without the excludes the archive gains
+   `onnxruntime.transformers` and `.machine_info` (5.7 KB, reached only from ORT's CUDA debug print).
+   Frozen run: `/health`, `/freemocap/onnx/system_information` (ORT 1.30.0, `onnxruntime-windowsml`,
+   DML and CPU EPs) and `POST /shutdown` to exit 0 in 1.6 s. Seen, not fixed: a frozen build from this
+   checkout lacks `skellycam` and `skellylogs` (setuptools finder editable installs are invisible to
+   PyInstaller; the run needed `PYTHONPATH` with their sources), and the frozen app with piped stdout
+   prints the cp1252 `UnicodeEncodeError` logging errors (58 at idle).
 3. On Windows the ONNX Runtime distribution is `onnxruntime-windowsml` 1.30.0 (brings DirectML).
    `import skellytracker` sets `ORT_DISABLE_TELEMETRY=1` (a preset value stays); freemocap imports
    onnxruntime nowhere before skellytracker.
+   VERIFIED 2026-11-19: no freemocap module imports `onnxruntime`; after `import freemocap.app.app` the
+   variable is `1`, `onnxruntime` is not yet imported, and `onnxruntime-windowsml` is the only ORT
+   distribution.
 4. `freemocap.__version__` drops its leading `v` (`v2.0.0-alpha.25` becomes `2.0.0-alpha.25`), and every
    reader of it changes in the same commit. Reason: the report format requires SemVer with no prefix.
 5. Windows first.

@@ -1,6 +1,6 @@
 # EP management, certification and report hand-in
 
-**State (2026-11-19): APPROVED PLAN; the Electron shutdown fix (decision 31) is built, the rest is not.** The user settled every decision below in a grilling
+**State (2026-11-19): APPROVED PLAN; the Electron shutdown fix (decision 31) and the hardware cleanup (6 to 8) are built, the rest is not.** The user settled every decision below in a grilling
 round in this session and in the skellytracker session (`skellytracker-6c`, the session that owns
 ONNX Runtime, EP packs and EP certification). The skellytracker interfaces this plan needs do not exist yet;
 do not code against their names until that session sends the built shapes. The work that needs no new
@@ -233,7 +233,12 @@ All as local commits on `sidecar-implementation`, in this order:
 1. Done: Electron's close (decision 31, `2a4c130d`). Still open: measure `POST /shutdown` to exit once an
    environment runs current freemocap, then set `SHUTDOWN_GRACE_MS`. The skellytracker call (32) follows when
    it exists.
-2. The hardware cleanup (decisions 6 to 8).
+2. Done: the hardware cleanup (decisions 6 to 8, `3cdf672f`). The ping keeps its payload keys; the benchmark
+   snapshot keeps `available_memory_bytes` and `system_cpu_percent` (percent) and replaces the `load_average`
+   list with `load_average_1m`; `psutil>=7.0.0` as skellycam declares it. `uv.lock` is not regenerated (it
+   cannot be on the dev PC); that happens with the pin. Checked: the new expressions run in skellytracker's
+   venv and match the old psutil/platform values; `test_machine_benchmarks.py` gives 9 passed, 4 failed both
+   before and after the change, all four from the stale freemocap venv.
 3. When skellytracker's CI on `55fabf4a` is green, macOS included: pin it and regenerate `uv.lock` (decision 1).
 4. The `__version__` change (decision 4) and `BUILD_TREE_MODIFIED` (decision 11).
 5. Everything else waits for the skellytracker shapes.

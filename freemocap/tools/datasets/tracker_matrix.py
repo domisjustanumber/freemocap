@@ -111,11 +111,13 @@ def run_matrix(*, datasets: list[str], recordings_root: Path, output: Path) -> i
         for detector, execution_provider in cases:
             case = f"{detector}_{execution_provider}"
             case_output = output / f"{dataset}-{case}"
-            with (output / f"{dataset}-{case}.log").open("w", encoding="utf-8") as log:
-                result = subprocess.run([
+            # Not subprocess.run: it kills the case 0.25 s after Ctrl+C, an unclean exit of its GPU EP; the case
+            # shares this console, gets the Ctrl+C itself and ends normally.
+            with (output / f"{dataset}-{case}.log").open("w", encoding="utf-8") as log, subprocess.Popen([
                     sys.executable, "-B", "-m", "freemocap.tools.datasets.tracker_comparison",
                     dataset, detector, "--execution-provider", execution_provider, "--recordings-root", str(recordings_root), "--output", str(case_output),
-                ], stdout=log, stderr=subprocess.STDOUT, check=False)
+                    ], stdout=log, stderr=subprocess.STDOUT) as result:
+                result.wait()
             report_path = case_output / "report.json"
             try:
                 report = json.loads(report_path.read_text(encoding="utf-8"))

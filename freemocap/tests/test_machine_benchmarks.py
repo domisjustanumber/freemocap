@@ -84,20 +84,14 @@ def test_published_records_replace_home_in_nested_paths():
 
 def test_wrapper_delegates_to_existing_runner_and_persists_failure(tmp_path, monkeypatch):
     from argparse import Namespace
-    from subprocess import CompletedProcess
     from freemocap.tools import machine_benchmarks as module
     machine = dict(label='test', cpu_name='test CPU', memory_total_bytes=1024)
     monkeypatch.setattr(module, 'machine_info', lambda label: machine)
     monkeypatch.setattr(module, 'capture_provenance', lambda: {})
     monkeypatch.setattr(module, 'load_snapshot', lambda: {})
+    from freemocap.tests.test_tracker_matrix import FakeCase
     calls = []
-    original_run = module.subprocess.run
-    def execute(command, **kwargs):
-        if command[0] == 'git':
-            return original_run(command, **kwargs)
-        calls.append(command)
-        return CompletedProcess(command, 1)
-    monkeypatch.setattr(module.subprocess, 'run', execute)
+    monkeypatch.setattr(module.subprocess, 'Popen', lambda command, **kwargs: FakeCase(lambda c: calls.append(c) or 1, command))
     args = Namespace(command='dataset', output=tmp_path / 'new', machine='test', conditions='unit test',
                      dataset='test_data', recordings_root=tmp_path / 'raw', output_profile='numerical',
                      tracker_preset='rtmpose', timeout=30, blender_path=None)
@@ -111,6 +105,28 @@ def test_wrapper_delegates_to_existing_runner_and_persists_failure(tmp_path, mon
     with pytest.raises(FileExistsError):
         module.run(args)
     assert len(calls) == 1
+
+
+def test_ctrl_c_leaves_the_runner_to_end_its_backend_or_worker(tmp_path, monkeypatch):
+    """The runner gets the Ctrl+C itself; killing it strands the process that holds a GPU EP session."""
+    from argparse import Namespace
+    from freemocap.tests.test_tracker_matrix import FakeCase
+    from freemocap.tools import machine_benchmarks as module
+    monkeypatch.setattr(module, 'machine_info', lambda label: dict(label='test', cpu_name='test CPU', memory_total_bytes=1024))
+    monkeypatch.setattr(module, 'capture_provenance', lambda: {})
+    monkeypatch.setattr(module, 'load_snapshot', lambda: {})
+    runners = []
+
+    def interrupted(command):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(module.subprocess, 'Popen', lambda command, **kwargs: runners.append(FakeCase(interrupted, command)) or runners[-1])
+    args = Namespace(command='dataset', output=tmp_path / 'new', machine='test', conditions='unit test',
+                     dataset='test_data', recordings_root=tmp_path / 'raw', output_profile='numerical',
+                     tracker_preset='rtmpose', timeout=30, blender_path=None)
+    with pytest.raises(KeyboardInterrupt):
+        module.run(args)
+    runners[0].kill.assert_not_called()
+    assert json.loads((args.output / 'benchmark.json').read_text())['status'] == 'interrupted'
 
 
 def test_archive_only_publishes_completed_small_records_and_never_overwrites(tmp_path):

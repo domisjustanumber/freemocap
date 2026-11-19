@@ -262,8 +262,11 @@ def run(args):
     record['command'] = portable(command)
     started = time.perf_counter()
     try:
-        with (output / 'runner.log').open('w', encoding='utf-8') as log:
-            result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT)
+        # Not subprocess.run: it kills the runner 0.25 s after Ctrl+C, before the runner ends the backend or worker
+        # that holds a GPU EP session; the runner shares this console, gets the Ctrl+C itself and ends them.
+        with ((output / 'runner.log').open('w', encoding='utf-8') as log,
+              subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT) as result):
+            result.wait()
         record['returncode'] = result.returncode
         if args.command == 'dataset':
             record['cases'] = [collect_dataset(output, args.dataset, args.output_profile, args.tracker_preset)]

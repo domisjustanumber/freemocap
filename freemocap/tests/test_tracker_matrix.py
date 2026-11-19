@@ -1,14 +1,30 @@
 """One broken native subprocess must not erase evidence or skip other detectors."""
 import json
 from pathlib import Path
-import subprocess
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from freemocap.tools.datasets.tracker_matrix import run_matrix, compare_backend_observations
-from freemocap.tools.datasets import tracker_comparison  # Load native dependencies before mocking subprocess.run.
+from freemocap.tools.datasets import tracker_comparison  # Load native dependencies before mocking subprocess.Popen.
+
+
+class FakeCase:
+    """A `subprocess.Popen` stand-in: `wait()` runs `effect(command)`, which returns the exit code or raises."""
+
+    def __init__(self, effect, command, **kwargs):
+        self.effect, self.command, self.kill = effect, command, Mock()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exception):
+        return False
+
+    def wait(self, timeout=None):
+        self.returncode = self.effect(self.command)
+        return self.returncode
 
 
 class TrackerMatrixTests(unittest.TestCase):
@@ -40,15 +56,16 @@ class TrackerMatrixTests(unittest.TestCase):
         with TemporaryDirectory() as temporary:
             output = Path(temporary) / "matrix"
 
-            def run(command, **kwargs):
+            def run(command):
                 case_output = Path(command[-1])
                 case_output.mkdir()
                 if "rtmpose_cpu" in case_output.name:
                     (case_output / "report.json").write_text('{"status":', encoding="utf-8")
-                return subprocess.CompletedProcess(command, 1)
+                return 1
 
             rows = [SimpleNamespace(key="cpu"), SimpleNamespace(key="gpu-ep")]  # The cases come from skellytracker's EP rows.
-            with (patch("freemocap.tools.datasets.tracker_matrix.subprocess.run", side_effect=run) as calls,
+            with (patch("freemocap.tools.datasets.tracker_matrix.subprocess.Popen",
+                        side_effect=lambda command, **kwargs: FakeCase(run, command)) as calls,
                   patch("freemocap.core.tracking.execution_providers.execution_provider_rows", return_value=rows)):
                 result = run_matrix(datasets=["test_data", "sample_data"], recordings_root=Path(temporary), output=output)
             self.assertEqual(result, 1)
@@ -58,6 +75,21 @@ class TrackerMatrixTests(unittest.TestCase):
             self.assertIn(["test_data", "rtmpose", "--execution-provider", "gpu-ep"], [call.args[0][4:8] for call in calls.call_args_list])
             self.assertTrue(all(report["status"] == "failed" for report in reports))
             self.assertEqual(json.loads((output / "sample_data-cpu-versus-gpu-ep.json").read_text())["status"], "not_compared")
+
+    def test_ctrl_c_leaves_the_case_to_end_itself(self):
+        """The case gets the Ctrl+C itself; a kill would be an unclean exit of its GPU EP session."""
+        def interrupted(command):
+            raise KeyboardInterrupt
+
+        cases = []
+        with TemporaryDirectory() as temporary:
+            with (patch("freemocap.tools.datasets.tracker_matrix.subprocess.Popen",
+                        side_effect=lambda command, **kwargs: cases.append(FakeCase(interrupted, command)) or cases[-1]),
+                  patch("freemocap.core.tracking.execution_providers.execution_provider_rows",
+                        return_value=[SimpleNamespace(key="gpu-ep")]),
+                  self.assertRaises(KeyboardInterrupt)):
+                run_matrix(datasets=["test_data"], recordings_root=Path(temporary), output=Path(temporary) / "matrix")
+        cases[0].kill.assert_not_called()
 
     def test_missing_backend_evidence_is_not_a_pass(self):
         with TemporaryDirectory() as temporary:

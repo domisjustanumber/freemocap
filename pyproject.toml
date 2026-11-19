@@ -97,7 +97,8 @@ freemocap = ["tests/streaming_fixtures/*.bin", "tests/fixtures/*.md", "tests/con
 # `current_version` below is the ONE canonical version. bumpver writes it to
 # every file in the format that ecosystem requires:
 #   - pyproject.toml `version`               PEP 440,  e.g. 2.0.0a2        (pip/uv)
-#   - freemocap/__init__.py `__version__`     display,  e.g. v2.0.0-alpha.2 (Python runtime)
+#   - freemocap/__init__.py `__version__`     SemVer,   e.g. 2.0.0-alpha.2  (Python runtime; no `v`,
+#                                             as skellycertify reports require)
 #   - freemocap-ui/package.json `version`     npm semver, e.g. 2.0.0-alpha.2 (Electron)
 #   - freemocap-docs .../downloads.ts         display,  e.g. 2.0.0-alpha.2  (docs site)
 #
@@ -126,7 +127,7 @@ push = true
     # pin above and clobbers it. (Both the marker and that pin go away when rtmlib does.)
     'version = "{pep440_version}"  # bumpver',
 ]
-"freemocap/__init__.py" = ['__version__ = "{version}"']
+"freemocap/__init__.py" = ['__version__ = "MAJOR.MINOR.PATCH[-TAG.NUM]"']
 "freemocap-ui/package.json" = ['"version": "MAJOR.MINOR.PATCH[-TAG.NUM]"']
 # freemocap-docs is a separate repo (not tracked here), so bumpver can't git-add it
 # — its DEFAULT_VERSION is bumped in that repo, not from freemocap.

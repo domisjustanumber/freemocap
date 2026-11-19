@@ -188,6 +188,8 @@ jobs:
         run: |
           SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-8)
           TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          # Before writing build_info.py, which itself dirties the tree.
+          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then TREE_MODIFIED=True; else TREE_MODIFIED=False; fi
 
           cat > freemocap/build_info.py << EOF
           """Build metadata and secrets populated by CI."""
@@ -196,6 +198,7 @@ jobs:
           BUILD_NUMBER: str = "${{ github.run_number }}"
           BUILD_TIMESTAMP: str = "${TIMESTAMP}"
           BUILD_TAG: str = "${{ github.ref_name }}"
+          BUILD_TREE_MODIFIED: bool | None = ${TREE_MODIFIED}
           SKELLYPINGS_SERVER_URL: str = "https://skellypings-401698866387.northamerica-northeast1.run.app"
           SKELLYPINGS_SECRET: str = "${{ secrets.SKELLYPINGS_SECRET }}"
           EOF

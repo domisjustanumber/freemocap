@@ -12,6 +12,8 @@ BUILD_GIT_SHA_SHORT: str = "dev"
 BUILD_NUMBER: str = "local"
 BUILD_TIMESTAMP: str = "unknown"
 BUILD_TAG: str = "untagged"
+# The tracked tree had changes when CI wrote this file; None outside CI (git can answer there).
+BUILD_TREE_MODIFIED: bool | None = None
 
 # ── Telemetry ──
 SKELLYPINGS_SERVER_URL: str = "https://skellypings-401698866387.northamerica-northeast1.run.app"

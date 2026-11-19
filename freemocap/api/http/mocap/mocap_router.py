@@ -18,6 +18,7 @@ from skelly_synchronize.core.models import SyncMethod, SyncRequest, SyncResult, 
 
 from freemocap.app.freemocap_application import get_freemocap_app
 from freemocap.system.certify.quick_check import StartRefused
+from freemocap.api.http.certify.quick_check_router import admitted
 from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
 from freemocap.system.default_paths import FREEMOCAP_TEST_DATA_PATH, default_recording_name, get_default_freemocap_recordings_path
 
@@ -236,7 +237,7 @@ async def check_video_sync(request: CheckVideoSyncRequest) -> CheckVideoSyncResp
     return _check_video_sync(request.video_paths)
 
 
-@mocap_router.post("/recording/synchronize", status_code=201)
+@mocap_router.post("/recording/synchronize", status_code=201, dependencies=[admitted("sync")])
 async def synchronize_videos(request: SynchronizeVideosRequest) -> SynchronizeVideosStartResponse:
     """Start a background job that aligns/trims a group of videos to a shared frame count.
 

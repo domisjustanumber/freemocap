@@ -16,6 +16,7 @@ from freemocap.api.http.recordings.recording_access import RecordingReadRoute
 from freemocap.core.recording.exports.catalog import export_options
 from freemocap.core.recording.recording_access import RecordingBusyError
 from .export_jobs import create_job, run_job, job_state, cancel_job
+from freemocap.api.http.certify.quick_check_router import admitted
 
 exports_router = APIRouter(prefix='/exports', tags=['Recording exports'],
                           include_in_schema=False, deprecated=True, route_class=RecordingReadRoute)
@@ -32,7 +33,7 @@ def export_selection(recording_path: str):
     return export_options(structure).model_dump(mode='json', exclude={'kinds'})
 
 
-@exports_router.post('/scientific', status_code=202)
+@exports_router.post('/scientific', status_code=202, dependencies=[admitted('export')])
 def save_channel_exports(request: SavedExportRequest, background: BackgroundTasks, http_request: Request):
     structure = structure_for(request.recording_path)
     options = ExportRequest(**request.model_dump(exclude={'recording_path'}))
@@ -84,7 +85,7 @@ def selection(recording_path: str) -> ExportSelection | Response:
             selected_run_id=view.metadata.selected_run_id, revision=view.revision)
 
 
-@exports_router.post('/tall-csv', response_model=TallCsvResult)
+@exports_router.post('/tall-csv', response_model=TallCsvResult, dependencies=[admitted('export')])
 def save_tall_csv(request: SavedTallCsvRequest, http_request: Request) -> TallCsvResult:
     # A synchronous route runs in FastAPI's thread pool; large exports do not
     # block the event loop or rerun detection/reconstruction.

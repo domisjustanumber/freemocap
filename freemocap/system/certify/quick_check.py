@@ -2,8 +2,9 @@
 
 The child runs `certify("quick", progress, cancel, execution_providers=[key], device=device_key, pipeline=P)` with P the
 user's detector pipeline. Progress comes back through a queue, cancel is a `multiprocessing.Event`, and the latest
-complete progress message is the job state (decision 9). A check is refused while any pipeline runs, and every
-pipeline start is refused while a check runs (F7, decision 20); nothing is queued (F8).
+complete progress message is the job state (decision 9). A check is refused while anything that does work runs
+(pipelines, recording, cameras, sync and export jobs), and every such start is refused while a check runs (F7, decision
+20, H1); both sides check and register under one lock (H2). Nothing is queued (F8).
 
 The job reuses the posthoc worker machinery (`BaseNode`, `WorkerRegistry`, `PipelineIPC`), as `SyncJob` does. The
 child must not be daemonic: `certify()` runs its probe and image run in `spawn` children of its own.
@@ -15,6 +16,8 @@ import multiprocessing.synchronize
 import socket
 import threading
 import time
+from collections.abc import Callable
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from multiprocessing.sharedctypes import Synchronized
 from queue import Empty
@@ -204,6 +207,10 @@ class QuickCheckManager:
     global_kill_flag: Synchronized
     worker_registry: WorkerRegistry
     lock: threading.Lock = field(default_factory=threading.Lock)
+    # H2: the check's admission and every other start check and register under this lock, held only for that step.
+    # A threading lock: the check starts in a thread-pool route, the other starts on the event loop or in threads.
+    admission_lock: threading.Lock = field(default_factory=threading.Lock)
+    claims: list[PipelineHold] = field(default_factory=list)  # starts admitted and not yet returned
     job: QuickCheckJob | None = None
     run: CertificationRun | None = None
     last_result: CertificationResult | None = None
@@ -217,7 +224,7 @@ class QuickCheckManager:
         return self.job is not None
 
     def refuse_pipeline_start(self, kind: str) -> None:
-        """F7: a pipeline start is refused while a check runs. The refusal is this request's answer, not a stored gate."""
+        """F7, H1: a start of work is refused while a check runs. The refusal is this request's answer, not a stored gate."""
         run = self.run
         if run is not None:
             item = run.items[0]
@@ -228,27 +235,55 @@ class QuickCheckManager:
                 "run": {"execution_provider": item.execution_provider, "device_key": item.device_key,
                         "done": run.done, "total": run.total}})
 
+    def claim(self, kind: str) -> PipelineHold:
+        """H2: refuse while a check runs, else register a claim that a check's admission sees until `release`."""
+        with self.admission_lock:
+            self.refuse_pipeline_start(kind)
+            claim = PipelineHold(kind, "starting")
+            self.claims.append(claim)
+            return claim
+
+    def release(self, claim: PipelineHold) -> None:
+        with self.admission_lock:
+            self.claims.remove(claim)
+
+    @contextmanager
+    def admit(self, kind: str):
+        """Run one start of work under a claim: by its end the work itself is listed by `holds`, or it failed."""
+        claim = self.claim(kind)
+        try:
+            yield
+        finally:
+            self.release(claim)
+
     def start(self, *, pair: CertificationPair, detector_type: str, rtmpose_model_name: str | None,
-              seconds_estimate: int | None, holds: tuple[PipelineHold, ...]) -> CertificationRun:
+              seconds_estimate: int | None, holds: Callable[[], tuple[PipelineHold, ...]]) -> CertificationRun:
+        """`holds` lists what runs (claims included); it is read under the admission lock and must not take it."""
         with self.lock:
-            if self.job is not None:
-                running = self.run.items[0]
-                raise StartRefused(409, {
-                    "code": "quick-check-running",
-                    "message": f"A quick check of {running.execution_provider} on {running.device_key} is already running.",
-                    "run": {"execution_provider": running.execution_provider, "device_key": running.device_key}})
-            if holds:
-                raise StartRefused(409, {
-                    "code": "pipelines-running",
-                    "message": "A quick check cannot start while a pipeline runs: "
-                               + ", ".join(f"{hold.kind} {hold.id}" for hold in holds) + ". Stop it first.",
-                    "gpu_held_by": [{"kind": hold.kind, "id": hold.id} for hold in holds]})
-            job = QuickCheckJob.create(pair=pair, detector_type=detector_type, rtmpose_model_name=rtmpose_model_name,
-                                       worker_registry=self.worker_registry, global_kill_flag=self.global_kill_flag,
-                                       certify=self.certify)
-            job.start()
+            with self.admission_lock:
+                if self.run is not None:
+                    running = self.run.items[0]
+                    raise StartRefused(409, {
+                        "code": "quick-check-running",
+                        "message": f"A quick check of {running.execution_provider} on {running.device_key} is already running.",
+                        "run": {"execution_provider": running.execution_provider, "device_key": running.device_key}})
+                held = holds()
+                if held:  # the names `pipelines-running` and `gpu_held_by` are historical: they cover all work (H1)
+                    raise StartRefused(409, {
+                        "code": "pipelines-running",
+                        "message": "A quick check cannot start while other work runs: "
+                                   + ", ".join(f"{hold.kind} {hold.id}" for hold in held) + ". Stop it first.",
+                        "gpu_held_by": [{"kind": hold.kind, "id": hold.id} for hold in held]})
+                self.run = CertificationRun(level="quick", items=(pair,), seconds_estimate=seconds_estimate)
+            try:  # the spawn is outside the admission lock; the run set above refuses other starts meanwhile
+                job = QuickCheckJob.create(pair=pair, detector_type=detector_type, rtmpose_model_name=rtmpose_model_name,
+                                           worker_registry=self.worker_registry, global_kill_flag=self.global_kill_flag,
+                                           certify=self.certify)
+                job.start()
+            except BaseException:
+                self.run = None
+                raise
             self.job = job
-            self.run = CertificationRun(level="quick", items=(pair,), seconds_estimate=seconds_estimate)
             logger.info("Quick check of %s on %s started", pair.execution_provider, pair.device_key)
             return self.run
 

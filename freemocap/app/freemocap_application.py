@@ -122,10 +122,10 @@ class FreemocapApplication:
     # ------------------------------------------------------------------
 
     async def start_recording_all(self, recording_info: RecordingInfo) -> None:
-        self.quick_checks.refuse_pipeline_start("recording")
-        await self.camera_group_manager.start_recording_all_groups(
-            recording_info=recording_info,
-        )
+        with self.quick_checks.admit("recording"):
+            await self.camera_group_manager.start_recording_all_groups(
+                recording_info=recording_info,
+            )
 
     async def stop_recording_all(self) -> RecordingInfo | None:
         recording_infos = await self.camera_group_manager.stop_recording_all_groups()
@@ -148,7 +148,15 @@ class FreemocapApplication:
             pipeline_config: RealtimePipelineConfig,
             realtime_camera_ids: list[CameraIdString] | None = None,
     ) -> RealtimePipeline:
-        self.quick_checks.refuse_pipeline_start("realtime")
+        with self.quick_checks.admit("realtime"):
+            return await self._create_or_update_realtime_pipeline(camera_configs, pipeline_config, realtime_camera_ids)
+
+    async def _create_or_update_realtime_pipeline(
+            self,
+            camera_configs: CameraConfigs,
+            pipeline_config: RealtimePipelineConfig,
+            realtime_camera_ids: list[CameraIdString] | None,
+    ) -> RealtimePipeline:
         node = pipeline_config.skeleton_inference_node_config
         if pipeline_config.camera_node_config.skeleton_tracking_enabled and not node.legacy_tracker_benchmark:  # Deleted at skellytracker stage 2.4 (legacy tracker benchmark): keep only the first condition.
             from freemocap.core.tracking.pipeline_runs import detector_takes_execution_provider
@@ -297,34 +305,33 @@ class FreemocapApplication:
             recording_info: RecordingInfo,
             calibration_config: PosthocCalibrationPipelineConfig,
     ) -> CalibrationPipeline:
-        self.quick_checks.refuse_pipeline_start("posthoc")
-        pipeline = self.posthoc_pipeline_manager.create_calibration_pipeline(
-            recording_info=recording_info,
-            calibration_config=calibration_config,
-        )
-        return pipeline
+        with self.quick_checks.admit("posthoc"):
+            return self.posthoc_pipeline_manager.create_calibration_pipeline(
+                recording_info=recording_info,
+                calibration_config=calibration_config,
+            )
 
     async def create_posthoc_mocap_pipeline(
             self,
             recording_info: RecordingInfo,
             mocap_config: PosthocMocapPipelineConfig,
     ) -> MocapPipeline:
-        self.quick_checks.refuse_pipeline_start("posthoc")
-        if mocap_config.start_stage == "observations":  # only a tracking run starts an EP
-            from freemocap.core.pipeline.dataflow.application_pipeline import resolve_tracking_provider
-            await asyncio.to_thread(refuse_unavailable_execution_provider, resolve_tracking_provider(mocap_config),
-                                    mocap_config.execution_device)
-        pipeline = self.posthoc_pipeline_manager.create_mocap_pipeline(
-            recording_info=recording_info,
-            mocap_config=mocap_config,
-        )
-        return pipeline
+        with self.quick_checks.admit("posthoc"):
+            if mocap_config.start_stage == "observations":  # only a tracking run starts an EP
+                from freemocap.core.pipeline.dataflow.application_pipeline import resolve_tracking_provider
+                await asyncio.to_thread(refuse_unavailable_execution_provider, resolve_tracking_provider(mocap_config),
+                                        mocap_config.execution_device)
+            return self.posthoc_pipeline_manager.create_mocap_pipeline(
+                recording_info=recording_info,
+                mocap_config=mocap_config,
+            )
 
     # ------------------------------------------------------------------
     # Video synchronization jobs
     # ------------------------------------------------------------------
 
     def create_sync_job(self, request: SyncRequest) -> SyncJob:
+        """The sync routes admit the start (H1) before staging their copies; see `quick_check_router.admitted`."""
         return self.sync_job_manager.create_job(request=request)
 
     # ------------------------------------------------------------------
@@ -374,17 +381,28 @@ class FreemocapApplication:
         }
 
     def pipeline_holds(self, cameras: dict | None = None) -> tuple[PipelineHold, ...]:
-        """Every running pipeline (realtime, including a startup in progress; recording; posthoc), CPU ones too."""
-        holds = [PipelineHold("realtime", pipeline.id)
-                 for pipeline in list(self.realtime_pipeline_manager.pipelines.values()) if pipeline.alive]
+        """Everything that does work and so refuses a quick check (H1): realtime pipelines (a startup in progress
+        too), recording, connected cameras without a realtime pipeline, posthoc pipelines, sync and export jobs, and
+        starts admitted but not yet listed. CPU work counts too. It must not take the admission lock (H2)."""
+        from freemocap.api.http.posthoc import export_jobs
+        pipelines = [pipeline for pipeline in list(self.realtime_pipeline_manager.pipelines.values()) if pipeline.alive]
+        holds = [PipelineHold("realtime", pipeline.id) for pipeline in pipelines]
         startup = self.startup_status.snapshot()
         if startup["status"] in ("running", "stopping") and startup["pipeline_id"] not in {hold.id for hold in holds}:
             holds.append(PipelineHold("realtime", startup["pipeline_id"] or self.startup_status.task_id or ""))
         groups = (cameras or self.camera_group_manager.to_state_dict()).get("camera_groups", {})
-        holds += [PipelineHold("recording", str(group_id)) for group_id, group in groups.items()
-                  if group.get("recording_in_progress")]
+        streaming = {str(pipeline.camera_group_id) for pipeline in pipelines}
+        holds += [PipelineHold("recording" if group.get("recording_in_progress") else "cameras", str(group_id))
+                  for group_id, group in groups.items()
+                  if group.get("recording_in_progress") or str(group_id) not in streaming]
         holds += [PipelineHold("posthoc", str(pipeline_id))
                   for pipeline_id, pipeline in list(self.posthoc_pipeline_manager.pipelines.items()) if pipeline.alive]
+        holds += [PipelineHold("sync", str(job_id))
+                  for job_id, job in list(self.sync_job_manager.jobs.items()) if job.is_alive]
+        holds += [PipelineHold("export", task.task_id.removeprefix("export:"))
+                  for task in export_jobs.task_state.snapshot()[1] if task.status in ("queued", "running")]
+        listed = {hold.kind for hold in holds}
+        holds += [claim for claim in tuple(self.quick_checks.claims) if claim.kind not in listed]
         return tuple(holds)
 
     # ------------------------------------------------------------------

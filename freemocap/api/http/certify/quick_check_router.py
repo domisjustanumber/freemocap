@@ -1,11 +1,12 @@
 """The quick check of one EP on one GPU (F9): its plan, start and cancel.
 
 The running check, its progress and every EP's state ride the `certification` field of `app_state`. A refusal answers
-this request with the current reason (a pipeline runs, a check runs, the EP cannot run here); nothing is queued.
+this request with the current reason (other work runs, a check runs, the EP cannot run here); nothing is queued.
+`admitted` is the route side of the busy rule for the starts that have no admission point in the application.
 """
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from freemocap.core.pipeline.realtime.camera_node_config import CameraNodeConfig
@@ -15,6 +16,40 @@ from freemocap.system.certify.quick_check import StartRefused
 quick_check_router = APIRouter(prefix="/certify", tags=["Certification"])
 
 _DEFAULTS = CameraNodeConfig()
+
+
+def _admission(kind_of):
+    def dependency(request: Request):
+        from freemocap.app.freemocap_application import get_freemocap_app
+        kind = kind_of(request)
+        try:
+            checks = None if kind is None else get_freemocap_app().quick_checks
+        except RuntimeError:  # no application, so no quick check (routers served on their own, as in tests)
+            checks = None
+        if checks is None:
+            yield
+            return
+        try:
+            claim = checks.claim(kind)
+        except StartRefused as error:
+            raise HTTPException(status_code=error.status, detail=error.detail) from None
+        try:
+            yield
+        finally:
+            checks.release(claim)
+    return Depends(dependency)
+
+
+def admitted(kind: str):
+    """A route dependency: refuse this start of work with `quick-check-running` while a check runs, else hold its
+    claim for the request so a check admitted meanwhile is refused (H1, H2)."""
+    return _admission(lambda request: kind)
+
+
+# The skellycam routes that start work; closing, stopping, pausing and detecting stay allowed.
+_CAMERA_STARTS = {"/camera/group/apply": "cameras", "/camera/group/all/record/start": "recording"}
+camera_starts_admitted = _admission(lambda request: next(
+    (kind for path, kind in _CAMERA_STARTS.items() if request.url.path.endswith(path)), None))
 
 
 class QuickCheckPlan(BaseModel):
@@ -77,13 +112,14 @@ def get_quick_check_plan(execution_provider: str, device_key: str) -> QuickCheck
 
 @quick_check_router.post("/quick_check", status_code=202, responses={
     400: {"description": "`unknown-ep-or-device`"},
-    409: {"description": "`pipelines-running` (with `gpu_held_by`), `quick-check-running`, or `cannot-run` (with "
-                         "skellytracker's `reason_code`)"}})
+    409: {"description": "`pipelines-running` (with `gpu_held_by`: any work, not only pipelines), "
+                         "`quick-check-running`, or `cannot-run` (with skellytracker's `reason_code`)"}})
 def start_quick_check(request: QuickCheckRequest) -> QuickCheckRunState:
     """Start the quick check of one EP on one GPU with the person's detector pipeline, in a child process.
 
-    Refused while any pipeline runs or another check runs; follow it in `app_state.certification.run`. When it ends,
-    `certification.items` shows skellytracker's stored result and `certification.last_result` how it ended."""
+    Refused while other work runs (a pipeline, recording, connected cameras, a sync or export job) or another check
+    runs; follow it in `app_state.certification.run`. When it ends, `certification.items` shows skellytracker's
+    stored result and `certification.last_result` how it ended."""
     from freemocap.app.freemocap_application import get_freemocap_app
     plan = _plan(request.execution_provider, request.device_key)
     not_run = (plan.get("details") or {}).get("not_run") or {}
@@ -98,7 +134,7 @@ def start_quick_check(request: QuickCheckRequest) -> QuickCheckRunState:
         run = app.quick_checks.start(
             pair=CertificationPair(request.execution_provider, request.device_key), detector_type=request.detector_type,
             rtmpose_model_name=request.rtmpose_model_name, seconds_estimate=plan.get("seconds_estimate"),
-            holds=app.pipeline_holds())
+            holds=app.pipeline_holds)
     except StartRefused as error:
         raise HTTPException(status_code=error.status, detail=error.detail) from None
     return QuickCheckRunState.of(run)

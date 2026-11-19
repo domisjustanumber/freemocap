@@ -1188,8 +1188,9 @@ export interface paths {
          * Start Quick Check
          * @description Start the quick check of one EP on one GPU with the person's detector pipeline, in a child process.
          *
-         *     Refused while any pipeline runs or another check runs; follow it in `app_state.certification.run`. When it ends,
-         *     `certification.items` shows skellytracker's stored result and `certification.last_result` how it ended.
+         *     Refused while other work runs (a pipeline, recording, connected cameras, a sync or export job) or another check
+         *     runs; follow it in `app_state.certification.run`. When it ends, `certification.items` shows skellytracker's
+         *     stored result and `certification.last_result` how it ended.
          */
         post: operations["start_quick_check_freemocap_certify_quick_check_post"];
         /**
@@ -7172,7 +7173,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description `pipelines-running` (with `gpu_held_by`), `quick-check-running`, or `cannot-run` (with skellytracker's `reason_code`) */
+            /** @description `pipelines-running` (with `gpu_held_by`: any work, not only pipelines), `quick-check-running`, or `cannot-run` (with skellytracker's `reason_code`) */
             409: {
                 headers: {
                     [name: string]: unknown;

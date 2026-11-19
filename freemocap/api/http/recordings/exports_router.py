@@ -2,6 +2,7 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel
 
+from freemocap.api.http.certify.quick_check_router import admitted
 from freemocap.api.http.posthoc import export_jobs
 from freemocap.api.http.recordings.recording_access import RecordingReadRoute
 from freemocap.api.http.recordings.recording_location import recording_location
@@ -36,7 +37,7 @@ class ExportTaskAccepted(BaseModel):
     status_url: str
 
 
-@recording_exports_router.post('/{recording_id}/exports', status_code=202)
+@recording_exports_router.post('/{recording_id}/exports', status_code=202, dependencies=[admitted('export')])
 def create_export(recording_id: str, options: RecordingExportRequest, background: BackgroundTasks,
                   http_request: Request, recording_parent_directory: str | None = None) -> ExportTaskAccepted:
     structure = recording_location(recording_id, recording_parent_directory)

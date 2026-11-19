@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from concurrent.futures import CancelledError
 from threading import Event
 from filelock import FileLock
+from freemocap.api.http.certify.quick_check_router import admitted
 from freemocap.api.http.recordings.recording_location import recording_path_location
 from freemocap.core.recording.recording_access import RecordingBusyError
 from freemocap.core.recording.exports.publication import artifact_path
@@ -163,7 +164,7 @@ def install_addon(request: InstallAddonRequest) -> InstallAddonResponse:
         raise HTTPException(status_code=500, detail=str(error)) from error
 
 
-@blender_router.post("/export", include_in_schema=False, deprecated=True)
+@blender_router.post("/export", include_in_schema=False, deprecated=True, dependencies=[admitted("export")])
 def export_to_blender_endpoint(request: ExportToBlenderRequest, http_request: Request) -> ExportToBlenderResponse:
     """Automatically prepare the required Blender package and export the recording."""
     try:

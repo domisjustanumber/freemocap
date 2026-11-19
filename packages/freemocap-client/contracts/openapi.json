@@ -3247,7 +3247,7 @@
           "Certification"
         ],
         "summary": "Start Quick Check",
-        "description": "Start the quick check of one EP on one GPU with the person's detector pipeline, in a child process.\n\nRefused while any pipeline runs or another check runs; follow it in `app_state.certification.run`. When it ends,\n`certification.items` shows skellytracker's stored result and `certification.last_result` how it ended.",
+        "description": "Start the quick check of one EP on one GPU with the person's detector pipeline, in a child process.\n\nRefused while other work runs (a pipeline, recording, connected cameras, a sync or export job) or another check\nruns; follow it in `app_state.certification.run`. When it ends, `certification.items` shows skellytracker's\nstored result and `certification.last_result` how it ended.",
         "operationId": "start_quick_check_freemocap_certify_quick_check_post",
         "requestBody": {
           "content": {
@@ -3274,7 +3274,7 @@
             "description": "`unknown-ep-or-device`"
           },
           "409": {
-            "description": "`pipelines-running` (with `gpu_held_by`), `quick-check-running`, or `cannot-run` (with skellytracker's `reason_code`)"
+            "description": "`pipelines-running` (with `gpu_held_by`: any work, not only pipelines), `quick-check-running`, or `cannot-run` (with skellytracker's `reason_code`)"
           },
           "422": {
             "description": "Validation Error",

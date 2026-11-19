@@ -732,7 +732,8 @@ class CertificationAuto:
 
 @dataclass(frozen=True, slots=True)
 class PipelineHold:
-    """A running pipeline: `kind` is realtime, recording or posthoc."""
+    """Running work that refuses a quick check (the class name is historical): `kind` is realtime, recording, cameras,
+    posthoc, sync or export; `id` is its id, or `starting` while its start is admitted."""
     kind: str = ""
     id: str = ""
 

@@ -2,6 +2,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from freemocap.api.http.certify.quick_check_router import admitted
 from freemocap.api.http.mocap import mocap_router as mocap
 
 import_router = APIRouter(prefix='/recording-import', tags=['Recording import'])
@@ -16,7 +17,7 @@ class SynchronizationAccepted(BaseModel):
     status_url: str
 
 
-@import_router.post('/synchronize', status_code=202)
+@import_router.post('/synchronize', status_code=202, dependencies=[admitted('sync')])
 async def synchronize(request: mocap.SynchronizeVideosRequest) -> SynchronizationAccepted:
     result = await mocap.synchronize_videos(request)
     task_id = f'sync:{result.job_id}'

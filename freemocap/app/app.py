@@ -22,6 +22,7 @@ import freemocap
 from freemocap.api.middleware.add_middleware import add_middleware
 from freemocap.api.middleware.cors import cors
 from freemocap.api.routers import SKELLYCAM_ROUTERS, FREEMOCAP_ROUTERS, APP_ROUTERS
+from freemocap.api.http.certify.quick_check_router import camera_starts_admitted
 from freemocap.api.server_constants import PROTOCOL, HOSTNAME
 from freemocap.api.websocket.websocket_connect import websocket_router
 from freemocap.app.freemocap_application import create_freemocap_app, get_freemocap_app
@@ -212,7 +213,8 @@ def _register_routes(app: FastAPI) -> None:
         logger.api(f"Registered FreeMoCap router: /{freemocap.__package_name__}{router.prefix}")
 
     for router in SKELLYCAM_ROUTERS:
-        app.include_router(router, prefix=f"/{skellycam.__package_name__}")
+        # Camera connect and recording start are refused while a quick check runs (H1).
+        app.include_router(router, prefix=f"/{skellycam.__package_name__}", dependencies=[camera_starts_admitted])
         logger.api(f"Registered SkellyCam router: /{skellycam.__package_name__}{router.prefix}")
 
 

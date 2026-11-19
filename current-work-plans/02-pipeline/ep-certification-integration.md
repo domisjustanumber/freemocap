@@ -363,6 +363,35 @@ Backend only, 2026-11-19: `208ae320` (file builder), `4e152100` (sender, outbox,
     always ends with `os._exit`, so skellytracker's `atexit` clean exit never runs). Inference runs only on the
     `SharedInference` thread of the backend process, so no worker process needs the notice. Not verified with a
     real GPU session held at close.
+    **Rule (skellytracker `e90245ce`, `core/eps/exits.py`, ADR-ER5X item 5).** Only the process that called
+    `build_session()` on a GPU EP writes a marker (`<store>/sessions/<pid>-<ns>.marker`, locked for its life); a
+    process that only starts it is unaffected. A clean interpreter exit (`atexit`) or `note_exit_requested()`
+    removes it; any other end leaves it, and the next `collect()` counts one unclean exit per EP and GPU model in
+    `<store>/unclean-exits.json`; two in a row write `failed`/`unclean-exits` to `quick-checks.json`. Call the
+    notice only in a process that really is about to end on purpose; never on a crash or a hang. Certification
+    writes no marker: every EP run of `certify()` is a `spawn` child inside `gate.certification_run()`, and
+    `note_session()` returns early there, so killing the quick-check child (`system/certify/quick_check.py`) adds
+    no count. CPU sessions write none (`gpu is None`).
+    **Audit, 2026-11-19 (every hard end in freemocap's code, tests and tools).** Fixed: the dataset preparation
+    worker, which runs `InferenceService` in its own process, was killed at once when `execute_worker` was
+    interrupted; the parent now creates a stop file, the worker gives the notice and ends with 130, and the kill
+    stays only for a timeout (a hang keeps its count) and after 10 s (`5803111e`, reworked in `60787afe` because a
+    pending stdin read on Windows blocks every subprocess the worker starts). `tracker_matrix` and
+    `machine_benchmarks` used `subprocess.run`, which kills the child 0.25 s after Ctrl+C on POSIX; they now
+    wait and let the child (same console) end itself (`ea85e9e7`); on Windows `Popen.wait` is not interrupted by
+    Ctrl+C, so that kill was reached only on POSIX. The start without `--port` killed whatever held port 53117 (an
+    earlier backend after an Electron crash); it now sends `POST /shutdown` first, waits 5 s, then kills
+    (`ce160407`, `freemocap/utilities/kill_process_on_port.py`, replacing skellycam's copy). Needs nothing: the
+    backend's own `os._exit` (every requested path has the notice; `KeyboardInterrupt` there is reachable only
+    before the signal handlers are installed, and a start that fails before serving has no session: sessions
+    open only on a pipeline request); `ServerSession` and `sdk_live_validation` (already `POST /shutdown`, wait
+    30 s, then terminate); Blender kills; node children; camera and annotation process workers (no ORT);
+    `check_main_process_heartbeat`'s self-SIGTERM (a 300 s hang, which should count); tests (no fixture runs
+    inference in a process it ends hard; `test_hardware_server_harness` ends its backend through `/shutdown`).
+    Real hardware (RTX 3060, trt-rtx by Auto, store `%LOCALAPPDATA%\skellytracker\eps`, before: no marker, no
+    count file): the worker held marker `19348-…` with `trt-rtx|0.5.0|Windows|10de:2484`, got the stop file,
+    exited 130; the backend held `42560-…` mid-posthoc, answered `POST /shutdown` and exited 0 in 1.5 s. After
+    each: no marker, no `unclean-exits.json`.
 
 ## The uncertified-EP flow, as settled 2026-11-19 (second grilling; user confirmed)
 

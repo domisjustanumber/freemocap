@@ -1156,6 +1156,77 @@ one page (the plan and refusal keep their server-identity keys as before).
 Commits: `73c87235`, `ded74c33`, `1087a6f7`, `826936fa`, `6500ff6a`. Tests: `tsc --noEmit` clean; UI unit suite 223
 tests, 0 failures, plus its 10 and 46; `check-ui-styles` 30 errors (unchanged, none in the changed files).
 
+#### Second round, 2026-11-20 (owner's notes after seeing the revision live)
+
+The owner's words, verbatim:
+
+> "Drop the hostname from the popup"
+>
+> "Quick check of this system must say 'Quick system checks to run:'"
+>
+> "Run quick check must say 'Start now' and the gap between the table and the button must be tightened up"
+>
+> "Reports to hand in sounds like school work, the tone must be more certifying hardware to help freemocap"
+> (with the replacements below)
+>
+> "When clicking View report, the UI goes blurry (zoom/scale issue?). Instead it must open the report in another
+> pop-up window."
+>
+> "The View report window must pop-up and show the summary view as described to skellycertify - the human-readable
+> summary at the top, with the json below. This must be in a .md reader so it formats nicely for reading."
+>
+> "Drop 'Click the "Full benchmark" button to run that now'"
+
+Built (UI only):
+
+- The host name line is gone; the section heading is "Quick system checks to run:"; the start button says "Start now"
+  in this dialog only (the EP setting's "Run quick check" elsewhere is unchanged). The reserved 3-line block for the
+  progress and a refusal moved below the button row, so the buttons sit right under the table and nothing above them
+  moves.
+- "Submit Report" / "Submit Reports" follows the server's pending count (`submitLabel`, tested).
+- "View report" opens a second pop-up over the dialog (same modal look, its own Close, Escape closes only it, focus
+  returns to "View report"; checked in the browser build). It shows the file name and size as a small line and the
+  exact file the server returned, read as Markdown: the summary on top, then "Data" with the JSON in a monospace block
+  with its own scroll (35vh), pop-up up to 800 px wide. The first dialog no longer shows the file inline. Submit's
+  fallback (sending off, too large) opens the same pop-up with "Save file and open issue form".
+- The Markdown reader is in-house (`services/server/report-markdown.ts`, tested; `ReportMarkdown.tsx`): `#`/`##`
+  headings, paragraphs (one line per line), `- ` lists, `> ` quotes, pipe tables with `\|`, one fenced block of any
+  fence length, inline `**bold**` and backtick code; React elements only, no HTML interpreted. `marked` is in
+  node_modules only as a transitive dependency, so it was not used. Checked with the current file and with
+  skellycertify's `plans/sample-report-2-app-with-failures.md` (fed to the pop-up in the browser only).
+- The Full benchmark paragraph ends after "...a full benchmark run on your system."
+- The blur: not reproduced. The dialogs no longer centre with `translate(-50%, -50%)` (the settings-modal rule, which
+  can put text on half pixels in a composited layer); a fixed flex layer centres them instead. At device scale 1.25
+  the old centring gave whole device pixels at the measured height (720 px, 80vh of 900), so the cause is likely but
+  not proven.
+
+Text changes of this dialog (old -> new), the owner's ones first, then the coordinator's additions awaiting the
+owner's confirmation:
+
+| Old | New | By |
+|---|---|---|
+| Quick check of this system | Quick system checks to run: | owner |
+| Run quick check (this dialog) | Start now | owner |
+| Reports to hand in | Help FreeMoCap by sharing your (anonymous) results | owner |
+| N reports to hand in[, F with a failure] | Share N reports with FreeMoCap[, F with a failure] (Share 1 report ...) | owner |
+| Note (optional) | Anything you'd like to tell us? | owner |
+| Submit Report | Submit Report / Submit Reports (count from the server) | owner |
+| ...Click the "Full benchmark" button to run that now. | (dropped) | owner |
+| No reports to hand in. | Nothing to share right now. | awaiting |
+| Handed in as issue #N | Shared as issue #N | awaiting |
+| Already handed in as issue #N | Already shared as issue #N | awaiting |
+| Not handed in: ... Use the issue form. | Not shared: ... Use the issue form. | awaiting |
+| Not handed in yet: ... | Not shared yet: ... | awaiting |
+| Could not record the hand-in: | Could not record that the report was shared: | awaiting |
+
+Unchanged: "File report", "Not sent", "Issue form opened", route names and code identifiers.
+
+The 1.2.0 writer (hardware lines, EP table, camera line) is being built by a separate change on 2026-11-20; the
+reader already shows that layout.
+
+Commits: `67b10d8d`, `87217f49`, and the fallback fix after it. Tests: `tsc --noEmit` clean; UI unit suite 226 tests, 0
+failures, plus its 10 and 46; `check-ui-styles` 30 errors (unchanged).
+
 ## Environment on the dev PC
 
 Found 2026-11-19 while measuring decision 31; nothing was changed. `freemocap/.venv` dates from August 2026

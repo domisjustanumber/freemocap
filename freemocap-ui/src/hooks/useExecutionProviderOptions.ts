@@ -16,6 +16,8 @@ export function useExecutionProviderOptions(selected: ExecutionProviderName | nu
     const endpoint = serverUrls.getHttpUrl();
     const [loaded, setLoaded] = useState<{key: string; catalog: ExecutionProviderCatalog} | null>(null);
     const key = `${endpoint}:${serverPid}:${isConnected}`;
+    // An EP install or remove that ended changes the EPs: query them again (F15 step 5).
+    const packEnded = certification?.last_pack_result ? JSON.stringify(certification.last_pack_result) : '';
     useEffect(() => {
         setLoaded(null);
         if (!isConnected) return;
@@ -28,7 +30,7 @@ export function useExecutionProviderOptions(selected: ExecutionProviderName | nu
                 if (!controller.signal.aborted) console.warn("Could not query ONNX providers:", error);
             });
         return () => controller.abort();
-    }, [endpoint, isConnected, serverPid, key]);
+    }, [endpoint, isConnected, serverPid, key, packEnded]);
     // A failed query must not advertise unsupported providers. Keep saved choices visible.
     const catalog = loaded?.key === key ? loaded.catalog : NO_CATALOG;
     const info = useMemo(() => executionProviderInfo(catalog.providers), [catalog]);

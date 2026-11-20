@@ -9,6 +9,7 @@ import type {ExecutionProviderName} from '@/types/execution-provider';
 import type {ExecutionProviderChoices} from '@/hooks/useExecutionProviderOptions';
 import {AutoOffersNote} from './execution-provider-info';
 import {QuickCheckPanel} from './quick-check-panel';
+import {EpPackPanel} from './ep-pack-panel';
 
 export const DETECTOR_INFO = {
     title: "Skeleton detector",
@@ -146,6 +147,7 @@ export function DetectorSettingRows({value, onChange, detectors, providers, cont
                 }}/>}/>}
 
         {takesProvider && <QuickCheckPanel value={value} onChange={onChange} providers={providers}/>}
+        {takesProvider && <EpPackPanel providers={providers}/>}
 
         {rtmw && <SettingRow inactive={inactive} label="Model" info={MODEL_INFO}
             control={<SettingSelectInput label="RTMPose model" value={value.model}

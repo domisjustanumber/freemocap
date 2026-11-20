@@ -30,6 +30,10 @@ export interface ExecutionProviderOption {
     devices: ExecutionProviderDevice[];
     /** One per GPU that passes the EP's floors; none for cpu and for an EP no GPU here can use. */
     checks: ExecutionProviderCheck[];
+    /** skellytracker's `PackStatus.source` (`windows-ml` for an EP of the Windows ML catalog) and `state`; the server
+     *  always sends both, optional so other uses of this type need not name them. */
+    source?: string;
+    state?: string;
 }
 
 /** An offer of skellytracker's Auto recommendation for the server's host (install a pack, update a driver), as it gives it. */

@@ -40,4 +40,7 @@ test('the app-state golden with its certification field passes the transport val
     assert.equal(certification.items[0].local_result, undefined);
     assert.equal(certification.auto?.execution_provider, 'cpu-ep');
     assert.deepEqual(certification.gpu_held_by, [{kind: 'posthoc', id: 'abc123'}]);
+    assert.deepEqual(certification.pack_run, {action: 'install', execution_provider: 'golden-ml-ep', phase: 'download', fraction: 0.25});
+    assert.deepEqual(certification.last_pack_result,
+        {action: 'remove', execution_provider: 'golden-ml-ep', result: 'failed', reason: 'package-not-removed'});
 });

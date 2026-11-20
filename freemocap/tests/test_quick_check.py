@@ -378,6 +378,21 @@ def test_the_certification_field_is_facts_only_and_decodes_on_its_own():
     assert "install_hint" not in str(certification) and "last_result" not in certification
 
 
+def test_refusals_name_the_ep_and_gpu_by_skellytrackers_labels():
+    checks = _checks(read_status=lambda: status_parts(_status(), []))
+    checks.refresh()
+    checks.job, checks.run = object(), CertificationRun(items=(CertificationPair(EP, DEVICE),))
+    running = f"The quick check of Fake EP on GPU {DEVICE} is running; the "
+    with pytest.raises(StartRefused) as refused:
+        checks.start(pair=CertificationPair("other-ep", DEVICE), detector_type="rtmpose", rtmpose_model_name=None,
+                     seconds_estimate=None, holds=lambda: ())
+    assert refused.value.detail["message"] == running + "quick check start was refused. Start again when the check ends."
+    with pytest.raises(StartRefused) as refused:
+        checks.claim("recording")
+    assert refused.value.detail["message"].startswith(running + "recording start was refused.")
+    assert checks.describe(CertificationPair("unknown-ep", "gpu:0")) == "The quick check of unknown-ep on gpu:0"
+
+
 def test_an_app_state_without_certification_still_encodes():
     message = cbor2.loads(encode_message(AppStateMessage.from_state_dict(server_pid=7, state={})))
     assert "certification" not in message["state"]
@@ -402,7 +417,8 @@ def route_client(monkeypatch):
         checks.job, checks.run = object(), CertificationRun(items=(kwargs["pair"],), seconds_estimate=kwargs["seconds_estimate"])
         return checks.run
 
-    application = SimpleNamespace(holds=(), quick_checks=SimpleNamespace(start=start, cancel=lambda: checks.run))
+    application = SimpleNamespace(holds=(), quick_checks=SimpleNamespace(start=start, cancel=lambda: checks.run,
+                                                                       describe=checks.describe))
     application.pipeline_holds = lambda: application.holds
     monkeypatch.setattr("freemocap.app.freemocap_application.get_freemocap_app", lambda: application)
     plans = {"not_run": {}}
@@ -437,6 +453,7 @@ def test_routes_plan_start_refuse_and_cancel(route_client):
     plans["not_run"] = {LABEL: "ep-not-installed"}
     refused = client.post("/certify/quick_check", json=body)
     assert refused.status_code == 409 and refused.json()["detail"]["reason_code"] == "ep-not-installed"
+    assert refused.json()["detail"]["message"] == f"The quick check of {EP} on {DEVICE} cannot run here: ep-not-installed."
     plans["not_run"] = {}
 
     accepted = client.post("/certify/quick_check", json=body)

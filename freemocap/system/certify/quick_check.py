@@ -84,8 +84,14 @@ def refuse_unavailable_execution_provider(execution_provider: str | None, device
                                                  "local_cause": check.local_cause, "usable": check.usable}}) from None
 
 
-def _what(pair: CertificationPair | None) -> str:
-    return "the start check" if pair is None else f"the quick check of {pair.execution_provider} on {pair.device_key}"
+def _what(pair: CertificationPair | None, items: tuple[CertificationItem, ...] = ()) -> str:
+    """The check in words: the EP and GPU by skellytracker's labels when its status has the pair, else by their keys."""
+    if pair is None:
+        return "the start check"
+    item = next((item for item in items
+                 if (item.execution_provider, item.device_key) == (pair.execution_provider, pair.device_key)), None)
+    return (f"the quick check of {item.label if item else pair.execution_provider} on "
+            f"{item and item.device_name or pair.device_key}")
 
 
 def _report_result(report: dict) -> tuple[str, str | None]:
@@ -246,7 +252,7 @@ class QuickCheckManager:
             item = run.items[0] if run.items else None
             raise StartRefused(409, {
                 "code": "quick-check-running",
-                "message": f"{_what(item).capitalize()} is running; the {kind} start was refused. Start again when the "
+                "message": f"{self.describe(item)} is running; the {kind} start was refused. Start again when the "
                            "check ends.",
                 "run": {"execution_provider": item and item.execution_provider, "device_key": item and item.device_key,
                         "done": run.done, "total": run.total}})
@@ -256,6 +262,11 @@ class QuickCheckManager:
                     "code": "ep-pack-running", "execution_provider": hold.id,
                     "message": f"An install or remove of the {hold.id} EP is running; the {kind} start was refused. "
                                "Start again when it ends."})
+
+    def describe(self, pair: CertificationPair | None) -> str:
+        """`_what` with the labels of the cached status, capitalised for the start of a sentence."""
+        text = _what(pair, self._parts[1] if self._parts else ())
+        return text[0].upper() + text[1:]  # not str.capitalize(): it lowercases the labels
 
     def status_changed(self) -> None:
         """Read skellytracker's status again at the next refresh (an EP pack install or remove ended)."""
@@ -293,7 +304,8 @@ class QuickCheckManager:
                     running = self.run.items[0] if self.run.items else None
                     raise StartRefused(409, {
                         "code": "quick-check-running",
-                        "message": f"{_what(running).capitalize()} is already running.",
+                        "message": f"{self.describe(running)} is running; the quick check start was refused. Start "
+                                   "again when the check ends.",
                         "run": {"execution_provider": running and running.execution_provider,
                                 "device_key": running and running.device_key}})
                 held = holds()

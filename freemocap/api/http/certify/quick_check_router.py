@@ -122,18 +122,18 @@ def start_quick_check(request: QuickCheckRequest) -> QuickCheckRunState:
     runs; follow it in `app_state.certification.run`. When it ends, `certification.items` shows skellytracker's
     stored result and `certification.last_result` how it ended."""
     from freemocap.app.freemocap_application import get_freemocap_app
+    app = get_freemocap_app()
+    pair = CertificationPair(request.execution_provider, request.device_key)
     plan = _plan(request.execution_provider, request.device_key)
     not_run = (plan.get("details") or {}).get("not_run") or {}
     if not_run:
         reason_code = next(iter(not_run.values()))
         raise HTTPException(status_code=409, detail={
             "code": "cannot-run", "reason_code": reason_code,
-            "message": f"The quick check of {request.execution_provider} on {request.device_key} cannot run here: "
-                       f"{reason_code}."})
-    app = get_freemocap_app()
+            "message": f"{app.quick_checks.describe(pair)} cannot run here: {reason_code}."})
     try:
         run = app.quick_checks.start(
-            pair=CertificationPair(request.execution_provider, request.device_key), detector_type=request.detector_type,
+            pair=pair, detector_type=request.detector_type,
             rtmpose_model_name=request.rtmpose_model_name, seconds_estimate=plan.get("seconds_estimate"),
             holds=app.pipeline_holds)
     except StartRefused as error:

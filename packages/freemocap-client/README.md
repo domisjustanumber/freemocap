@@ -10,6 +10,11 @@ server baseline in [compatibility](compatibility/0.1.0-dev.0.json), not every se
 with the same application version or WebSocket shape version. See the
 [operation coverage](contracts/coverage.md) and [contract sources](contracts/README.md).
 
+## Refresh the contract
+
+After the server's routes change, run `uv run python packages/freemocap-client/tools/refresh-openapi.py` from the
+repository root, then `npm run generate` here.
+
 ## Install from source
 
 From the FreeMoCap repository, change to `packages/freemocap-client`, run

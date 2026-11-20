@@ -322,8 +322,8 @@ def test_the_routes_view_send_and_list_the_hand_in(fake_relay, monkeypatch):
     viewed = client.post("/certify/hand_in/file", json=selection).json()
     assert viewed["file_name"] == "certify-report-20261119T100000Z.md" and viewed["fits_relay"]
     assert hashlib.sha256(viewed["content"].encode()).hexdigest() == viewed["sha256"]
-    refused = client.post("/certify/hand_in/file", json={**selection, "note": "mail me at a@example.org"})
-    assert (refused.status_code, refused.json()["detail"]) == (422, {"code": "privacy-rule", "detail": "5"})
+    refused = client.post("/certify/hand_in/file", json={**selection, "note": "adapter 00:1a:2b:3c:4d:5e"})
+    assert (refused.status_code, refused.json()["detail"]) == (422, {"code": "privacy-rule", "detail": "4"})
     changed = client.post("/certify/hand_in/send", json={**selection, "note": "edited", "sha256": viewed["sha256"]})
     assert (changed.status_code, changed.json()["detail"]["code"]) == (409, "file-changed")
     fake_relay.answer(422, {"error": "privacy-rule", "retry": False, "detail": 3})

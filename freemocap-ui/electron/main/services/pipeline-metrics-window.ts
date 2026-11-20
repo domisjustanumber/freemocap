@@ -1,9 +1,23 @@
-import {BrowserWindow, shell} from 'electron';
+import {app, BrowserWindow, dialog, shell} from 'electron';
+import fs from 'node:fs';
+import path from 'node:path';
 import {APP_ENVIRONMENT} from '../index';
 import {APP_PATHS} from '../app-paths';
 import {WindowManager} from './window-manager';
 
 let metricsWindow: BrowserWindow | null = null;
+const PIPELINE_METRICS_SNAPSHOT_URL = 'freemocap-snapshot:pipeline-metrics';
+
+/** Capture the window as a PNG and save it where the user picks, defaulting to Downloads. */
+async function saveSnapshot(window: BrowserWindow): Promise<void> {
+    const image = await window.webContents.capturePage();
+    const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[-:]/g, '').replace('T', '-');
+    const {canceled, filePath} = await dialog.showSaveDialog(window, {
+        defaultPath: path.join(app.getPath('downloads'), `pipeline-metrics-${stamp}.png`),
+        filters: [{name: 'PNG image', extensions: ['png']}],
+    });
+    if (!canceled && filePath) await fs.promises.writeFile(filePath, image.toPNG());
+}
 
 /** Open the pipeline metrics page in its own window, or focus the one already open.
  *  `pipeline` (`mode:pipeline_id`) selects that run, also in a window already open. */
@@ -35,6 +49,11 @@ export function openPipelineMetricsWindow(pipeline?: string): void {
     window.on('closed', () => { metricsWindow = null; });
     window.once('ready-to-show', () => window.show());
     window.webContents.setWindowOpenHandler(({url}) => {
+        // The page has no preload, so its Save snapshot button asks for a capture by opening this URL.
+        if (url === PIPELINE_METRICS_SNAPSHOT_URL) {
+            void saveSnapshot(window).catch(error => console.error('Failed to save pipeline metrics snapshot:', error));
+            return {action: 'deny'};
+        }
         if (url.startsWith('http:') || url.startsWith('https:')) {
             shell.openExternal(url).catch(error => console.error('Failed to open external link:', error));
         }

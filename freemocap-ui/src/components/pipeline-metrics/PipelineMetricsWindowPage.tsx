@@ -134,6 +134,9 @@ export default function PipelineMetricsWindowPage(): React.ReactElement {
                 <div className="flex-1"/>
                 {runs.length > 0 && <SettingSelectInput label="Pipeline run" value={live?.key ?? ''} disabled={frozen != null}
                     options={runs.map(option => ({label: runLabel(option), value: option.key}))} onChange={setSelectedKey}/>}
+                {/* Electron's window-open handler captures the window (pipeline-metrics-window.ts); a browser has no such handler. */}
+                {navigator.userAgent.includes('Electron') && <IconButton icon="camera-icon" title="Save snapshot" ariaLabel="Save snapshot"
+                    onClick={() => window.open('freemocap-snapshot:pipeline-metrics')}/>}
                 <IconButton icon={frozen ? 'play-icon' : 'pause-icon'} title={frozen ? 'Resume' : 'Pause'}
                     onClick={() => setFrozen(frozen ? null : live)}/>
             </div>

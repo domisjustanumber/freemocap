@@ -74,7 +74,7 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
         {!required && <div className="pos-fixed inset-0 bg-surface-overlay z-10" onClick={onClose}/>}
         <Centred zIndex={1000}>
         <div className="settings-modal bg-primary border-1 border-black elevated-sharp p-1 flex flex-col br-2" role="dialog"
-             aria-label={CERTIFICATION_TEXT.title} style={{...UNTRANSFORMED, width: 560}}>
+             aria-label={CERTIFICATION_TEXT.title} style={{...UNTRANSFORMED, width: 560, height: '80vh'}}>
             <div className="flex flex-col p-2 gap-2 bg-middark br-1">
                 <div className="flex justify-content-space-between items-center">
                     <SubactionHeader text={CERTIFICATION_TEXT.title}/>

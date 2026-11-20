@@ -38,9 +38,10 @@ MEDIA_EXTENSIONS = (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp", "
 REASON_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
 TRACEBACK = "Traceback (most recent call last)"
 NOTE_PATH_RE = re.compile(PATH_RE.pattern + r"[^\s\"'|,;]*", re.ASCII)
-# Rules 18 and 20 as relay/src/privacy.js and issue.js state them (re.ASCII: JavaScript's \b and \d without `u`).
+# Rules 17, 18 and 20 as relay/src/privacy.js and issue.js state them (re.ASCII: JavaScript's \b and \d without `u`).
 NOTE_KEPT = frozenset(" \n.,:;_+=()'%/?·-")  # rule 18, besides the Unicode categories L, M and N
 LINK_RE = re.compile(r"://|www\.", re.ASCII | re.IGNORECASE)
+MARKUP_RE = re.compile(r"(\])(?=[(:])|(:)(?=//)|(www)(?=\.)", re.ASCII | re.IGNORECASE)  # rule 17 less `<`
 IPV4_PART = r"(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)"
 IPV4_RE = re.compile(rf"\b(?:{IPV4_PART}\.){{3}}{IPV4_PART}\b", re.ASCII)
 
@@ -152,9 +153,16 @@ def privacy_rule(markdown_lines: list[str], data: dict) -> int:
     return min((rule for rule in found if rule), default=0)
 
 
+def _harmless(line: str) -> str:
+    """Markdown text that rules 17 and 20 accept: `](`, `]:`, `://` and `www.` split by a space, and an IPv4-looking
+    string (a four-part version, say) with spaces for dots. Only the readable part changes; the JSON keeps each value."""
+    return _no_ipv4(MARKUP_RE.sub(r"\1\2\3 ", line))
+
+
 def _cell(value: object) -> str:
-    """One table cell: one line, a `|` escaped, no `<` or `>` (rule 17: `<private>` shows as `private`)."""
-    return " ".join(str("" if value is None else value).split()).replace("|", "\\|").replace("<", "").replace(">", "")
+    """One table cell or value of a line: one line, a `|` escaped, no `<` or `>` (rule 17: `<private>` shows as
+    `private`), harmless."""
+    return _harmless(" ".join(str("" if value is None else value).split()).replace("|", "\\|").replace("<", "").replace(">", ""))
 
 
 def _row(cells: list[str]) -> str:
@@ -287,8 +295,8 @@ def _markdown(modules: list[dict], note: str | None, app: dict | None, created: 
     if note is not None:
         # A clean note's one Markdown character, `_`, escaped so it shows as typed; wrapped under the 2000-character rule.
         quoted = [chunk.replace("_", "\\_") for line in note.split("\n") for chunk in textwrap.wrap(line, 900) or [""]]
-        # Again without IPv4: the escape or a wrap can put a word boundary next to a number of the note.
-        lines += ["Note of the person:", "", *(_no_ipv4(f"> {line}".rstrip()) for line in quoted), ""]
+        # Harmless again: the escape or a wrap can put a word boundary next to a number of the note.
+        lines += ["Note of the person:", "", *(_harmless(f"> {line}".rstrip()) for line in quoted), ""]
     return lines[:-1]
 
 

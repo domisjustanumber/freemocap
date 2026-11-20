@@ -145,6 +145,20 @@ def test_private_and_path_markers_show_without_angle_brackets_in_the_markdown():
     assert '"<private> Linux 24.04"' in body.decode("utf-8")  # the JSON keeps the value
 
 
+def test_ipv4_looking_values_and_link_markup_are_harmless_only_in_the_markdown():
+    host = {**HOST, "os": {"name": "Linux", "label": "Ubuntu 24.04.1 kernel 6.8.0.45"},
+            "gpus": [{**HOST["gpus"][0], "name": "Test GPU 1.2.3.4.5.6.7"}]}
+    camera = {"group": "camera", "name": "see https://x](y) WWW.z ]:", "device": "046d:085c", "result": "fail"}
+    _, body = build_report_file([_module(host=host, summary=SUMMARY + [camera])], None, None)
+    head, text = _head(body), body.decode("utf-8")
+    assert "- OS: Ubuntu 24.04.1 kernel 6 8 0 45\n" in head and "| Test 1 2 3 4 5 6 7 8 GB | CUDA | pass |" in head
+    assert "| see https: //x] (y) WWW .z ] : | fail |" in head
+    assert all(f'"{value}"' in text for value in ("Ubuntu 24.04.1 kernel 6.8.0.45", "Test GPU 1.2.3.4.5.6.7",
+                                                  "see https://x](y) WWW.z ]:"))  # the JSON keeps each value
+    if RELAY_SRC.is_dir() and shutil.which("node") is not None:
+        assert _relay_verdict(body) == {"rule": 0}
+
+
 def test_two_modules_of_two_packages_print_the_system_once_and_a_line_for_each_module():
     camera = {"group": "camera", "name": "Logitech C922", "device": "046d:085c", "result": "fail"}
     ticks = _module(checks=[{"name": "a ``` b", "result": "pass", "reason": None}])  # the fence outgrows a run of ticks

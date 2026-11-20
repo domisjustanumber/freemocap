@@ -239,7 +239,7 @@ class QuickCheckManager:
     start_results: tuple[StartCheckResult, ...] = ()  # how the last start check of this server session ended
     start_released: bool = False  # a start check ended other than by a cancel in this server session (decision 14)
     read_start_needed: object = None  # tests: a stand-in for `start_check.start_check_needed`
-    _start_needed: bool = False
+    _start_needed: bool | None = None  # None until the first status read: the gated starts are refused until then
     _parts: tuple | None = None
     _parts_read_at: float = 0.0
 
@@ -249,7 +249,7 @@ class QuickCheckManager:
 
     @property
     def start_required(self) -> bool:
-        return self._start_needed and not self.start_released
+        return self._start_needed is not False and not self.start_released
 
     def refuse_pipeline_start(self, kind: str) -> None:
         """F7, H1: a start of work is refused while a check runs, and a camera or pipeline start while the start check is
@@ -257,7 +257,8 @@ class QuickCheckManager:
         if kind in START_CHECK_GATED and self.start_required:
             raise StartRefused(409, {
                 "code": "start-check-required",
-                "message": f"FreeMoCap must finish its system checks before {START_CHECK_GATED[kind]} can start."})
+                "message": "FreeMoCap is still starting; try again in a moment." if self._start_needed is None
+                else f"FreeMoCap must finish its system checks before {START_CHECK_GATED[kind]} can start."})
         run = self.run
         if run is not None:
             item = run.items[0] if run.items else None

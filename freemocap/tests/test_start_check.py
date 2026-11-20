@@ -330,6 +330,27 @@ def test_camera_and_pipeline_starts_are_refused_while_the_start_check_is_require
         manager.shutdown()
 
 
+def test_gated_starts_are_refused_until_the_first_status_read_and_the_check_can_start(base):
+    manager = _manager(own_until_cancelled, needed=False)
+    try:
+        for kind in ("cameras", "realtime", "posthoc"):
+            with pytest.raises(StartRefused) as refused:
+                manager.claim(kind)
+            assert refused.value.detail == {"code": "start-check-required",
+                                            "message": "FreeMoCap is still starting; try again in a moment."}
+        manager.release(manager.claim("recording"))  # only the gated kinds wait for the first read
+        manager.refresh()
+        manager.release(manager.claim("cameras"))  # this machine needs no start check
+    finally:
+        manager.shutdown()
+    unread = _manager(own_until_cancelled)
+    try:
+        unread.start(pair=None, detector_type="rtmpose", rtmpose_model_name=None, seconds_estimate=1, holds=lambda: ())
+        assert unread.running, "the start check stays startable before the first read"
+    finally:
+        unread.shutdown()
+
+
 def test_camera_and_pipeline_starts_are_admitted_once_the_start_check_is_not_required(base):
     for manager in (_manager(own_pass, needed=False), _manager(own_pass)):
         manager.refresh()

@@ -72,7 +72,7 @@ def certify_raise(level, progress, cancel, **options):
 def _checks(**options):
     flag = multiprocessing.Value("b", False)
     return QuickCheckManager(global_kill_flag=flag, worker_registry=WorkerRegistry(global_kill_flag=flag,
-                             worker_mode=WorkerMode.PROCESS), **options)
+                             worker_mode=WorkerMode.PROCESS), _start_needed=False, **options)
 
 
 @pytest.fixture

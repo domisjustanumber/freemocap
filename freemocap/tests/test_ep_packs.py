@@ -26,7 +26,7 @@ KEY = "amdgpu"
 def _checks(**options) -> QuickCheckManager:
     registry = WorkerRegistry(global_kill_flag=multiprocessing.Value("b", False), worker_mode=WorkerMode.PROCESS)
     return QuickCheckManager(global_kill_flag=multiprocessing.Value("b", False), worker_registry=registry,
-                             read_status=lambda: ("host", (), None, ()), **options)
+                             read_status=lambda: ("host", (), None, ()), _start_needed=False, **options)
 
 
 class Gate:

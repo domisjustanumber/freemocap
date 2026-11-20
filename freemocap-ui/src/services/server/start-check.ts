@@ -40,10 +40,11 @@ export type RowStatus = {kind: 'waiting' | 'running' | 'done' | 'passed' | 'fail
  * Each package's status cell from the current server state only. While a start check runs (a run without items),
  * packages before the running one are done, it runs with "N of M", later ones wait; the server sends only
  * package-level progress. Otherwise each package shows how its part of the last start check ended (a crash of the
- * whole check, which names no package, stands for every package without its own result), or waits.
+ * whole check, which names no package, stands for every package without its own result), or waits while the
+ * check is required.
  */
 export function startCheckRowStatus(packages: readonly string[], run: CertificationRun | undefined,
-                                    results: readonly StartCheckResult[]): RowStatus[] {
+                                    results: readonly StartCheckResult[], required = true): RowStatus[] {
     if (run && !run.items.length) {
         const running = Math.max(0, run.package ? packages.indexOf(run.package) : 0);
         return packages.map((_, index) => index < running ? {kind: 'done', text: 'Done'}
@@ -52,7 +53,8 @@ export function startCheckRowStatus(packages: readonly string[], run: Certificat
     }
     return packages.map(name => {
         const ended = results.find(result => result.package === name) ?? results.find(result => result.package === undefined);
-        if (!ended) return {kind: 'waiting', text: 'Waiting'};
+        // Results last only for the server session; a check passed before a restart is not shown as waiting.
+        if (!ended) return required ? {kind: 'waiting', text: 'Waiting'} : {kind: 'not-run', text: 'Not run in this session'};
         const {result, reason} = ended;
         if (result === 'pass' || result === 'record-only') return {kind: 'passed', text: 'Passed'};
         if (result === 'fail') return {kind: 'failed', text: `Failed: ${reason ?? result}`};

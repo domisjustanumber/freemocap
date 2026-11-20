@@ -46,7 +46,8 @@ export function StartCheckSection() {
 
     const running = certification?.run;
     const packages = mine.plans?.map(plan => plan.package) ?? [...START_CHECK_PACKAGES];
-    const statuses = startCheckRowStatus(packages, running, certification?.start_results ?? []);
+    const statuses = startCheckRowStatus(packages, running, certification?.start_results ?? [],
+        certification?.start_required === true);
     const detail = (name: string) => {
         const plan = mine.plans?.find(item => item.package === name);
         return plan ? planDetail(plan) : mine.planError ? START_CHECK_TEXT.couldNotReadPlan + mine.planError : START_CHECK_TEXT.loadingPlan;

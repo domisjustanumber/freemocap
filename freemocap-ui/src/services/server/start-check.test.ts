@@ -54,6 +54,7 @@ test("each package's status cell follows the current run, else how its part of t
     const packages = ['freemocap', 'skellytracker'];
     const run = {level: 'quick', items: [], state: 'running', done: 1, total: 4};
     assert.deepEqual(startCheckRowStatus(packages, undefined, []).map(row => row.text), ['Waiting', 'Waiting']);
+    assert.deepEqual(startCheckRowStatus(packages, undefined, [], false).map(row => row.text), ['Not run in this session', 'Not run in this session']);
     assert.deepEqual(startCheckRowStatus(packages, {...run, total: undefined}, []).map(row => row.text), ['Starting', 'Waiting']);
     assert.deepEqual(startCheckRowStatus(packages, {...run, package: 'skellytracker'}, [{package: 'freemocap', result: 'pass'}])
         .map(row => [row.kind, row.text]), [['done', 'Done'], ['running', 'Running, 1 of 4']]);

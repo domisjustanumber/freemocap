@@ -1,6 +1,6 @@
 // src/hooks/useKeyboardShortcuts.ts
 import {useEffect} from "react";
-import {useAppDispatch} from "@/store";
+import {useAppDispatch, useAppSelector} from "@/store";
 // import { localeToggled } from "@/store/slices/settings";
 import {pauseUnpauseCameras} from "@/store/slices/cameras";
 
@@ -12,8 +12,11 @@ import {pauseUnpauseCameras} from "@/store/slices/cameras";
  */
 export function useKeyboardShortcuts(): void {
   const dispatch = useAppDispatch();
+  // The required start check's pop-up blocks input to everything behind it, shortcuts included.
+  const startRequired = useAppSelector((state) => state.connection.certification?.start_required === true);
 
   useEffect(() => {
+    if (startRequired) return;
     const handleKeyDown = (e: KeyboardEvent): void => {
       // Ignore keystrokes aimed at text inputs
       if (
@@ -40,5 +43,5 @@ export function useKeyboardShortcuts(): void {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [dispatch]);
+  }, [dispatch, startRequired]);
 }

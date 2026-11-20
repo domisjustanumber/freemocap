@@ -58,11 +58,14 @@ export const AppContent = function () {
             <AutoUpdateProvider>
                 <TutorialProvider>
                     <PlaybackProvider>
-                        <BasePanelLayout onOpenWelcome={() => setWelcomeOpen(true)}>
-                            <BaseContentRouter />
-                        </BasePanelLayout>
-                        <WelcomeModal open={welcomeOpen} onClose={() => setWelcomeOpen(false)} />
-                        <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+                        {/* The required start check blocks keyboard focus too: everything but its dialog is inert. */}
+                        <div inert={startRequired}>
+                            <BasePanelLayout onOpenWelcome={() => setWelcomeOpen(true)}>
+                                <BaseContentRouter />
+                            </BasePanelLayout>
+                            <WelcomeModal open={welcomeOpen} onClose={() => setWelcomeOpen(false)} />
+                            <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+                        </div>
                         <CertificationDialog open={certificationOpen || startRequired} onClose={closeCertification} required={startRequired} />
                         <TourController />
                     </PlaybackProvider>

@@ -5,10 +5,35 @@ the pipeline fixtures.
 """
 
 import os
+from pathlib import Path
 
 import pytest
 from tempfile import mkdtemp
 from skellylogs.handlers.websocket_log_queue_handler import create_websocket_log_queue
+
+
+def _isolate_user_folders() -> None:
+    """Keep the suite out of the user's skellytracker store, engine cache and freemocap data folder.
+
+    Set in `os.environ` before any test, so spawned children inherit it. The installed EP packs stay
+    readable: each pack folder of the real store is joined into the scratch store (nothing is copied),
+    while verdicts, sessions, reports and refs are written in the scratch store only.
+    """
+    import subprocess
+
+    from skellytracker.core.eps import store
+
+    real_store = store.store_root()
+    scratch = Path(mkdtemp(prefix="fmc-user-"))
+    scratch_store = scratch / "eps"
+    scratch_store.mkdir()
+    if real_store.is_dir():
+        for pack in real_store.iterdir():
+            if pack.is_dir() and not pack.name.startswith(".") and pack.name not in {"refs", "reports", "sessions"}:
+                subprocess.run(["cmd", "/c", "mklink", "/J", str(scratch_store / pack.name), str(pack)], check=True, capture_output=True)
+    os.environ[store.STORE_VARIABLE] = str(scratch_store)
+    os.environ[store.CACHE_VARIABLE] = str(scratch / "ep-cache")
+    os.environ.setdefault("FREEMOCAP_BASE_FOLDER", str(scratch / "freemocap_data"))
 
 
 def pytest_configure(config):
@@ -16,6 +41,7 @@ def pytest_configure(config):
     # The certify relay files a real public issue and the start-up retry sends any kept outbox file:
     # no test may reach it. `relay_url()` reads this at each call; the relay tests set the fake address themselves.
     os.environ["FREEMOCAP_CERTIFY_RELAY_URL"] = ""
+    _isolate_user_folders()
     if config.option.basetemp is not None:
         return
     # Keep video paths below Windows limits; avoid pytest's shared per-user root.

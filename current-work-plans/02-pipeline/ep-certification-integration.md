@@ -1224,6 +1224,50 @@ Unchanged: "File report", "Not sent", "Issue form opened", route names and code 
 The 1.2.0 writer (hardware lines, EP table, camera line) is being built by a separate change on 2026-11-20; the
 reader already shows that layout.
 
+#### Third round, 2026-11-20 (owner's notes while watching)
+
+The owner's words, verbatim:
+
+> "At the bottom of the view report, the buttons must be submit (or save file and open issue form if the relay is
+> down) and close. Close on the left, submit on the right, in blue"
+>
+> "reports must not populate in the main pop-up until the checks have completed."
+>
+> "Reduce the gap between the Start now button and the Help FreeMoCap heading."
+>
+> "Submit Reports should be Submit reports (no capital R for second word to match other buttons)."
+>
+> 'run a check must be "run some checks"'
+>
+> 'When clicking Submit reports, the button must change to "Submitting..." dim and the same circle animation must show
+> to things are happening. When it's done, the button briefly changes to "Sent!" then the pop-up closes and the app
+> opens.'
+
+Built:
+
+- The report pop-up has a sticky footer: "Close" at the left, and at the right "Submit report(s)" while the relay can
+  take the file, else "Save file and open issue form" (relay off, too large, or a send answer that offers the issue
+  form): `reportFooterAction`, tested. A reserved line above the footer shows the send answer or why the issue form
+  is offered. The right button is filled with the existing primary fill, `--color-primary-fill` =
+  `--color-info-strong` = `--blue-600` (the logo's teal, which `color.css` calls "Blue Shades"); the first dialog's
+  Submit already used the same `primary accent` classes. The pop-up stays open after a send, showing the last viewed
+  file and the answer line, until "Close" (coordinator's choice); with nothing pending the right button goes.
+- The sharing section shows "Your results appear here when the checks are done." (coordinator's wording, awaiting the
+  owner) while a check runs or the required start check has not ended; then the list, note and buttons
+  (`reportsReady`, tested, from `start_required`, `run`, `start_results`).
+- No reserved block between "Start now" and the sharing heading: a refusal (or an EP pair check's progress) is one
+  truncated line beside the buttons with its full text as a tooltip; the start check's progress is in the table's
+  status cells. The main dialog has a fixed height (80vh) so it does not move while the checks run; empty space is at
+  its bottom.
+- Labels "Submit report" / "Submit reports"; the owner's paragraph says "click the Submit report button below".
+- Sub-title: "...so we need to run some checks to confirm things work before launching." ("run a check" appears in no
+  other text of this dialog).
+- "Submitting..." / "Sent!": see the state at the end of this section.
+
+Commits: see `git log` for 2026-11-20 10:30 to 10:52.
+
+#### Second round commits
+
 Commits: `67b10d8d`, `87217f49`, and the fallback fix after it. Tests: `tsc --noEmit` clean; UI unit suite 226 tests, 0
 failures, plus its 10 and 46; `check-ui-styles` 30 errors (unchanged).
 

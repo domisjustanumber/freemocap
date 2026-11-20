@@ -13,6 +13,7 @@ import {
     DetectCamerasResponse,
 } from './cameras-types';
 import {selectSelectedCameraConfigs} from './cameras-selectors';
+import {describeError} from '@/store/slices/thunk-helpers';
 import {
     loadPersistedCameraSettings,
     PersistedCameraSettingsMap,
@@ -151,8 +152,8 @@ export const camerasConnectOrUpdate = createAsyncThunk<
         }
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to connect to cameras');
+            // A refusal's detail can be an object with the server's sentence in `message`.
+            throw new Error(describeError(await response.json()) || 'Failed to connect to cameras');
         }
 
         return response.json() as Promise<ConnectCamerasResponse>;

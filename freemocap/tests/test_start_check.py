@@ -306,6 +306,60 @@ def test_every_start_is_refused_while_the_start_check_runs_and_it_is_refused_whi
         manager.shutdown()
 
 
+def test_camera_and_pipeline_starts_are_refused_while_the_start_check_is_required_and_the_check_can_start(base):
+    import asyncio
+    from freemocap.app.freemocap_application import FreemocapApplication
+    manager = _manager(own_until_cancelled)
+    try:
+        manager.refresh()
+        assert manager.snapshot(()).start_required
+        for kind, words in (("cameras", "cameras"), ("realtime", "processing"), ("posthoc", "processing")):
+            with pytest.raises(StartRefused) as refused:
+                manager.claim(kind)
+            assert refused.value.detail == {"code": "start-check-required", "message":
+                                            f"FreeMoCap must finish its system checks before {words} can start."}
+        application = SimpleNamespace(quick_checks=manager)  # the application's own admission points use these kinds
+        for start in (FreemocapApplication.create_or_update_realtime_pipeline, FreemocapApplication.create_posthoc_mocap_pipeline,
+                      FreemocapApplication.create_posthoc_calibration_pipeline):
+            with pytest.raises(StartRefused, match="before processing can start"):
+                asyncio.run(start.__wrapped__(application, None, None))  # unwrapped: no type check of the stand-ins
+        assert manager.claims == []
+        manager.start(pair=None, detector_type="rtmpose", rtmpose_model_name=None, seconds_estimate=1, holds=lambda: ())
+        assert manager.running, "the start check itself is how the requirement clears"
+    finally:
+        manager.shutdown()
+
+
+def test_camera_and_pipeline_starts_are_admitted_once_the_start_check_is_not_required(base):
+    for manager in (_manager(own_pass, needed=False), _manager(own_pass)):
+        manager.refresh()
+        manager.start_released = manager.start_released or manager.start_required  # a start check ended other than by a cancel
+        assert not manager.snapshot(()).start_required
+        for kind in ("cameras", "realtime", "posthoc"):
+            manager.release(manager.claim(kind))
+
+
+def test_the_camera_connect_route_is_refused_while_the_start_check_is_required_and_detect_stays_open(base, monkeypatch):
+    from fastapi import APIRouter
+    from freemocap.api.http.certify.quick_check_router import camera_starts_admitted
+    manager = _manager(own_pass)
+    manager.refresh()
+    monkeypatch.setattr("freemocap.app.freemocap_application.get_freemocap_app", lambda: SimpleNamespace(quick_checks=manager))
+    cameras = APIRouter(prefix="/camera")  # stand-ins at skellycam's paths, gated as app.py gates skellycam's router
+    for path in ("/group/apply", "/detect"):
+        cameras.add_api_route(path, lambda: "ran", methods=["POST"])
+    app = FastAPI()
+    app.include_router(cameras, prefix="/skellycam", dependencies=[camera_starts_admitted])
+    client = TestClient(app)
+    refused = client.post("/skellycam/camera/group/apply")
+    assert refused.status_code == 409 and refused.json()["detail"]["message"] == (
+        "FreeMoCap must finish its system checks before cameras can start.")
+    assert client.post("/skellycam/camera/detect").json() == "ran"
+    manager.start_released = True
+    assert client.post("/skellycam/camera/group/apply").json() == "ran"
+    assert manager.claims == []
+
+
 # - Routes -
 
 def test_the_start_check_routes_give_each_packages_plan_and_start_or_refuse(monkeypatch):

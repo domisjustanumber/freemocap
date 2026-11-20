@@ -44,6 +44,8 @@ logger = logging.getLogger(__name__)
 
 STATUS_REFRESH_SECONDS = 5.0  # the store can also change outside a check (a CLI check, an install, unclean exits)
 CANCEL_GRACE_SECONDS = 5.0  # a set cancel stops certify()'s own child within about a second, then it writes its report
+# The starts refused while the start check is required (claim kinds), with their words in the refusal.
+START_CHECK_GATED = {"cameras": "cameras", "realtime": "processing", "posthoc": "processing"}
 
 
 class StartRefused(Exception):
@@ -245,8 +247,17 @@ class QuickCheckManager:
     def running(self) -> bool:
         return self.job is not None
 
+    @property
+    def start_required(self) -> bool:
+        return self._start_needed and not self.start_released
+
     def refuse_pipeline_start(self, kind: str) -> None:
-        """F7, H1: a start of work is refused while a check runs. The refusal is this request's answer, not a stored gate."""
+        """F7, H1: a start of work is refused while a check runs, and a camera or pipeline start while the start check is
+        required. The refusal is this request's answer, not a stored gate."""
+        if kind in START_CHECK_GATED and self.start_required:
+            raise StartRefused(409, {
+                "code": "start-check-required",
+                "message": f"FreeMoCap must finish its system checks before {START_CHECK_GATED[kind]} can start."})
         run = self.run
         if run is not None:
             item = run.items[0] if run.items else None
@@ -380,7 +391,7 @@ class QuickCheckManager:
         host, items, auto, reports = parts
         return CertificationSnapshot(host=host, run=self.run, last_result=self.last_result, items=items, auto=auto,
                                      gpu_held_by=holds, pending_reports=reports,
-                                     start_required=self._start_needed and not self.start_released,
+                                     start_required=self.start_required,
                                      start_results=self.start_results)
 
     def shutdown(self) -> None:

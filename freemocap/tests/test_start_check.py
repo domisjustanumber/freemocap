@@ -45,7 +45,7 @@ def test_the_quick_level_runs_its_six_checks_in_order_and_obeys_the_report_forma
     assert [path.name for path in (base / "certify" / "reports").iterdir()] == [f"{report['id']}.json"]
     assert rows["install-facts"]["result"] == "record-only" and rows["install-facts"]["numbers"]["ui_remote"] is False
     assert rows["build-identity"]["result"] in ("pass", "record-only")
-    assert report["schema"] == "skellycertify.report/1.1.0" and report["kind"] == "quick"
+    assert report["schema"] == "skellycertify.report/1.4.0" and report["kind"] == "quick"
     assert report["package"]["name"] == "freemocap" and re.fullmatch(r"[0-9a-f-]{36}", report["id"])
     assert report["evidence"]["valid"] is (not report["evidence"]["reasons"])
     assert messages[0]["state"] == "starting" and messages[-1]["state"] == "done" and messages[-1]["done"] == 6
@@ -93,6 +93,8 @@ def test_the_full_level_is_not_built_not_evidence_and_a_bad_level_raises(base):
     assert {(row["result"], row["reason"]) for row in report["checks"]} == {("not-run", "not-built")}
     assert "partial-run" in report["evidence"]["reasons"] and report["evidence"]["valid"] is False  # format 7.1 statement 4
     assert certification.certify_plan("quick")["details"]["checks"] == list(certification.QUICK_CHECKS)
+    # format 2.6: `total` counts the checks that run, and a quick plan has no risks
+    assert [(plan["total"], plan["risks"]) for plan in map(certification.certify_plan, ("quick", "full"))] == [(6, []), (0, [])]
     assert certification.certify_plan("quick", ui_remote=True, blender_exe_path=None) == certification.certify_plan("quick")
     with pytest.raises(ValueError):
         certification.certify("medium")

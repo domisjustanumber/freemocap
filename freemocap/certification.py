@@ -1,4 +1,4 @@
-"""freemocap's own certify checks (skellycertify report format 1.1.0; ep-certification-integration.md, "freemocap's own
+"""freemocap's own certify checks (skellycertify report format 1.4.0; ep-certification-integration.md, "freemocap's own
 checks"): only what freemocap owns, so no check loads an EP, a model or a camera, and none uses a GPU.
 
     import freemocap
@@ -43,7 +43,7 @@ import freemocap
 
 logger = logging.getLogger(__name__)
 
-SCHEMA = "skellycertify.report/1.1.0"
+SCHEMA = "skellycertify.report/1.4.0"  # no `summary`: no group of format 3.7 fits freemocap's checks
 SCHEMA_PREFIX = "skellycertify.report/1."
 REPORT_STATES = ("pending", "opened", "covered")  # as skellytracker's: `opened` = issue form opened, `covered` = an issue holds it
 REPORT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$")  # a safe file name only; ids are v4 UUIDs, never parsed
@@ -64,11 +64,13 @@ def _check_level(level: str) -> None:
 
 
 def certify_plan(level: str, *, ui_remote: bool | None = None, blender_exe_path: str | None = None) -> dict:
-    """What `certify(level)` runs: no download, no change outside freemocap's data folder, no question. It takes the
-    options of `certify` (report format 2.2); neither changes the plan."""
+    """What `certify(level)` runs: no download, no change outside freemocap's data folder, no question, no risk to a
+    device. `total` counts the checks that run: the six of `quick`, none of `full` (not built). It takes the options of
+    `certify` (report format 2.2); neither changes the plan."""
     _check_level(level)
-    return {"package": "freemocap", "kind": level, "seconds_estimate": 30, "downloads": [], "system_changes": [],
-            "questions": [], "details": {"checks": list(QUICK_CHECKS if level == "quick" else FULL_CHECKS)}}
+    return {"package": "freemocap", "kind": level, "seconds_estimate": 30, "total": len(QUICK_CHECKS) if level == "quick" else 0,
+            "risks": [], "downloads": [], "system_changes": [], "questions": [],
+            "details": {"checks": list(QUICK_CHECKS if level == "quick" else FULL_CHECKS)}}
 
 
 def _import_child(queue, modules: tuple[str, ...]) -> None:

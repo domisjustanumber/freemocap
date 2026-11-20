@@ -1414,6 +1414,8 @@ Nothing below is still missing except a package-wide `certify()` / `certify_plan
 
 ## Handoff note, 2026-11-19 late evening (read this first after a compaction)
 
+> 2026-11-20: the order of work and the newest rulings are in "Decisions of the fifth grilling, 2026-11-20"; read that section first.
+
 The coordinating session works through sub-agents (opus/sonnet/haiku, never fable unless the user names it).
 All work is local commits on `sidecar-implementation`; nothing is pushed; CI stays unbuildable until the
 frame-ring move. Sub-agents stage by explicit path because several edit this checkout at once.
@@ -1619,6 +1621,124 @@ All confirmed by the user.
   rest (`inert` and opacity 0.4); the compact connection status stays usable. Covered by the manual checklist of step 4
   (no test renders the layout).
 - J20. The full-check step is designed after the user's manual pass over steps 2 to 5.
+
+## Decisions of the fifth grilling, 2026-11-20 (after the demo; owner answered Q1 to Q52)
+
+Read this section before the older "Next actions": it replaces their order. All points are the owner's
+answers in the freemocap session unless marked "coordinator's choice".
+
+### Order of work
+
+1. The server refuses camera starts and pipeline starts while the start check is required: one sentence that
+   the UI shows beside the control; the control keeps its label and stays clickable (stable-controls rule).
+   Then one time-boxed trace, in the real Electron window, of the fault "cameras start behind the pop-up
+   before any check ran". The blocking layer stays whatever the trace finds.
+2. Move the skellytracker pin to `e17761b4` (named by the skellytracker session: branch head, four CI runs
+   green, holds the 1.2.0 `summary`). Run the full fast Python suite and the UI suite (neither ran since the
+   report writer and blocking changes). Bring `fixtures/certify/valid.md` to the 1.2.0 layout. Then push
+   `sidecar-implementation`. skellytracker's and skellycam's commits are pushed by their own sessions.
+3. "System" replaces "machine" in every text a user can read (UI labels, messages the server sends to the UI,
+   the report file). Not in code identifiers, log lines, plan documents or test names.
+4. Small report items: failed-checks table `Package | Module | Reason` (Module has the meaning of the results
+   table; the failing check's name starts the Reason); a line naming the pairs the quick level skipped
+   because they hold a reviewed pass (needs skellytracker to write them); comparison of freemocap's 6 quick
+   checks with rule 3 of level quick, gaps brought to the owner before any check is added.
+5. Full benchmark (below).
+6. Smaller defects, with two findings of the skellytracker session: install progress scale (fixed there to
+   0 to 1 in `e17761b4`; freemocap's install panel not yet checked) and pack removal failing in the process
+   that installed the pack.
+
+The installer for isolated systems (model files inside it) is out of this work: the owner starts a separate
+session for it, it comes just before release and blocks nothing. The move to skellycam `dom/demo` is a
+separate plan. The relay stays in test mode until the owner did one real send of a 1.2.0 report and saw
+its issue. Each platform is validated independently; Linux and macOS do not wait for Windows.
+
+### Rulings relayed by peer sessions and confirmed here by the owner
+
+- "All system/platform/hardware/ep validation from now on will be done via the certify process in freemocap
+  builds" (Linux and macOS certification runs need a freemocap build there).
+- "passive record needs to be in pre-release"; freemocap's part (opt-in question, run at idle after a
+  recording) waits until skellycertify defines the record and skellytracker has an interface.
+- Level quick (skellycertify report-format.md section 2.7): the whole run takes no more than 2 minutes for
+  all packages together; it downloads nothing; it is enough that a recording, a realtime session and a
+  post-hoc session can each start and run, where the package has them.
+
+### Start check (level quick)
+
+- It stays limited to pairs with no reviewed pass in skellytracker's bundled evidence file. On the dev PC
+  that is DirectML on both GPUs; CUDA and TensorRT RTX are skipped by design.
+- Quick tests do not repeat work between packages.
+- The test images are bundled (the owner handles this with skellytracker; ask that session for updates) and
+  also sit in the shared test media folder.
+- skellycam's quick part joins as soon as its session names a green commit with `skellycam.certify`, and
+  runs first. No camera plugged in (detection finds none): its camera rows read "not checked", nothing
+  fails, the app opens. A camera counts as checked per model (USB vendor and product id) on this system.
+  An unchecked camera is checked when the user first asks the app to open it (pop-up and lock as for the
+  start check, about 30 s, then the cameras start); plugging in alone triggers nothing.
+- Provisional time split (coordinator's choice): 40 s for each of the three packages.
+
+### Full benchmark (level full)
+
+- The button keeps the name "Full benchmark". It runs every package's full tests; work is not duplicated.
+- Division (the owner made this session the authority; the other sessions follow it): skellycam owns
+  cameras, the recording of camera frames, disk speed and take load, its own processes' CPU use;
+  skellytracker owns execution-provider correctness, the GPU JPEG suite and inference timing; freemocap owns
+  the end-to-end post-hoc run on a known-good recording, Blender when installed, app and install facts, and
+  only write access to its data folder. No package runs a whole-system CPU benchmark. freemocap makes no
+  second recording.
+- Run order: skellycam, skellytracker, freemocap. freemocap's benchmark uses the new skellytracker
+  pipelines, not the legacy ones, and runs only on providers that passed skellytracker's checks.
+- Recording: for now the freemocap sample recording, saved in a shared test media folder that other
+  modules use too. The folder is per user, outside any one package's data; the app passes its location to
+  each package; the rule is to be written in the skellycertify spec.
+- The benchmark processes a fixed number of frames per provider (count set after measurement on the dev
+  PC) and reports ms/frame with FPS per stage, reusing the measuring code of `machine_benchmarks.py`.
+  Blender export runs once, timed as its own row, only when Blender is already installed (never install
+  it); otherwise "Blender: not installed".
+- Staging, in skellytracker's part and in the benchmark alike: unknown providers first (no reviewed pass
+  for provider, GPU model and OS in the bundled evidence), then the known-fastest (TensorRT RTX), then CPU
+  as baseline, then the rest.
+- Offered only after the start check passed, also from the Certification button, never required.
+- Consent step before the run: table of downloads (name, source host, size, total), time estimate per
+  package, checkbox "remove benchmark data after a successful run" on by default, Start and Cancel; nothing
+  downloads before Start. Clean-up removes what the run downloaded and its processing output; it keeps the
+  report, bundled test images and files that were in the shared folder before. After a failed or cancelled
+  run nothing is removed.
+- The app is locked during the run as during the quick check; "Cancel check" stays and unlocks at once.
+- Progress: one row per provider and GPU pair with state and turning icon, a count of finished checks, no
+  percentage, no time remaining.
+- Failure: a provider that fails probe or image is treated as after a quick-check failure; JPEG-suite
+  failures and timing rows are reported only.
+- Crash, both levels: the name of the running check is written to a small file and removed when the check
+  ends; a file found at launch records that check as "crashed", it is not re-run automatically and it
+  appears in the report; at level quick it counts as failed for its provider only.
+- A cancelled or crashed run keeps its finished stages in a shareable report marked incomplete, with the
+  rest "not run".
+- The result is one more report in the same share list, never pruned. The Markdown head gains a table
+  `| GPU | Module | Stage | ms/frame | FPS |` once the skellycertify session defined it; freemocap's own
+  module then moves to 1.2.0.
+- A full run of roughly 15 to 25 minutes is accepted (skellycam 6 to 11, skellytracker about 5, plus the
+  benchmark); the text "approx 5 to 10 mins" is replaced by the measured total.
+
+### Facts found this session
+
+- `sidecar-implementation` sits on the tip of `upstream/sfn26` (`ca0c17cc`), 284 ahead, 0 behind (fetched
+  2026-11-20). `upstream/main` has 5 commits that neither branch holds.
+- `certify("full")` and `machine_benchmarks.py` share no code. Full is mostly correctness (probe, image
+  against CPU, about 23 GPU JPEG checks) plus 3 record-only timing rows per provider, on one downloaded
+  test image and generated pictures.
+- skellytracker's plan `downloads` items hold only `name` and `bytes` (no source) and list only the test
+  image; its full level downloads no model and has no clean-up option. Both are on that session's list.
+- The installer bundles no EP pack and no model today (`freemocap.spec:81-83`); only CPU and, on Windows,
+  DirectML come with the Python environment.
+- Wording choices of the demo morning all stand (list in "Certify pop-up revision, 2026-11-20").
+
+### Not built from skellycam's overlap list (freemocap's duties, coordinator accepted them)
+
+The app closes its camera groups before any certify run; the app asks for the macOS camera permission
+before the run; the app shows "Camera <name>: wedged, please replug" from a `cleanup` row
+`release:<camera>` (reason `camera-wedged` or `camera-not-restored`), name found through the summary item
+with the same `device`.
 
 ## Next actions
 

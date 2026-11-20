@@ -3,19 +3,21 @@ import ButtonSm from '@/components/ui-components/ButtonSm';
 import SubactionHeader from '@/components/ui-components/SubactionHeader';
 import {serverUrls} from '@/services';
 import {useAppSelector} from '@/store';
-import {QUICK_CHECK_TEXT} from '@/services/server/execution-providers';
-import {CERTIFICATION_TEXT, openCertification, REPORTS_SECTION_ID} from '@/services/server/certification-hand-in';
+import {QUICK_CHECK_TEXT, quickCheckProgressText, requestQuickCheckCancel} from '@/services/server/execution-providers';
+import {CERTIFICATION_TEXT, REPORTS_SECTION_ID} from '@/services/server/certification-hand-in';
 import {
-    type PackagePlan, planLines, requestStartCheck, requestStartCheckPlan, START_CHECK_TEXT, startResultLines,
+    type PackagePlan, planDetail, requestStartCheck, requestStartCheckPlan, START_CHECK_PACKAGES, START_CHECK_TEXT, startCheckRowStatus,
 } from '@/services/server/start-check';
 
 /**
- * The start check in the Certification dialog (decisions 14, 17, 27): each package's plan, "Run quick check", the
- * server's refusal of this window's start, and how each package's part of the last start check ended. Its progress and
- * cancel are the dialog's running check. The plan and the refusal belong to one server identity; the rest is the
- * server's current state. The button never changes label or disables.
+ * The start check in the Certification dialog (decisions 14, 17, 27): a table with one row per package (its plan and
+ * its status: waiting, running with a moving icon, done, passed, failed, cancelled, not run), the running check's
+ * progress, the server's refusal of this window's start, "Run quick check" and "Cancel check". The table's rows and
+ * the message lines keep their place whatever the state, so the dialog does not jump. The plan and the refusal belong
+ * to one server identity; the rest is the server's current state. The buttons never change label or disable; Cancel
+ * is hidden (its space kept) while nothing runs.
  */
-export function StartCheckSection({required}: {required: boolean}) {
+export function StartCheckSection() {
     const {isConnected, serverPid, certification} = useAppSelector(state => state.connection);
     const blenderExePath = useAppSelector(state => state.blender.blenderExePath);
     const endpoint = serverUrls.getHttpUrl();
@@ -42,26 +44,55 @@ export function StartCheckSection({required}: {required: boolean}) {
         if (current.current === key) setLocal(previous => ({...(previous.key === key ? previous : {key}), refusal: refusal ?? undefined}));
     }, [endpoint, serverKey, blenderExePath]);
 
-    const results = certification?.run ? [] : startResultLines(certification?.start_results ?? []);
-    const fileReport = () => {
-        openCertification();
-        document.getElementById(REPORTS_SECTION_ID)?.scrollIntoView({block: 'nearest'});
+    const running = certification?.run;
+    const packages = mine.plans?.map(plan => plan.package) ?? [...START_CHECK_PACKAGES];
+    const statuses = startCheckRowStatus(packages, running, certification?.start_results ?? []);
+    const detail = (name: string) => {
+        const plan = mine.plans?.find(item => item.package === name);
+        return plan ? planDetail(plan) : mine.planError ? START_CHECK_TEXT.couldNotReadPlan + mine.planError : START_CHECK_TEXT.loadingPlan;
     };
+    // A failed package's report is in the hand-in list below (freemocap's own and skellytracker's, J13).
+    const fileReport = () => document.getElementById(REPORTS_SECTION_ID)?.scrollIntoView({block: 'nearest'});
+    const cell = {padding: '4px 6px', height: 36, verticalAlign: 'middle' as const};
+
     return <div className="flex flex-col gap-2 bg-secondary p-2 br-1">
         <SubactionHeader text={START_CHECK_TEXT.heading} className="text-gray"/>
-        <p className={`text sm ${required ? 'text-white' : 'text-gray'}`}>{required ? START_CHECK_TEXT.required : START_CHECK_TEXT.optional}</p>
-        {mine.plans ? <ul className="text sm text-gray">{planLines(mine.plans).map(line => <li key={line}>{line}</li>)}</ul>
-            : <p className="text sm text-darkgray">{mine.planError ? START_CHECK_TEXT.couldNotReadPlan + mine.planError : START_CHECK_TEXT.loadingPlan}</p>}
-        <div className="flex flex-row">
-            <ButtonSm text={START_CHECK_TEXT.run} textColor="text-white" className="primary accent" onClick={run}/>
+        <table className="certify-table text sm" style={{width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse'}}>
+            <thead>
+            <tr className="text-darkgray" style={{textAlign: 'left'}}>
+                <th style={{...cell, width: '24%', height: 'auto'}}>Package</th>
+                <th style={{...cell, width: '38%', height: 'auto'}}>What it checks</th>
+                <th style={{...cell, height: 'auto'}}>Status</th>
+            </tr>
+            </thead>
+            <tbody>
+            {packages.map((name, index) => {
+                const status = statuses[index];
+                return <tr key={name} className="border-1" title={mine.plans?.find(item => item.package === name)?.checks.join(', ')}>
+                    <td style={cell} className="text-white">{name}</td>
+                    <td style={cell} className="text-gray">{detail(name)}</td>
+                    <td style={cell} role="status">
+                        <span className="flex flex-row items-center gap-1">
+                            {status.kind === 'running' && <span className="icon loader-icon icon-size-20" role="img" aria-label="Running"/>}
+                            <span className={status.kind === 'failed' ? 'settings-note-error' : status.kind === 'passed' || status.kind === 'running'
+                                ? 'text-white' : 'text-gray'}>{status.text}</span>
+                            {status.kind === 'failed' && <ButtonSm text={CERTIFICATION_TEXT.fileReport} buttonType="secondary" onClick={fileReport}/>}
+                        </span>
+                    </td>
+                </tr>;
+            })}
+            </tbody>
+        </table>
+        <div className="text sm" style={{minHeight: '3em'}}>
+            {running && <p className="text sm text-gray">{quickCheckProgressText(running, certification?.items, START_CHECK_TEXT.progressName)}</p>}
+            {mine.refusal && <p className="text sm settings-note-error" role="alert">{QUICK_CHECK_TEXT.couldNotStart}{mine.refusal}</p>}
         </div>
-        {mine.refusal && <p className="text sm settings-note-error" role="alert">{QUICK_CHECK_TEXT.couldNotStart}{mine.refusal}</p>}
-        {results.map(line => line.failed
-            // A failed package's report is in the hand-in list below (freemocap's own and skellytracker's, J13).
-            ? <div key={line.text} className="settings-note settings-note-dismissable" role="status">
-                <span className="settings-note-error">{line.text}</span>
-                <ButtonSm text={CERTIFICATION_TEXT.fileReport} className="setting-action-button" onClick={fileReport}/>
-            </div>
-            : <p key={line.text} className="text sm text-white" role="status">{line.text}</p>)}
+        <div className="flex flex-row gap-2">
+            <ButtonSm text={START_CHECK_TEXT.run} textColor="text-white" className="primary accent" onClick={run}/>
+            <span style={{visibility: running ? 'visible' : 'hidden'}}>
+                <ButtonSm text={CERTIFICATION_TEXT.cancelCheck} buttonType="secondary" onClick={() =>
+                    requestQuickCheckCancel(endpoint).catch(error => console.warn("Could not cancel the quick check:", error))}/>
+            </span>
+        </div>
     </div>;
 }

@@ -126,6 +126,11 @@
 ========================= */
 
 @media (prefers-reduced-motion: reduce) {
+  /* The certification table's running row keeps its "Running" text; the icon stops turning. */
+  .certify-table .loader-icon {
+    animation: none;
+  }
+
   .reveal {
     animation: none;
     /* skip animation, show element instantly */

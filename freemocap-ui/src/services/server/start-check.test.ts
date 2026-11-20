@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {quickCheckProgressText} from './execution-providers';
-import {planLines, requestStartCheck, requestStartCheckPlan, START_CHECK_TEXT, startResultLines} from './start-check';
+import {planLines, requestStartCheck, requestStartCheckPlan, START_CHECK_TEXT, startCheckRowStatus, startResultLines} from './start-check';
 
 test('each package\'s plan is one line with its checks, estimate, downloads and changes', () => {
     assert.deepEqual(planLines([
@@ -48,4 +48,23 @@ test('the start check\'s requests: the plan, an accepted start, and a refusal wi
     'A quick check cannot start while other work runs: cameras g1. Stop it first.');
     assert.deepEqual(calls.map(call => call.replace(/^(GET|POST) /, '')), Array(3).fill(0).map((_, index) =>
         `http://server.invalid/freemocap/certify/start_check${index ? '' : '/plan'}`));
+});
+
+test("each package's status cell follows the current run, else how its part of the last start check ended", () => {
+    const packages = ['freemocap', 'skellytracker'];
+    const run = {level: 'quick', items: [], state: 'running', done: 1, total: 4};
+    assert.deepEqual(startCheckRowStatus(packages, undefined, []).map(row => row.text), ['Waiting', 'Waiting']);
+    assert.deepEqual(startCheckRowStatus(packages, {...run, total: undefined}, []).map(row => row.text), ['Starting', 'Waiting']);
+    assert.deepEqual(startCheckRowStatus(packages, {...run, package: 'skellytracker'}, [{package: 'freemocap', result: 'pass'}])
+        .map(row => [row.kind, row.text]), [['done', 'Done'], ['running', 'Running, 1 of 4']]);
+    assert.deepEqual(startCheckRowStatus(packages, undefined, [{package: 'freemocap', result: 'record-only'},
+        {package: 'skellytracker', result: 'fail', reason: 'dml@x-0'}]).map(row => [row.kind, row.text]),
+    [['passed', 'Passed'], ['failed', 'Failed: dml@x-0']]);
+    assert.deepEqual(startCheckRowStatus(packages, undefined, [{package: 'freemocap', result: 'not-run', reason: 'no-check'},
+        {package: 'skellytracker', result: 'not-run', reason: 'cancelled'}]).map(row => row.text), ['Nothing to check', 'Cancelled']);
+    assert.deepEqual(startCheckRowStatus(packages, undefined, [{package: 'freemocap', result: 'pass'}, {result: 'crashed', reason: 'exit-code-3'}])
+        .map(row => row.kind), ['passed', 'failed']);
+    // An EP pair's quick check (a run with items) is not the start check: the rows keep the last start check's results.
+    assert.deepEqual(startCheckRowStatus(packages, {...run, items: [{execution_provider: 'dml'}]}, []).map(row => row.text), ['Waiting', 'Waiting']);
+    assert.ok(Object.values(START_CHECK_TEXT).every(text => !/machine/.test(text)), 'this dialog says "system"');
 });

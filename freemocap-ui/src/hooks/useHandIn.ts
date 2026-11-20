@@ -60,18 +60,35 @@ export function useHandIn(endpoint: string, serverKey: string, open: boolean, ce
 
     const viewed = viewIsCurrent(local.view, pending, local.note) ? local.view : null;
     const sending = useRef(false);
-    const send = useCallback(() => {
-        if (!viewed || sending.current) return;
+    const sendView = useCallback((target: ViewedReport) => {
+        if (sending.current) return;
         const key = serverKey;
         sending.current = true;
-        requestSend(endpoint, viewed)
+        requestSend(endpoint, target)
             .catch(error => ({text: CERTIFICATION_TEXT.couldNotSend + errorText(error), error: true, offerIssueForm: false}))
             .then(answer(key, (message: HandInMessage) => {
                 update(message.viewAgain ? {message, view: null} : {message});
                 requestHandIn(endpoint).then(answer(key, list => update({list})), () => undefined);
             }))
             .finally(() => { sending.current = false; });
-    }, [endpoint, serverKey, viewed, update, answer]);
+    }, [endpoint, serverKey, update, answer]);
+
+    /** "Submit Report": send the viewed file, or build it first; a file the relay cannot take stays shown with the issue
+     * form offered (relay off, too large). */
+    const relayOff = local.list?.relay_enabled === false;
+    const submit = useCallback(() => {
+        const sendOrOffer = (target: ViewedReport) => relayOff || !target.file.fits_relay
+            ? update({message: {text: relayOff ? CERTIFICATION_TEXT.relayNotSetUp : CERTIFICATION_TEXT.tooLarge, error: true, offerIssueForm: true}})
+            : sendView(target);
+        if (viewed) return sendOrOffer(viewed);
+        const key = serverKey, reportIds = pendingKey ? pendingKey.split('\n') : [], note = local.note;
+        update({view: null, message: null});
+        requestReportFile(endpoint, reportIds, note).then(answer(key, file => {
+            const target = {reportIds, note, file};
+            update({view: target});
+            sendOrOffer(target);
+        }), answer(key, error => update({message: {text: CERTIFICATION_TEXT.couldNotView + errorText(error), error: true, offerIssueForm: false}})));
+    }, [endpoint, serverKey, pendingKey, local.note, viewed, relayOff, sendView, update, answer]);
 
     /** Save the viewed file here, open the issue form, then mark the reports opened (handed in, no link; decision 24). */
     const issueForm = useCallback(() => {
@@ -99,7 +116,7 @@ export function useHandIn(endpoint: string, serverKey: string, open: boolean, ce
         view: viewed,
         message: local.message,
         viewReport: view,
-        send,
+        submit,
         issueForm,
         notSent,
     };

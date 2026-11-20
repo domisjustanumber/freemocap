@@ -1,33 +1,64 @@
 import {createHttpClient} from '@freemocap/client/http';
 import type {Certification, components} from '@freemocap/client';
 import {describeError} from '@/store/slices/thunk-helpers';
-import {QUICK_CHECK_TEXT, quickCheckResultText} from '@/services/server/execution-providers';
+import {type CertificationRun, QUICK_CHECK_TEXT, quickCheckResultText} from '@/services/server/execution-providers';
 
 export type PackagePlan = components['schemas']['PackagePlan'];
 export type StartCheckResult = NonNullable<Certification['start_results']>[number];
 
-/** Every text of the start check (decisions 13 to 17), in one place; "machine" for the computer (G1). */
+/** Every text of the start check (decisions 13 to 17), in one place; "system" for the computer in this dialog. */
 export const START_CHECK_TEXT = {
-    heading: 'Quick check of this machine',
-    required: 'This machine has no checked result for this version of freemocap. Run the quick check before you use the '
-        + 'app; it takes about a minute. Cancel keeps the app waiting; any finished check, passed or failed, releases it.',
-    optional: 'freemocap\'s own checks and every GPU execution provider that has no reviewed result on this machine.',
+    heading: 'Quick check of this system',
+    required: 'FreeMoCap has not run on this type of system before, so we need to run a check to confirm things work before launching.',
+    optional: "freemocap's own checks and every GPU execution provider that has no reviewed result on this system.",
     run: 'Run quick check',
     loadingPlan: 'Reading what the check runs…',
     couldNotReadPlan: 'Could not read what the check runs: ',
-    progressName: 'this machine',
+    progressName: 'this system',
     crashed: 'The check',
 } as const;
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
-/** One line per package: its checks, its one-off estimate, and any download or system change it would make. */
-export function planLines(plans: readonly PackagePlan[]): string[] {
-    return plans.map(plan => {
-        const megabytes = plan.downloads.reduce((sum, download) => sum + (Number(download.bytes) || 0), 0) / 1e6;
-        return [`${plan.package}: ${plan.checks.length ? plural(plan.checks.length, 'check') : 'nothing to check'}`,
-            `up to about ${plan.seconds_estimate} seconds`, megabytes ? `downloads about ${Math.ceil(megabytes)} MB` : '',
-            ...plan.system_changes].filter(Boolean).join(', ');
+/** A package's checks, its one-off estimate, and any download or system change it would make. */
+export function planDetail(plan: PackagePlan): string {
+    const megabytes = plan.downloads.reduce((sum, download) => sum + (Number(download.bytes) || 0), 0) / 1e6;
+    return [plan.checks.length ? plural(plan.checks.length, 'check') : 'nothing to check',
+        `up to about ${plan.seconds_estimate} seconds`, megabytes ? `downloads about ${Math.ceil(megabytes)} MB` : '',
+        ...plan.system_changes].filter(Boolean).join(', ');
+}
+
+/** One line per package: its name and its plan detail. */
+export const planLines = (plans: readonly PackagePlan[]): string[] => plans.map(plan => `${plan.package}: ${planDetail(plan)}`);
+
+/** The start check's packages, in the order they run; the table shows them before the plan arrives. */
+export const START_CHECK_PACKAGES = ['freemocap', 'skellytracker'] as const;
+
+export type RowStatus = {kind: 'waiting' | 'running' | 'done' | 'passed' | 'failed' | 'cancelled' | 'not-run'; text: string};
+
+/**
+ * Each package's status cell from the current server state only. While a start check runs (a run without items),
+ * packages before the running one are done, it runs with "N of M", later ones wait; the server sends only
+ * package-level progress. Otherwise each package shows how its part of the last start check ended (a crash of the
+ * whole check, which names no package, stands for every package without its own result), or waits.
+ */
+export function startCheckRowStatus(packages: readonly string[], run: CertificationRun | undefined,
+                                    results: readonly StartCheckResult[]): RowStatus[] {
+    if (run && !run.items.length) {
+        const running = Math.max(0, run.package ? packages.indexOf(run.package) : 0);
+        return packages.map((_, index) => index < running ? {kind: 'done', text: 'Done'}
+            : index > running ? {kind: 'waiting', text: 'Waiting'}
+                : {kind: 'running', text: run.total === undefined ? 'Starting' : `Running, ${run.done} of ${run.total}`});
+    }
+    return packages.map(name => {
+        const ended = results.find(result => result.package === name) ?? results.find(result => result.package === undefined);
+        if (!ended) return {kind: 'waiting', text: 'Waiting'};
+        const {result, reason} = ended;
+        if (result === 'pass' || result === 'record-only') return {kind: 'passed', text: 'Passed'};
+        if (result === 'fail') return {kind: 'failed', text: `Failed: ${reason ?? result}`};
+        if (result === 'not-run') return reason === 'cancelled' ? {kind: 'cancelled', text: 'Cancelled'}
+            : {kind: 'not-run', text: reason === 'no-check' ? 'Nothing to check' : `Not run: ${reason ?? result}`};
+        return {kind: 'failed', text: quickCheckResultText({result, reason})};
     });
 }
 

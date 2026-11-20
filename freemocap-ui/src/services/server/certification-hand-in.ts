@@ -13,16 +13,24 @@ export type PendingReport = Certification['pending_reports'][number];
 export const ISSUE_FORM_URL = 'https://github.com/domisjustanumber/skellycertify/issues/new?template=certify-report.yml';
 const ISSUE_URL = /^https:\/\/github\.com\/domisjustanumber\/skellycertify\/issues\/[1-9][0-9]*$/;
 
-/** Every text of the Certification button and dialog, in one place ("machine" for the computer, G1). */
+/** Every text of the Certification button and dialog, in one place ("system" for the computer in this dialog). */
 export const CERTIFICATION_TEXT = {
     button: 'Certification',
+    title: 'Certify FreeMoCap on this system',
+    invitation: "We'd love your help to know this is a good configuration for FreeMoCap to run on in the future. If you'd "
+        + 'like to submit your anonymous certification report, click the Submit Report button below. If you want to see '
+        + "what we'll get before it sends, click the View report button first.",
+    fullBenchmark: 'Full benchmark',
+    fullBenchmarkInvitation: "If you have the time (approx 5 to 10 mins), we'd really appreciate the results from a full "
+        + 'benchmark run on your system. Click the "Full benchmark" button to run that now.',
+    notAvailableYet: 'Not available yet',
     reports: 'Reports to hand in',
     nothingPending: 'No reports to hand in.',
     noteLabel: 'Note (optional)',
     privacy: 'The note becomes part of the report, which is public. Do not write your name, contact details or other '
-        + 'personal details. Paths and this machine\'s user and host names are removed.',
+        + 'personal details. Paths and this system\'s user and host names are removed.',
     viewReport: 'View report',
-    sendReport: 'Send report',
+    submitReport: 'Submit Report',
     issueForm: 'Save file and open issue form',
     issueFormHelp: 'Attach the saved file to the issue form. If GitHub does not accept the .md file, rename it to .txt.',
     relayNotSetUp: 'Sending is not set up in this build; use the issue form.',
@@ -40,7 +48,15 @@ export const CERTIFICATION_TEXT = {
     fileReport: 'File report',
     recordWaits: 'A recording can start once the quick check ends. ',
     close: 'Close',
+    continue: 'Continue',
 } as const;
+
+/** The dialog's bottom button from the current server state: none while the start check is required, "Continue" once a
+ * start check has ended and released the app, else "Close". */
+export function bottomButtonLabel(certification: Certification | null): string | null {
+    if (certification?.start_required) return null;
+    return certification && !certification.run && certification.start_results?.length ? CERTIFICATION_TEXT.continue : CERTIFICATION_TEXT.close;
+}
 
 /** Opens the Certification dialog from anywhere (the button, a failed check's "File report"; decisions 23, 25 to 27). */
 export const openCertification = () => window.dispatchEvent(new CustomEvent('open-certification'));

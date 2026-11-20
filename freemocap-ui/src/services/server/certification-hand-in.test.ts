@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import type {Certification} from '@freemocap/client';
 import {
-    certificationButtonSuffix, handedIn, type HandInList, isLocalHost, issueFormProminent, outboxLine, pendingRows, pendingSummary,
+    bottomButtonLabel, certificationButtonSuffix, handedIn, type HandInList, isLocalHost, issueFormProminent, outboxLine, pendingRows, pendingSummary,
     requestHandIn, requestNotSent, requestOpened, requestReportFile, requestSend, safeIssueUrl, sendAnswerMessage, viewIsCurrent,
     type ViewedReport,
 } from './certification-hand-in';
@@ -116,4 +116,13 @@ test('the requests name the routes, the reports, the note and the viewed SHA-256
     await assert.rejects(requestOpened('http://server.invalid', VIEW, answer(Response.json(
         {detail: {code: 'file-changed', detail: 'the report file is not the file that was viewed; view it again'}}, {status: 409}))),
     /view it again/);
+});
+
+test('the bottom button follows the server state: none while required, Continue once a start check ended, else Close', () => {
+    const run = {level: 'quick', items: [], state: 'running', done: 0};
+    assert.equal(bottomButtonLabel(null), 'Close');
+    assert.equal(bottomButtonLabel(BASE), 'Close');
+    assert.equal(bottomButtonLabel({...BASE, start_required: true, start_results: [{package: 'freemocap', result: 'pass'}]}), null);
+    assert.equal(bottomButtonLabel({...BASE, start_results: [{package: 'freemocap', result: 'fail'}]}), 'Continue');
+    assert.equal(bottomButtonLabel({...BASE, run, start_results: [{package: 'freemocap', result: 'pass'}]}), 'Close');
 });

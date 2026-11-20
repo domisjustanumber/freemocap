@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import type {Certification} from '@freemocap/client';
 import {
-    bottomButtonLabel, certificationButtonSuffix, footerActionText, reportFooterAction, reportsReady, submitLabel, submitText, handedIn, type HandInList, isLocalHost, issueFormProminent, outboxLine, pendingRows, pendingSummary,
+    bottomButtonLabel, certificationButtonSuffix, footerActionText, reportFooterAction, reportsReady, sendAndOpenLabel, submitLabel, submitText, handedIn, type HandInList, isLocalHost, issueFormProminent, outboxLine, pendingRows, pendingSummary,
     requestHandIn, requestNotSent, requestOpened, requestReportFile, requestSend, safeIssueUrl, sendAnswerMessage, viewIsCurrent,
     type ViewedReport,
 } from './certification-hand-in';
@@ -153,13 +153,14 @@ test('the report pop-up offers Submit while the relay can take the file, else th
     assert.equal(reportFooterAction(LIST, small, null, 0), null);
 });
 
-test('the send button says Submitting... while the send is in flight and Sent! once accepted', () => {
-    assert.deepEqual([submitText('idle', 2), submitText('submitting', 2), submitText('sent', 1), submitText('idle', 1)],
-        ['Submit reports', 'Submitting...', 'Sent!', 'Submit report']);
+test('the send button says Sending... while the send is in flight and Sent! once accepted', () => {
+    assert.deepEqual([submitText('idle', 'Submit reports'), submitText('submitting', 'Submit reports'), submitText('sent', 'x')],
+        ['Submit reports', 'Sending...', 'Sent!']);
+    assert.deepEqual([sendAndOpenLabel(1), sendAndOpenLabel(2)], ['Send report and open FreeMoCap', 'Send reports and open FreeMoCap']);
 });
 
 test('the report pop-up says what its right-hand button does, with the same plural rule', () => {
-    assert.equal(footerActionText('submit', 1), 'Submit report sends this report to the FreeMoCap team as a public issue on GitHub.');
-    assert.equal(footerActionText('submit', 3), 'Submit reports sends this report to the FreeMoCap team as a public issue on GitHub.');
+    assert.equal(footerActionText('submit', 1), 'Send report and open FreeMoCap sends this report to the FreeMoCap team as a public issue on GitHub.');
+    assert.equal(footerActionText('submit', 3), 'Send reports and open FreeMoCap sends this report to the FreeMoCap team as a public issue on GitHub.');
     assert.equal(footerActionText('issue-form', 3), 'Save file and open issue form saves this report and opens the GitHub form to attach it to.');
 });

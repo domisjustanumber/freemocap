@@ -6,7 +6,7 @@ import {serverUrls} from '@/services';
 import {useAppSelector} from '@/store';
 import {useHandIn} from '@/hooks/useHandIn';
 import {
-    bottomButtonLabel, certificationButtonSuffix, footerActionText, reportFooterAction, reportsReady, submitText, CERTIFICATION_TEXT, handedIn, ISSUE_FORM_URL, issueFormProminent, issueLabel, isLocalHost,
+    bottomButtonLabel, certificationButtonSuffix, footerActionText, reportFooterAction, reportsReady, sendAndOpenLabel, submitText, CERTIFICATION_TEXT, handedIn, ISSUE_FORM_URL, issueFormProminent, issueLabel, isLocalHost,
     openCertification, outboxLine, pendingRows, pendingSummary, REPORTS_SECTION_ID, submitLabel,
 } from '@/services/server/certification-hand-in';
 import {START_CHECK_TEXT} from '@/services/server/start-check';
@@ -109,7 +109,7 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                                       onChange={event => handIn.setNote(event.target.value)}/>
                         </label>
                         <div className="flex flex-row gap-2 flex-wrap">
-                            <SendButton phase={phase} text={submitText(phase, pending.length)} className={prominent ? '' : 'primary accent'}
+                            <SendButton phase={phase} text={submitText(phase, submitLabel(pending.length))} className={prominent ? '' : 'primary accent'}
                                         buttonType={prominent ? 'secondary' : ''} onClick={() => { setClosedView(null); handIn.submit(); }}/>
                             <span ref={viewButton}>
                                 <ButtonSm text={CERTIFICATION_TEXT.viewReport} buttonType="secondary" onClick={() => {
@@ -179,8 +179,11 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                                 : footer === 'issue-form' ? (list?.relay_enabled === false ? CERTIFICATION_TEXT.relayNotSetUp
                                     : !shown.file.fits_relay ? CERTIFICATION_TEXT.tooLarge : '') : ''}</p>
                         <div className="flex flex-row gap-2" style={{justifyContent: 'space-between'}}>
-                            <ButtonSm text={CERTIFICATION_TEXT.close} buttonType="secondary" textColor="text-white" onClick={closeReport}/>
-                            {footer === 'submit' && <SendButton phase={phase} text={submitText(phase, pending.length)} className="primary accent"
+                            <ButtonSm text={CERTIFICATION_TEXT.doNotSend} buttonType="secondary" textColor="text-white" onClick={() => {
+                                closeReport();
+                                if (!required) onClose();
+                            }}/>
+                            {footer === 'submit' && <SendButton phase={phase} text={submitText(phase, sendAndOpenLabel(pending.length))} className="primary accent"
                                                                 buttonType="" onClick={handIn.submit}/>}
                             {footer === 'issue-form' && <ButtonSm text={CERTIFICATION_TEXT.issueForm} textColor="text-white"
                                                                   className="primary accent" onClick={handIn.issueForm}/>}

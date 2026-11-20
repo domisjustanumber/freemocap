@@ -52,18 +52,22 @@ export const CERTIFICATION_TEXT = {
     recordWaits: 'A recording can start once the quick check ends. ',
     close: 'Close',
     continue: 'Continue',
+    doNotSend: 'Do not send and open FreeMoCap',
 } as const;
 
 /** "Submit report", or "Submit reports" when the server lists more than one pending report. */
 export type SendPhase = 'idle' | 'submitting' | 'sent';
 
-/** The send button's label: "Submitting..." while this window's send is in flight, "Sent!" just after it was accepted. */
-export const submitText = (phase: SendPhase, pendingCount: number) =>
-    phase === 'submitting' ? 'Submitting...' : phase === 'sent' ? 'Sent!' : submitLabel(pendingCount);
+/** A send button's label: "Sending..." while this window's send is in flight, "Sent!" just after it was accepted, else
+ * its own label. */
+export const submitText = (phase: SendPhase, idle: string) => phase === 'submitting' ? 'Sending...' : phase === 'sent' ? 'Sent!' : idle;
+
+/** The report pop-up's send button (plural by the same rule as Submit, the coordinator's choice). */
+export const sendAndOpenLabel = (pendingCount: number) => pendingCount > 1 ? 'Send reports and open FreeMoCap' : 'Send report and open FreeMoCap';
 
 /** What the report pop-up's right-hand button does, in one sentence (coordinator's wording, awaiting the owner). */
 export const footerActionText = (action: 'submit' | 'issue-form', pendingCount: number) => action === 'submit'
-    ? `${submitLabel(pendingCount)} sends this report to the FreeMoCap team as a public issue on GitHub.`
+    ? `${sendAndOpenLabel(pendingCount)} sends this report to the FreeMoCap team as a public issue on GitHub.`
     : `${CERTIFICATION_TEXT.issueForm} saves this report and opens the GitHub form to attach it to.`;
 
 export const submitLabel = (pendingCount: number) => pendingCount > 1 ? CERTIFICATION_TEXT.submitReports : CERTIFICATION_TEXT.submitReport;

@@ -50,10 +50,11 @@ export async function requestStartCheckPlan(baseUrl: string, signal?: AbortSigna
     return data.packages;
 }
 
-/** Start the start check. Null when accepted, else the server's reason (other work runs, a check runs). */
-export async function requestStartCheck(baseUrl: string, request: typeof fetch = fetch): Promise<string | null> {
+/** Start the start check, with the Blender path chosen in Blender settings (null: the server's best guess). Null when
+ * accepted, else the server's reason (other work runs, a check runs). */
+export async function requestStartCheck(baseUrl: string, request: typeof fetch = fetch, blenderExePath: string | null = null): Promise<string | null> {
     const response = await createHttpClient({baseUrl, fetch: request}).responses
-        .start_start_check_freemocap_certify_start_check_post({});
+        .start_start_check_freemocap_certify_start_check_post({body: {blenderExePath}});
     if (response.ok) return null;
     const body: unknown = await response.json().catch(() => null);
     return describeError(body) || `HTTP ${response.status}`;

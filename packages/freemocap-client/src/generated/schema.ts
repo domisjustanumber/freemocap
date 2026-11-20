@@ -5025,6 +5025,14 @@ export interface components {
             /** Framerates */
             framerates: number[];
         };
+        /** StartCheckRequest */
+        StartCheckRequest: {
+            /**
+             * Blenderexepath
+             * @description The Blender path chosen in Blender settings; null uses freemocap's best guess.
+             */
+            blenderExePath?: string | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -7409,7 +7417,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["StartCheckRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             202: {
@@ -7426,6 +7438,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };

@@ -16,6 +16,7 @@ import {
  */
 export function StartCheckSection({required}: {required: boolean}) {
     const {isConnected, serverPid, certification} = useAppSelector(state => state.connection);
+    const blenderExePath = useAppSelector(state => state.blender.blenderExePath);
     const endpoint = serverUrls.getHttpUrl();
     const serverKey = `${endpoint}:${serverPid}:${isConnected}`;
     const [local, setLocal] = useState<{key: string; plans?: PackagePlan[]; planError?: string; refusal?: string}>({key: serverKey});
@@ -36,9 +37,9 @@ export function StartCheckSection({required}: {required: boolean}) {
     const run = useCallback(async () => {
         const key = serverKey;
         setLocal(previous => ({...(previous.key === key ? previous : {key}), refusal: undefined}));
-        const refusal = await requestStartCheck(endpoint).catch(error => String(error));
+        const refusal = await requestStartCheck(endpoint, fetch, blenderExePath).catch(error => String(error));
         if (current.current === key) setLocal(previous => ({...(previous.key === key ? previous : {key}), refusal: refusal ?? undefined}));
-    }, [endpoint, serverKey]);
+    }, [endpoint, serverKey, blenderExePath]);
 
     const results = certification?.run ? [] : startResultLines(certification?.start_results ?? []);
     return <div className="flex flex-col gap-2 bg-secondary p-2 br-1">

@@ -80,13 +80,15 @@ def record_pass(report: dict) -> None:
     temporary.replace(path)
 
 
-def run_start_check(progress, cancel, *, ui_remote: bool | None, own_certify=None, certify=None) -> tuple:
+def run_start_check(progress, cancel, *, ui_remote: bool | None, blender_exe_path: str | None = None, own_certify=None,
+                    certify=None) -> tuple:
     """Each package's quick check in turn; `("start", ((package, result, reason), ...))`. A module that raises is
     `error` with the exception class name; after a cancel the next module is `not-run` with `cancelled`."""
     from freemocap.system.certify.own_checks import certify as freemocap_certify, module_result
     results = []
     try:
-        report = (own_certify or freemocap_certify)("quick", progress, cancel, ui_remote=ui_remote)
+        report = (own_certify or freemocap_certify)("quick", progress, cancel, ui_remote=ui_remote,
+                                                 blender_exe_path=blender_exe_path)
         results.append(("freemocap", *module_result(report)))
         if results[0][1] == "pass":
             record_pass(report)

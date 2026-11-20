@@ -108,7 +108,7 @@ class QuickCheckJob(BaseNode):
     @classmethod
     def create(cls, *, pair: CertificationPair | None, detector_type: str, rtmpose_model_name: str | None,
                worker_registry: WorkerRegistry, global_kill_flag: Synchronized, certify=None, own_certify=None,
-               ui_remote: bool | None = None) -> "QuickCheckJob":
+               ui_remote: bool | None = None, blender_exe_path: str | None = None) -> "QuickCheckJob":
         """`certify` and `own_certify` replace `skellytracker.certify` and freemocap's own in the child (module-level
         functions, for tests)."""
         ipc = PipelineIPC.create(global_kill_flag=global_kill_flag, heartbeat_timestamp=worker_registry.heartbeat_timestamp)
@@ -123,14 +123,14 @@ class QuickCheckJob(BaseNode):
             kwargs=dict(ipc=ipc, execution_provider=pair and pair.execution_provider, device_key=pair and pair.device_key,
                         detector_type=detector_type, rtmpose_model_name=rtmpose_model_name,
                         progress_pub=progress_queue, result_pub=result_queue, cancel=cancel, certify=certify,
-                        own_certify=own_certify, ui_remote=ui_remote))
+                        own_certify=own_certify, ui_remote=ui_remote, blender_exe_path=blender_exe_path))
         return cls(shutdown_self_flag=shutdown_self_flag, worker=worker, pair=pair, progress_subscription=progress_queue,
                    result_subscription=result_queue, cancel=cancel)
 
     @staticmethod
     def _run(*, ipc: PipelineIPC, execution_provider: str | None, device_key: str | None, detector_type: str,
              rtmpose_model_name: str | None, progress_pub, result_pub, cancel, shutdown_self_flag: Synchronized,
-             certify=None, own_certify=None, ui_remote: bool | None = None) -> None:
+             certify=None, own_certify=None, ui_remote: bool | None = None, blender_exe_path: str | None = None) -> None:
         def watch() -> None:  # a stop, or the backend's exit or death, sets the cancel that certify() polls
             parent = multiprocessing.parent_process()
             # Poll, never `cancel.wait()`: a process that dies while waiting on a multiprocessing.Event makes the next
@@ -144,7 +144,8 @@ class QuickCheckJob(BaseNode):
         try:
             if execution_provider is None:
                 from freemocap.system.certify.start_check import run_start_check
-                result_pub.put(run_start_check(progress_pub.put, cancel, ui_remote=ui_remote, own_certify=own_certify,
+                result_pub.put(run_start_check(progress_pub.put, cancel, ui_remote=ui_remote, blender_exe_path=blender_exe_path,
+                                               own_certify=own_certify,
                                                certify=certify))
                 return
             if certify is None:
@@ -283,7 +284,7 @@ class QuickCheckManager:
 
     def start(self, *, pair: CertificationPair | None, detector_type: str, rtmpose_model_name: str | None,
               seconds_estimate: int | None, holds: Callable[[], tuple[PipelineHold, ...]],
-              ui_remote: bool | None = None) -> CertificationRun:
+              ui_remote: bool | None = None, blender_exe_path: str | None = None) -> CertificationRun:
         """`holds` lists what runs (claims included); it is read under the admission lock and must not take it.
         `pair` None starts the start check of every package."""
         with self.lock:
@@ -306,7 +307,8 @@ class QuickCheckManager:
             try:  # the spawn is outside the admission lock; the run set above refuses other starts meanwhile
                 job = QuickCheckJob.create(pair=pair, detector_type=detector_type, rtmpose_model_name=rtmpose_model_name,
                                            worker_registry=self.worker_registry, global_kill_flag=self.global_kill_flag,
-                                           certify=self.certify, own_certify=self.own_certify, ui_remote=ui_remote)
+                                           certify=self.certify, own_certify=self.own_certify, ui_remote=ui_remote,
+                                           blender_exe_path=blender_exe_path)
                 job.start()
             except BaseException:
                 self.run = None

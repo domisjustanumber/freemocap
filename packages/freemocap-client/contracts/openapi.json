@@ -3352,6 +3352,33 @@
           },
           "409": {
             "description": "`pipelines-running` (with `gpu_held_by`: any work, not only pipelines) or `quick-check-running`"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/StartCheckRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
           }
         }
       }
@@ -12018,6 +12045,24 @@
         ],
         "title": "CaptureMode",
         "description": "One MJPEG capture resolution and every frame rate the camera reports for it."
+      },
+      "StartCheckRequest": {
+        "properties": {
+          "blenderExePath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blenderexepath",
+            "description": "The Blender path chosen in Blender settings; null uses freemocap's best guess."
+          }
+        },
+        "type": "object",
+        "title": "StartCheckRequest"
       }
     }
   },

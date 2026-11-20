@@ -177,9 +177,14 @@ def get_start_check_plan() -> StartCheckPlan:
     return StartCheckPlan(packages=_start_plans())
 
 
+class StartCheckRequest(BaseModel):
+    blender_exe_path: str | None = Field(alias="blenderExePath", default=None, description="The Blender path chosen in "
+                                         "Blender settings; null uses freemocap's best guess.")
+
+
 @quick_check_router.post("/start_check", status_code=202, responses={
     409: {"description": "`pipelines-running` (with `gpu_held_by`: any work, not only pipelines) or `quick-check-running`"}})
-def start_start_check(request: Request) -> QuickCheckRunState:
+def start_start_check(request: Request, body: StartCheckRequest | None = None) -> QuickCheckRunState:
     """Start the quick check of this machine: freemocap's own checks, then skellytracker's quick check of every GPU EP
     with no reviewed row (field-test EPs included), in a child process. Refused like a quick check; stop it with
     `DELETE /certify/quick_check`. Follow it in `app_state.certification.run` (no `items`); `start_results` says how it
@@ -191,6 +196,7 @@ def start_start_check(request: Request) -> QuickCheckRunState:
     try:
         run = app.quick_checks.start(pair=None, detector_type=_DEFAULTS.detector_type, rtmpose_model_name=None,
                                      seconds_estimate=seconds, holds=app.pipeline_holds,
+                                     blender_exe_path=body.blender_exe_path if body else None,
                                      ui_remote=None if client is None else client not in ("127.0.0.1", "::1", "localhost"))
     except StartRefused as error:
         raise HTTPException(status_code=error.status, detail=error.detail) from None

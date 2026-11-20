@@ -146,10 +146,10 @@ def _install_facts(ui_remote: bool | None) -> dict:
             "ui_remote": ui_remote}
 
 
-def _blender(cancelled) -> tuple[str, str | None, dict]:
+def _blender(cancelled, blender_exe_path: str | None = None) -> tuple[str, str | None, dict]:
     from freemocap.core.blender.runtime import executable, run_external
     try:
-        blender = executable()
+        blender = executable(blender_exe_path)  # the path chosen in Blender settings, else the best guess
     except ValueError:
         return "record-only", "not-found", {"found": False}
     try:
@@ -162,9 +162,11 @@ def _blender(cancelled) -> tuple[str, str | None, dict]:
     return "record-only", None, {"found": True, "version_major": major, "version_minor": minor, "version_patch": patch}
 
 
-def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = None) -> dict:
+def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = None,
+            blender_exe_path: str | None = None) -> dict:
     """Run freemocap's checks of `level` and return the module report. A check never raises; a cancel makes each check
-    that did not end `not-run` with `cancelled`. `ui_remote`: whether the UI runs on another machine (None: unknown)."""
+    that did not end `not-run` with `cancelled`. `ui_remote`: whether the UI runs on another machine (None: unknown).
+    `blender_exe_path`: the path chosen in Blender settings, if any."""
     _check_level(level)
     created = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     package, reasons = _identity()
@@ -216,7 +218,7 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
         elif name == "install-facts":
             record(row, "record-only", None, _install_facts(ui_remote))
         elif name == "blender":
-            result = _blender(cancelled)
+            result = _blender(cancelled, blender_exe_path)
             if cancelled():
                 stopped = "cancelled"
                 record(row, "not-run", stopped)

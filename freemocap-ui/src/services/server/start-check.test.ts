@@ -37,6 +37,12 @@ test('the start check\'s requests: the plan, an accepted start, and a refusal wi
     }) as typeof fetch;
     assert.deepEqual(await requestStartCheckPlan('http://server.invalid', undefined, answer(Response.json({packages: []}))), []);
     assert.equal(await requestStartCheck('http://server.invalid', answer(Response.json({}, {status: 202}))), null);
+    const sent: string[] = [];
+    await requestStartCheck('http://server.invalid', (async (input: RequestInfo | URL, init?: RequestInit) => {
+        sent.push(String(init?.body ?? (input instanceof Request ? await input.text() : '')));
+        return Response.json({}, {status: 202});
+    }) as typeof fetch, 'C:/Blender/blender.exe');
+    assert.deepEqual(JSON.parse(sent[0]), {blenderExePath: 'C:/Blender/blender.exe'});
     assert.equal(await requestStartCheck('http://server.invalid', answer(Response.json({detail: {code: 'pipelines-running',
         message: 'A quick check cannot start while other work runs: cameras g1. Stop it first.'}}, {status: 409}))),
     'A quick check cannot start while other work runs: cameras g1. Stop it first.');

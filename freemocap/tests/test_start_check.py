@@ -27,7 +27,7 @@ def base(tmp_path, monkeypatch):
 
 @pytest.fixture
 def no_blender(monkeypatch):
-    monkeypatch.setattr(own_checks, "_blender", lambda cancelled: ("record-only", "not-found", {"found": False}))
+    monkeypatch.setattr(own_checks, "_blender", lambda cancelled, path=None: ("record-only", "not-found", {"found": False}))
 
 
 # - freemocap's own checks -
@@ -65,6 +65,17 @@ def test_a_spawn_child_with_no_answer_stops_the_rest(base, no_blender, monkeypat
     rows = {row["name"]: row for row in own_checks.certify("quick")["checks"]}
     assert (rows["spawn-child"]["result"], rows["spawn-child"]["reason"]) == ("fail", "crashed")
     assert {(rows[name]["result"], rows[name]["reason"]) for name in own_checks.QUICK_CHECKS[2:]} == {("not-run", "spawn-failed")}
+
+
+def test_the_blender_check_uses_the_chosen_path_else_the_best_guess(tmp_path, monkeypatch):
+    chosen = tmp_path / "blender.exe"
+    chosen.write_text("")
+    ran = []
+    monkeypatch.setattr("freemocap.core.blender.runtime.run_external", lambda command, **kwargs: ran.append(command[0]) or
+                        SimpleNamespace(stdout="Blender 4.2.1"))
+    monkeypatch.setattr("freemocap.core.blender.runtime.get_best_guess_of_blender_path", lambda: None)
+    assert own_checks._blender(lambda: False, str(chosen))[2]["version_major"] == 4 and ran == [str(chosen)]
+    assert own_checks._blender(lambda: False)[1] == "not-found"  # no path chosen and no guess
 
 
 def test_a_data_folder_that_cannot_be_written_fails_with_the_class_name(tmp_path, monkeypatch):
@@ -105,17 +116,17 @@ def test_a_reviewed_row_for_this_machine_stops_the_start_check(base, monkeypatch
 
 # - The job, in a real spawn child (module-level stand-ins, so the child can import them) -
 
-def own_pass(level, progress, cancel, *, ui_remote):
+def own_pass(level, progress, cancel, *, ui_remote, blender_exe_path=None):
     progress({"package": "freemocap", "kind": level, "state": "done", "step": None, "checks": [], "done": 6, "total": 6,
               "seconds_left": None})
     return {"checks": [{"name": "spawn-child", "result": "pass", "reason": None}], "evidence": {"reasons": []}}
 
 
-def own_fail(level, progress, cancel, *, ui_remote):
+def own_fail(level, progress, cancel, *, ui_remote, blender_exe_path=None):
     return {"checks": [{"name": "data-folder", "result": "fail", "reason": "PermissionError"}], "evidence": {"reasons": []}}
 
 
-def own_until_cancelled(level, progress, cancel, *, ui_remote):
+def own_until_cancelled(level, progress, cancel, *, ui_remote, blender_exe_path=None):
     while not cancel.is_set():
         time.sleep(0.05)
     return {"checks": [{"name": "spawn-child", "result": "not-run", "reason": "cancelled"}], "evidence": {"reasons": ["cancelled"]}}
@@ -237,3 +248,5 @@ def test_the_start_check_routes_give_each_packages_plan_and_start_or_refuse(monk
     accepted = client.post("/certify/start_check")
     assert accepted.status_code == 202 and accepted.json()["items"] == [] and accepted.json()["seconds_estimate"] == 120
     assert started[0]["pair"] is None and started[0]["ui_remote"] is True  # the test client's host is not loopback
+    assert client.post("/certify/start_check", json={"blenderExePath": "C:/Blender/blender.exe"}).status_code == 202
+    assert started[0]["blender_exe_path"] is None and started[1]["blender_exe_path"] == "C:/Blender/blender.exe"

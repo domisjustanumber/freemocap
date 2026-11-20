@@ -13,7 +13,8 @@ from skellycam.core.ipc.process_management.managed_worker import WorkerMode
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 
 from freemocap.core.streaming.message_model import CertificationHost, PipelineHold
-from freemocap.system.certify import own_checks, start_check
+from freemocap import certification
+from freemocap.system.certify import start_check
 from freemocap.system.certify.quick_check import QuickCheckManager, StartRefused
 
 PATH = re.compile(r"(?:\b[A-Za-z]:[\\/]|\\\\[^\\\s]|/(?:home|Users|root)/|~[\\/])")  # privacy rule 1
@@ -27,15 +28,15 @@ def base(tmp_path, monkeypatch):
 
 @pytest.fixture
 def no_blender(monkeypatch):
-    monkeypatch.setattr(own_checks, "_blender", lambda cancelled, path=None: ("record-only", "not-found", {"found": False}))
+    monkeypatch.setattr(certification, "_blender", lambda cancelled, path=None: ("record-only", "not-found", {"found": False}))
 
 
 # - freemocap's own checks -
 
 def test_the_quick_level_runs_its_six_checks_in_order_and_obeys_the_report_format(base, no_blender):
     messages = []
-    report = own_checks.certify("quick", messages.append, None, ui_remote=False)
-    assert [row["name"] for row in report["checks"]] == list(own_checks.QUICK_CHECKS)
+    report = certification.certify("quick", messages.append, None, ui_remote=False)
+    assert [row["name"] for row in report["checks"]] == list(certification.QUICK_CHECKS)
     rows = {row["name"]: row for row in report["checks"]}
     assert rows["spawn-child"]["result"] == "pass" and rows["bundle-imports"]["result"] == "pass", rows
     assert rows["bundle-imports"]["numbers"] == {"failed": [], "from_bundle": None}  # not frozen
@@ -48,23 +49,23 @@ def test_the_quick_level_runs_its_six_checks_in_order_and_obeys_the_report_forma
     assert report["evidence"]["valid"] is (not report["evidence"]["reasons"])
     assert messages[0]["state"] == "starting" and messages[-1]["state"] == "done" and messages[-1]["done"] == 6
     assert not PATH.search(json.dumps(report)), "no path in a report (privacy rule 1)"
-    assert own_checks.module_result(report) == ("pass", None)
+    assert certification.module_result(report) == ("pass", None)
 
 
 def test_a_cancel_makes_every_check_not_run_and_the_run_not_a_pass(base, no_blender):
     cancel = multiprocessing.Event()
     cancel.set()
-    report = own_checks.certify("quick", None, cancel)
+    report = certification.certify("quick", None, cancel)
     assert {(row["result"], row["reason"]) for row in report["checks"]} == {("not-run", "cancelled")}
     assert "cancelled" in report["evidence"]["reasons"]
-    assert own_checks.module_result(report) == ("not-run", "cancelled")
+    assert certification.module_result(report) == ("not-run", "cancelled")
 
 
 def test_a_spawn_child_with_no_answer_stops_the_rest(base, no_blender, monkeypatch):
-    monkeypatch.setattr(own_checks, "_spawn_imports", lambda cancelled: (None, "crashed"))
-    rows = {row["name"]: row for row in own_checks.certify("quick")["checks"]}
+    monkeypatch.setattr(certification, "_spawn_imports", lambda cancelled: (None, "crashed"))
+    rows = {row["name"]: row for row in certification.certify("quick")["checks"]}
     assert (rows["spawn-child"]["result"], rows["spawn-child"]["reason"]) == ("fail", "crashed")
-    assert {(rows[name]["result"], rows[name]["reason"]) for name in own_checks.QUICK_CHECKS[2:]} == {("not-run", "spawn-failed")}
+    assert {(rows[name]["result"], rows[name]["reason"]) for name in certification.QUICK_CHECKS[2:]} == {("not-run", "spawn-failed")}
 
 
 def test_the_blender_check_uses_the_chosen_path_else_the_best_guess(tmp_path, monkeypatch):
@@ -74,23 +75,35 @@ def test_the_blender_check_uses_the_chosen_path_else_the_best_guess(tmp_path, mo
     monkeypatch.setattr("freemocap.core.blender.runtime.run_external", lambda command, **kwargs: ran.append(command[0]) or
                         SimpleNamespace(stdout="Blender 4.2.1"))
     monkeypatch.setattr("freemocap.core.blender.runtime.get_best_guess_of_blender_path", lambda: None)
-    assert own_checks._blender(lambda: False, str(chosen))[2]["version_major"] == 4 and ran == [str(chosen)]
-    assert own_checks._blender(lambda: False)[1] == "not-found"  # no path chosen and no guess
+    assert certification._blender(lambda: False, str(chosen))[2]["version_major"] == 4 and ran == [str(chosen)]
+    assert certification._blender(lambda: False)[1] == "not-found"  # no path chosen and no guess
 
 
 def test_a_data_folder_that_cannot_be_written_fails_with_the_class_name(tmp_path, monkeypatch):
     blocked = tmp_path / "a-file"
     blocked.write_text("")
     monkeypatch.setenv("FREEMOCAP_BASE_FOLDER", str(blocked))
-    result, reason, numbers = own_checks._data_folder()
+    result, reason, numbers = certification._data_folder()
     assert result == "fail" and re.fullmatch(r"[A-Za-z]+Error", reason) and numbers == {}
 
 
-def test_the_full_level_is_not_built_and_a_bad_level_raises():
-    assert {(row["result"], row["reason"]) for row in own_checks.certify("full")["checks"]} == {("not-run", "not-built")}
-    assert own_checks.certify_plan("quick")["details"]["checks"] == list(own_checks.QUICK_CHECKS)
+def test_the_full_level_is_not_built_not_evidence_and_a_bad_level_raises(base):
+    report = certification.certify("full")
+    assert {(row["result"], row["reason"]) for row in report["checks"]} == {("not-run", "not-built")}
+    assert "partial-run" in report["evidence"]["reasons"] and report["evidence"]["valid"] is False  # format 7.1 statement 4
+    assert certification.certify_plan("quick")["details"]["checks"] == list(certification.QUICK_CHECKS)
+    assert certification.certify_plan("quick", ui_remote=True, blender_exe_path=None) == certification.certify_plan("quick")
     with pytest.raises(ValueError):
-        own_checks.certify("medium")
+        certification.certify("medium")
+
+
+def test_import_freemocap_loads_no_certification_and_the_two_names_resolve_lazily():
+    import subprocess
+    import sys
+    script = ("import sys, freemocap; assert 'freemocap.certification' not in sys.modules; "
+              "from freemocap import certify, certify_plan; import freemocap.certification as c; "
+              "assert certify is c.certify and certify_plan is c.certify_plan and freemocap.certify is c.certify")
+    subprocess.run([sys.executable, "-c", script], check=True, timeout=120)
 
 
 # - Whether the start check is needed -
@@ -241,7 +254,7 @@ def test_the_start_check_routes_give_each_packages_plan_and_start_or_refuse(monk
     client = TestClient(app)
     plan = client.get("/certify/start_check/plan").json()
     assert [(row["package"], row["checks"]) for row in plan["packages"]] == [
-        ("freemocap", list(own_checks.QUICK_CHECKS)), ("skellytracker", ["dml@x-0"])]
+        ("freemocap", list(certification.QUICK_CHECKS)), ("skellytracker", ["dml@x-0"])]
     application.holds = (PipelineHold("realtime", "rt1"),)
     assert client.post("/certify/start_check").status_code == 409
     application.holds = ()

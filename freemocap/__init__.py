@@ -20,3 +20,12 @@ beartype_this_package()
 # Near-zero steady-state overhead — handlers stay dormant until a fatal signal actually fires.
 import faulthandler
 faulthandler.enable()
+
+
+def __getattr__(name: str):
+    """`freemocap.certify` and `freemocap.certify_plan` (skellycertify report format, section 9) load
+    `freemocap.certification` on first use, so `import freemocap` stays light."""
+    if name in ("certify", "certify_plan"):
+        from freemocap import certification
+        return getattr(certification, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

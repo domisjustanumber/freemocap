@@ -165,7 +165,7 @@ class StartCheckPlan(BaseModel):
 
 def _start_plans() -> list[PackagePlan]:
     import skellytracker
-    from freemocap.system.certify.own_checks import certify_plan
+    from freemocap.certification import certify_plan
     return [PackagePlan(package=plan["package"], seconds_estimate=plan["seconds_estimate"], downloads=plan["downloads"],
                         system_changes=plan.get("system_changes", []), checks=(plan.get("details") or {}).get("checks", []))
             for plan in (certify_plan("quick"), skellytracker.certify_plan("quick"))]

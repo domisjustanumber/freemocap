@@ -1,9 +1,15 @@
 """freemocap's own certify checks (skellycertify report format 1.1.0; ep-certification-integration.md, "freemocap's own
 checks"): only what freemocap owns, so no check loads an EP, a model or a camera, and none uses a GPU.
 
-`certify(level, progress, cancel, *, ui_remote=None)` returns freemocap's module report; `certify_plan(level)` its plan.
-The level `quick` runs the six checks below. The level `full` (reference-posthoc, concurrent-runs, exports, live-numbers)
-is not built: each of its checks is `not-run` with `not-built` (F13, G12).
+    import freemocap
+    plan = freemocap.certify_plan("quick")          # show the plan, then get the consent of the person
+    report = freemocap.certify("quick", progress=show, cancel=event)
+
+`certify(level, progress, cancel, *, ui_remote=None, blender_exe_path=None)` returns freemocap's module report;
+`certify_plan(level)` takes the same options and gives its plan. `import freemocap` does not import this module: the
+two names load it on first use. The level `quick` runs the six checks below. The level `full` (reference-posthoc,
+concurrent-runs, exports, live-numbers) is not built: each of its checks is `not-run` with `not-built`, and the report
+is not valid as evidence (`partial-run`, report format 7.1 statement 4) (F13, G12).
 
 freemocap's reason codes (report format 5.4), besides the common ones:
 - `spawn-failed`: the spawn child of `spawn-child` gave no answer, so the later checks did not run.
@@ -43,8 +49,9 @@ def _check_level(level: str) -> None:
         raise ValueError(f"level must be 'quick' or 'full', not {level!r}")
 
 
-def certify_plan(level: str) -> dict:
-    """What `certify(level)` runs: no download, no change outside freemocap's data folder, no question."""
+def certify_plan(level: str, *, ui_remote: bool | None = None, blender_exe_path: str | None = None) -> dict:
+    """What `certify(level)` runs: no download, no change outside freemocap's data folder, no question. It takes the
+    options of `certify` (report format 2.2); neither changes the plan."""
     _check_level(level)
     return {"package": "freemocap", "kind": level, "seconds_estimate": 30, "downloads": [], "system_changes": [],
             "questions": [], "details": {"checks": list(QUICK_CHECKS if level == "quick" else FULL_CHECKS)}}
@@ -224,6 +231,8 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
                 record(row, "not-run", stopped)
             else:
                 record(row, *result)
+    if level == "full":  # its checks are not built, so the run did not select each check of its level (7.1 statement 4)
+        reasons.append("partial-run")
     if stopped == "cancelled":
         reasons.append("cancelled")
     send("done", None)

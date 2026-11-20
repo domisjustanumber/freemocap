@@ -105,3 +105,23 @@ def test_modules_with_ids_declare_1_1_0_and_pass_through_unchanged():
         assert _relay_verdict(body) == {"rule": 0}
         bad_id = body.replace(b"3f2b8c1e-9a4d-4e7b-b6a1-0c5d2e8f7a90", b"quick-20261119T100000Z")
         assert _relay_verdict(bad_id)["refused"] == "bad-value"
+
+
+def test_freemocaps_own_modules_obey_the_privacy_rules_and_the_relay_validator_beside_skellytrackers(tmp_path, monkeypatch):
+    """freemocap's real `certify()` with stand-ins for the spawn child and Blender, quick and full, in one file with two
+    skellytracker modules (one file may hold modules of two packages)."""
+    from freemocap import certification
+
+    monkeypatch.setenv("FREEMOCAP_BASE_FOLDER", str(tmp_path))
+    monkeypatch.setattr(certification, "_spawn_imports", lambda cancelled: ({"failed": [], "from_bundle": None}, None))
+    monkeypatch.setattr(certification, "_blender", lambda cancelled, path=None: (
+        "record-only", None, {"found": True, "version_major": 5, "version_minor": 2, "version_patch": 3}))
+    quick, full = certification.certify("quick", ui_remote=False), certification.certify("full")
+    assert "partial-run" in full["evidence"]["reasons"] and full["evidence"]["valid"] is False
+    _, data = _sample("valid-quick.md")
+    # build_report_file applies freemocap's Python copy of privacy rules 1 to 11 and raises on a break
+    _, body = build_report_file([quick, full, *data["modules"]], "freemocap and skellytracker", report_file.app_block())
+    built = json.loads(body.decode("utf-8").split("```json\n")[1].rsplit("```", 1)[0])
+    assert built["schema"] == "skellycertify.report/1.1.0" and built["modules"][:2] == [quick, full]
+    if RELAY_SRC.is_dir() and shutil.which("node") is not None:
+        assert _relay_verdict(body) == {"rule": 0}

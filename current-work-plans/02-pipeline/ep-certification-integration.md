@@ -765,7 +765,7 @@ carries its check facts); `certification.items[].reason_code` is now the GPU's `
 `reason` stays the EP row's text), and the menu filter shows a pair that is usable or has a check-rule code.
 
 What step 4 is, from decisions 9, 12 to 15, 17, 27 and "freemocap's own checks", with F13/G12 (no full-check controls):
-- freemocap's own checks (`freemocap/system/certify/own_checks.py`): `certify(level, progress, cancel, *, ui_remote=None)`
+- freemocap's own checks (now `freemocap/certification.py`; it was `freemocap/system/certify/own_checks.py`): `certify(level, progress, cancel, *, ui_remote=None)`
   and `certify_plan(level)` per skellycertify report format 1.1.0. Quick: `build-identity` (pass with SemVer and a 40-hex
   commit, else record-only with the evidence reasons), `spawn-child` (a `spawn` child answers and exits within 120 s;
   else fail with `crashed`/`timed-out`/`hung-at-exit` and every later check `not-run` `spawn-failed`), `bundle-imports`
@@ -808,7 +808,7 @@ What step 4 is, from decisions 9, 12 to 15, 17, 27 and "freemocap's own checks",
   connection, the log terminal and the Electron menu stay usable. When the check ends the dialog stays open (now
   closable) so its results show. Everything comes from the current server state; a restart without a recorded pass
   brings the box back.
-- Real run on this machine: `own_checks.certify("quick")` in 1.7 s (warm): spawn-child, bundle-imports, data-folder
+- Real run on this machine: `certification.certify("quick")` in 1.7 s (warm): spawn-child, bundle-imports, data-folder
   pass; build-identity record-only with evidence `modified-tree` (BUILD_TREE_MODIFIED is None outside CI); `blender`
   found 5.2.3; module result pass. skellytracker's quick plan with no EP
   named lists `directml` on both GPUs (RTX 3070 and the Intel iGPU), up to about 90 s. The whole start check was not run
@@ -830,7 +830,7 @@ What step 4 is, from decisions 9, 12 to 15, 17, 27 and "freemocap's own checks",
      hand-in routes merge them with skellytracker's (one file per hand-in, decision 22). Needs a decision because it
      changes the hand-in routes.
   3. skellycertify's report format lists only skellytracker and skellycam as packages (section 9); freemocap's module
-     needs a row there (reason codes: the docstring of `own_checks.py`). Recommended: ask the skellycertify session.
+     needs a row there (reason codes: the docstring of `freemocap/certification.py`). Recommended: ask the skellycertify session.
   4. skellycam's `certify()` is not built, so only freemocap's item gates the box. Recommended: add skellycam's item when
      it exists; no placeholder now.
   5. "skellyforge native parts": skellyforge has no compiled modules here, so the check imports `skellyforge`.
@@ -1275,7 +1275,7 @@ All confirmed by the user.
 - J16 (`4d0e5a03`). The start check's Blender check uses the path chosen in Blender settings, else the best guess. That
   path lives only in the UI's store, so `POST /certify/start_check` takes an optional body `{blenderExePath}` that the
   UI fills from `state.blender.blenderExePath` (not the detected path); it is passed through the child process to
-  `own_checks.certify(..., blender_exe_path=)` and `runtime.executable(path)`. The contract and generated schema were
+  `certification.certify(..., blender_exe_path=)` and `runtime.executable(path)`. The contract and generated schema were
   refreshed.
 - J17 (`245a885d`). While the start check is needed, the collapsed sidebar's expand button is dimmed and inert like the
   rest (`inert` and opacity 0.4); the compact connection status stays usable. Covered by the manual checklist of step 4

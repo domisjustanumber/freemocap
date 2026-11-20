@@ -12,7 +12,7 @@ import {
 /**
  * The start check in the Certification dialog (decisions 14, 17, 27): a table with one row per package (its plan and
  * its status: waiting, running with a moving icon, done, passed, failed, cancelled, not run), the running check's
- * progress, the server's refusal of this window's start, "Run quick check" and "Cancel check". The table's rows and
+ * progress, the server's refusal of this window's start, "Start now" and "Cancel check". The table's rows and
  * the message lines keep their place whatever the state, so the dialog does not jump. The plan and the refusal belong
  * to one server identity; the rest is the server's current state. The buttons never change label or disable; Cancel
  * is hidden (its space kept) while nothing runs.
@@ -84,16 +84,17 @@ export function StartCheckSection() {
             })}
             </tbody>
         </table>
-        <div className="text sm" style={{minHeight: '3em'}}>
-            {running && <p className="text sm text-gray">{quickCheckProgressText(running, certification?.items, START_CHECK_TEXT.progressName)}</p>}
-            {mine.refusal && <p className="text sm settings-note-error" role="alert">{QUICK_CHECK_TEXT.couldNotStart}{mine.refusal}</p>}
-        </div>
         <div className="flex flex-row gap-2">
-            <ButtonSm text={START_CHECK_TEXT.run} textColor="text-white" className="primary accent" onClick={run}/>
+            <ButtonSm text={CERTIFICATION_TEXT.startNow} textColor="text-white" className="primary accent" onClick={run}/>
             <span style={{visibility: running ? 'visible' : 'hidden'}}>
                 <ButtonSm text={CERTIFICATION_TEXT.cancelCheck} buttonType="secondary" onClick={() =>
                     requestQuickCheckCancel(endpoint).catch(error => console.warn("Could not cancel the quick check:", error))}/>
             </span>
+        </div>
+        {/* Reserved below the buttons, so the progress and a refusal never move the table or the buttons. */}
+        <div className="text sm" style={{minHeight: '3em'}}>
+            {running && <p className="text sm text-gray">{quickCheckProgressText(running, certification?.items, START_CHECK_TEXT.progressName)}</p>}
+            {mine.refusal && <p className="text sm settings-note-error" role="alert">{QUICK_CHECK_TEXT.couldNotStart}{mine.refusal}</p>}
         </div>
     </div>;
 }

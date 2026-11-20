@@ -8,10 +8,9 @@ export type StartCheckResult = NonNullable<Certification['start_results']>[numbe
 
 /** Every text of the start check (decisions 13 to 17), in one place; "system" for the computer in this dialog. */
 export const START_CHECK_TEXT = {
-    heading: 'Quick check of this system',
+    heading: 'Quick system checks to run:',
     required: 'FreeMoCap has not run on this type of system before, so we need to run a check to confirm things work before launching.',
     optional: "freemocap's own checks and every GPU execution provider that has no reviewed result on this system.",
-    run: 'Run quick check',
     loadingPlan: 'Reading what the check runs…',
     couldNotReadPlan: 'Could not read what the check runs: ',
     progressName: 'this system',

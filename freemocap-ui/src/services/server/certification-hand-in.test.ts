@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import type {Certification} from '@freemocap/client';
 import {
-    bottomButtonLabel, certificationButtonSuffix, handedIn, type HandInList, isLocalHost, issueFormProminent, outboxLine, pendingRows, pendingSummary,
+    bottomButtonLabel, certificationButtonSuffix, submitLabel, handedIn, type HandInList, isLocalHost, issueFormProminent, outboxLine, pendingRows, pendingSummary,
     requestHandIn, requestNotSent, requestOpened, requestReportFile, requestSend, safeIssueUrl, sendAnswerMessage, viewIsCurrent,
     type ViewedReport,
 } from './certification-hand-in';
@@ -32,8 +32,8 @@ test('the button suffix follows the server state: progress, then failures, then 
 });
 
 test('the pending reports are summed up and listed failures first, with the list facts (package first) when known', () => {
-    assert.equal(pendingSummary(pending(false)), '1 report to hand in');
-    assert.equal(pendingSummary(pending(false, true, true)), '3 reports to hand in, 2 with a failure');
+    assert.equal(pendingSummary(pending(false)), 'Share 1 report with FreeMoCap');
+    assert.equal(pendingSummary(pending(false, true, true)), 'Share 3 reports with FreeMoCap, 2 with a failure');
     const rows = pendingRows(pending(false, true), {...LIST, reports: [report('r0', 'pending')]});
     assert.deepEqual(rows.map(row => row.text), ['r1 · with a failure', 'freemocap · 2026-11-19T12:00:00Z · quick · no failure']);
 });
@@ -54,19 +54,19 @@ test('a kept file says whether it waits for the next start or the issue form is 
         last_error: {status: 503, error: 'github-unavailable', retry: true, detail: null}};
     assert.equal(outboxLine(entry), 'Waiting to be sent again at the next backend start: f.md (1 failed attempt; last: github-unavailable).');
     assert.equal(outboxLine({...entry, offer_issue_form: true, last_error: {status: 422, error: 'privacy-rule', retry: false, detail: '7'}}),
-        'Not handed in: f.md (privacy rule 7). Use the issue form.');
+        'Not shared: f.md (privacy rule 7). Use the issue form.');
 });
 
 test('each answer to "send" gives its message: accepted, kept, given up, refused, relay off, file changed, other', () => {
     const outcome = {state: 'covered', issue_url: ISSUE, issue_number: 42, duplicate: false, error: null, offer_issue_form: false};
-    assert.deepEqual(sendAnswerMessage(200, outcome), {text: 'Handed in as issue #42', issueUrl: ISSUE, error: false, offerIssueForm: false});
-    assert.equal(sendAnswerMessage(200, {...outcome, duplicate: true}).text, 'Already handed in as issue #42');
+    assert.deepEqual(sendAnswerMessage(200, outcome), {text: 'Shared as issue #42', issueUrl: ISSUE, error: false, offerIssueForm: false});
+    assert.equal(sendAnswerMessage(200, {...outcome, duplicate: true}).text, 'Already shared as issue #42');
     const error = {status: 503, error: 'github-unavailable', retry: true, detail: 'try later'};
     const kept = sendAnswerMessage(200, {...outcome, state: 'kept', issue_url: null, error});
-    assert.equal(kept.text, 'Not handed in yet: github-unavailable (try later). The file is kept and sent again at the next backend start.');
+    assert.equal(kept.text, 'Not shared yet: github-unavailable (try later). The file is kept and sent again at the next backend start.');
     assert.equal(kept.offerIssueForm, false);
     assert.deepEqual(sendAnswerMessage(200, {...outcome, state: 'kept', issue_url: null, error, offer_issue_form: true}),
-        {text: 'Not handed in: github-unavailable (try later). Use the issue form.', error: true, offerIssueForm: true});
+        {text: 'Not shared: github-unavailable (try later). Use the issue form.', error: true, offerIssueForm: true});
     assert.deepEqual(sendAnswerMessage(200, {...outcome, state: 'refused', issue_url: null, offer_issue_form: true,
         error: {status: 422, error: 'privacy-rule', retry: false, detail: '3'}}),
     {text: 'The relay refused the report: privacy rule 3. Use the issue form.', error: true, offerIssueForm: true});
@@ -127,4 +127,8 @@ test('the bottom button follows the server state: none while required, Continue 
     assert.equal(bottomButtonLabel({...BASE, run, start_results: [{package: 'freemocap', result: 'pass'}]}), 'Close');
     assert.equal(bottomButtonLabel({...BASE, start_results: [{package: 'freemocap', result: 'pass'},
         {package: 'skellytracker', result: 'not-run', reason: 'cancelled'}]}), 'Close');
+});
+
+test('Submit Report is plural while the server lists more than one pending report', () => {
+    assert.deepEqual([0, 1, 2, 5].map(submitLabel), ['Submit Report', 'Submit Report', 'Submit Reports', 'Submit Reports']);
 });

@@ -22,15 +22,17 @@ export const CERTIFICATION_TEXT = {
         + "what we'll get before it sends, click the View report button first.",
     fullBenchmark: 'Full benchmark',
     fullBenchmarkInvitation: "If you have the time (approx 5 to 10 mins), we'd really appreciate the results from a full "
-        + 'benchmark run on your system. Click the "Full benchmark" button to run that now.',
+        + 'benchmark run on your system.',
     notAvailableYet: 'Not available yet',
-    reports: 'Reports to hand in',
-    nothingPending: 'No reports to hand in.',
-    noteLabel: 'Note (optional)',
+    reports: 'Help FreeMoCap by sharing your (anonymous) results',
+    nothingPending: 'Nothing to share right now.',
+    noteLabel: "Anything you'd like to tell us?",
     privacy: 'The note becomes part of the report, which is public. Do not write your name, contact details or other '
         + 'personal details. Paths and this system\'s user and host names are removed.',
     viewReport: 'View report',
     submitReport: 'Submit Report',
+    submitReports: 'Submit Reports',
+    startNow: 'Start now',
     issueForm: 'Save file and open issue form',
     issueFormHelp: 'Attach the saved file to the issue form. If GitHub does not accept the .md file, rename it to .txt.',
     relayNotSetUp: 'Sending is not set up in this build; use the issue form.',
@@ -39,7 +41,7 @@ export const CERTIFICATION_TEXT = {
     fileChanged: 'The report changed after you viewed it. View it again.',
     couldNotView: 'Could not build the report: ',
     couldNotSend: 'Could not send: ',
-    couldNotMark: 'Could not record the hand-in: ',
+    couldNotMark: 'Could not record that the report was shared: ',
     issueFormOpened: 'Issue form opened',
     openIssueFormAgain: 'Open the issue form again',
     notSent: 'Not sent',
@@ -50,6 +52,9 @@ export const CERTIFICATION_TEXT = {
     close: 'Close',
     continue: 'Continue',
 } as const;
+
+/** "Submit Report", or "Submit Reports" when the server lists more than one pending report. */
+export const submitLabel = (pendingCount: number) => pendingCount > 1 ? CERTIFICATION_TEXT.submitReports : CERTIFICATION_TEXT.submitReport;
 
 /** The dialog's bottom button from the current server state: none while the start check is required, "Continue" once a
  * start check of this server session has ended and released the app, else "Close". */
@@ -85,10 +90,10 @@ export function certificationButtonSuffix(certification: Certification | null, r
     return parts.filter(Boolean).join(' ');
 }
 
-/** "N reports to hand in, F with a failure". */
+/** "Share N reports with FreeMoCap, F with a failure". */
 export function pendingSummary(pending: readonly PendingReport[]): string {
     const failures = pending.filter(report => report.has_failure).length;
-    return `${plural(pending.length, 'report')} to hand in${failures ? `, ${failures} with a failure` : ''}`;
+    return `Share ${plural(pending.length, 'report')} with FreeMoCap${failures ? `, ${failures} with a failure` : ''}`;
 }
 
 /** The pending reports, failures first, each with the facts the hand-in list gives (package, time, kind) when it has them. */
@@ -125,7 +130,7 @@ const relayErrorText = (error: RelayError | null) => !error ? 'unknown error'
 /** A kept file's line (F20): waiting to be sent again, or given up with the issue form offered. */
 export function outboxLine(entry: HandInList['outbox'][number]): string {
     const error = relayErrorText(entry.last_error);
-    return entry.offer_issue_form ? `Not handed in: ${entry.file_name} (${error}). Use the issue form.`
+    return entry.offer_issue_form ? `Not shared: ${entry.file_name} (${error}). Use the issue form.`
         : `Waiting to be sent again at the next backend start: ${entry.file_name} (${plural(entry.failed_attempts, 'failed attempt')}; last: ${error}).`;
 }
 
@@ -138,7 +143,7 @@ export function sendAnswerMessage(status: number, body: unknown): HandInMessage 
         const outcome = body as SendOutcome;
         const url = safeIssueUrl(outcome.issue_url);
         if (outcome.state === 'covered') {
-            const text = `${outcome.duplicate ? 'Already handed in' : 'Handed in'}${url ? ` as ${issueLabel(url)}` : ''}`;
+            const text = `${outcome.duplicate ? 'Already shared' : 'Shared'}${url ? ` as ${issueLabel(url)}` : ''}`;
             return {text, issueUrl: url ?? undefined, error: false, offerIssueForm: false};
         }
         const error = relayErrorText(outcome.error);
@@ -146,8 +151,8 @@ export function sendAnswerMessage(status: number, body: unknown): HandInMessage 
             return {text: `The relay refused the report: ${error}. Use the issue form.`, error: true, offerIssueForm: true};
         }
         return outcome.offer_issue_form
-            ? {text: `Not handed in: ${error}. Use the issue form.`, error: true, offerIssueForm: true}
-            : {text: `Not handed in yet: ${error}. The file is kept and sent again at the next backend start.`, error: true,
+            ? {text: `Not shared: ${error}. Use the issue form.`, error: true, offerIssueForm: true}
+            : {text: `Not shared yet: ${error}. The file is kept and sent again at the next backend start.`, error: true,
                 offerIssueForm: false};
     }
     const code = (body as {detail?: {code?: unknown}} | null)?.detail?.code;

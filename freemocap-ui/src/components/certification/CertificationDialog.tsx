@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import ButtonSm from '@/components/ui-components/ButtonSm';
 import IconButton from '@/components/ui-components/IconButton';
 import SubactionHeader from '@/components/ui-components/SubactionHeader';
@@ -7,7 +7,7 @@ import {useAppSelector} from '@/store';
 import {useHandIn} from '@/hooks/useHandIn';
 import {
     bottomButtonLabel, certificationButtonSuffix, CERTIFICATION_TEXT, handedIn, ISSUE_FORM_URL, issueFormProminent, issueLabel, isLocalHost,
-    openCertification, outboxLine, pendingRows, pendingSummary, REPORTS_SECTION_ID,
+    openCertification, outboxLine, pendingRows, pendingSummary, REPORTS_SECTION_ID, submitLabel,
 } from '@/services/server/certification-hand-in';
 import {START_CHECK_TEXT} from '@/services/server/start-check';
 import {StartCheckSection} from './StartCheckSection';
@@ -38,16 +38,29 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
     const {isConnected, serverPid, certification} = useAppSelector(state => state.connection);
     const endpoint = serverUrls.getHttpUrl();
     const handIn = useHandIn(endpoint, `${endpoint}:${serverPid}:${isConnected}`, open, certification);
+    const {list, view, message} = handIn;
+    // The report pop-up: opened by "View report", or by Submit Report's issue-form fallback; closed for this file only.
+    const [reportAsked, setReportAsked] = useState(false);
+    const [closedView, setClosedView] = useState<typeof view>(null);
+    const viewButton = useRef<HTMLSpanElement>(null);
+    const showReport = Boolean(view && view !== closedView && (reportAsked || message?.offerIssueForm));
+    const closeReport = useCallback(() => {
+        setReportAsked(false);
+        setClosedView(view);
+        viewButton.current?.querySelector('button')?.focus();
+    }, [view]);
 
     useEffect(() => {
-        if (!open || required) return;
-        const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+        if (!open || (required && !showReport)) return;
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            if (showReport) closeReport(); else onClose();
+        };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [open, onClose, required]);
+    }, [open, onClose, required, showReport, closeReport]);
 
     if (!open) return null;
-    const {list, view, message} = handIn;
     const pending = certification?.pending_reports ?? [];
     const prominent = issueFormProminent(list, message, view);
     const bottom = required ? null : bottomButtonLabel(certification);
@@ -55,14 +68,12 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
 
     return <>
         {!required && <div className="pos-fixed inset-0 bg-surface-overlay z-10" onClick={onClose}/>}
-        <div className="settings-modal bg-primary border-1 border-black pos-fixed elevated-sharp p-1 flex flex-col br-2" role="dialog"
-             aria-label={CERTIFICATION_TEXT.title} style={{width: 560, maxWidth: 'calc(100vw - 32px)', minWidth: 0}}>
+        <Centred zIndex={1000}>
+        <div className="settings-modal bg-primary border-1 border-black elevated-sharp p-1 flex flex-col br-2" role="dialog"
+             aria-label={CERTIFICATION_TEXT.title} style={{...UNTRANSFORMED, width: 560}}>
             <div className="flex flex-col p-2 gap-2 bg-middark br-1">
                 <div className="flex justify-content-space-between items-center">
-                    <div className="flex flex-col">
-                        <SubactionHeader text={CERTIFICATION_TEXT.title}/>
-                        {certification && <p className="text sm text-darkgray">{certification.host.name}</p>}
-                    </div>
+                    <SubactionHeader text={CERTIFICATION_TEXT.title}/>
                     {!required && <IconButton icon="close-icon" onClick={onClose}/>}
                 </div>
                 <p className="text sm text-white">{required ? START_CHECK_TEXT.required : START_CHECK_TEXT.optional}</p>
@@ -84,36 +95,29 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                                       onChange={event => handIn.setNote(event.target.value)}/>
                         </label>
                         <div className="flex flex-row gap-2 flex-wrap">
-                            <ButtonSm text={CERTIFICATION_TEXT.submitReport} textColor="text-white" className={prominent ? '' : 'primary accent'}
+                            <ButtonSm text={submitLabel(pending.length)} textColor="text-white" className={prominent ? '' : 'primary accent'}
                                       buttonType={prominent ? 'secondary' : ''} onClick={handIn.submit}/>
-                            <ButtonSm text={CERTIFICATION_TEXT.viewReport} buttonType="secondary" onClick={handIn.viewReport}/>
+                            <span ref={viewButton}>
+                                <ButtonSm text={CERTIFICATION_TEXT.viewReport} buttonType="secondary" onClick={() => {
+                                    setReportAsked(true);
+                                    setClosedView(null);
+                                    handIn.viewReport();
+                                }}/>
+                            </span>
                         </div>
                         <p className="text sm text-darkgray">{CERTIFICATION_TEXT.privacy}</p>
                     </>}
-                    {view && <>
-                        <p className="text sm text-gray">{view.file.file_name} ({view.file.size_bytes} bytes)</p>
-                        <pre className="text sm text-white bg-dark p-1 br-1"
-                             style={{maxHeight: '40vh', overflow: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-mono)'}}>
-                            {view.file.content}</pre>
-                        {/* Not repeated when Submit Report's answer below already says it. */}
-                        {list?.relay_enabled === false && message?.text !== CERTIFICATION_TEXT.relayNotSetUp
-                            && <p className="text sm text-gray">{CERTIFICATION_TEXT.relayNotSetUp}</p>}
-                        {!view.file.fits_relay && message?.text !== CERTIFICATION_TEXT.tooLarge
-                            && <p className="text sm text-gray">{CERTIFICATION_TEXT.tooLarge}</p>}
-                        <div className="flex flex-row gap-2 flex-wrap">
-                            <ButtonSm text={CERTIFICATION_TEXT.issueForm} textColor="text-white"
-                                      className={prominent ? 'primary accent' : ''} buttonType={prominent ? '' : 'secondary'}
-                                      onClick={handIn.issueForm}/>
-                        </div>
-                    </>}
                     {message && <p className={`text sm ${message.error ? 'settings-note-error' : 'text-white'}`} role="status">
                         {message.text}{message.issueUrl && <>: {link(message.issueUrl, message.issueUrl)}</>}</p>}
+                    {view && !showReport && message?.offerIssueForm && <div className="flex flex-row">
+                        <ButtonSm text={CERTIFICATION_TEXT.issueForm} textColor="text-white" className="primary accent" onClick={handIn.issueForm}/>
+                    </div>}
                     {list?.outbox.map(entry => <div key={entry.sha256} className="settings-note settings-note-dismissable">
                         <span>{outboxLine(entry)}</span>
                         <ButtonSm text={CERTIFICATION_TEXT.notSent} buttonType="secondary" onClick={() => handIn.notSent(entry.report_ids)}/>
                     </div>)}
                     {handedIn(list).map(group => <div key={group.issueUrl ?? 'opened'} className="settings-note settings-note-dismissable">
-                        <span>{group.issueUrl ? <>Handed in as {link(group.issueUrl, issueLabel(group.issueUrl))}</>
+                        <span>{group.issueUrl ? <>Shared as {link(group.issueUrl, issueLabel(group.issueUrl))}</>
                             : <>{CERTIFICATION_TEXT.issueFormOpened} ({link(ISSUE_FORM_URL, CERTIFICATION_TEXT.openIssueFormAgain)})</>}
                             {' '}· {group.reportIds.length} report{group.reportIds.length === 1 ? '' : 's'}</span>
                         <ButtonSm text={CERTIFICATION_TEXT.notSent} buttonType="secondary" onClick={() => handIn.notSent(group.reportIds)}/>
@@ -136,5 +140,39 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                 </div>}
             </div>
         </div>
+        </Centred>
+
+        {showReport && view && <>
+            <div className="pos-fixed inset-0 bg-surface-overlay" style={{zIndex: 1001}} onClick={closeReport}/>
+            <Centred zIndex={1002}>
+            <div className="settings-modal bg-primary border-1 border-black elevated-sharp p-1 flex flex-col br-2" role="dialog"
+                 aria-label={CERTIFICATION_TEXT.viewReport} style={{...UNTRANSFORMED, width: 720}}>
+                <div className="flex flex-col p-2 gap-2 bg-middark br-1">
+                    <div className="flex justify-content-space-between items-center">
+                        <SubactionHeader text={`${view.file.file_name} (${view.file.size_bytes} bytes)`}/>
+                        <IconButton icon="close-icon" onClick={closeReport}/>
+                    </div>
+                    <pre className="text sm text-white bg-dark p-1 br-1"
+                         style={{maxHeight: '60vh', overflow: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-mono)'}}>
+                        {view.file.content}</pre>
+                    {list?.relay_enabled === false && <p className="text sm text-gray">{CERTIFICATION_TEXT.relayNotSetUp}</p>}
+                    {!view.file.fits_relay && <p className="text sm text-gray">{CERTIFICATION_TEXT.tooLarge}</p>}
+                    <div className="flex flex-row gap-2 flex-wrap" style={{justifyContent: 'space-between'}}>
+                        <ButtonSm text={CERTIFICATION_TEXT.issueForm} textColor="text-white"
+                                  className={prominent ? 'primary accent' : ''} buttonType={prominent ? '' : 'secondary'}
+                                  onClick={handIn.issueForm}/>
+                        <ButtonSm text={CERTIFICATION_TEXT.close} buttonType="secondary" textColor="text-white" onClick={closeReport}/>
+                    </div>
+                </div>
+            </div>
+            </Centred>
+        </>}
     </>;
 }
+
+/** The settings-modal centres itself with translate(-50%, -50%), which puts the text on half pixels (blurred) whenever
+ * the height or the display scale makes the half odd; these dialogs are centred by a flex layer instead. */
+const UNTRANSFORMED: React.CSSProperties = {position: 'relative', top: 'auto', left: 'auto', transform: 'none', maxWidth: 'calc(100vw - 32px)',
+    minWidth: 0, pointerEvents: 'auto'};
+const Centred = ({zIndex, children}: {zIndex: number; children: React.ReactNode}) =>
+    <div className="pos-fixed inset-0 flex items-center justify-center" style={{zIndex, pointerEvents: 'none'}}>{children}</div>;

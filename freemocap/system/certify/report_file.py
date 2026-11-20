@@ -1,4 +1,4 @@
-"""The certify report file: one Markdown file that merges module reports (skellycertify report format 1.1.0, section 4).
+"""The certify report file: one Markdown file that merges module reports (skellycertify report format 1.2.0, section 4).
 
 `build_report_file()` is pure: the same module reports, note and app block give the same bytes, so the file the
 person views is the file that is sent. It refuses a file that breaks privacy rules 1 to 11 of section 6, the rules
@@ -10,14 +10,14 @@ import json
 import re
 import socket
 import subprocess
+import textwrap
 from functools import cache
 from pathlib import Path
 
 import freemocap
 from freemocap.build_info import BUILD_GIT_SHA
 
-SCHEMA = "skellycertify.report/1.0.0"
-SCHEMA_WITH_IDS = "skellycertify.report/1.1.0"  # 1.1.0 adds the optional module `id` (a v4 UUID)
+SCHEMA = "skellycertify.report/1.2.0"  # 1.2.0: the Markdown part is the short summary for a person (spec 4.2)
 NOTE_MAX_CHARS = 2000
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
 CREATED_UTC = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$")
@@ -132,10 +132,119 @@ def _cell(value: object) -> str:
     return " ".join(str("" if value is None else value).split()).replace("|", "\\|")
 
 
+def _row(cells: list[str]) -> str:
+    return "|" + "|".join(f" {cell} " if cell else " " for cell in cells) + "|"
+
+
+def _result(result: object) -> str:
+    """`pass`, `fail` or `record` (the display of `record-only`); empty for no result."""
+    return "record" if result == "record-only" else _cell(result)
+
+
+def gpu_display_name(name: object) -> str:
+    """A GPU name for the Markdown only (spec 4.2 display names): `NVIDIA GeForce RTX 3070` -> `NVIDIA RTX 3070`."""
+    return _cell(re.sub(r"\((?i:R|TM)\)|\b(?:GeForce|Radeon|Arc|Graphics|GPU|Series)\b", " ", str(name or "")))
+
+
+def cpu_display_name(name: object) -> str:
+    """A CPU name for the Markdown only: no (R), (TM), generation prefix, clock speed or core-count suffix."""
+    return _cell(re.sub(r"\((?i:R|TM)\)|\b\d+(?:st|nd|rd|th) Gen\b|\b(?:CPU )?@ ?[\d.]+ ?GHz|\b\d+-Core Processor\b",
+                        " ", str(name or "")))
+
+
+def os_display_name(label: object) -> str:
+    """`os.label` without the edition words `Home` and `Pro`."""
+    return _cell(re.sub(r"\b(?:Home|Pro)\b", " ", str(label or "")))
+
+
+def _gb(size: object) -> str:
+    return f"{round(size / 2**30)} GB" if isinstance(size, int) and size >= 2**30 else ""
+
+
+def _host_lines(host: dict) -> list[str]:
+    """The system list of spec 4.2 item 3; a line is absent when `host` lacks its key."""
+    lines = []
+    if (host.get("os") or {}).get("label"):
+        lines.append(f"- OS: {os_display_name(host['os']['label'])}")
+    if (host.get("cpu") or {}).get("name"):
+        lines.append(f"- CPU: {cpu_display_name(host['cpu']['name'])}")
+    if _gb(host.get("memory_bytes")):
+        lines.append(f"- RAM: {_gb(host['memory_bytes'])}")
+    for gpu in host.get("gpus") or ():
+        lines.append(" ".join(filter(None, ("- GPU:", gpu_display_name(gpu.get("name")), _gb(gpu.get("vram_bytes"))))))
+    return lines
+
+
+def _markdown(modules: list[dict], note: str | None, app: dict | None, created: str) -> list[str]:
+    """The Markdown part before `## Data`: the short summary for a person (spec 4.2 items 1 to 7)."""
+    def run(module: dict) -> str:
+        package = module.get("package") or {}
+        return f"{_cell(package.get('name'))} {_cell(package.get('version'))} · {_cell(module.get('kind'))} run"
+
+    def validity(module: dict) -> str:
+        evidence = module.get("evidence") or {}
+        if evidence.get("valid"):
+            return "valid as evidence"
+        return "not valid as evidence: " + ", ".join(_cell(reason) for reason in evidence.get("reasons") or ())
+
+    def when(time: str) -> str:
+        return f"{time[:10]} {time[11:16]} UTC"
+
+    lines = ["# Certify report", ""]
+    if app is None and len(modules) == 1:
+        lines += [f"{run(modules[0])} · {when(modules[0]['created_utc'])} · {validity(modules[0])}", ""]
+    else:
+        lines += [" · ".join(([f"{_cell(app.get('name'))} {_cell(app.get('version'))}"] if app else []) + [when(created)]),
+                  "", *(f"- {run(module)} · {validity(module)}" for module in modules), ""]
+    hosts = [module.get("host") or {} for module in modules]
+    if all(host == hosts[0] for host in hosts):
+        lines += [*_host_lines(hosts[0]), ""]
+    else:
+        for module, host in zip(modules, hosts):
+            package = module.get("package") or {}
+            lines += [f"{_cell(package.get('name'))} {_cell(package.get('version'))}:", *_host_lines(host), ""]
+    # The writer prints the summary items; it never computes them from checks (spec 3.7).
+    items = [(index, item) for index, module in enumerate(modules) for item in module.get("summary") or ()
+             if isinstance(item, dict)]
+    jpeg = {(index, item.get("name"), item.get("device")): item.get("result") for index, item in items
+            if item.get("group") == "gpu-jpeg"}
+    eps = []
+    for index, item in items:
+        if item.get("group") != "ep":
+            continue
+        gpus = {gpu.get("id"): gpu.get("name") for gpu in hosts[index].get("gpus") or ()}
+        device = item.get("device")
+        cells = [_cell(item.get("name")), gpu_display_name(gpus.get(device, device)) if device else "",
+                 _result(item.get("result"))]
+        eps.append(_row(cells + ([_result(jpeg.get((index, item.get("name"), device)))] if jpeg else [])))
+    if eps:
+        lines += ["| EP | GPU | Result | GPU JPEG |" if jpeg else "| EP | GPU | Result |",
+                  "|---|---|---|---|" if jpeg else "|---|---|---|", *eps, ""]
+    cameras = [_row([_cell(item.get("name")), _result(item.get("result"))]) for _, item in items
+               if item.get("group") == "camera"]
+    lines += ["| Camera | Result |", "|---|---|", *cameras, ""] if cameras else ["Cameras: not checked on this system.", ""]
+    failed = []  # spec 4.2 item 6: a row for each failed section, or for each failed check of a module with no sections
+    for module in modules:
+        name = _cell((module.get("package") or {}).get("name"))
+        for row in (module.get("sections") if "sections" in module else module.get("checks")) or ():
+            if row.get("result") == "fail":
+                failed.append(_row([name, _cell(row.get("name")), _cell(row.get("reason"))]))
+    if failed:
+        lines += ["Failed checks:", "", "| Module | Check | Reason |", "|---|---|---|", *failed, ""]
+    if note is not None:
+        # Markdown characters escaped so the note shows as typed; wrapped so no line passes the 2000-character rule.
+        quoted = [re.sub(r"([\\`*_\[\]<>!|~#])", r"\\\1", chunk)
+                  for line in note.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+                  for chunk in textwrap.wrap(line, 900) or [""]]
+        lines += ["Note of the person:", "", *(f"> {line}".rstrip() for line in quoted), ""]
+    return lines[:-1]
+
+
 def build_report_file(modules: list[dict], note: str | None, app: dict | None) -> tuple[str, bytes]:
     """The file name and the UTF-8 bytes of the report file (section 4.2) that holds `modules` in their order.
 
-    The name and the time line use the earliest `created_utc` of the modules. The note is only in the JSON block.
+    The name and the time line use the earliest `created_utc` of the modules. A module with no `summary` gives no EP
+    and no camera row (spec 3.7).
     """
     if not modules:
         raise ReportFileError("bad-module", "a report file holds at least one module report")
@@ -145,28 +254,8 @@ def build_report_file(modules: list[dict], note: str | None, app: dict | None) -
     if not all(isinstance(time, str) and CREATED_UTC.match(time) for time in times):
         raise ReportFileError("bad-module", "each module report needs created_utc as YYYY-MM-DDTHH:MM:SSZ")
     created = min(times)
-    schema = SCHEMA_WITH_IDS if any("id" in module for module in modules) else SCHEMA
-    lines = ["# Certify report", "",
-             f"Schema `{schema}`, " + (f"app {_cell(app['name'])} {_cell(app['version'])}, " if app else "")
-             + f"created {created} (UTC).", ""]
-    for module in modules:
-        package, evidence = module.get("package") or {}, module.get("evidence") or {}
-        head = f"**{_cell(package.get('name'))} {_cell(package.get('version'))}:**"
-        reasons = ", ".join(_cell(reason) for reason in evidence.get("reasons") or ())
-        lines.append(f"{head} valid as evidence." if evidence.get("valid") else f"{head} not valid as evidence: {reasons}.")
-    failed = []  # spec 4.2 item 4: a row for each failed section, or for each failed check of a module with no sections
-    for module in modules:
-        name = _cell((module.get("package") or {}).get("name"))
-        rows = module.get("sections") if "sections" in module else module.get("checks")
-        for row in rows or ():
-            if row.get("result") != "fail":
-                continue
-            label = f"{row.get('id')}. {row.get('name')}" if "sections" in module else row.get("name")
-            cells = (name, _cell(label), _cell(row.get("result")), _cell(row.get("reason")))
-            failed.append("|" + "|".join(f" {cell} " if cell else " " for cell in cells) + "|")
-    if failed:
-        lines += ["", "| Module | Section | Result | Reason |", "|---|---|---|---|", *failed]
-    data = {"schema": schema, "app": app, "modules": modules, "note": note}
+    lines = _markdown(modules, note, app, created)
+    data = {"schema": SCHEMA, "app": app, "modules": modules, "note": note}
     rule = privacy_rule(lines, data)
     if rule:
         raise ReportFileError("privacy-rule", str(rule))

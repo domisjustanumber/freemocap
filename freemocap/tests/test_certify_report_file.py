@@ -1,4 +1,4 @@
-"""The certify report file against skellycertify's contract (report format 1.1.0, section 4).
+"""The certify report file against skellycertify's contract (report format 1.2.0, section 4).
 
 `fixtures/certify/*.md` are copies of skellycertify `relay/samples/` at `33c6c19` (`valid-quick.md` at `3609369`).
 When the skellycertify checkout and node are present, the relay's own validator (`relay/src/report.js`, `relay/src/privacy.js`) checks the built file.
@@ -36,31 +36,103 @@ def _relay_verdict(body: bytes) -> dict:
     return json.loads(result.stdout)
 
 
-def test_the_valid_sample_is_reproduced_byte_for_byte():
-    text, data = _sample("valid.md")
-    name, body = build_report_file(data["modules"], data["note"], data["app"])
-    assert name == "certify-report-20261119T100000Z.md"
-    # The sample has one line of prose and a table of passed sections; the app writes neither (spec 4.2 item 4).
-    table = text[text.index("| Module"):text.index("This file is a sample")]
-    assert body.decode("utf-8") == text.replace(table, "").replace(
-        "This file is a sample for the relay tests. It holds example values only.\n\n", "")
+HOST = {"os": {"name": "Windows", "label": "Windows 11 Home 26H2"}, "cpu": {"name": "Intel(R) Core(TM) i7-14700K"},
+        "memory_bytes": 68388003840,
+        "gpus": [{"vendor": "nvidia", "name": "NVIDIA GeForce RTX 3070", "id": "10de:2484", "vram_bytes": 8589934592},
+                 {"vendor": "intel", "name": "Intel(R) UHD Graphics 770", "id": "8086:a780", "vram_bytes": 134217728}]}
+SUMMARY = [{"group": "ep", "name": "TensorRT RTX", "device": "10de:2484", "result": "pass"},
+           {"group": "gpu-jpeg", "name": "TensorRT RTX", "device": "10de:2484", "result": "pass"},
+           {"group": "ep", "name": "DirectML", "device": "8086:a780", "result": "pass"},
+           {"group": "ep", "name": "CPU", "device": None, "result": "record-only"}]
 
 
-def test_two_modules_name_the_file_by_the_earliest_run_and_end_with_one_json_block():
-    _, data = _sample("valid.md")
-    later = copy.deepcopy(data["modules"][0])
-    later.update(created_utc="2026-11-20T08:30:00Z", kind="quick", evidence={"valid": False, "reasons": ["no-commit"]})
-    del later["sections"]
-    later["checks"] = [{"name": "cuda@10de-2484-0", "result": "fail", "reason": "probe-L3-failed"}]
-    name, body = build_report_file([later, data["modules"][0]], "a ``` b", data["app"])
+def _module(name="skellytracker", created="2026-11-20T00:25:51Z", checks=(), summary=SUMMARY, host=HOST, valid=True):
+    module = {"schema": "skellycertify.report/1.2.0", "package": {"name": name, "version": "2.0.0"}, "kind": "full",
+              "created_utc": created, "host": host, "checks": list(checks),
+              "evidence": {"valid": valid, "reasons": [] if valid else ["modified-tree"]}}
+    return module if summary is None else {**module, "summary": summary}
+
+
+def _head(body: bytes) -> str:
+    return body.decode("utf-8").split("\n## Data\n")[0]
+
+
+def test_one_module_all_pass_prints_the_short_summary():
+    name, body = build_report_file([_module(checks=[{"name": "x", "result": "pass", "reason": None}])], None, None)
+    assert name == "certify-report-20261120T002551Z.md"
+    assert _head(body) == """# Certify report
+
+skellytracker 2.0.0 · full run · 2026-11-20 00:25 UTC · valid as evidence
+
+- OS: Windows 11 26H2
+- CPU: Intel Core i7-14700K
+- RAM: 64 GB
+- GPU: NVIDIA RTX 3070 8 GB
+- GPU: Intel UHD 770
+
+| EP | GPU | Result | GPU JPEG |
+|---|---|---|---|
+| TensorRT RTX | NVIDIA RTX 3070 | pass | pass |
+| DirectML | Intel UHD 770 | pass | |
+| CPU | | record | |
+
+Cameras: not checked on this system.
+"""
+    assert json.loads(body.decode("utf-8").split("```json\n")[1].rsplit("```", 1)[0])["schema"] == report_file.SCHEMA
+
+
+def test_a_failed_check_adds_the_failed_table_and_the_note_is_quoted_and_escaped():
+    module = _module(checks=[{"name": "directml@8086-a780-0", "result": "fail", "reason": "image-mismatch"},
+                             {"name": "y", "result": "pass", "reason": None}], valid=False)
+    text = _head(build_report_file([module], "works | elsewhere\n# ![x](y)", None)[1])
+    assert "· not valid as evidence: modified-tree" in text
+    assert ("Failed checks:\n\n| Module | Check | Reason |\n|---|---|---|\n"
+            "| skellytracker | directml@8086-a780-0 | image-mismatch |\n\n") in text
+    assert text.endswith("Note of the person:\n\n> works \\| elsewhere\n> \\# \\!\\[x\\](y)\n")
+    assert "Failed checks:" not in _head(build_report_file([_module()], None, None)[1])
+
+
+def test_two_modules_of_two_packages_print_the_system_once_and_a_line_for_each_module():
+    camera = {"group": "camera", "name": "Logitech C922", "device": "046d:085c", "result": "fail"}
+    modules = [_module(), _module("skellycam", "2026-11-19T10:00:00Z", summary=[camera], valid=False)]
+    name, body = build_report_file(modules, "a ``` b", {"name": "freemocap", "version": "2.0.0", "commit": None})
     text = body.decode("utf-8")
     assert name == "certify-report-20261119T100000Z.md"
-    assert "**skellytracker 2.0.0:** not valid as evidence: no-commit." in text
-    assert "| Module | Section | Result | Reason |" in text
-    assert "| skellytracker | cuda@10de-2484-0 | fail | probe-L3-failed |" in text
-    assert "| skellytracker | 1. Checkout" not in text  # a passed section has no row
+    assert text.startswith("# Certify report\n\nfreemocap 2.0.0 · 2026-11-19 10:00 UTC\n\n"
+                           "- skellytracker 2.0.0 · full run · valid as evidence\n"
+                           "- skellycam 2.0.0 · full run · not valid as evidence: modified-tree\n\n- OS: ")
+    assert text.count("- CPU:") == 1 and "| Camera | Result |\n|---|---|\n| Logitech C922 | fail |\n" in text
     assert text.endswith("\n````\n") and "\n````json\n" in text and "\r" not in text
     assert json.loads(text.split("````json\n")[1].rsplit("````", 1)[0])["note"] == "a ``` b"
+    other = _head(build_report_file([_module(), _module("freemocap", host={"cpu": HOST["cpu"]})], None, None)[1])
+    assert "skellytracker 2.0.0:\n- OS:" in other and "freemocap 2.0.0:\n- CPU: Intel Core i7-14700K\n" in other
+
+
+def test_display_names_shorten_only_the_markdown():
+    assert report_file.gpu_display_name("NVIDIA GeForce RTX 3070") == "NVIDIA RTX 3070"
+    assert report_file.gpu_display_name("Intel(R) UHD Graphics 770") == "Intel UHD 770"
+    assert report_file.gpu_display_name("Intel(R) Arc(TM) A770 Graphics") == "Intel A770"
+    assert report_file.gpu_display_name("AMD Radeon RX 7800 XT") == "AMD RX 7800 XT"
+    assert report_file.cpu_display_name("Intel(R) Core(TM) i7-14700K") == "Intel Core i7-14700K"
+    assert report_file.cpu_display_name("13th Gen Intel(R) Core(TM) i9-13900K") == "Intel Core i9-13900K"
+    assert report_file.cpu_display_name("Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz") == "Intel Core i7-8700"
+    assert report_file.cpu_display_name("AMD Ryzen 7 7700X 8-Core Processor") == "AMD Ryzen 7 7700X"
+    assert report_file.os_display_name("Windows 11 Home 26H2") == report_file.os_display_name("Windows 11 Pro 26H2") \
+        == "Windows 11 26H2"
+    _, body = build_report_file([_module()], None, None)
+    assert '"NVIDIA GeForce RTX 3070"' in body.decode("utf-8")  # the JSON keeps the driver's name
+
+
+def test_a_module_without_summary_gives_no_ep_or_camera_rows():
+    text = _head(build_report_file([_module(summary=None)], None, None)[1])
+    assert "| EP |" not in text and text.endswith("- GPU: Intel UHD 770\n\nCameras: not checked on this system.\n")
+    no_jpeg = _head(build_report_file([_module(summary=SUMMARY[2:])], None, None)[1])
+    assert "| EP | GPU | Result |\n|---|---|---|\n| DirectML | Intel UHD 770 | pass |\n" in no_jpeg
+
+
+def test_a_long_note_line_is_wrapped_under_the_2000_character_rule():
+    _, body = build_report_file([_module()], "word " * 399 + "x" * 4, None)
+    assert max(len(line) for line in _head(body).splitlines()) <= 2000
 
 
 def test_the_note_and_the_privacy_rules_refuse_a_file():
@@ -96,14 +168,14 @@ def test_the_relay_validator_accepts_the_built_file():
     assert _relay_verdict(body.replace(b"Windows 11 Home 26H2", b"C:\\\\Users\\\\x"))["rule"] == 1
 
 
-def test_modules_with_ids_declare_1_1_0_and_pass_through_unchanged():
+def test_modules_with_ids_declare_1_2_0_and_pass_through_unchanged():
     _, data = _sample("valid-quick.md")  # two quick reports of one package, each with a v4 UUID id
     modules = copy.deepcopy(data["modules"])
     _, body = build_report_file(modules, data["note"], data["app"])
     text = body.decode("utf-8")
-    assert "Schema `skellycertify.report/1.1.0`, app freemocap 2.0.0, created 2026-11-19T10:00:00Z (UTC)." in text
+    assert text.startswith("# Certify report\n\nfreemocap 2.0.0 · 2026-11-19 10:00 UTC\n\n- skellytracker ")
     built = json.loads(text.split("```json\n")[1].rsplit("```", 1)[0])
-    assert built["schema"] == "skellycertify.report/1.1.0" and built["modules"] == data["modules"]
+    assert built["schema"] == "skellycertify.report/1.2.0" and built["modules"] == data["modules"]
     if RELAY_SRC.is_dir() and shutil.which("node") is not None:
         assert _relay_verdict(body) == {"rule": 0}
         bad_id = body.replace(b"3f2b8c1e-9a4d-4e7b-b6a1-0c5d2e8f7a90", b"quick-20261119T100000Z")
@@ -125,6 +197,6 @@ def test_freemocaps_own_modules_obey_the_privacy_rules_and_the_relay_validator_b
     # build_report_file applies freemocap's Python copy of privacy rules 1 to 11 and raises on a break
     _, body = build_report_file([quick, full, *data["modules"]], "freemocap and skellytracker", report_file.app_block())
     built = json.loads(body.decode("utf-8").split("```json\n")[1].rsplit("```", 1)[0])
-    assert built["schema"] == "skellycertify.report/1.1.0" and built["modules"][:2] == [quick, full]
+    assert built["schema"] == "skellycertify.report/1.2.0" and built["modules"][:2] == [quick, full]
     if RELAY_SRC.is_dir() and shutil.which("node") is not None:
         assert _relay_verdict(body) == {"rule": 0}

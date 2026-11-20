@@ -67,7 +67,7 @@ def test_automatic_export_binds_produced_run_and_separates_failure(recording_pro
         calls.append(kwargs['request'])
         if fails:
             raise OSError('Disk full')
-        return SimpleNamespace(manifest_path=structure.exports_dir / 'metadata.json')
+        return SimpleNamespace(files=(), manifest_path=structure.exports_dir / 'metadata.json')
     monkeypatch.setattr(wide_csv, 'export_recording', writer)
     request = Mock(spec=MocapWorkerRequest, config=config, recording=SimpleNamespace(full_recording_path=structure.full_path),
         ipc=SimpleNamespace(should_continue=True), performance=PerformanceReport(), report=lambda *args: reports.append(args))

@@ -44,9 +44,9 @@ def test_completion_exports_only_when_enabled_and_preserves_processing_success(s
         calls.append(kwargs)
         if fails:
             raise OSError('Disk full')
-        return SimpleNamespace(manifest_path=saved_request.structure.exports_dir / 'metadata.json')
+        return SimpleNamespace(files=(), manifest_path=saved_request.structure.exports_dir / 'metadata.json')
     monkeypatch.setattr(tall_csv, 'export_tall_csv', export)
-    request = Mock(spec=MocapWorkerRequest, config=PosthocMocapPipelineConfig(exportTallCsv=enabled, exportToBlender=False),
+    request = Mock(spec=MocapWorkerRequest, config=PosthocMocapPipelineConfig(exportTallCsv=enabled, exportToBlender=False, exportOptions=dict(formats=[])),
         recording=SimpleNamespace(full_recording_path=saved_request.structure.full_path),
         ipc=SimpleNamespace(should_continue=True), performance=PerformanceReport(), report=lambda *args: reports.append(args))
     before = saved_request.structure.data_parquet_path.read_bytes()

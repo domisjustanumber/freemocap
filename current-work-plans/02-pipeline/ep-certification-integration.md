@@ -1284,6 +1284,15 @@ Built:
   108 px (1080 px), height 494 px while waiting and running, 720 / 774 px once complete and when opened later. Scale 1
   was not measured.
 
+- The owner, verbatim: 'on the view report window the button must say "Send report and open FreeMoCap" the Close
+  button must say "Do no send and open FreeMoCap". Then the send button changes to "Sending..." The spinning icon is
+  on a black box that rotates, it needs to be transparent.' Built: the box was `.accent > .icon`'s fill
+  (`--color-on-primary`) behind the loader, which is an image, not a mask; `.accent > .loader-icon` is now
+  transparent. Footer: "Do not send and open FreeMoCap" (read as "not"; awaiting the owner) closes both pop-ups;
+  "Send report(s) and open FreeMoCap" (plural by the Submit rule; awaiting the owner); the fallback keeps "Save file
+  and open issue form". In flight both send buttons say "Sending..." (the main pop-up too; awaiting the owner). The
+  helping sentence names the new label. `sendAndOpenLabel`, `submitText`, tested.
+
 Commits: see `git log` for 2026-11-20 10:30 to 10:52.
 
 #### Second round commits

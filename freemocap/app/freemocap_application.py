@@ -38,6 +38,7 @@ from skelly_synchronize.core.models import SyncRequest
 from freemocap.core.streaming.outputs.manager import StreamingOutputManager
 from freemocap.core.streaming.pipeline_timing_relay import PipelineTimingRelay
 from freemocap.core.streaming.message_model import PipelineHold
+from freemocap.system.certify.ep_packs import EpPackManager
 from freemocap.system.certify.quick_check import QuickCheckManager, refuse_unavailable_execution_provider
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,7 @@ class FreemocapApplication:
     sync_job_manager: SyncJobManager
     camera_group_manager: CameraBackendManager
     quick_checks: QuickCheckManager
+    ep_packs: EpPackManager = field(init=False)
     streaming_outputs: StreamingOutputManager = field(init=False)
     pipeline_timing_relay: PipelineTimingRelay = field(default_factory=PipelineTimingRelay, init=False)
     startup_status: RealtimeStartupStatus = field(default_factory=RealtimeStartupStatus, init=False)
@@ -84,6 +86,7 @@ class FreemocapApplication:
         from freemocap.core.streaming.outputs.source import RuntimeOutputSource
         self.streaming_outputs = StreamingOutputManager(
             source=RuntimeOutputSource(self), protocols=builtin_protocols())
+        self.ep_packs = EpPackManager(quick_checks=self.quick_checks)
 
     @classmethod
     def create(cls, fastapi_app: FastAPI) -> "FreemocapApplication":
@@ -377,7 +380,7 @@ class FreemocapApplication:
                 }
                 for pipeline in self.realtime_pipeline_manager.pipelines.values()
             ],
-            "certification": self.quick_checks.snapshot(self.pipeline_holds(cameras)),
+            "certification": self.ep_packs.add_to(self.quick_checks.snapshot(self.pipeline_holds(cameras))),
         }
 
     def pipeline_holds(self, cameras: dict | None = None) -> tuple[PipelineHold, ...]:
@@ -411,6 +414,7 @@ class FreemocapApplication:
 
     def shutdown_all_processing(self) -> None:
         self.quick_checks.shutdown()
+        self.ep_packs.shutdown()
         self.realtime_pipeline_manager.shutdown()
         self.posthoc_pipeline_manager.shutdown()
         self.sync_job_manager.shutdown()

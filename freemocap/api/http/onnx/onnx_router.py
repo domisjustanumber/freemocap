@@ -32,6 +32,8 @@ class ExecutionProviderOption(BaseModel):
     uses_gpu: bool
     devices: list[ExecutionProviderDevice]
     checks: list[ExecutionProviderCheck]
+    source: str  # skellytracker's `PackStatus.source`: `windows-ml` for an EP of the Windows ML catalog
+    state: str  # skellytracker's `PackStatus.state`, e.g. `not_installed`
 
 
 class ExecutionProviderOffer(BaseModel):
@@ -69,7 +71,7 @@ def get_available_execution_providers() -> AvailableExecutionProvidersResponse:
                 checks=[ExecutionProviderCheck(device_key=check.device_key, certified=check.certified,
                                                local_result=check.local_result, usable=check.usable,
                                                local_cause=check.local_cause)
-                        for check in row.checks]) for row in status.eps],
+                        for check in row.checks], source=row.source, state=row.state) for row in status.eps],
             detector_takes_execution_provider={detector: detector_takes_execution_provider(detector) for detector in PIPELINE_KEYS},
             auto_offers=[ExecutionProviderOffer(kind=offer.kind, ep_key=offer.ep_key, download_bytes=offer.download_bytes,
                 disk_bytes=offer.disk_bytes, licence_url=offer.licence_url, note=offer.note)

@@ -48,9 +48,10 @@ def test_provider_route_gives_each_ep_as_skellytracker_does_in_its_order_without
     check = SimpleNamespace(device_key='gpu:0', name='Some GPU', certified=True, local_result='failed', usable=False,
                             local_cause='unclean-exits')
     rows = (SimpleNamespace(key='gpu-ep', label='GPU EP', description='Runs on a GPU.', usable=True, install_hint=None,
-                            uses_gpu=True, devices=(device,), checks=(check,)),
+                            uses_gpu=True, devices=(device,), checks=(check,), source='pypi', state='ready'),
             SimpleNamespace(key='other-ep', label='Other EP', description='Needs a pack.', usable=False,
-                            install_hint='Run `install other-ep`.', uses_gpu=True, devices=(), checks=()))
+                            install_hint='Run `install other-ep`.', uses_gpu=True, devices=(), checks=(),
+                            source='windows-ml', state='not_installed'))
     offer = SimpleNamespace(kind='add-pack', ep_key='other-ep', pack_id='other-pack', download_bytes=100, disk_bytes=300,
                             licence_url='https://example.org/licence', note='Run `install other-ep`.')
     status = SimpleNamespace(eps=rows, performance=SimpleNamespace(offers=(offer,)))
@@ -63,9 +64,10 @@ def test_provider_route_gives_each_ep_as_skellytracker_does_in_its_order_without
             {'key': 'gpu-ep', 'label': 'GPU EP', 'description': 'Runs on a GPU.', 'usable': True, 'install_hint': None,
              'uses_gpu': True, 'devices': [{'key': 'gpu:0', 'name': 'Some GPU', 'vram_total_bytes': 8 * 2**30}],
              'checks': [{'device_key': 'gpu:0', 'certified': True, 'local_result': 'failed', 'usable': False,
-                         'local_cause': 'unclean-exits'}]},
+                         'local_cause': 'unclean-exits'}], 'source': 'pypi', 'state': 'ready'},
             {'key': 'other-ep', 'label': 'Other EP', 'description': 'Needs a pack.', 'usable': False,
-             'install_hint': 'Run `install other-ep`.', 'uses_gpu': True, 'devices': [], 'checks': []}],
+             'install_hint': 'Run `install other-ep`.', 'uses_gpu': True, 'devices': [], 'checks': [],
+             'source': 'windows-ml', 'state': 'not_installed'}],
         'detector_takes_execution_provider': {'rtmpose': True, 'mediapipe': False},
         'auto_offers': [{'kind': 'add-pack', 'ep_key': 'other-ep', 'download_bytes': 100, 'disk_bytes': 300,
                          'licence_url': 'https://example.org/licence', 'note': 'Run `install other-ep`.'}]}

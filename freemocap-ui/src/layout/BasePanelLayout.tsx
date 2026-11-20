@@ -13,6 +13,7 @@ import { RecordingCompleteDialog } from "@/components/control-panels/recording-i
 import { OperationErrorBanner } from "@/components/common/OperationErrorBanner";
 import { MainNavTabs } from "@/components/ui-components/MainNavTabs";
 import { CertificationButton } from "@/components/certification/CertificationDialog";
+import { useAppSelector } from "@/store";
 
 // The camera views are the primary content: the sidebar and the console may grow
 // to at most these shares of the window, so they can never squeeze the views away.
@@ -56,6 +57,10 @@ export const BasePanelLayout = ({
     [],
   );
 
+  // Decision 14: while the start check is needed, everything but the server connection, the log terminal and the
+  // Certification dialog is greyed out and inert.
+  const startRequired = useAppSelector((state) => state.connection.certification?.start_required === true);
+
   useMenuActions({ onToggleSidebar: handleToggleCollapse });
   useKeyboardShortcuts();
 
@@ -98,7 +103,8 @@ export const BasePanelLayout = ({
               }}
             />
             <Panel className="right-side-panel" defaultSize={76} minSize={100 - SIDEBAR_MAX_PCT}>
-              <div className="flex flex-col h-full pos-rel bg-darkgray br-2">
+              <div className="flex flex-col h-full pos-rel bg-darkgray br-2" inert={startRequired}
+                   style={startRequired ? { opacity: 0.4 } : undefined}>
                 <MainNavTabs />
                 <CertificationButton />
                 <div className="flex-1 min-h-0 mt-45 flex flex-col">

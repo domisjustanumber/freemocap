@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { HashRouter } from 'react-router-dom';
 import { BasePanelLayout } from "@/layout/BasePanelLayout";
-import { useAppDispatch } from "@/store";
+import { useAppDispatch, useAppSelector } from "@/store";
 import { BaseContentRouter } from "@/layout/content/BaseContentRouter";
 import { UpdateBanner } from "@/components/ui-components/UpdateBanner";
 import PipelineProgressSnackbar from "@/components/pipeline-progress/PipelineProgressSnackbar";
@@ -39,6 +39,10 @@ export const AppContent = function () {
         return () => window.removeEventListener('open-certification', openCertification);
     }, []);
     const closeCertification = React.useCallback(() => setCertificationOpen(false), []);
+    // While the server says the start check is needed the dialog stays open with no dismiss (decision 14); it stays
+    // open after the check ends, so its results show until the person closes it.
+    const startRequired = useAppSelector(state => state.connection.certification?.start_required === true);
+    React.useEffect(() => { if (startRequired) setCertificationOpen(true); }, [startRequired]);
 
     React.useEffect(() => {
         document.documentElement.dir = direction;
@@ -59,7 +63,7 @@ export const AppContent = function () {
                         </BasePanelLayout>
                         <WelcomeModal open={welcomeOpen} onClose={() => setWelcomeOpen(false)} />
                         <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-                        <CertificationDialog open={certificationOpen} onClose={closeCertification} />
+                        <CertificationDialog open={certificationOpen || startRequired} onClose={closeCertification} required={startRequired} />
                         <TourController />
                     </PlaybackProvider>
                 </TutorialProvider>

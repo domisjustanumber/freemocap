@@ -16,7 +16,8 @@ const isCheck = (check: Record<string, unknown> | null) => typeof check?.device_
 const isProvider = (row: Record<string, unknown> | null) => typeof row?.key === 'string' && typeof row.label === 'string'
     && typeof row.description === 'string' && typeof row.usable === 'boolean' && typeof row.uses_gpu === 'boolean'
     && (row.install_hint === null || typeof row.install_hint === 'string')
-    && Array.isArray(row.devices) && row.devices.every(isDevice) && Array.isArray(row.checks) && row.checks.every(isCheck);
+    && Array.isArray(row.devices) && row.devices.every(isDevice) && Array.isArray(row.checks) && row.checks.every(isCheck)
+    && (row.source === undefined || typeof row.source === 'string') && (row.state === undefined || typeof row.state === 'string');
 const isNumberOrNull = (value: unknown) => value === null || typeof value === 'number';
 const isStringOrNull = (value: unknown) => value === null || typeof value === 'string';
 const isOffer = (offer: Record<string, unknown> | null) => typeof offer?.kind === 'string' && isStringOrNull(offer.ep_key)
@@ -141,7 +142,9 @@ export function pairLabel(pair: {execution_provider: string; device_key?: string
 export function quickCheckProgressText(run: CertificationRun, items?: readonly CertificationItem[]): string {
     const done = run.total === undefined ? 'starting' : `${run.done} of ${run.total} checks done`;
     const estimate = run.seconds_estimate === undefined ? '' : `, up to about ${run.seconds_estimate} seconds`;
-    return `Quick check of ${run.items[0] ? pairLabel(run.items[0], items) : 'an execution provider'}: ${done}${estimate}.`;
+    // A start check has no items: it checks this machine, one package after the other.
+    const what = run.items[0] ? pairLabel(run.items[0], items) : `this machine${run.package ? ` (${run.package})` : ''}`;
+    return `Quick check of ${what}: ${done}${estimate}.`;
 }
 
 /** The six lines saying how a quick check ended (user-confirmed wording, 2026-11-19), in one place. */

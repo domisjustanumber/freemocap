@@ -231,6 +231,8 @@ export const SidePanelContent = ({ isCollapsed = false, onToggleCollapse, onOpen
     }, [visibleSections, measurements, plan]);
 
     const { t } = useTranslation();
+    // Decision 14: the sections grey out while the start check is needed; the server connection above stays usable.
+    const startRequired = useAppSelector(state => state.connection.certification?.start_required === true);
 
     return (
         <>
@@ -274,7 +276,8 @@ export const SidePanelContent = ({ isCollapsed = false, onToggleCollapse, onOpen
                 {/* Sidebar Sections — vertically resizable (react-resizable-panels).
                     The camera list keeps a guaranteed floor; other sections are sized
                     to their content when it fits and scroll internally when it does not. */}
-                <div ref={setGroupEl} className="flex-1 min-h-0">
+                <div ref={setGroupEl} className="flex-1 min-h-0" inert={startRequired}
+                     style={startRequired ? {opacity: 0.4} : undefined}>
                     <PanelGroup
                         ref={panelGroupRef}
                         key={visibleSections.join('|')}

@@ -10,6 +10,7 @@ import {
     pendingRows, pendingSummary,
 } from '@/services/server/certification-hand-in';
 import {quickCheckProgressText, requestQuickCheckCancel} from '@/services/server/execution-providers';
+import {StartCheckSection} from './StartCheckSection';
 
 /** The button at the top right of the main navigation strip: a fixed label with a suffix from the server state (25). */
 export function CertificationButton() {
@@ -29,18 +30,20 @@ const link = (url: string, text: string) => <a href={url} target="_blank" rel="n
  * reports to hand in: summary, note, the exact file, "Send report", "Save file and open issue form", the hand-ins
  * already made and the kept files, each with "Not sent". Everything shown comes from the current server state and
  * the answers to this window's requests; no label changes with history and no button is greyed out.
+ * `required` (the server's `start_required`, decision 14): the start check is needed, so the dialog has no dismiss and
+ * no overlay; the layout greys out the rest of the UI except the server connection and the log terminal.
  */
-export function CertificationDialog({open, onClose}: {open: boolean; onClose: () => void}) {
+export function CertificationDialog({open, onClose, required = false}: {open: boolean; onClose: () => void; required?: boolean}) {
     const {isConnected, serverPid, certification} = useAppSelector(state => state.connection);
     const endpoint = serverUrls.getHttpUrl();
     const handIn = useHandIn(endpoint, `${endpoint}:${serverPid}:${isConnected}`, open, certification);
 
     useEffect(() => {
-        if (!open) return;
+        if (!open || required) return;
         const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [open, onClose]);
+    }, [open, onClose, required]);
 
     if (!open) return null;
     const {list, view, message} = handIn;
@@ -50,13 +53,13 @@ export function CertificationDialog({open, onClose}: {open: boolean; onClose: ()
     const section = 'flex flex-col gap-2 bg-secondary p-2 br-1';
 
     return <>
-        <div className="pos-fixed inset-0 bg-surface-overlay z-10" onClick={onClose}/>
+        {!required && <div className="pos-fixed inset-0 bg-surface-overlay z-10" onClick={onClose}/>}
         <div className="settings-modal bg-primary border-1 border-black pos-fixed elevated-sharp p-1 flex flex-col br-2" role="dialog"
              aria-label={CERTIFICATION_TEXT.button}>
             <div className="flex flex-col p-2 gap-2 bg-middark br-1">
                 <div className="flex justify-content-space-between items-center">
                     <SubactionHeader text={certification ? `${CERTIFICATION_TEXT.button} · ${certification.host.name}` : CERTIFICATION_TEXT.button}/>
-                    <IconButton icon="close-icon" onClick={onClose}/>
+                    {!required && <IconButton icon="close-icon" onClick={onClose}/>}
                 </div>
 
                 {run && <div className={section} role="status">
@@ -67,6 +70,8 @@ export function CertificationDialog({open, onClose}: {open: boolean; onClose: ()
                             requestQuickCheckCancel(endpoint).catch(error => console.warn("Could not cancel the quick check:", error))}/>
                     </div>
                 </div>}
+
+                <StartCheckSection required={required}/>
 
                 <div className={section}>
                     <SubactionHeader text={CERTIFICATION_TEXT.reports} className="text-gray"/>
@@ -115,9 +120,9 @@ export function CertificationDialog({open, onClose}: {open: boolean; onClose: ()
                     </div>)}
                 </div>
 
-                <div className="flex flex-row gap-2" style={{justifyContent: 'flex-end'}}>
+                {!required && <div className="flex flex-row gap-2" style={{justifyContent: 'flex-end'}}>
                     <ButtonSm text={CERTIFICATION_TEXT.close} buttonType="quaternary" onClick={onClose}/>
-                </div>
+                </div>}
             </div>
         </div>
     </>;

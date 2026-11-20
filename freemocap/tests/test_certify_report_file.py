@@ -1,6 +1,7 @@
 """The certify report file against skellycertify's contract (report format 1.2.0, section 4).
 
-`fixtures/certify/*.md` are copies of skellycertify `relay/samples/` at `33c6c19` (`valid-quick.md` at `3609369`).
+`fixtures/certify/*.md` are copies of skellycertify `relay/samples/` at `33c6c19` (`valid-quick.md` at `3609369`;
+`valid.md` at `c8f8f35`, format 1.2.0, which `build_report_file` reproduces byte for byte).
 When the skellycertify checkout and node are present, the relay's own validator (`relay/src/report.js`, `relay/src/privacy.js`) checks the built file.
 """
 
@@ -145,6 +146,11 @@ def test_the_system_list_takes_each_value_from_the_first_host_that_has_it():
 def test_a_long_note_line_is_wrapped_under_the_2000_character_rule():
     _, body = build_report_file([_module()], "word " * 399 + "x" * 4, None)
     assert max(len(line) for line in _head(body).splitlines()) <= 2000
+
+
+def test_the_valid_sample_is_the_file_the_writer_builds_from_its_own_data():
+    text, data = _sample("valid.md")
+    assert build_report_file(data["modules"], data["note"], data["app"])[1].decode("utf-8") == text
 
 
 def test_the_note_and_the_privacy_rules_refuse_a_file():

@@ -1,21 +1,32 @@
 # Certify report
 
-Schema `skellycertify.report/1.0.0`, app freemocap 2.0.0, created 2026-11-19T10:00:00Z (UTC).
+freemocap 2.0.0 · 2026-11-19 10:00 UTC
 
-**skellytracker 2.0.0:** valid as evidence.
+- skellytracker 2.0.0 · full run · valid as evidence
 
-| Module | Section | Result | Reason |
-|---|---|---|---|
-| skellytracker | 1. Checkout and versions | pass | |
-| skellytracker | 3. EPs: install, verify and certify | pass | |
+- OS: Windows 11 26H2
+- CPU: AMD Ryzen 7 7700X
+- RAM: 32 GB
 
-This file is a sample for the relay tests. It holds example values only.
+| GPU | Module | Result |
+|---|---|---|
+| NVIDIA RTX 3070 8 GB | TensorRT RTX | pass |
+| NVIDIA RTX 3070 8 GB | CUDA | pass |
+| NVIDIA RTX 3070 8 GB | CUDA GPU decode | pass |
+| - | CPU | pass |
+| Intel UHD 770 | | not checked |
+
+Cameras: not checked on this system.
+
+Note of the person:
+
+> Example note: the run took about five minutes. This file is a sample for the relay tests. It holds example values only.
 
 ## Data
 
 ```json
 {
- "schema": "skellycertify.report/1.0.0",
+ "schema": "skellycertify.report/1.2.0",
  "app": {
   "name": "freemocap",
   "version": "2.0.0",
@@ -23,7 +34,7 @@ This file is a sample for the relay tests. It holds example values only.
  },
  "modules": [
   {
-   "schema": "skellycertify.report/1.0.0",
+   "schema": "skellycertify.report/1.2.0",
    "package": {
     "name": "skellytracker",
     "version": "2.0.0",
@@ -42,7 +53,7 @@ This file is a sample for the relay tests. It holds example values only.
      "arch": "x86_64"
     },
     "cpu": {
-     "name": "Example 8-Core Processor"
+     "name": "AMD Ryzen 7 7700X 8-Core Processor"
     },
     "memory_bytes": 34359738368,
     "gpus": [
@@ -52,9 +63,42 @@ This file is a sample for the relay tests. It holds example values only.
       "id": "10de:2484",
       "driver_version": "610.88",
       "vram_bytes": 8589934592
+     },
+     {
+      "vendor": "intel",
+      "name": "Intel(R) UHD Graphics 770",
+      "id": "8086:4688",
+      "driver_version": "32.0.101.6881",
+      "vram_bytes": 134217728
      }
     ]
    },
+   "summary": [
+    {
+     "group": "ep",
+     "name": "TensorRT RTX",
+     "device": "10de:2484",
+     "result": "pass"
+    },
+    {
+     "group": "ep",
+     "name": "CUDA",
+     "device": "10de:2484",
+     "result": "pass"
+    },
+    {
+     "group": "gpu-jpeg",
+     "name": "CUDA",
+     "device": "10de:2484",
+     "result": "pass"
+    },
+    {
+     "group": "ep",
+     "name": "CPU",
+     "device": null,
+     "result": "pass"
+    }
+   ],
    "sections": [
     {
      "id": "1",
@@ -180,6 +224,6 @@ This file is a sample for the relay tests. It holds example values only.
    }
   }
  ],
- "note": "Example note: the run took about five minutes."
+ "note": "Example note: the run took about five minutes. This file is a sample for the relay tests. It holds example values only."
 }
 ```

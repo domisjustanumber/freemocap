@@ -95,8 +95,11 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                         <pre className="text sm text-white bg-dark p-1 br-1"
                              style={{maxHeight: '40vh', overflow: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-mono)'}}>
                             {view.file.content}</pre>
-                        {list?.relay_enabled === false && <p className="text sm text-gray">{CERTIFICATION_TEXT.relayNotSetUp}</p>}
-                        {!view.file.fits_relay && <p className="text sm text-gray">{CERTIFICATION_TEXT.tooLarge}</p>}
+                        {/* Not repeated when Submit Report's answer below already says it. */}
+                        {list?.relay_enabled === false && message?.text !== CERTIFICATION_TEXT.relayNotSetUp
+                            && <p className="text sm text-gray">{CERTIFICATION_TEXT.relayNotSetUp}</p>}
+                        {!view.file.fits_relay && message?.text !== CERTIFICATION_TEXT.tooLarge
+                            && <p className="text sm text-gray">{CERTIFICATION_TEXT.tooLarge}</p>}
                         <div className="flex flex-row gap-2 flex-wrap">
                             <ButtonSm text={CERTIFICATION_TEXT.issueForm} textColor="text-white"
                                       className={prominent ? 'primary accent' : ''} buttonType={prominent ? '' : 'secondary'}

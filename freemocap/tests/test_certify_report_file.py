@@ -1,7 +1,7 @@
-"""The certify report file against skellycertify's contract (report format 1.2.0, section 4).
+"""The certify report file against skellycertify's contract (report format 1.4.0, section 4).
 
-`fixtures/certify/*.md` are copies of skellycertify `relay/samples/` at `33c6c19` (`valid-quick.md` at `3609369`;
-`valid.md` at `c8f8f35`, format 1.2.0, which `build_report_file` reproduces byte for byte).
+`fixtures/certify/*.md` are copies of skellycertify `relay/samples/` at `9e6d575` (format 1.4.0; `valid.md` and
+`valid-quick.md` are files that `build_report_file` reproduces byte for byte).
 When the skellycertify checkout and node are present, the relay's own validator (`relay/src/report.js`, `relay/src/privacy.js`) checks the built file.
 """
 
@@ -62,7 +62,7 @@ SYSTEM = "- OS: Windows 11 26H2\n- CPU: Intel Core i7-14700K\n- RAM: 64 GB\n"
 
 
 def _module(name="skellytracker", created="2026-11-20T00:25:51Z", checks=(), summary=SUMMARY, host=HOST, valid=True):
-    module = {"schema": "skellycertify.report/1.2.0", "package": {"name": name, "version": "2.0.0"}, "kind": "full",
+    module = {"schema": "skellycertify.report/1.4.0", "package": {"name": name, "version": "2.0.0"}, "kind": "full",
               "created_utc": created, "host": host, "checks": list(checks),
               "evidence": {"valid": valid, "reasons": [] if valid else ["modified-tree"]}}
     return module if summary is None else {**module, "summary": summary}
@@ -85,10 +85,61 @@ def test_a_failed_check_adds_the_failed_table_and_the_note_is_quoted_and_escaped
                              {"name": "y", "result": "pass", "reason": None}], valid=False)
     text = _head(build_report_file([module], "works | elsewhere\n# ![x](y)", None)[1])
     assert "· not valid as evidence: modified-tree" in text
-    assert ("Failed checks:\n\n| Module | Check | Reason |\n|---|---|---|\n"
-            "| skellytracker | directml@8086-a780-0 | image-mismatch |\n\n") in text
+    assert ("Checks that did not pass:\n\n| Package | Module | Test | Result | Reason |\n|---|---|---|---|---|\n"
+            "| skellytracker | | directml@8086-a780-0 | fail | image-mismatch |\n\n") in text
     assert text.endswith("Note of the person:\n\n> works \\| elsewhere\n> \\# \\!\\[x\\](y)\n")
-    assert "Failed checks:" not in _head(build_report_file([_module()], None, None)[1])
+    assert "Checks that did not pass:" not in _head(build_report_file([_module()], None, None)[1])
+
+
+def test_a_not_run_check_has_a_row_only_when_a_partial_or_failed_item_names_its_module():
+    camera = [{"group": "camera", "name": "Logitech C922", "device": "046d:085c", "result": "partial"},
+              {"group": "camera", "name": "Razer Kiyo", "device": "1532:0e05", "result": "skipped", "reason": "busy"}]
+    checks = [{"name": "set-fps", "module": "Logitech C922", "result": "fail", "reason": "timed-out"},
+              {"name": "record-30s", "module": "Logitech C922", "result": "not-run", "reason": "over-budget"},
+              {"name": "open", "module": "Razer Kiyo", "result": "not-run", "reason": "camera-busy"},
+              {"name": "usb3", "result": "not-run", "reason": "no-usb3"}]
+    sections = [{"id": "1", "name": "cameras", "result": "fail", "reason": "timed-out"},
+                {"id": "2", "name": "crashed-part", "result": "fail", "reason": "crashed"}]
+    module = _module("skellycam", checks=[{**check, "section": "1"} for check in checks], summary=camera)
+    text = _head(build_report_file([{**module, "sections": sections}], None, None)[1])
+    assert "| Logitech C922 | partial |\n| Razer Kiyo | skipped (busy) |\n" in text
+    assert text.endswith("Checks that did not pass:\n\n| Package | Module | Test | Result | Reason |\n|---|---|---|---|---|\n"
+                         "| skellycam | Logitech C922 | set-fps | fail | timed-out |\n"
+                         "| skellycam | Logitech C922 | record-30s | not run | over-budget |\n"
+                         "| skellycam | | crashed-part | fail | crashed |\n")
+
+
+def test_a_cancelled_or_interrupted_module_reads_incomplete_and_skipped_items_say_why():
+    reviewed = [{"group": "ep", "name": "CUDA", "device": "10de:2484", "result": "skipped", "reason": "reviewed"},
+                {"group": "ep", "name": "DirectML", "device": "10de:2484", "result": "partial", "gate": "dml:gate"}]
+    cancelled = {**_module(summary=reviewed), "evidence": {"valid": False, "reasons": ["cancelled"]}}
+    text = _head(build_report_file([cancelled], None, None)[1])
+    assert "· full run · 2026-11-20 00:25 UTC · incomplete · not valid as evidence: cancelled\n" in text
+    assert ("| NVIDIA RTX 3070 8 GB | CUDA | skipped (already reviewed) |\n"
+            "| NVIDIA RTX 3070 8 GB | DirectML | partial |\n") in text
+    interrupted = {**_module("skellycam"), "evidence": {"valid": False, "reasons": ["modified-tree", "interrupted"]}}
+    listed = _head(build_report_file([_module(), interrupted], None, {"name": "freemocap", "version": "2.0.0"})[1])
+    assert ("- skellytracker 2.0.0 · full run · valid as evidence\n"
+            "- skellycam 2.0.0 · full run · incomplete · not valid as evidence: modified-tree, interrupted\n") in listed
+
+
+def test_benchmark_items_give_the_benchmark_table_after_the_gpu_table():
+    bench = [{"group": "benchmark", "name": "CUDA", "device": "10de:2484", "stage": "pipeline-1", "ms_per_frame": 12.44,
+              "fps": 80},
+             {"group": "benchmark", "name": "CPU", "device": None, "stage": "blender-export", "ms_per_frame": 95, "fps": 10.55}]
+    text = _head(build_report_file([_module(summary=SUMMARY + bench)], None, None)[1])
+    assert (f"{TABLE}\n| GPU | Module | Stage | ms/frame | FPS |\n|---|---|---|---|---|\n"
+            "| NVIDIA RTX 3070 8 GB | CUDA | pipeline-1 | 12.4 | 80.0 |\n| - | CPU | blender-export | 95.0 | 10.6 |\n\n"
+            "Cameras:") in text
+    assert "| Stage |" not in _head(build_report_file([_module()], None, None)[1])
+
+
+def test_private_and_path_markers_show_without_angle_brackets_in_the_markdown():
+    host = {**HOST, "os": {"name": "Linux", "label": "<private> Linux 24.04"}, "cpu": {"name": "<path> CPU"}}
+    _, body = build_report_file([_module(host=host)], None, None)
+    head = _head(body)
+    assert "- OS: private Linux 24.04\n- CPU: path CPU\n" in head and "<" not in head
+    assert '"<private> Linux 24.04"' in body.decode("utf-8")  # the JSON keeps the value
 
 
 def test_two_modules_of_two_packages_print_the_system_once_and_a_line_for_each_module():
@@ -186,14 +237,14 @@ def test_the_relay_validator_accepts_the_built_file():
     assert _relay_verdict(body.replace(b"Windows 11 Home 26H2", b"C:\\\\Users\\\\x"))["rule"] == 1
 
 
-def test_modules_with_ids_declare_1_2_0_and_pass_through_unchanged():
-    _, data = _sample("valid-quick.md")  # two quick reports of one package, each with a v4 UUID id
+def test_modules_with_ids_declare_1_4_0_and_pass_through_unchanged():
+    sample, data = _sample("valid-quick.md")  # two quick reports of one package, each with a v4 UUID id
     modules = copy.deepcopy(data["modules"])
     _, body = build_report_file(modules, data["note"], data["app"])
     text = body.decode("utf-8")
-    assert text.startswith("# Certify report\n\nfreemocap 2.0.0 · 2026-11-19 10:00 UTC\n\n- skellytracker ")
+    assert text == sample  # its "Checks that did not pass:" table included
     built = json.loads(text.split("```json\n")[1].rsplit("```", 1)[0])
-    assert built["schema"] == "skellycertify.report/1.2.0" and built["modules"] == data["modules"]
+    assert built["schema"] == "skellycertify.report/1.4.0" and built["modules"] == data["modules"]
     if RELAY_SRC.is_dir() and shutil.which("node") is not None:
         assert _relay_verdict(body) == {"rule": 0}
         bad_id = body.replace(b"3f2b8c1e-9a4d-4e7b-b6a1-0c5d2e8f7a90", b"quick-20261119T100000Z")
@@ -215,6 +266,6 @@ def test_freemocaps_own_modules_obey_the_privacy_rules_and_the_relay_validator_b
     # build_report_file applies freemocap's Python copy of privacy rules 1 to 11 and raises on a break
     _, body = build_report_file([quick, full, *data["modules"]], "freemocap and skellytracker", report_file.app_block())
     built = json.loads(body.decode("utf-8").split("```json\n")[1].rsplit("```", 1)[0])
-    assert built["schema"] == "skellycertify.report/1.2.0" and built["modules"][:2] == [quick, full]
+    assert built["schema"] == "skellycertify.report/1.4.0" and built["modules"][:2] == [quick, full]
     if RELAY_SRC.is_dir() and shutil.which("node") is not None:
         assert _relay_verdict(body) == {"rule": 0}

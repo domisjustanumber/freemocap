@@ -16,6 +16,11 @@ freemocap 2.0.0 · 2026-11-19 10:00 UTC
 | - | CPU | pass |
 | Intel UHD 770 | | not checked |
 
+| GPU | Module | Stage | ms/frame | FPS |
+|---|---|---|---|---|
+| NVIDIA RTX 3070 8 GB | CUDA | pipeline-1 | 12.4 | 80.6 |
+| - | CPU | pipeline-1 | 95.0 | 10.5 |
+
 Cameras: not checked on this system.
 
 Note of the person:
@@ -26,7 +31,7 @@ Note of the person:
 
 ```json
 {
- "schema": "skellycertify.report/1.2.0",
+ "schema": "skellycertify.report/1.4.0",
  "app": {
   "name": "freemocap",
   "version": "2.0.0",
@@ -34,7 +39,7 @@ Note of the person:
  },
  "modules": [
   {
-   "schema": "skellycertify.report/1.2.0",
+   "schema": "skellycertify.report/1.4.0",
    "package": {
     "name": "skellytracker",
     "version": "2.0.0",
@@ -97,6 +102,22 @@ Note of the person:
      "name": "CPU",
      "device": null,
      "result": "pass"
+    },
+    {
+     "group": "benchmark",
+     "name": "CUDA",
+     "device": "10de:2484",
+     "stage": "pipeline-1",
+     "ms_per_frame": 12.4,
+     "fps": 80.6
+    },
+    {
+     "group": "benchmark",
+     "name": "CPU",
+     "device": null,
+     "stage": "pipeline-1",
+     "ms_per_frame": 95.0,
+     "fps": 10.5
     }
    ],
    "sections": [
@@ -170,12 +191,14 @@ Note of the person:
     {
      "section": "3",
      "name": "trt-rtx",
+     "module": "TensorRT RTX",
      "result": "pass",
      "reason": null
     },
     {
      "section": "3",
      "name": "cuda",
+     "module": "CUDA",
      "result": "pass",
      "reason": null
     },

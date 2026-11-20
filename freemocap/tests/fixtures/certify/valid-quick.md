@@ -1,34 +1,40 @@
 # Certify report
 
-Schema `skellycertify.report/1.1.0`, app freemocap 2.0.0, created 2026-11-19T10:00:00Z (UTC).
+freemocap 2.0.0 · 2026-11-19 10:00 UTC
 
-**skellytracker 2.0.0** (id 3f2b8c1e-9a4d-4e7b-b6a1-0c5d2e8f7a90): valid as evidence.
+- skellytracker 2.0.0 · quick run · valid as evidence
+- skellytracker 2.0.0 · quick run · not valid as evidence: check-failed
 
-**skellytracker 2.0.0** (id c1d2e3f4-5a6b-4c7d-8e9f-a0b1c2d3e4f5): not valid as evidence: check-failed.
+- OS: Windows 11 26H2
+- CPU: AMD Ryzen 7 7700X
+- RAM: 32 GB
 
-| Module | Check | Result | Reason |
-|---|---|---|---|
-| skellytracker 3f2b8c1e-9a4d-4e7b-b6a1-0c5d2e8f7a90 | cuda@10de-2484-0 | pass |  |
-| skellytracker 3f2b8c1e-9a4d-4e7b-b6a1-0c5d2e8f7a90 | cuda@10de-2484-0:probe | pass |  |
-| skellytracker 3f2b8c1e-9a4d-4e7b-b6a1-0c5d2e8f7a90 | cuda@10de-2484-0:image | pass |  |
-| skellytracker 3f2b8c1e-9a4d-4e7b-b6a1-0c5d2e8f7a90 | cuda@10de-2484-0:jpeg-decode | pass |  |
-| skellytracker 3f2b8c1e-9a4d-4e7b-b6a1-0c5d2e8f7a90 | cuda@10de-2484-0:jpeg-preprocess | pass |  |
-| skellytracker c1d2e3f4-5a6b-4c7d-8e9f-a0b1c2d3e4f5 | trt-rtx@10de-2484-0 | fail | image-failed |
-| skellytracker c1d2e3f4-5a6b-4c7d-8e9f-a0b1c2d3e4f5 | trt-rtx@10de-2484-0:probe | pass |  |
-| skellytracker c1d2e3f4-5a6b-4c7d-8e9f-a0b1c2d3e4f5 | trt-rtx@10de-2484-0:image | fail | output-mismatch |
-| skellytracker c1d2e3f4-5a6b-4c7d-8e9f-a0b1c2d3e4f5 | trt-rtx@10de-2484-0:jpeg-decode | pass |  |
-| skellytracker c1d2e3f4-5a6b-4c7d-8e9f-a0b1c2d3e4f5 | trt-rtx@10de-2484-0:jpeg-preprocess | pass |  |
-| skellytracker c1d2e3f4-5a6b-4c7d-8e9f-a0b1c2d3e4f5 | directml@10de-2484-0 | pass |  |
-| skellytracker c1d2e3f4-5a6b-4c7d-8e9f-a0b1c2d3e4f5 | directml@10de-2484-0:probe | pass |  |
-| skellytracker c1d2e3f4-5a6b-4c7d-8e9f-a0b1c2d3e4f5 | directml@10de-2484-0:image | pass |  |
+| GPU | Module | Result |
+|---|---|---|
+| NVIDIA RTX 3070 8 GB | CUDA | pass |
+| NVIDIA RTX 3070 8 GB | CUDA GPU decode | pass |
+| NVIDIA RTX 3070 8 GB | TensorRT RTX | fail |
+| NVIDIA RTX 3070 8 GB | TensorRT RTX GPU decode | pass |
+| NVIDIA RTX 3070 8 GB | DirectML | pass |
 
-This file is a sample for the relay tests. It holds example values only.
+Cameras: not checked on this system.
+
+Checks that did not pass:
+
+| Package | Module | Test | Result | Reason |
+|---|---|---|---|---|
+| skellytracker | TensorRT RTX | trt-rtx@10de-2484-0 | fail | image-failed |
+| skellytracker | TensorRT RTX | trt-rtx@10de-2484-0:image | fail | output-mismatch |
+
+Note of the person:
+
+> Example note: two quick runs of skellytracker on one PC. This file is a sample for the relay tests. It holds example values only.
 
 ## Data
 
 ```json
 {
- "schema": "skellycertify.report/1.1.0",
+ "schema": "skellycertify.report/1.4.0",
  "app": {
   "name": "freemocap",
   "version": "2.0.0",
@@ -36,7 +42,7 @@ This file is a sample for the relay tests. It holds example values only.
  },
  "modules": [
   {
-   "schema": "skellycertify.report/1.1.0",
+   "schema": "skellycertify.report/1.4.0",
    "id": "3f2b8c1e-9a4d-4e7b-b6a1-0c5d2e8f7a90",
    "package": {
     "name": "skellytracker",
@@ -56,7 +62,7 @@ This file is a sample for the relay tests. It holds example values only.
      "arch": "x86_64"
     },
     "cpu": {
-     "name": "Example 8-Core Processor"
+     "name": "AMD Ryzen 7 7700X 8-Core Processor"
     },
     "memory_bytes": 34359738368,
     "gpus": [
@@ -69,6 +75,20 @@ This file is a sample for the relay tests. It holds example values only.
      }
     ]
    },
+   "summary": [
+    {
+     "group": "ep",
+     "name": "CUDA",
+     "device": "10de:2484",
+     "result": "pass"
+    },
+    {
+     "group": "gpu-jpeg",
+     "name": "CUDA",
+     "device": "10de:2484",
+     "result": "pass"
+    }
+   ],
    "checks": [
     {
      "name": "cuda@10de-2484-0",
@@ -134,7 +154,7 @@ This file is a sample for the relay tests. It holds example values only.
    }
   },
   {
-   "schema": "skellycertify.report/1.1.0",
+   "schema": "skellycertify.report/1.4.0",
    "id": "c1d2e3f4-5a6b-4c7d-8e9f-a0b1c2d3e4f5",
    "package": {
     "name": "skellytracker",
@@ -154,7 +174,7 @@ This file is a sample for the relay tests. It holds example values only.
      "arch": "x86_64"
     },
     "cpu": {
-     "name": "Example 8-Core Processor"
+     "name": "AMD Ryzen 7 7700X 8-Core Processor"
     },
     "memory_bytes": 34359738368,
     "gpus": [
@@ -167,9 +187,30 @@ This file is a sample for the relay tests. It holds example values only.
      }
     ]
    },
+   "summary": [
+    {
+     "group": "ep",
+     "name": "TensorRT RTX",
+     "device": "10de:2484",
+     "result": "fail"
+    },
+    {
+     "group": "gpu-jpeg",
+     "name": "TensorRT RTX",
+     "device": "10de:2484",
+     "result": "pass"
+    },
+    {
+     "group": "ep",
+     "name": "DirectML",
+     "device": "10de:2484",
+     "result": "pass"
+    }
+   ],
    "checks": [
     {
      "name": "trt-rtx@10de-2484-0",
+     "module": "TensorRT RTX",
      "result": "fail",
      "reason": "image-failed"
     },
@@ -180,6 +221,7 @@ This file is a sample for the relay tests. It holds example values only.
     },
     {
      "name": "trt-rtx@10de-2484-0:image",
+     "module": "TensorRT RTX",
      "result": "fail",
      "reason": "output-mismatch"
     },
@@ -265,6 +307,6 @@ This file is a sample for the relay tests. It holds example values only.
    }
   }
  ],
- "note": "Example note: two quick runs of skellytracker on one PC."
+ "note": "Example note: two quick runs of skellytracker on one PC. This file is a sample for the relay tests. It holds example values only."
 }
 ```

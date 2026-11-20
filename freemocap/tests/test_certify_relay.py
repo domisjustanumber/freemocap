@@ -415,8 +415,8 @@ def test_the_hand_in_list_and_the_file_merge_both_packages_and_keep_each_module(
         ("skellytracker", ID_1), ("freemocap", OWN), ("skellytracker", ID_2)]
     _, body = relay.report_file_for([OWN, ID_1], None)
     data = json.loads(body.decode("utf-8").split("```json\n")[1].rsplit("```", 1)[0])
-    assert data["schema"] == "skellycertify.report/1.2.0" and data["modules"] == [MODULE, own_report]
-    assert "| freemocap | data-folder | PermissionError |" in body.decode("utf-8")
+    assert data["schema"] == "skellycertify.report/1.4.0" and data["modules"] == [MODULE, own_report]
+    assert "| freemocap | | data-folder | fail | PermissionError |" in body.decode("utf-8")
 
 
 def test_a_kept_file_retried_at_start_marks_each_report_covered_in_its_own_store(fake_relay, own_report):

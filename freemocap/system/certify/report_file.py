@@ -1,4 +1,4 @@
-"""The certify report file: one Markdown file that merges module reports (skellycertify report format 1.2.0, section 4).
+"""The certify report file: one Markdown file that merges module reports (skellycertify report format 1.4.0, section 4).
 
 `build_report_file()` is pure: the same module reports, note and app block give the same bytes, so the file the
 person views is the file that is sent. It refuses a file that breaks privacy rules 1 to 11 of section 6, the rules
@@ -17,7 +17,7 @@ from pathlib import Path
 import freemocap
 from freemocap.build_info import BUILD_GIT_SHA
 
-SCHEMA = "skellycertify.report/1.2.0"  # 1.2.0: the Markdown part is the short summary for a person (spec 4.2)
+SCHEMA = "skellycertify.report/1.4.0"  # the file declares the format of its Markdown layout (spec 4.1, 4.2)
 NOTE_MAX_CHARS = 2000
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
 CREATED_UTC = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$")
@@ -128,17 +128,28 @@ def privacy_rule(markdown_lines: list[str], data: dict) -> int:
 
 
 def _cell(value: object) -> str:
-    """One table cell: one line, a `|` escaped."""
-    return " ".join(str("" if value is None else value).split()).replace("|", "\\|")
+    """One table cell: one line, a `|` escaped, no `<` or `>` (rule 17: `<private>` shows as `private`)."""
+    return " ".join(str("" if value is None else value).split()).replace("|", "\\|").replace("<", "").replace(">", "")
 
 
 def _row(cells: list[str]) -> str:
     return "|" + "|".join(f" {cell} " if cell else " " for cell in cells) + "|"
 
 
-def _result(result: object) -> str:
-    """`pass`, `fail` or `record` (the display of `record-only`); empty for no result."""
+SKIPPED = {"busy": "skipped (busy)", "reviewed": "skipped (already reviewed)"}
+
+
+def _result(item: dict) -> str:
+    """The display of a summary item's result (spec 4.2): `record` for `record-only`, `skipped (<why>)` for `skipped`."""
+    result = item.get("result")
+    if result == "skipped":
+        return SKIPPED.get(item.get("reason"), "skipped")
     return "record" if result == "record-only" else _cell(result)
+
+
+def _figure(value: object) -> str:
+    """A benchmark number with one decimal place."""
+    return f"{value:.1f}" if isinstance(value, (int, float)) and not isinstance(value, bool) else _cell(value)
 
 
 def gpu_display_name(name: object) -> str:
@@ -175,16 +186,18 @@ def _gpu_cell(gpu: dict) -> str:
 
 
 def _markdown(modules: list[dict], note: str | None, app: dict | None, created: str) -> list[str]:
-    """The Markdown part before `## Data`: the short summary for a person (spec 4.2 items 1 to 7)."""
+    """The Markdown part before `## Data`: the short summary for a person (spec 4.2 parts 1 to 8)."""
     def run(module: dict) -> str:
         package = module.get("package") or {}
         return f"{_cell(package.get('name'))} {_cell(package.get('version'))} · {_cell(module.get('kind'))} run"
 
     def validity(module: dict) -> str:
         evidence = module.get("evidence") or {}
+        reasons = evidence.get("reasons") or ()
+        incomplete = "incomplete · " if "cancelled" in reasons or "interrupted" in reasons else ""
         if evidence.get("valid"):
-            return "valid as evidence"
-        return "not valid as evidence: " + ", ".join(_cell(reason) for reason in evidence.get("reasons") or ())
+            return incomplete + "valid as evidence"
+        return incomplete + "not valid as evidence: " + ", ".join(_cell(reason) for reason in reasons)
 
     def when(time: str) -> str:
         return f"{time[:10]} {time[11:16]} UTC"
@@ -200,17 +213,20 @@ def _markdown(modules: list[dict], note: str | None, app: dict | None, created: 
     # The writer prints the summary items; it never computes them from checks (spec 3.7).
     items = [(index, item) for index, module in enumerate(modules) for item in module.get("summary") or ()
              if isinstance(item, dict)]
+    def gpu_of(index: int, item: dict) -> str:  # the GPU of the same module report whose id is `device`; `-` for none
+        device = item.get("device")
+        gpus = {gpu.get("id"): gpu for gpu in hosts[index].get("gpus") or ()}
+        return _gpu_cell(gpus.get(device, {"name": device})) if device else "-"
+
     eps = []
     for index, item in items:
         if item.get("group") != "ep":
             continue
-        gpus = {gpu.get("id"): gpu for gpu in hosts[index].get("gpus") or ()}
-        device = item.get("device")
-        cell = _gpu_cell(gpus.get(device, {"name": device})) if device else "-"
-        eps.append(_row([cell, _cell(item.get("name")), _result(item.get("result"))]))
-        eps += [_row([cell, f"{_cell(item.get('name'))} GPU decode", _result(decode.get("result"))])
+        cell = gpu_of(index, item)
+        eps.append(_row([cell, _cell(item.get("name")), _result(item)]))
+        eps += [_row([cell, f"{_cell(item.get('name'))} GPU decode", _result(decode)])
                 for other, decode in items if other == index and decode.get("group") == "gpu-jpeg"
-                and (decode.get("name"), decode.get("device")) == (item.get("name"), device)]
+                and (decode.get("name"), decode.get("device")) == (item.get("name"), item.get("device"))]
     named = {item.get("device") for _, item in items if item.get("group") == "ep"}
     unchecked = {}  # spec 4.2 item 4: one `not checked` row for each GPU id of the file that no `ep` item names
     for host in hosts:
@@ -220,17 +236,29 @@ def _markdown(modules: list[dict], note: str | None, app: dict | None, created: 
     eps += unchecked.values()
     if eps:
         lines += ["| GPU | Module | Result |", "|---|---|---|", *eps, ""]
-    cameras = [_row([_cell(item.get("name")), _result(item.get("result"))]) for _, item in items
-               if item.get("group") == "camera"]
+    benchmarks = [_row([gpu_of(index, item), _cell(item.get("name")), _cell(item.get("stage")), _figure(item.get("ms_per_frame")),
+                        _figure(item.get("fps"))]) for index, item in items if item.get("group") == "benchmark"]
+    if benchmarks:
+        lines += ["| GPU | Module | Stage | ms/frame | FPS |", "|---|---|---|---|---|", *benchmarks, ""]
+    cameras = [_row([_cell(item.get("name")), _result(item)]) for _, item in items if item.get("group") == "camera"]
     lines += ["| Camera | Result |", "|---|---|", *cameras, ""] if cameras else ["Cameras: not checked on this system.", ""]
-    failed = []  # spec 4.2 item 6: a row for each failed section, or for each failed check of a module with no sections
-    for module in modules:
+    # Spec 4.2 part 7: each failed check, each not-run check whose `module` names a partial or failed item of its module
+    # report (not every check that cannot run here), then each failed section with no check of its own.
+    rows = []
+    for index, module in enumerate(modules):
         name = _cell((module.get("package") or {}).get("name"))
-        for row in (module.get("sections") if "sections" in module else module.get("checks")) or ():
-            if row.get("result") == "fail":
-                failed.append(_row([name, _cell(row.get("name")), _cell(row.get("reason"))]))
-    if failed:
-        lines += ["Failed checks:", "", "| Module | Check | Reason |", "|---|---|---|", *failed, ""]
+        open_items = {item.get("name") for other, item in items if other == index and item.get("result") in ("partial", "fail")}
+        checks = [check for check in module.get("checks") or () if isinstance(check, dict)]
+        with_checks = {check.get("section") for check in checks}
+        for row in [*(check for check in checks if check.get("result") == "fail"
+                      or (check.get("result") == "not-run" and check.get("module") in open_items)),
+                    *(section for section in module.get("sections") or ()
+                      if isinstance(section, dict) and section.get("result") == "fail" and section.get("id") not in with_checks)]:
+            rows.append(_row([name, _cell(row.get("module")), _cell(row.get("name")),
+                              "fail" if row.get("result") == "fail" else "not run", _cell(row.get("reason"))]))
+    if rows:
+        lines += ["Checks that did not pass:", "", "| Package | Module | Test | Result | Reason |", "|---|---|---|---|---|",
+                  *rows, ""]
     if note is not None:
         # Markdown characters escaped so the note shows as typed; wrapped so no line passes the 2000-character rule.
         quoted = [re.sub(r"([\\`*_\[\]<>!|~#])", r"\\\1", chunk)
@@ -243,8 +271,8 @@ def _markdown(modules: list[dict], note: str | None, app: dict | None, created: 
 def build_report_file(modules: list[dict], note: str | None, app: dict | None) -> tuple[str, bytes]:
     """The file name and the UTF-8 bytes of the report file (section 4.2) that holds `modules` in their order.
 
-    The name and the time line use the earliest `created_utc` of the modules. A module with no `summary` gives no EP
-    and no camera row (spec 3.7).
+    The name and the time line use the earliest `created_utc` of the modules. A module with no `summary` gives no row
+    to the GPU, benchmark or camera table (spec 3.7).
     """
     if not modules:
         raise ReportFileError("bad-module", "a report file holds at least one module report")

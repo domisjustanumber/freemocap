@@ -42,8 +42,22 @@ HOST = {"os": {"name": "Windows", "label": "Windows 11 Home 26H2"}, "cpu": {"nam
                  {"vendor": "intel", "name": "Intel(R) UHD Graphics 770", "id": "8086:a780", "vram_bytes": 134217728}]}
 SUMMARY = [{"group": "ep", "name": "TensorRT RTX", "device": "10de:2484", "result": "pass"},
            {"group": "gpu-jpeg", "name": "TensorRT RTX", "device": "10de:2484", "result": "pass"},
+           {"group": "ep", "name": "CUDA", "device": "10de:2484", "result": "pass"},
+           {"group": "gpu-jpeg", "name": "CUDA", "device": "10de:2484", "result": "fail"},
+           {"group": "ep", "name": "DirectML", "device": "10de:2484", "result": "pass"},
            {"group": "ep", "name": "DirectML", "device": "8086:a780", "result": "pass"},
            {"group": "ep", "name": "CPU", "device": None, "result": "record-only"}]
+TABLE = """| GPU | EP | Result |
+|---|---|---|
+| NVIDIA RTX 3070 8 GB | TensorRT RTX | pass |
+| NVIDIA RTX 3070 8 GB | TensorRT RTX GPU decode | pass |
+| NVIDIA RTX 3070 8 GB | CUDA | pass |
+| NVIDIA RTX 3070 8 GB | CUDA GPU decode | fail |
+| NVIDIA RTX 3070 8 GB | DirectML | pass |
+| Intel UHD 770 | DirectML | pass |
+| - | CPU | record |
+"""
+SYSTEM = "- OS: Windows 11 26H2\n- CPU: Intel Core i7-14700K\n- RAM: 64 GB\n"
 
 
 def _module(name="skellytracker", created="2026-11-20T00:25:51Z", checks=(), summary=SUMMARY, host=HOST, valid=True):
@@ -60,24 +74,8 @@ def _head(body: bytes) -> str:
 def test_one_module_all_pass_prints_the_short_summary():
     name, body = build_report_file([_module(checks=[{"name": "x", "result": "pass", "reason": None}])], None, None)
     assert name == "certify-report-20261120T002551Z.md"
-    assert _head(body) == """# Certify report
-
-skellytracker 2.0.0 · full run · 2026-11-20 00:25 UTC · valid as evidence
-
-- OS: Windows 11 26H2
-- CPU: Intel Core i7-14700K
-- RAM: 64 GB
-- GPU: NVIDIA RTX 3070 8 GB
-- GPU: Intel UHD 770
-
-| EP | GPU | Result | GPU JPEG |
-|---|---|---|---|
-| TensorRT RTX | NVIDIA RTX 3070 | pass | pass |
-| DirectML | Intel UHD 770 | pass | |
-| CPU | | record | |
-
-Cameras: not checked on this system.
-"""
+    assert _head(body) == ("# Certify report\n\nskellytracker 2.0.0 · full run · 2026-11-20 00:25 UTC · valid as evidence\n\n"
+                           f"{SYSTEM}\n{TABLE}\nCameras: not checked on this system.\n")
     assert json.loads(body.decode("utf-8").split("```json\n")[1].rsplit("```", 1)[0])["schema"] == report_file.SCHEMA
 
 
@@ -104,8 +102,12 @@ def test_two_modules_of_two_packages_print_the_system_once_and_a_line_for_each_m
     assert text.count("- CPU:") == 1 and "| Camera | Result |\n|---|---|\n| Logitech C922 | fail |\n" in text
     assert text.endswith("\n````\n") and "\n````json\n" in text and "\r" not in text
     assert json.loads(text.split("````json\n")[1].rsplit("````", 1)[0])["note"] == "a ``` b"
-    other = _head(build_report_file([_module(), _module("freemocap", host={"cpu": HOST["cpu"]})], None, None)[1])
-    assert "skellytracker 2.0.0:\n- OS:" in other and "freemocap 2.0.0:\n- CPU: Intel Core i7-14700K\n" in other
+    own = _module("freemocap", summary=None, valid=False, host={key: HOST[key] for key in ("os", "cpu", "memory_bytes")})
+    assert _head(build_report_file([own, _module()], None, {"name": "freemocap", "version": "2.0.0"})[1]) == (
+        "# Certify report\n\nfreemocap 2.0.0 · 2026-11-20 00:25 UTC\n\n"
+        "- freemocap 2.0.0 · full run · not valid as evidence: modified-tree\n"
+        "- skellytracker 2.0.0 · full run · valid as evidence\n\n"
+        f"{SYSTEM}\n{TABLE}\nCameras: not checked on this system.\n")
 
 
 def test_display_names_shorten_only_the_markdown():
@@ -125,9 +127,9 @@ def test_display_names_shorten_only_the_markdown():
 
 def test_a_module_without_summary_gives_no_ep_or_camera_rows():
     text = _head(build_report_file([_module(summary=None)], None, None)[1])
-    assert "| EP |" not in text and text.endswith("- GPU: Intel UHD 770\n\nCameras: not checked on this system.\n")
-    no_jpeg = _head(build_report_file([_module(summary=SUMMARY[2:])], None, None)[1])
-    assert "| EP | GPU | Result |\n|---|---|---|\n| DirectML | Intel UHD 770 | pass |\n" in no_jpeg
+    assert "| GPU |" not in text and text.endswith(f"{SYSTEM}\nCameras: not checked on this system.\n")
+    one = _head(build_report_file([_module(summary=SUMMARY[5:6])], None, None)[1])
+    assert "| GPU | EP | Result |\n|---|---|---|\n| Intel UHD 770 | DirectML | pass |\n\n" in one
 
 
 def test_a_long_note_line_is_wrapped_under_the_2000_character_rule():

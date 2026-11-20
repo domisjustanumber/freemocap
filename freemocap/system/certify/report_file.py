@@ -162,7 +162,7 @@ def _gb(size: object) -> str:
 
 
 def _host_lines(host: dict) -> list[str]:
-    """The system list of spec 4.2 item 3; a line is absent when `host` lacks its key."""
+    """The system list (OS, CPU, RAM); a line is absent when `host` lacks its key. The GPUs are in the EP table."""
     lines = []
     if (host.get("os") or {}).get("label"):
         lines.append(f"- OS: {os_display_name(host['os']['label'])}")
@@ -170,8 +170,6 @@ def _host_lines(host: dict) -> list[str]:
         lines.append(f"- CPU: {cpu_display_name(host['cpu']['name'])}")
     if _gb(host.get("memory_bytes")):
         lines.append(f"- RAM: {_gb(host['memory_bytes'])}")
-    for gpu in host.get("gpus") or ():
-        lines.append(" ".join(filter(None, ("- GPU:", gpu_display_name(gpu.get("name")), _gb(gpu.get("vram_bytes"))))))
     return lines
 
 
@@ -197,29 +195,25 @@ def _markdown(modules: list[dict], note: str | None, app: dict | None, created: 
         lines += [" · ".join(([f"{_cell(app.get('name'))} {_cell(app.get('version'))}"] if app else []) + [when(created)]),
                   "", *(f"- {run(module)} · {validity(module)}" for module in modules), ""]
     hosts = [module.get("host") or {} for module in modules]
-    if all(host == hosts[0] for host in hosts):
-        lines += [*_host_lines(hosts[0]), ""]
-    else:
-        for module, host in zip(modules, hosts):
-            package = module.get("package") or {}
-            lines += [f"{_cell(package.get('name'))} {_cell(package.get('version'))}:", *_host_lines(host), ""]
+    # Owner ruling (ahead of the spec): one system block for the file, from the first module that has one; no GPU lines.
+    lines += [*next((block for block in map(_host_lines, hosts) if block), []), ""]
     # The writer prints the summary items; it never computes them from checks (spec 3.7).
     items = [(index, item) for index, module in enumerate(modules) for item in module.get("summary") or ()
              if isinstance(item, dict)]
-    jpeg = {(index, item.get("name"), item.get("device")): item.get("result") for index, item in items
-            if item.get("group") == "gpu-jpeg"}
     eps = []
     for index, item in items:
         if item.get("group") != "ep":
             continue
-        gpus = {gpu.get("id"): gpu.get("name") for gpu in hosts[index].get("gpus") or ()}
+        gpus = {gpu.get("id"): gpu for gpu in hosts[index].get("gpus") or ()}
         device = item.get("device")
-        cells = [_cell(item.get("name")), gpu_display_name(gpus.get(device, device)) if device else "",
-                 _result(item.get("result"))]
-        eps.append(_row(cells + ([_result(jpeg.get((index, item.get("name"), device)))] if jpeg else [])))
+        gpu = gpus.get(device, {"name": device})
+        cell = " ".join(filter(None, (gpu_display_name(gpu.get("name")), _gb(gpu.get("vram_bytes"))))) if device else "-"
+        eps.append(_row([cell, _cell(item.get("name")), _result(item.get("result"))]))
+        eps += [_row([cell, f"{_cell(item.get('name'))} GPU decode", _result(decode.get("result"))])
+                for other, decode in items if other == index and decode.get("group") == "gpu-jpeg"
+                and (decode.get("name"), decode.get("device")) == (item.get("name"), device)]
     if eps:
-        lines += ["| EP | GPU | Result | GPU JPEG |" if jpeg else "| EP | GPU | Result |",
-                  "|---|---|---|---|" if jpeg else "|---|---|---|", *eps, ""]
+        lines += ["| GPU | EP | Result |", "|---|---|---|", *eps, ""]
     cameras = [_row([_cell(item.get("name")), _result(item.get("result"))]) for _, item in items
                if item.get("group") == "camera"]
     lines += ["| Camera | Result |", "|---|---|", *cameras, ""] if cameras else ["Cameras: not checked on this system.", ""]

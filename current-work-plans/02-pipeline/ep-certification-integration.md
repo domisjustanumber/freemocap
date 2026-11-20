@@ -1262,7 +1262,16 @@ Built:
 - Labels "Submit report" / "Submit reports"; the owner's paragraph says "click the Submit report button below".
 - Sub-title: "...so we need to run some checks to confirm things work before launching." ("run a check" appears in no
   other text of this dialog).
-- "Submitting..." / "Sent!": see the state at the end of this section.
+- "Submitting..." / "Sent!" (built and checked with the send route stubbed in Playwright): while this window's send is
+  in flight the button (main pop-up and report footer alike) says "Submitting...", dimmed, disabled, `aria-busy`, with
+  the turning `loader-icon` (still under reduced motion); on success "Sent!" for 1.5 s (coordinator's figure), then
+  both pop-ups close. A refusal or failure returns the button at once with the answer line; the existing rules choose
+  the issue-form fallback. The phase is held per server identity, so a reconnect clears it; the timer is cleared on
+  unmount. `submitText`, tested.
+- The owner's addition, verbatim: "and a web browser is launched with the issue page it just created". On a
+  successful send the issue address from the server's answer opens with `window.open`, the mechanism the issue form
+  already uses; only a skellycertify issue address on github.com passes `safeIssueUrl`. It is opened once per send
+  answer of this window, never from a re-shown state. Not checked in Electron.
 
 Commits: see `git log` for 2026-11-20 10:30 to 10:52.
 

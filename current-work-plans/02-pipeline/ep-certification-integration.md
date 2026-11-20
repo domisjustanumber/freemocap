@@ -1128,6 +1128,7 @@ workspace's editable installs (`skellylogs`, `skellycam` are invisible to PyInst
 Suite, 2026-11-19 late: 1672 passed, 7 failed (exactly the known baseline), 20 skipped, with the relay URL empty;
 skellytracker was at `03e5b3bb`, dirty (certification.py, core/eps/installer.py, core/eps/store.py,
 tools/certify_eps.py modified; .gitattributes modified; .editorconfig untracked).
+Suite, 2026-11-19 night, after F15 step 5: 1697 passed, 7 failed (exactly the known baseline), 20 skipped, with the relay URL empty (the run showed 9 failures; 2 were the app-close test missing an `ep_packs` stand-in, fixed in `84ee32ac`); skellytracker was at `28ec03f04103de1936c6f3aaf22abe9a25b6cfeb`, dirty (tools/certify_eps.py and tools/tests/test_certify_eps.py modified).
 G5 done in `e6ee3d78`: openapi.json and generated schema.ts regenerated from the app; no operation added or removed
 (78 bindings verified), only CaptureMode, CameraDeviceInfo supported_modes/usb_version and route descriptions.
 

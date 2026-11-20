@@ -79,7 +79,7 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
     const section = 'flex flex-col gap-2 bg-secondary p-2 br-1';
 
     return <>
-        {!required && <div className="pos-fixed inset-0 bg-surface-overlay z-10" onClick={onClose}/>}
+        {!required && <div className="pos-fixed inset-0 bg-surface-overlay" style={{zIndex: 999}} onClick={onClose}/>}
         {/* Anchored at a fixed top, so the one step when the reports appear grows downward and nothing above moves. */}
         <Centred zIndex={1000} top block={required}>
         <div className="settings-modal bg-primary border-1 border-black elevated-sharp p-1 flex flex-col br-2" role="dialog"

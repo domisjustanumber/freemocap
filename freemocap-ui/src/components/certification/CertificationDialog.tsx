@@ -97,7 +97,7 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                         </label>
                         <div className="flex flex-row gap-2 flex-wrap">
                             <ButtonSm text={submitLabel(pending.length)} textColor="text-white" className={prominent ? '' : 'primary accent'}
-                                      buttonType={prominent ? 'secondary' : ''} onClick={handIn.submit}/>
+                                      buttonType={prominent ? 'secondary' : ''} onClick={() => { setClosedView(null); handIn.submit(); }}/>
                             <span ref={viewButton}>
                                 <ButtonSm text={CERTIFICATION_TEXT.viewReport} buttonType="secondary" onClick={() => {
                                     setReportAsked(true);

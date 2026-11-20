@@ -33,7 +33,7 @@ test('progress and results say what the server says, with "machine" for the comp
     assert.equal(result('install', 'error', 'OSError'), 'Install of AMD GPU could not run: OSError');
     assert.equal(result('remove', 'done'), 'AMD GPU removed');
     assert.equal(result('remove', 'done', 'was-present'),
-        'AMD GPU removed from this app; its package was on this machine before and stays');
+        'AMD GPU removed from this app; its package was on this system before and stays');
     assert.equal(result('remove', 'failed', 'no-record'), 'Nothing to remove: no install of AMD GPU by this app is recorded');
     assert.equal(result('remove', 'failed', 'package-not-removed'), 'Remove of AMD GPU failed: package-not-removed');
     const every = [EP_PACK_TEXT.confirmRemove('AMD GPU'), result('remove', 'done', 'was-present')].join(' ');

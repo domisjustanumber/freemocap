@@ -42,7 +42,7 @@ export function QuickCheckPanel({value, onChange, providers}: {
         </div>}
         {prompt && <div className="settings-note settings-note-dismissable" role="alert">
             <span><strong>{pairLabel(prompt.pair, items)}</strong>: {PAIR_MARKERS[prompt.pair.state]}. A quick check on this
-                machine decides whether it can run here.</span>
+                system decides whether it can run here.</span>
             {action('Run quick check', () => quickCheck.run(prompt.pair, prompt.change, detector))}
             {action('Not now', quickCheck.notNow)}
         </div>}
@@ -52,7 +52,7 @@ export function QuickCheckPanel({value, onChange, providers}: {
             {action('Run quick check', () => quickCheck.run(selected, null, detector))}
         </div>}
         {faster && <div className="settings-note settings-note-dismissable" role="status">
-            <span>A faster option needs a quick check on this machine: {pairLabel(faster, items)}.</span>
+            <span>A faster option needs a quick check on this system: {pairLabel(faster, items)}.</span>
             {action('Run quick check', () => quickCheck.run(faster, null, detector))}
         </div>}
         {quickCheck.refusal && <p className="settings-note settings-note-error" role="alert">

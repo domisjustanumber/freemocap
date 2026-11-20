@@ -25,7 +25,7 @@ test('how the start check ended uses the quick check\'s result texts, per packag
 
 test('a start check\'s progress names this machine and the package that runs now', () => {
     assert.equal(quickCheckProgressText({level: 'quick', items: [], state: 'running', done: 2, total: 6, package: 'freemocap',
-        seconds_estimate: 120}), 'Quick check of this machine (freemocap): 2 of 6 checks done, up to about 120 seconds.');
+        seconds_estimate: 120}), 'Quick check of this system (freemocap): 2 of 6 checks done, up to about 120 seconds.');
     assert.ok(Object.values(START_CHECK_TEXT).every(text => !/\bPC\b|\bdevice\b/.test(text)), 'G1: machine, never PC or device');
 });
 

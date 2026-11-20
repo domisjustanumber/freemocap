@@ -36,7 +36,7 @@ export function executionProviderInfo(providers: readonly ExecutionProviderOptio
                 {!isOffered(provider) && <> <NotUsableNote provider={provider}/></>}
                 {provider.checks.filter(check => check.usable && !check.certified && check.local_result === 'passed').map(check =>
                     <em key={check.device_key}> {provider.devices.find(({key}) => key === check.device_key)?.name ?? check.device_key}:
-                        passed on this machine, not yet reviewed.</em>)}
+                        passed on this system, not yet reviewed.</em>)}
             </p>)}
         </>,
     };

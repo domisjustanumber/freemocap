@@ -24,7 +24,7 @@ export const EP_PACK_TEXT = {
     cancel: 'Cancel install',
     keep: 'Keep',
     confirmRemove: (label: string) => `Remove ${label}? Windows removes the package that this app installed for it; a `
-        + 'package that was on this machine before stays.',
+        + 'package that was on this system before stays.',
     couldNotStart: (action: EpPackAction) => `${action === 'install' ? 'Install' : 'Remove'} could not start: `,
 } as const;
 
@@ -44,7 +44,7 @@ export function packResultText({action, result, reason, message}: EpPackResult, 
     if (result === 'done') {
         if (action === 'install') return `${label} installed`;
         return reason === 'was-present'
-            ? `${label} removed from this app; its package was on this machine before and stays` : `${label} removed`;
+            ? `${label} removed from this app; its package was on this system before and stays` : `${label} removed`;
     }
     if (result === 'cancelled') return `Install of ${label} cancelled. Remove takes away anything it added.`;
     if (result === 'failed' && action === 'remove' && reason === 'no-record') {

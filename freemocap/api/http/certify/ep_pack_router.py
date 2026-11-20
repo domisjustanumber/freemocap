@@ -50,7 +50,7 @@ def _windows_ml_row(key: str):
     from freemocap.system.certify.ep_packs import windows_ml_row
     row = windows_ml_row(key)
     if row is None:
-        raise _refused(400, "not-windows-ml", f"{key} is not an EP of the Windows ML catalog on this machine.")
+        raise _refused(400, "not-windows-ml", f"{key} is not an EP of the Windows ML catalog on this system.")
     return row
 
 

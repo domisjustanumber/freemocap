@@ -316,7 +316,7 @@ test('an unchecked EP is in the menu, marked; choosing it opens the prompt and k
     const providers = checkedProviders(CERTIFICATION, quickCheckStub({}, calls));
     const html = detectorRows('rtmpose', 'all', {providers});
     assert.deepEqual(optionsOf(rowLabelled(html, 'Execution provider')), ['auto', 'cpu', 'gpu-ep']);
-    assert.match(rowLabelled(html, 'Execution provider'), />GPU EP \(not checked on this machine\)</);
+    assert.match(rowLabelled(html, 'Execution provider'), />GPU EP \(not checked on this system\)</);
     const rows = DetectorSettingRows(detectorProps('rtmpose', 'all', {providers, onChange: change => changes.push(change)}));
     handlerOf(rows, 'Execution provider')('gpu-ep');
     assert.deepEqual(changes, [], 'the selection stays until a pass');
@@ -334,8 +334,8 @@ test('the Device row marks each GPU with its own state and asks for that pair (F
     const value = {...VALUE, provider: 'gpu-ep'};
     const row = rowLabelled(detectorRows('rtmpose', 'all', {providers, value}), 'Device');
     assert.deepEqual(optionsOf(row), ['auto', 'gpu:0', 'gpu:1']);
-    assert.match(row, />Big GPU \(not checked on this machine\)</);
-    assert.match(row, />Small GPU \(check failed on this machine\)</);
+    assert.match(row, />Big GPU \(not checked on this system\)</);
+    assert.match(row, />Small GPU \(check failed on this system\)</);
     handlerOf(DetectorSettingRows(detectorProps('rtmpose', 'all', {providers, value, onChange: change => changes.push(change)})), 'Device')('gpu:1');
     assert.deepEqual(changes, []);
     assert.deepEqual((calls[0][1] as {change: unknown}).change, {provider: 'gpu-ep', device: 'gpu:1'});
@@ -351,7 +351,7 @@ test('the prompt has exactly two choices, never disabled (F5)', () => {
     const prompt = {pair: {execution_provider: 'gpu-ep', device_key: 'gpu:0', name: 'Big GPU', state: 'not-checked' as const, needsCheck: true},
         change: {provider: 'gpu-ep', device: null}};
     const html = detectorRows('rtmpose', 'all', {providers: checkedProviders({...CERTIFICATION, auto: undefined}, quickCheckStub({prompt}))});
-    assert.match(plain(html), /GPU EP on Big GPU : not checked on this machine\. A quick check on this machine decides whether it can run here\./);
+    assert.match(plain(html), /GPU EP on Big GPU : not checked on this system\. A quick check on this system decides whether it can run here\./);
     assert.deepEqual(actions(html), ['Run quick check', 'Not now']);
     assert.doesNotMatch(html, /<button[^>]*disabled/);
 });
@@ -369,7 +369,7 @@ test('a running check shows done of total, the one-off estimate and a cancel; no
 
 test('Auto shows the notice with Run quick check and no dismiss while the server reports a pair needing a check (F3, F11)', () => {
     const html = detectorRows('rtmpose', 'all', {providers: checkedProviders(CERTIFICATION, quickCheckStub())});
-    assert.match(plain(html), /A faster option needs a quick check on this machine: GPU EP on Big GPU\./);
+    assert.match(plain(html), /A faster option needs a quick check on this system: GPU EP on Big GPU\./);
     assert.deepEqual(actions(html), ['Run quick check']);
     const none = detectorRows('rtmpose', 'all', {providers: checkedProviders({...CERTIFICATION, auto: {execution_provider: 'cpu', needs_check: []}},
         quickCheckStub())});
@@ -381,7 +381,7 @@ test('Auto shows the notice with Run quick check and no dismiss while the server
 test('a saved choice that needs a check offers it from the server state, not from a past error (F4)', () => {
     const value = {...VALUE, provider: 'gpu-ep', device: 'gpu:1'};
     const html = detectorRows('rtmpose', 'all', {providers: checkedProviders(CERTIFICATION, quickCheckStub(), 'gpu-ep'), value});
-    assert.match(plain(html), /GPU EP on Small GPU : check failed on this machine\. A start with it is refused until a quick check passes\./);
+    assert.match(plain(html), /GPU EP on Small GPU : check failed on this system\. A start with it is refused until a quick check passes\./);
     assert.deepEqual(actions(html), ['Run quick check']);
     // The same pair once the server reports it usable: no offer.
     const passed = {...CERTIFICATION, items: ITEMS.map(item => ({...item, usable: true, local_result: 'passed'}))};

@@ -53,8 +53,8 @@ test('the explanation marks a pair that passed here and has no reviewed row, and
     const text = (providers: ReturnType<typeof ep>[]) => renderToStaticMarkup(executionProviderInfo(providers).text)
         .replace(/<[^>]+>/g, '').replace(/\s+/g, ' ');
     assert.match(text([ep([pair(null, true, true), pair('passed', false, true, 'gpu:1')])]),
-        /Runs on a GPU\. Second GPU: passed on this machine, not yet reviewed\./);
-    assert.doesNotMatch(text([ep([pair(null, true, true)])]), /passed on this machine|Not usable/);
+        /Runs on a GPU\. Second GPU: passed on this system, not yet reviewed\./);
+    assert.doesNotMatch(text([ep([pair(null, true, true)])]), /passed on this system|Not usable/);
     assert.match(text([ep([pair('failed', true, false)])]), /Runs on a GPU\. Not usable here\./);
 });
 
@@ -131,8 +131,8 @@ test('F12: five states of a pair, worded with "machine"', () => {
     assert.equal(pairState({certified: false, usable: false}), 'not-checked');
     assert.equal(pairState({certified: true, local_result: 'failed', usable: false}), 'failed');
     assert.equal(pairState({certified: false, local_result: 'failed', local_cause: 'unclean-exits', usable: false}), 'unclean-exits');
-    assert.deepEqual(Object.values(PAIR_MARKERS), ['', 'passed on this machine, not yet reviewed', 'not checked on this machine',
-        'check failed on this machine', 'exited uncleanly twice']);
+    assert.deepEqual(Object.values(PAIR_MARKERS), ['', 'passed on this system, not yet reviewed', 'not checked on this system',
+        'check failed on this system', 'exited uncleanly twice']);
     assert.ok(Object.values(PAIR_MARKERS).every(marker => !/\bPC\b|device/.test(marker)));
 });
 
@@ -158,7 +158,7 @@ test('a choice asks for the check of one pair only when it cannot run now (F1, F
     assert.equal(pairToCheck(CPU, null, items), undefined, 'an EP with no GPU checks');
     assert.equal(pairToCheck(undefined, null, items), undefined, 'Auto');
     assert.deepEqual(executionProviderOptions(null, [provider, CPU], items).map(({label}) => label),
-        ['Auto', 'GPU EP (passed on this machine, not yet reviewed)', 'CPU']);
+        ['Auto', 'GPU EP (passed on this system, not yet reviewed)', 'CPU']);
 });
 
 test('the six result lines, a cancel included, from last_result', () => {

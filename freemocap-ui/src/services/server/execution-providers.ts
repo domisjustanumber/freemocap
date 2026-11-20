@@ -69,9 +69,9 @@ export function executionProviderOptions(selected: ExecutionProviderName | null,
 /** F12's five states of one EP on one GPU, worded with "machine" for the computer (G1). A reviewed pair has no marker. */
 export const PAIR_MARKERS = {
     'reviewed': '',
-    'passed-here': 'passed on this machine, not yet reviewed',
-    'not-checked': 'not checked on this machine',
-    'failed': 'check failed on this machine',
+    'passed-here': 'passed on this system, not yet reviewed',
+    'not-checked': 'not checked on this system',
+    'failed': 'check failed on this system',
     'unclean-exits': 'exited uncleanly twice',
 } as const;
 export type PairState = keyof typeof PAIR_MARKERS;
@@ -139,7 +139,7 @@ export function pairLabel(pair: {execution_provider: string; device_key?: string
 }
 
 /** The running check as F10 words it: checks done of total, and the plan's one-off estimate; no countdown. */
-export function quickCheckProgressText(run: CertificationRun, items?: readonly CertificationItem[], machine = 'this machine'): string {
+export function quickCheckProgressText(run: CertificationRun, items?: readonly CertificationItem[], machine = 'this system'): string {
     const done = run.total === undefined ? 'starting' : `${run.done} of ${run.total} checks done`;
     const estimate = run.seconds_estimate === undefined ? '' : `, up to about ${run.seconds_estimate} seconds`;
     // A start check has no items: it checks this machine, one package after the other.

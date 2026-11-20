@@ -1120,6 +1120,15 @@ To do next, in order (items 1 to 3 below are older; see the update above for wha
    F15 step 2: menu markers, the two-choice prompt and the background check in the UI, briefed from the
    message shape step 1 recorded. Then steps 3 to 5 in parallel.
 
+Update 2026-11-19, after the fourth grilling (decisions J1 to J20, above):
+(a) On this machine the app opens blocked until a start check has run, because
+`C:\Users\Dom\freemocap_data\certify\start-check.json` does not exist and no reviewed OS row exists. Running it
+also runs DirectML checks and writes this machine's EP store.
+(b) Which repository holds freemocap's commits for `package.commit` is the user's open decision: the branch is local
+with no upstream, and the remotes are the user's fork and the organisation's repository.
+(c) To do next: the user's manual checklists for steps 2 to 5; then the full-check grilling; freemocap's own reports
+after the skellycertify spec change (J13, J19); the pin move after the user's version numbers (H4).
+
 Settled by the third grilling (see below): freemocap says "machine" for the computer (G1); dependency bumps are
 out of this plan (G8), so there is nothing to wait for from the user except the F15 step 2 checklist (G7).
 
@@ -1222,6 +1231,56 @@ The user confirmed all of these.
   normal-use record (deferred by F14) exists; the Certification button's suffix is the only reminder.
 - Fact, from the skellytracker session, 2026-11-19: skellytracker `19b70775` has one red tool test on the fork (no
   package code wrong); it is not a pin target; freemocap already uses its cancel type and refusal fields.
+
+## Decisions of the fourth grilling, 2026-11-19
+
+All confirmed by the user.
+
+- J1. The EP pack panel stays beside the EP setting; it moves into the Certification dialog when the dialog gets its EP
+  list (with the full-check step).
+- J2. Field-test EPs get no Install without an opt-in. skellytracker was asked to report the install state of a
+  field-test EP's pack; the app stays as built until that exists.
+- J3. No install or remove controls for the wheel packs (CUDA, TensorRT).
+- J4. No Repair button; Remove, then Install.
+- J5. Remove is always shown.
+- J6. The EP pack panel's texts in `freemocap-ui/src/services/server/ep-packs.ts` are confirmed as written.
+- J7. Step 3's seven choices are accepted as built ([F15 step 3: built](#f15-step-3-built)): the button suffix counts
+  failures when there are any, else all pending; the issue form link is `issues/new?template=certify-report.yml`; a
+  hand-in line shows the issue link and report count but no date; "open again" for an issue-form hand-in opens the form,
+  not the saved file; the saved file uses the browser download, not a new Electron call; no "Do not remind me" and no
+  idle notice; the dialog title carries the host name.
+- J8 (`9e395508`). The busy rule covers two more starts: video import's file copy (`POST /recording-import` and
+  `POST /mocap/recording/import`, kind `import`) and the Blender add-on install (`POST /blender/addon/install`, kind
+  `blender-addon`) are refused while a quick check or start check runs, and while they run they refuse a check. Both are
+  single synchronous requests with no in-progress state, so the route dependency `admitted(kind)` holds the claim for the
+  request, as for sync and export. Opening a .blend in Blender and saving a calibration transform stay allowed.
+- J9 (`84fad3dd`). `packages/freemocap-client/tools/refresh-openapi.py` writes `contracts/openapi.json` from the app's
+  real OpenAPI, keeping key order and existing `example`/`examples` values and appending new keys; the README says to run
+  it, then `npm run generate`. On the tree before J16 it gave no diff.
+- J10. Step 5 is recorded as built and tested with stand-ins only. It has never run for real, until a Windows 11 machine
+  with an AMD GPU is available.
+- J11. A failed start check frees the app only until the backend restarts; only a pass is recorded.
+- J12. After a cancel the app stays blocked if freemocap's own part had not passed.
+- J13. freemocap will keep its own reports and pending state, and the hand-in routes will merge them with skellytracker's.
+  J18: stored under `certify/` in the data folder, with the same states as skellytracker's (pending, handed in, "Not sent"
+  returns to pending) and the same pruning of older duplicate passes. NOT built yet. J19: it waits for skellycertify's
+  spec to list freemocap as a package (asked; that spec change is the user's decision in the skellycertify session). Until
+  then a freemocap failure shows a red line with no "File report".
+- J14. skellycertify was asked to add freemocap as a package. Facts from its reply: one file may hold modules of two
+  packages (the normal case; report-format 4.1 and 4.3); the relay checks each module on its own; the issue title uses
+  `app.name`/`app.version`, the OS label of `modules[0]` and the GPU names of all modules; the issue body limit is 65,536
+  characters and one full-level skellytracker module (382 checks) needs about 51,000, so several large modules give a
+  shortened table in the issue while the committed file holds everything.
+- J15. skellycam's check is added when it exists; no placeholder.
+- J16 (`4d0e5a03`). The start check's Blender check uses the path chosen in Blender settings, else the best guess. That
+  path lives only in the UI's store, so `POST /certify/start_check` takes an optional body `{blenderExePath}` that the
+  UI fills from `state.blender.blenderExePath` (not the detected path); it is passed through the child process to
+  `own_checks.certify(..., blender_exe_path=)` and `runtime.executable(path)`. The contract and generated schema were
+  refreshed.
+- J17 (`245a885d`). While the start check is needed, the collapsed sidebar's expand button is dimmed and inert like the
+  rest (`inert` and opacity 0.4); the compact connection status stays usable. Covered by the manual checklist of step 4
+  (no test renders the layout).
+- J20. The full-check step is designed after the user's manual pass over steps 2 to 5.
 
 ## Next actions
 

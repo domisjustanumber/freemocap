@@ -126,7 +126,8 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                     </div>
                 </div>
 
-                {bottom && <div className="flex flex-row gap-2" style={{justifyContent: 'flex-end'}}>
+                {/* Sticky: the dialog scrolls at 80vh, and Continue must stay in sight. */}
+                {bottom && <div className="flex flex-row gap-2 bg-middark pt-1" style={{justifyContent: 'flex-end', position: 'sticky', bottom: 0}}>
                     <ButtonSm text={bottom} textColor="text-white" className={bottom === CERTIFICATION_TEXT.continue ? 'primary accent' : ''}
                               buttonType={bottom === CERTIFICATION_TEXT.continue ? '' : 'secondary'} onClick={onClose}/>
                 </div>}

@@ -315,6 +315,9 @@ User-confirmed 2026-11-19, relayed from the skellycertify session (skellycertify
 - The relay is OFF now and stays off until the GitHub App is set up. (Superseded 2026-11-19: the relay is ON
   again; see "Decisions after step 1".)
 - The `app` block gets no tree-modified flag.
+- Report layout (spec section 4.2, skellycertify main `b7b6fd7`; owner confirmed 2026-11-19): the summary table has
+  one row only for each section with the result `fail` (each failed check when a module has no sections), and a file
+  with no such row has no table. `build_report_file` follows it; the JSON block still holds each check.
 
 Built (`bf6e9e9f`): `send_report` reads `enabled` from `GET /health` after the file checks and before the
 outbox copy. `enabled: false`, or a POST answer with error `relay-off` (503, `retry: true`), raises
@@ -756,8 +759,9 @@ files nothing.
     stays on GitHub.)
 14. freemocap's own reports (after any start check that ended, pass or fail; step 4 checklist): open the dialog. Each
     line under "Reports to hand in" starts with the package, "freemocap · ..." or "skellytracker · ...".
-15. Click "View report". The file holds a freemocap module and the skellytracker modules together; its table has rows
-    starting "| freemocap |".
+15. Click "View report". The file holds a freemocap module and the skellytracker modules together; a table appears only
+    when a section (or, for a module with no sections, a check) has the result `fail`, with rows starting
+    "| freemocap |" for a failed freemocap check; a file with all passes has no table.
 16. Click "Save file and open issue form", close the GitHub tab WITHOUT submitting, then "Not sent". The freemocap line is
     listed again with the skellytracker lines (each package's store got the mark).
 

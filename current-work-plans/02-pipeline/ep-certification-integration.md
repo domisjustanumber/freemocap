@@ -865,6 +865,117 @@ To see the box again later, delete that file.
 10. Restart the backend while the dialog shows a running check. The page recovers without a refresh; no old progress or
     red line stays.
 
+### F15 step 5: built
+
+Windows ML install and remove (F16), 2026-11-19, against `../skellytracker` at `19b70775` (dirty in tools only). Commits:
+`f1e23b91` (backend, tests, client) and `711ec645` (UI). Built and tested with stand-ins, never run for real (a real run needs Windows 11 with an AMD GPU). No real install, download or remove ran on any machine; skellytracker's `install()` and `remove()` were replaced by
+stand-ins in every test.
+
+- Which EPs: an EP whose `PackStatus.source` is `windows-ml` (today `amdgpu` and `migraphx`, both field-test, Windows
+  only), whose state is not `unsupported` (no GPU here can run it) and not `field_test` (a field-test EP with no opt-in;
+  skellytracker says never offer it). Install is offered only for `not_installed`; Remove always (see open points).
+  On the dev PC (RTX 3070) both Windows ML EPs are `unsupported`, so nothing shows there.
+- Job (`freemocap/system/certify/ep_packs.py`, `EpPackManager`, made by `FreemocapApplication`): one install or remove
+  at a time, in a daemon thread of the backend (not a child process: `install()` takes a progress callback and a cancel
+  with `is_set()`, and both calls run Windows' own installer; it reuses the step-1 manager pattern, not its child).
+  Install runs `eps.install(eps.plan_install([key]), progress=..., cancel=threading.Event)`; remove runs
+  `eps.remove(execution_provider=key)` (no cancel exists for it). `refresh()` runs in the 0.5 s task collector before the
+  check's refresh; when the job has ended it keeps how, frees the busy rule and has `QuickCheckManager` read
+  skellytracker's status again at once (`status_changed()`), so `certification.items` follow; the UI queries
+  `/onnx/execution_providers` again when `last_pack_result` changes. `shutdown()` (in `shutdown_all_processing()`) sets
+  the cancel and waits up to 5 s.
+- Busy rule (F16, H1, H2): the start runs under `QuickCheckManager.admission_lock`: `refuse_pipeline_start("ep-pack")`
+  (a check runs: 409 `quick-check-running`; another install or remove: 409 `ep-pack-running`), then `pipeline_holds()`
+  (anything runs: 409 `pipelines-running` with `gpu_held_by`); then it adds a claim `PipelineHold("ep-pack", <EP key>)`
+  to `claims` until the job is reaped. So `pipeline_holds()` and `certification.gpu_held_by` list it (new `kind`
+  `ep-pack`), a quick check is refused with `pipelines-running`, and every other start (realtime, recording, cameras,
+  posthoc, sync, export) is refused in `refuse_pipeline_start` with 409 `ep-pack-running` {`execution_provider`,
+  `message`}. Nothing is queued.
+- Routes (`freemocap/api/http/certify/ep_pack_router.py`, tag Certification):
+  `POST /freemocap/certify/ep_pack/install` and `POST /freemocap/certify/ep_pack/remove` with `{execution_provider}`
+  answer 202 with the run `{action, execution_provider, phase, fraction}`, or 400 `not-windows-ml`, 409 `cannot-install`
+  (install only: the state is not `not_installed`, or `plan_install` refuses, e.g. a field-test EP with no opt-in; the
+  message is skellytracker's), 409 `pipelines-running`, `quick-check-running`, `ep-pack-running`;
+  `DELETE /freemocap/certify/ep_pack` asks a running install to stop and answers `{run: <the run> | null}`. The EP route
+  `/onnx/execution_providers` now carries skellytracker's `source` and `state` per EP. Contract: only these paths, the
+  three schemas and the two fields were added to `contracts/openapi.json`, plus `operations.json`, `coverage.md` and the
+  generated client.
+- Message: two fields in `app_state.state.certification` (null values left out, as everywhere):
+  `pack_run: {action: install | remove, execution_provider, phase, fraction}` (skellytracker's latest `InstallProgress`;
+  `fraction` is Windows ML's 0 to 1, absent before its first value and for a remove) and
+  `last_pack_result: {action, execution_provider, result, reason, message}` with `result` `done`, `cancelled`, `failed`
+  (`reason`: skellytracker's error code of the install, e.g. `failed`, or the remove's reason codes joined, e.g.
+  `no-record`, `package-not-removed`; `message`: skellytracker's install text) or `error` (`reason`: the exception class).
+  A remove of a package that was on the machine before the install is `done` with `reason` `was-present`. Golden
+  fixtures regenerated on both sides; the client Zod schema lists both fields.
+- Honest end states, as skellytracker reports them (read from its code, not seen on hardware): a cancel before Windows
+  starts changes nothing; a cancel during the install asks Windows ML to stop; if it stops, skellytracker keeps its
+  `pending` record (the EP stays `not_installed`) and Remove takes away each package that the install added; if Windows
+  finishes first, the install is recorded and the result is `done`. A failed install leaves the `pending` record too.
+- UI (`freemocap-ui/src/components/mocap-setup/ep-pack-panel.tsx`, rules, texts and requests in
+  `freemocap-ui/src/services/server/ep-packs.ts`): beside the EP setting (both places, under the quick-check panel),
+  one line per shown EP, "<EP> (Windows ML): <state>", with "Install" (when not installed) and "Remove"; Remove asks
+  first ("Remove <EP>? Windows removes the package that this app installed for it; a package that was on this machine
+  before stays." with "Remove" / "Keep"); the running job "Installing <EP>: 25%" with "Cancel install" (or "Removing
+  <EP>…"); a refused start "Install could not start: <server's reason>"; and how the last job ended. The buttons never
+  change label or disable; a start answered after a newer one or by another server is ignored.
+- Tests: `freemocap/tests/test_ep_packs.py` (10: progress, cancel, error, both busy directions, shutdown, result
+  mapping of skellytracker's records, skellytracker's real `install()` with only `windows_ml.install` replaced, the
+  message fields, the routes), `freemocap-ui/src/services/server/ep-packs.test.tsx` (3), the golden test; results: test_ep_packs 10 passed; the five backend files 75 passed; UI SDK integration 46 passed, `tsc` clean, client package 146 passed.
+- Not covered: a real install, cancel or remove (Windows ML on an AMD GPU; none here); the panel's rendering and its
+  local state (no store or React renderer in the UI's unit tests; the pure rules are tested); the live routes (a backend
+  from this checkout started and its EP route gave `source` and `state`; calling the install routes was not done).
+
+#### Open points (smallest option taken; recommendations)
+
+1. Placement: beside the EP setting, not in the Certification dialog's Items part (decision 26), which step 3's dialog
+   does not have yet. Recommend moving `EpPackPanel` into Items when it exists (it is self-contained).
+2. Field-test EPs: both Windows ML EPs are field-test, so with no opt-in they show no controls (skellytracker refuses
+   the install and says never offer them). Passing `field_test=True` would install, but the EP's state stays
+   `field_test`, so the UI could not tell installed from not, and a second Install would record the package as
+   `was_present`, after which Remove keeps it. Today the controls appear after the CLI opt-in. Recommend asking
+   skellytracker for the install state of a field-test EP in `PackStatus` and for `install()` to keep its own record,
+   then offering Install with `field_test=True`, the quick check staying the opt-in (decision 17).
+3. Repair: Install is not offered for `stale` or `not_ready` (the same `was_present` overwrite). Recommend the same
+   skellytracker change; until then Remove, then Install.
+4. Remove is always offered for a shown EP, so a cancelled install's `pending` record can be cleared; with nothing
+   installed by this app it says "Nothing to remove: no install of <EP> by this app is recorded". Recommend keep.
+5. Texts (all in `EP_PACK_TEXT`, `packStateText`, `packProgressText`, `packResultText`): "<EP> installed", "Install
+   of <EP> cancelled. Remove takes away anything it added.", "Install of <EP> failed: <skellytracker's text>", "<EP>
+   removed", "<EP> removed from this app; its package was on this machine before and stays", "Remove of <EP> failed:
+   <codes>", "<Install|Remove> of <EP> could not run: <class>". Recommend the user confirms them.
+6. Pack EPs (`cuda`, `trt-rtx`, wheels from pypi/azure) get no install or remove here: F16 names Windows ML only.
+   Recommend a separate decision.
+7. A remove while the inference service still holds a session of the EP could fail with `package-not-removed`
+   (shown as it comes); not seen.
+
+#### MANUAL CHECKLIST (step 5)
+
+You need Windows 11 with an AMD GPU (the Windows ML EPs today: AMD GPU and MIGraphX). Steps marked REAL change the
+machine: Windows downloads, installs or removes a package for your user.
+
+1. REAL. Opt in and install once with skellytracker's tool: `skellytracker-eps install amdgpu --field-test` (answer
+   yes). Without this the app shows no controls for a field-test EP (open point 2).
+2. Start the app. Open "Processing settings". Under the EP setting you see "AMD GPU (Windows ML): installed" with a
+   "Remove" button.
+3. Start real-time processing. Click "Remove". A box asks "Remove AMD GPU? ..." with "Remove" and "Keep". Click
+   "Remove". A red line says "Remove could not start: ..." (the processing runs). Stop the processing.
+4. REAL. Click "Remove", then "Remove" in the box. A line says "Removing AMD GPU…", then "AMD GPU removed" (or "AMD GPU
+   removed from this app; its package was on this machine before and stays" if it was there before step 1). The line
+   above now says "not installed" and shows "Install".
+5. REAL (downloads). Click "Install". A line says "Installing AMD GPU: starting", then a percentage, with "Cancel
+   install". While it runs, press "Real-time processing": the error banner says an install or remove is running. When
+   it ends: "AMD GPU installed", and the EP menu lists AMD GPU again (with its check marker).
+6. REAL. Remove it again (step 4), then click "Install" and at once "Cancel install". You see "Install of AMD GPU
+   cancelled. Remove takes away anything it added." (or "AMD GPU installed" if Windows finished first). Click "Remove"
+   and confirm: it removes what the cancelled install added, or says "Nothing to remove: ...".
+7. Start a quick check of another EP, then click "Install" or "Remove": "... could not start: A quick check of ... is
+   running ...".
+8. REAL. Start an install, then quit and restart the backend. The page recovers without a refresh; no old progress
+   stays; the AMD GPU line shows the state skellytracker reports (an install stopped by the exit stays "not
+   installed"; "Remove" clears what it added).
+9. The "Install", "Remove", "Keep" and "Cancel install" labels never change and are never greyed out.
+
 ## Environment on the dev PC
 
 Found 2026-11-19 while measuring decision 31; nothing was changed. `freemocap/.venv` dates from August 2026
@@ -971,7 +1082,11 @@ The coordinating session works through sub-agents (opus/sonnet/haiku, never fabl
 All work is local commits on `sidecar-implementation`; nothing is pushed; CI stays unbuildable until the
 frame-ring move. Sub-agents stage by explicit path because several edit this checkout at once.
 
-Running when this was written (their reports arrive as messages; act on them):
+Running / built (update 2026-11-19 night): steps 1 to 5 of F15 are built: [F15 step 1: built](#f15-step-1-built),
+[F15 step 2: built](#f15-step-2-built), [F15 step 3: built](#f15-step-3-built), [F15 step 4: built](#f15-step-4-built),
+[F15 step 5: built](#f15-step-5-built). Open: the user's manual checklists (steps 2, 3, 4, 5), the questions of the
+fourth grilling (in progress with the user), the full-check step (G12), and the pin move, which waits for the user's
+version numbers (H4).
 - F15 step 1: landed; see [F15 step 1: built](#f15-step-1-built) for the commits and the message shape.
 - A hard-exit audit (rule from skellytracker-6c: a process that held a GPU EP session and ends by `os._exit`,
   terminate or kill must call `skellytracker.note_exit_requested()` first). Suspects: the tools
@@ -979,7 +1094,7 @@ Running when this was written (their reports arrive as messages; act on them):
   they started; `tools/datasets/preparation.py`; `utilities/kill_process_on_port.py`; tests that end a real
   backend. It also answers whether killing the quick-check child can leave a marker.
 
-To do next, in order:
+To do next, in order (items 1 to 3 below are older; see the update above for what is open now):
 1. When step 1 lands: run the full fast suite (`uv run --frozen pytest freemocap/tests/ --timeout=120
    --timeout-method=thread -m "not e2e and not slow"`; last result 1634 passed, 7 failed = the old baseline,
    20 skipped) against `../skellytracker` at `e90245cefb7330ce33d9f1d395674b4ff3eaed7f`, then record the pin
@@ -1098,6 +1213,12 @@ The user confirmed all of these.
   unchanged. This supersedes "the relay is OFF now". The rule stands and matters more now: tests and agents use
   a fake relay only, with `FREEMOCAP_CERTIFY_RELAY_URL` empty for anything run; the first real send is the
   user's, from the hand-in UI. No agent contacts the real relay.
+- H5 (user, 2026-11-19). The report file is saved by a browser download instead of the Electron call of decision 30.
+  The Electron call is built only if the save dialog does not appear in the user's manual check.
+- H6 (user, 2026-11-19). The idle reminder notice and "Do not remind me" of decision 23 stay unbuilt until the
+  normal-use record (deferred by F14) exists; the Certification button's suffix is the only reminder.
+- Fact, from the skellytracker session, 2026-11-19: skellytracker `19b70775` has one red tool test on the fork (no
+  package code wrong); it is not a pin target; freemocap already uses its cancel type and refusal fields.
 
 ## Next actions
 

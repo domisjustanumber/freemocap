@@ -6,7 +6,7 @@ import {serverUrls} from '@/services';
 import {useAppSelector} from '@/store';
 import {useHandIn} from '@/hooks/useHandIn';
 import {
-    bottomButtonLabel, certificationButtonSuffix, reportFooterAction, reportsReady, submitText, CERTIFICATION_TEXT, handedIn, ISSUE_FORM_URL, issueFormProminent, issueLabel, isLocalHost,
+    bottomButtonLabel, certificationButtonSuffix, footerActionText, reportFooterAction, reportsReady, submitText, CERTIFICATION_TEXT, handedIn, ISSUE_FORM_URL, issueFormProminent, issueLabel, isLocalHost,
     openCertification, outboxLine, pendingRows, pendingSummary, REPORTS_SECTION_ID, submitLabel,
 } from '@/services/server/certification-hand-in';
 import {START_CHECK_TEXT} from '@/services/server/start-check';
@@ -169,6 +169,10 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                     <ReportMarkdown text={shown.file.content}/>
                     {/* Sticky footer: the answer line (reserved, so nothing jumps), then Close left and the action right. */}
                     <div className="flex flex-col gap-1 bg-middark pt-1" style={{position: 'sticky', bottom: 0}}>
+                        {footer && <div>
+                            <p className="text sm text-white"><strong>{CERTIFICATION_TEXT.reports}</strong></p>
+                            <p className="text sm text-gray">{footerActionText(footer, pending.length)}</p>
+                        </div>}
                         <p className={`text sm ${message?.error ? 'settings-note-error' : 'text-white'}`} role="status" style={{minHeight: '3em'}}>
                             {message ? <>{message.text}{message.issueUrl && <>: {link(message.issueUrl, message.issueUrl)}</>}</>
                                 : footer === 'issue-form' ? (list?.relay_enabled === false ? CERTIFICATION_TEXT.relayNotSetUp

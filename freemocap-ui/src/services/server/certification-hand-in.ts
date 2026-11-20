@@ -61,6 +61,11 @@ export type SendPhase = 'idle' | 'submitting' | 'sent';
 export const submitText = (phase: SendPhase, pendingCount: number) =>
     phase === 'submitting' ? 'Submitting...' : phase === 'sent' ? 'Sent!' : submitLabel(pendingCount);
 
+/** What the report pop-up's right-hand button does, in one sentence (coordinator's wording, awaiting the owner). */
+export const footerActionText = (action: 'submit' | 'issue-form', pendingCount: number) => action === 'submit'
+    ? `${submitLabel(pendingCount)} sends this report to the FreeMoCap team as a public issue on GitHub.`
+    : `${CERTIFICATION_TEXT.issueForm} saves this report and opens the GitHub form to attach it to.`;
+
 export const submitLabel = (pendingCount: number) => pendingCount > 1 ? CERTIFICATION_TEXT.submitReports : CERTIFICATION_TEXT.submitReport;
 
 /** The reports to share show once no check runs and the start check, when required, has ended (passed, failed or

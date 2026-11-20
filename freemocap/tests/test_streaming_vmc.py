@@ -201,7 +201,7 @@ def test_real_udp_measurement_time_and_clean_close(human):
             # No wall-clock/sleep relationship: replay may emit later immediately.
             emitter.emit(delayed)
             second = receive_frame(receiver, 256)
-            assert len([m for m in first if m[0] == "/VMC/Ext/Bone/Pos"]) == 21
+            assert len([m for m in first if m[0] == "/VMC/Ext/Bone/Pos"]) == 51  # 21 body and 30 finger bones (fingers stream by default)
             assert first[-2] == ("/VMC/Ext/OK", [1])
             root = next(values for address, values in first if address == "/VMC/Ext/Root/Pos")
             assert root[0] == "root"

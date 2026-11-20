@@ -13,7 +13,8 @@ type EventShape = Pick<StoredPipelineTaskEvent, 'nodeKind' | 'stage'>;
 
 // The span names of the old skellytracker Tracker, and its `child_<stage>` spans. // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
 const LEGACY_STAGES = new Set(['object_detection_infer', 'object_detection', 'bbox_reuse', 'bbox_smoothing', 'crop', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
-    'keypoint_detection_infer', 'keypoint_smoothing', 'keypoint_detection', 'keypoint_merge', 'keypoint_tracked_bbox']); // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    'keypoint_detection_infer', 'keypoint_smoothing', 'keypoint_detection', 'keypoint_merge', 'keypoint_tracked_bbox',
+    'object_detection_preprocess', 'keypoint_detection_preprocess']); // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
 const isLegacyStage = (stage: string) => LEGACY_STAGES.has(stage) || stage.startsWith('child_'); // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
 
 /** skellytracker 2.0 names its spans `<node_id>.<span>` (person.inference, crop.run) and `pipeline.run`. */
@@ -44,6 +45,8 @@ export const PRETTY_STAGE_LABELS: Record<string, string> = {
     // A legacy row comparable with a 2.0 span names it; the others have no 2.0 counterpart. // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
     'skeleton_inference:object_detection_infer': 'Person detection inference (compare person.inference)', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
     'skeleton_inference:keypoint_detection_infer': 'Wholebody inference (compare wholebody.inference)', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    'skeleton_inference:object_detection_preprocess': 'Person detection preprocess (compare person.preprocess)', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
+    'skeleton_inference:keypoint_detection_preprocess': 'Wholebody preprocess (compare wholebody.preprocess)', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
     'skeleton_inference:bbox_reuse': 'Box reuse', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
     'skeleton_inference:bbox_smoothing': 'Box smoothing', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).
     'skeleton_inference:crop': 'Crop', // Deleted at skellytracker stage 2.4 (legacy tracker benchmark).

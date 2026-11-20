@@ -449,7 +449,7 @@ requires-dist = [
     { name = "skellyforge", editable = "../skellyforge" },
     { name = "skellylogs", editable = "../utils/skellylogs" },
     { name = "skellypings", editable = "../utils/skellypings" },
-    { name = "skellytracker", extras = ["mediapipe"], editable = "../skellytracker" },
+    { name = "skellytracker", extras = ["mediapipe"], editable = "../skellytracker-pin" },
     { name = "tomli-w", specifier = ">=1.2.0" },
 ]
 
@@ -1674,7 +1674,7 @@ admin = [{ name = "google-cloud-firestore", specifier = ">=2.19.0" }]
 
 [[package]]
 name = "skellytracker"
-source = { editable = "../skellytracker" }
+source = { editable = "../skellytracker-pin" }
 dependencies = [
     { name = "beartype" },
     { name = "numpy" },

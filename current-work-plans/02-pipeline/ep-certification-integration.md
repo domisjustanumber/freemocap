@@ -1740,6 +1740,29 @@ its issue. Each platform is validated independently; Linux and macOS do not wait
   DirectML come with the Python environment.
 - Wording choices of the demo morning all stand (list in "Certify pop-up revision, 2026-11-20").
 
+### After the grilling, 2026-11-20 (same day)
+
+- Pin mechanism: freemocap takes skellytracker from a separate clone, `../skellytracker-pin`, detached at
+  `e17761b4` (owner: "yes, pin to e17761b4"). Its 22 ONNX files are hard links to the files in
+  `../skellytracker/skellytracker/core/model_zoo`. A git URL was tried first and failed: an installed
+  skellytracker holds no ONNX file and the sidecars give no `url`. Move the clone only when the skellytracker
+  session names a commit; its next commits rename `<label>:image` to `<label>:video` and `<label>:live`
+  (fixtures `valid-quick.md` and `test_start_check.py` name the old rows).
+- Fast suite on the clone: 1724 passed, 1 failed, 20 skipped. The failure,
+  `test_the_relay_validator_accepts_the_built_file`, comes from the hardened relay code in `../skellycertify`
+  (rule 18, clean note) and stays until the note cleaning is built here.
+- Owner, Q53 to Q56: freemocap adds two quick checks, realtime session and post-hoc session, through its own
+  processes on skellytracker's 30 bundled frames (a function returning the JPEG bytes is promised by that
+  session); with no model files they are `not-run` with `models-missing` and do not fail the start check;
+  quick budget skellytracker 75 s, skellycam 30 s, freemocap 15 s.
+- Done: steps 1 to 3 of the order of work (server refusal `796dede6`, `254ff4dd`; branch pushed once at
+  `68381103`; "system" wording `0518a227`); test isolation from the real stores `f2a36e64`. Cause of the
+  demo fault: the Welcome window's "Connect Cameras" card stayed clickable under the pop-up.
+- Waiting on the owner's confirmation here: skellycertify format 1.4.0 (table "Checks that did not pass:"
+  `Package | Module | Test | Result | Reason`; no pop-up when each plan's `total` is 0; `risks`, `notices`),
+  the sender rules 17 to 20 with the clean note (skellycertify `9e6d575`), and skellycam's "pause is a
+  display freeze only". The relay is switched off.
+
 ### Not built from skellycam's overlap list (freemocap's duties, coordinator accepted them)
 
 The app closes its camera groups before any certify run; the app asks for the macOS camera permission

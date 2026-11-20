@@ -1,7 +1,8 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 import type {Certification} from "@freemocap/client";
 import {
-    type CheckIntent, checkIntentOutcome, type MenuPair, requestQuickCheck, requestQuickCheckCancel,
+    type CheckIntent, checkIntentOutcome, type MenuPair, quickCheckResultShows, type QuickCheckLines, requestQuickCheck,
+    requestQuickCheckCancel, settleQuickCheckLines,
 } from "@/services/server/execution-providers";
 import type {DetectorType, RTMPoseModelName} from "@/store/slices/mocap";
 import type {ExecutionProviderName} from "@/types/execution-provider";
@@ -13,13 +14,9 @@ export interface QuickCheckPrompt {
     change: {provider: ExecutionProviderName; device: string | null};
 }
 
-interface Local {
+interface Local extends QuickCheckLines {
     prompt: QuickCheckPrompt | null;
     intent: CheckIntent | null;
-    /** The server's refusal of this window's last start; the answer to that request only. */
-    refusal: string | null;
-    /** The `last_result` the person moved on from by a new choice; hidden until the next check. */
-    dismissed: string | null;
 }
 const NONE: Local = {prompt: null, intent: null, refusal: null, dismissed: null};
 
@@ -41,12 +38,13 @@ export function useQuickCheck(endpoint: string, serverKey: string, certification
     const outcome = local.intent ? checkIntentOutcome(local.intent, certification) : null;
     const resultKey = certification?.last_result ? JSON.stringify(certification.last_result) : null;
     useEffect(() => {
-        if (certification?.run && local.dismissed !== null) update({dismissed: null});
+        const settled = settleQuickCheckLines(local, certification);
+        if (settled !== local) update({refusal: settled.refusal, dismissed: settled.dismissed});
         if (outcome === 'running' && certification?.run && local.intent && !local.intent.sawRun) {
             update({intent: {...local.intent, sawRun: true}});
         }
         if (outcome === 'ended') update({intent: null});
-    }, [certification, outcome, local.intent, local.dismissed, update]);
+    }, [certification, outcome, local, update]);
 
     /** The person made a choice in the EP, Device or detector row: earlier prompts, refusals and results are done. */
     const choose = useCallback((prompt: QuickCheckPrompt | null = null) => {
@@ -60,7 +58,7 @@ export function useQuickCheck(endpoint: string, serverKey: string, certification
         update({prompt: null, intent: null, refusal: null});
         const refusal = await requestQuickCheck(endpoint, pair, detector).catch(error => describeError(error) || String(error));
         if (generation.current !== started || current.current !== key) return;
-        update(refusal !== null ? {refusal} : {intent: change && {pair, change, before, sawRun: false}});
+        update(refusal !== null ? {refusal: {text: refusal, sawBusy: false}} : {intent: change && {pair, change, before, sawRun: false}});
     }, [endpoint, serverKey, resultKey, update]);
 
     const cancel = useCallback(() => {
@@ -69,9 +67,9 @@ export function useQuickCheck(endpoint: string, serverKey: string, certification
 
     return {
         prompt: local.prompt,
-        refusal: local.refusal,
+        refusal: local.refusal?.text ?? null,
         /** The last check's ending, unless the person has made a choice since (item 6). */
-        showsResult: resultKey !== null && !certification?.run && resultKey !== local.dismissed,
+        showsResult: quickCheckResultShows(certification, local.dismissed),
         /** The selection a passed check of this window makes (F6); the rows apply it, then call `settle`. */
         passed: outcome === 'passed' ? local.intent?.change ?? null : null,
         settle: useCallback(() => update({intent: null}), [update]),

@@ -192,6 +192,33 @@ export function checkIntentOutcome(intent: CheckIntent, certification: Certifica
         && result.device_key === intent.pair.device_key ? 'passed' : 'ended';
 }
 
+/** What a window keeps of its quick-check requests besides the started check. */
+export interface QuickCheckLines {
+    /** The server's refusal of this window's last start, and whether the server has since shown work running. */
+    refusal: {text: string; sawBusy: boolean} | null;
+    /** The `last_result` the person moved on from by a new choice. */
+    dismissed: string | null;
+}
+
+/**
+ * The lines after a new server state, so that neither outlives the state it answered: a refusal goes once the work
+ * that refused it (a check, or anything in `gpu_held_by`) is seen to end; a result moved on from may show again only
+ * after an EP quick check ran, since a start check leaves `last_result` as it was. Returns `lines` when nothing changes.
+ */
+export function settleQuickCheckLines<T extends QuickCheckLines>(lines: T, certification: Certification | null): T {
+    const busy = Boolean(certification?.run || certification?.gpu_held_by.length);
+    const held = lines.refusal;
+    const refusal = !held ? null : busy ? (held.sawBusy ? held : {...held, sawBusy: true}) : held.sawBusy ? null : held;
+    const dismissed = certification?.run?.items.length ? null : lines.dismissed;
+    return refusal === held && dismissed === lines.dismissed ? lines : {...lines, refusal, dismissed};
+}
+
+/** The last check's ending shows unless a check runs or the person moved on from it. */
+export function quickCheckResultShows(certification: Certification | null, dismissed: string | null): boolean {
+    const result = certification?.last_result;
+    return Boolean(result) && !certification?.run && JSON.stringify(result) !== dismissed;
+}
+
 /** Start the quick check of one pair with the person's detector (F9). Null when accepted, else the server's reason. */
 export async function requestQuickCheck(baseUrl: string, pair: {execution_provider: string; device_key: string},
     detector: {detector_type: 'rtmpose' | 'mediapipe'; rtmpose_model_name: 'rtmw-x-l_256x192' | 'rtmw-x-l_384x288' | 'rtmw-l-m_256x192'},

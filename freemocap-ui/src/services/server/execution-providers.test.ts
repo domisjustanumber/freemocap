@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {
     checkIntentOutcome, detectorShowsExecutionProvider, executionProviderOptions, menuPairs, offeredDevices, PAIR_MARKERS, pairState, pairToCheck,
-    quickCheckProgressText, quickCheckResultText, requestExecutionProviders, requestExecutionProviderSuggestion, requestQuickCheck, requestQuickCheckCancel,
+    quickCheckProgressText, type QuickCheckLines, quickCheckResultShows, quickCheckResultText, requestExecutionProviders, settleQuickCheckLines, requestExecutionProviderSuggestion, requestQuickCheck, requestQuickCheckCancel,
 } from './execution-providers';
 import {executionProviderInfo} from '@/components/mocap-setup/execution-provider-info';
 import {renderToStaticMarkup} from 'react-dom/server';
@@ -186,6 +186,32 @@ test('a started check ends from the server state only: a pass selects its choice
         'a pass of another pair');
     assert.equal(checkIntentOutcome(seen, state({})), 'ended', 'a restarted server with no result');
     assert.equal(checkIntentOutcome(intent, null), 'ended', 'disconnected');
+});
+
+test('a refusal goes when the work that refused it ends; a result moved on from comes back only after an EP check ran', () => {
+    const passed = {execution_provider: 'gpu-ep', device_key: 'gpu:0', result: 'pass'};
+    const state = (more: object) => ({host: {name: 'h', os: 'o'}, items: [], gpu_held_by: [], pending_reports: [], last_result: passed, ...more});
+    const startCheck = state({run: {level: 'quick', items: [], state: 'running', done: 0, total: 6, package: 'skellytracker'}});
+    const idle = state({});
+    const refused: QuickCheckLines = {refusal: {text: 'The start check is running; ...', sawBusy: false}, dismissed: JSON.stringify(passed)};
+    // The defect: an EP check refused during a start check, then the start check ends.
+    const during: QuickCheckLines = settleQuickCheckLines(refused, startCheck);
+    assert.deepEqual(during, {...refused, refusal: {text: 'The start check is running; ...', sawBusy: true}}, 'a start check keeps the moved-on-from result hidden');
+    assert.equal(settleQuickCheckLines(during, startCheck), during, 'nothing changes while it runs');
+    const after: QuickCheckLines = settleQuickCheckLines(during, idle);
+    assert.deepEqual(after, {refusal: null, dismissed: JSON.stringify(passed)});
+    assert.equal(quickCheckResultShows(idle, after.dismissed), false, 'the old pass does not come back');
+    // Other work in gpu_held_by holds a refusal too; a refusal the server never showed busy for stays until the next choice.
+    const cameras = state({gpu_held_by: [{kind: 'cameras', id: 'g1'}]});
+    assert.equal(settleQuickCheckLines(settleQuickCheckLines(refused, cameras), idle).refusal, null);
+    assert.equal(settleQuickCheckLines(refused, idle), refused);
+    // An EP quick check makes the next ending show, even one equal to the result moved on from.
+    const epCheck = state({run: {level: 'quick', items: [{execution_provider: 'gpu-ep', device_key: 'gpu:0'}], state: 'running', done: 1, total: 5}});
+    const lines = settleQuickCheckLines<QuickCheckLines>({refusal: null, dismissed: JSON.stringify(passed)}, epCheck);
+    assert.equal(lines.dismissed, null);
+    assert.equal(quickCheckResultShows(epCheck, lines.dismissed), false, 'hidden while a check runs');
+    assert.equal(quickCheckResultShows(idle, lines.dismissed), true);
+    assert.equal(quickCheckResultShows(null, null), false, 'disconnected');
 });
 
 test('progress is done of total with the one-off estimate', () => {

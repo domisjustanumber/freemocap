@@ -10,6 +10,7 @@ import {
     openCertification, outboxLine, pendingRows, pendingSummary, REPORTS_SECTION_ID, submitLabel,
 } from '@/services/server/certification-hand-in';
 import {START_CHECK_TEXT} from '@/services/server/start-check';
+import {ReportMarkdown} from './ReportMarkdown';
 import {StartCheckSection} from './StartCheckSection';
 
 /** The button after the Streaming and Playback tabs, clear of the pages' toolbars at the right: a fixed label with a suffix from the server state (25). */
@@ -146,15 +147,14 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
             <div className="pos-fixed inset-0 bg-surface-overlay" style={{zIndex: 1001}} onClick={closeReport}/>
             <Centred zIndex={1002}>
             <div className="settings-modal bg-primary border-1 border-black elevated-sharp p-1 flex flex-col br-2" role="dialog"
-                 aria-label={CERTIFICATION_TEXT.viewReport} style={{...UNTRANSFORMED, width: 720}}>
+                 aria-label={CERTIFICATION_TEXT.viewReport} style={{...UNTRANSFORMED, width: 800, maxHeight: '90vh'}}>
                 <div className="flex flex-col p-2 gap-2 bg-middark br-1">
                     <div className="flex justify-content-space-between items-center">
-                        <SubactionHeader text={`${view.file.file_name} (${view.file.size_bytes} bytes)`}/>
+                        <p className="text sm text-gray">{view.file.file_name} ({view.file.size_bytes} bytes)</p>
                         <IconButton icon="close-icon" onClick={closeReport}/>
                     </div>
-                    <pre className="text sm text-white bg-dark p-1 br-1"
-                         style={{maxHeight: '60vh', overflow: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-mono)'}}>
-                        {view.file.content}</pre>
+                    {/* The exact file the server returned, read as Markdown; never rebuilt here. */}
+                    <ReportMarkdown text={view.file.content}/>
                     {list?.relay_enabled === false && <p className="text sm text-gray">{CERTIFICATION_TEXT.relayNotSetUp}</p>}
                     {!view.file.fits_relay && <p className="text sm text-gray">{CERTIFICATION_TEXT.tooLarge}</p>}
                     <div className="flex flex-row gap-2 flex-wrap" style={{justifyContent: 'space-between'}}>

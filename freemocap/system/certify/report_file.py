@@ -154,14 +154,18 @@ def build_report_file(modules: list[dict], note: str | None, app: dict | None) -
         head = f"**{_cell(package.get('name'))} {_cell(package.get('version'))}:**"
         reasons = ", ".join(_cell(reason) for reason in evidence.get("reasons") or ())
         lines.append(f"{head} valid as evidence." if evidence.get("valid") else f"{head} not valid as evidence: {reasons}.")
-    lines += ["", "| Module | Section | Result | Reason |", "|---|---|---|---|"]
+    failed = []  # spec 4.2 item 4: a row for each failed section, or for each failed check of a module with no sections
     for module in modules:
         name = _cell((module.get("package") or {}).get("name"))
         rows = module.get("sections") if "sections" in module else module.get("checks")
         for row in rows or ():
+            if row.get("result") != "fail":
+                continue
             label = f"{row.get('id')}. {row.get('name')}" if "sections" in module else row.get("name")
             cells = (name, _cell(label), _cell(row.get("result")), _cell(row.get("reason")))
-            lines.append("|" + "|".join(f" {cell} " if cell else " " for cell in cells) + "|")
+            failed.append("|" + "|".join(f" {cell} " if cell else " " for cell in cells) + "|")
+    if failed:
+        lines += ["", "| Module | Section | Result | Reason |", "|---|---|---|---|", *failed]
     data = {"schema": schema, "app": app, "modules": modules, "note": note}
     rule = privacy_rule(lines, data)
     if rule:

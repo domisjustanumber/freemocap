@@ -40,8 +40,9 @@ def test_the_valid_sample_is_reproduced_byte_for_byte():
     text, data = _sample("valid.md")
     name, body = build_report_file(data["modules"], data["note"], data["app"])
     assert name == "certify-report-20261119T100000Z.md"
-    # The sample has one line of prose for a person that the app does not write.
-    assert body.decode("utf-8") == text.replace(
+    # The sample has one line of prose and a table of passed sections; the app writes neither (spec 4.2 item 4).
+    table = text[text.index("| Module"):text.index("This file is a sample")]
+    assert body.decode("utf-8") == text.replace(table, "").replace(
         "This file is a sample for the relay tests. It holds example values only.\n\n", "")
 
 
@@ -55,7 +56,9 @@ def test_two_modules_name_the_file_by_the_earliest_run_and_end_with_one_json_blo
     text = body.decode("utf-8")
     assert name == "certify-report-20261119T100000Z.md"
     assert "**skellytracker 2.0.0:** not valid as evidence: no-commit." in text
+    assert "| Module | Section | Result | Reason |" in text
     assert "| skellytracker | cuda@10de-2484-0 | fail | probe-L3-failed |" in text
+    assert "| skellytracker | 1. Checkout" not in text  # a passed section has no row
     assert text.endswith("\n````\n") and "\n````json\n" in text and "\r" not in text
     assert json.loads(text.split("````json\n")[1].rsplit("````", 1)[0])["note"] == "a ``` b"
 

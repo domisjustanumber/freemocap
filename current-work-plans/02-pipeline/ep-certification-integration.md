@@ -667,7 +667,7 @@ either.
 12. Busy rule, with cameras: with cameras streaming and nothing else, try a quick check. It is refused with the
     server's reason (once the backend's wider busy rule is in).
 13. Busy rule, other way: start a quick check, then press "Real-time processing" or Record. The start is refused:
-    the error banner shows the server's reason ("A quick check of ... is running ..."). Nothing starts by itself when
+    the error banner shows the server's reason ("The quick check of <EP> on <GPU> is running; ..."). Nothing starts by itself when
     the check ends; press it again.
 14. Refused saved choice: on a machine where your saved EP is not checked (or failed), start real-time processing.
     It fails with the server's message in the error banner, and it does not switch to CPU. Under the EP setting you
@@ -728,7 +728,7 @@ HTTP API change; the routes of "Relay hand-in: built" and F19/F20 were enough.
 Do NOT click "Send report" before step 13. Every other step files nothing. Closing a GitHub tab without submitting it
 files nothing.
 
-1. Start the app. At the top right of the strip with "Streaming" and "Playback" you see "Certification". On the dev
+1. Start the app. In the strip, right after "Streaming" and "Playback", you see "Certification". On the dev
    machine (7 pending reports) it reads "Certification · 7 to file".
 2. Stop the backend. The button text turns dim and the suffix goes away. Start the backend again. The suffix comes back
    without a page refresh.
@@ -1050,6 +1050,48 @@ machine: Windows downloads, installs or removes a package for your user.
      keep.
   4. A freemocap pass is still also copied into `start-check.json` (the start check's record); the store keeps its own copy.
      Recommended: keep; they serve different rules (decision 13 against the hand-in).
+
+### Playwright pass, 2026-11-19: defects fixed
+
+A browser-only pass (Vite dev server, backend from this checkout, relay URL empty, telemetry off, no cameras) found four
+defects in the certification UI; each is fixed and was seen rendered in the same setup afterwards.
+
+1. The Certification button did not dim while disconnected: `.button.quaternary>p` sets the text colour, so its colour
+   classes had no effect (and `text-gray` and `text-darkgray` are the same colour). Fix: the button is dimmed by opacity
+   0.5 while disconnected, as the layout dims the required mode; the dead colour logic is gone. Other quaternary buttons are
+   unchanged. `36404d81` (`CertificationDialog.tsx`).
+2. The button (top right of the strip) was covered by the real-time toolbar ("Real-time processing", "Processing
+   settings") and by Playback's grid button. Fix: it sits right after the Streaming and Playback tabs (one absolutely
+   placed flex row holds both; `MainNavTabs` lost its own placement). Measured, banner gone, default sidebar: no overlap at
+   1440, 1280, 1100 and 1024 px wide, on Streaming and Playback; at 1024 the button's right edge meets the toolbar's.
+   `64ab6272` (`CertificationDialog.tsx`, `MainNavTabs.tsx`, `BasePanelLayout.tsx`). The step 3 checklist item 1 now says
+   where it is.
+3. A refusal named the EP and GPU by keys ("The quick check of directml on gpu:10de:2484:0 is already running."). Fix:
+   `quick_check._what` takes the labels and device names of the cached `certification.items` (skellytracker's status),
+   falling back to the keys; used by the busy refusal of every start, the refusal of a second check, and the router's
+   `cannot-run` text; no longer `str.capitalize()`, which lowercased the labels. The refusal of a second check now reads like
+   its siblings: "<The check> is running; the quick check start was refused. Start again when the check ends." So the step
+   4 checklist item 9 ("The start check is running; ...") was already right and the text changed, not the checklist; the
+   step 2 checklist item 13 now quotes the labelled form. `72feaa17` (`quick_check.py`, `quick_check_router.py`, test).
+4. After a start check ended, the quick-check panel kept its refusal, and a result the person had moved on from came back
+   (with a red border). Root cause: `useQuickCheck` cleared `dismissed` on any `certification.run`, also a start check's,
+   which leaves `last_result` as it was; and the refusal outlived the run that caused it. Fix, once in the shared rule
+   `settleQuickCheckLines` (`execution-providers.ts`): `dismissed` clears only when an EP quick check runs (`run.items`
+   not empty); a refusal goes once the server has shown work running (`run` or `gpu_held_by`) and then none. A result line
+   uses the bordered layout only when it fails (it then has "File report"), else a plain note. `92f9c4da`
+   (`execution-providers.ts` with its test, `useQuickCheck.ts`, `quick-check-panel.tsx`).
+
+Tests: UI unit suite (`node tools/test-sdk-integration.mjs`) 221 tests, 220 pass, 1 skipped, plus its 10 and 46;
+`tsc --noEmit` clean; `test_quick_check.py`, `test_start_check.py`, `test_ep_packs.py` and
+`test_no_execution_provider_knowledge.py` 54 pass; fast suite 1708 passed, 7 failed (exactly the known baseline), 20
+skipped, relay URL empty; `check-ui-styles` 30 errors, none in the changed files.
+
+Still unverified: Electron (only the browser build was seen); at 800 px (the window minimum) the real-time toolbar
+already covers the tabs and now covers the Certification button too, so nothing fits in one row there; with the camera
+error banner shown the real-time toolbar is under the banner (as before). Seen and not fixed: the button still showed its suffix
+1.5 s after a disconnect (checklist step 3 item 2 says it goes away; not watched longer); the start-check refusal in
+`StartCheckSection.tsx` also stays after the work ends; every other bordered quick-check note (running check, prompt,
+offer) keeps the red border of `.settings-note-dismissable`; the EP pack refusals still name the EP by its key.
 
 ## Environment on the dev PC
 

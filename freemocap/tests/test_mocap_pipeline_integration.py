@@ -49,6 +49,6 @@ def test_worker_exit_without_terminal_report_fails_pipeline(tmp_path):
     worker.exitcode = 0
     pipeline = MocapPipeline(id=request.pipeline_id, recording_info=request.recording,
         ipc=request.ipc, worker=worker, progress_queue=request.progress_queue, started=True)
-    pipeline._latest[pipeline.id] = Mock(phase=AggregatorPhase.SETTING_UP, operations=None, timing=None)
+    pipeline._latest[pipeline.id] = Mock(phase=AggregatorPhase.SETTING_UP, operations=None, timing=None, plan=None)
     assert pipeline.get_progress_messages()[-1].phase == AggregatorPhase.FAILED
     assert request.ipc.pipeline_shutdown_flag.value

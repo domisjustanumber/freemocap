@@ -12,12 +12,12 @@ import {
 import {quickCheckProgressText, requestQuickCheckCancel} from '@/services/server/execution-providers';
 import {StartCheckSection} from './StartCheckSection';
 
-/** The button at the top right of the main navigation strip: a fixed label with a suffix from the server state (25). */
+/** The button after the Streaming and Playback tabs, clear of the pages' toolbars at the right: a fixed label with a suffix from the server state (25). */
 export function CertificationButton() {
     const {isConnected, certification} = useAppSelector(state => state.connection);
     const suffix = certificationButtonSuffix(certification, !isLocalHost(serverUrls.getHost()));
     // Dimmed by opacity: the quaternary button's own rule sets its text colour, so a colour class has no effect.
-    return <div className="main-tab-bar pos-abs top-0 right-0" style={isConnected ? undefined : {opacity: 0.5}}>
+    return <div style={isConnected ? undefined : {opacity: 0.5}}>
         <ButtonSm text={suffix ? `${CERTIFICATION_TEXT.button} ${suffix}` : CERTIFICATION_TEXT.button} buttonType="quaternary"
                   onClick={openCertification}/>
     </div>;

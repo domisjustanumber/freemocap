@@ -105,8 +105,10 @@ export const BasePanelLayout = ({
             <Panel className="right-side-panel" defaultSize={76} minSize={100 - SIDEBAR_MAX_PCT}>
               <div className="flex flex-col h-full pos-rel bg-darkgray br-2" inert={startRequired}
                    style={startRequired ? { opacity: 0.4 } : undefined}>
-                <MainNavTabs />
-                <CertificationButton />
+                <div className="pos-abs top-0 left-0 flex items-center">
+                  <MainNavTabs />
+                  <CertificationButton />
+                </div>
                 <div className="flex-1 min-h-0 mt-45 flex flex-col">
                   <OperationErrorBanner />
                   <div className="flex-1 min-h-0">{children}</div>

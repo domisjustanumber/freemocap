@@ -81,7 +81,7 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
     return <>
         {!required && <div className="pos-fixed inset-0 bg-surface-overlay z-10" onClick={onClose}/>}
         {/* Anchored at a fixed top, so the one step when the reports appear grows downward and nothing above moves. */}
-        <Centred zIndex={1000} top>
+        <Centred zIndex={1000} top block={required}>
         <div className="settings-modal bg-primary border-1 border-black elevated-sharp p-1 flex flex-col br-2" role="dialog"
              aria-label={CERTIFICATION_TEXT.title} style={{...UNTRANSFORMED, width: 560}}>
             <div className="flex flex-col p-2 gap-2 bg-middark br-1">
@@ -208,6 +208,8 @@ const SendButton = ({phase, text, className, buttonType, onClick}: {phase: strin
  * the height or the display scale makes the half odd; these dialogs are centred by a flex layer instead. */
 const UNTRANSFORMED: React.CSSProperties = {position: 'relative', top: 'auto', left: 'auto', transform: 'none', maxWidth: 'calc(100vw - 32px)',
     minWidth: 0, pointerEvents: 'auto'};
-const Centred = ({zIndex, top = false, children}: {zIndex: number; top?: boolean; children: React.ReactNode}) =>
+// `block`: the layer takes every pointer event over the whole window, so nothing behind the dialog can be clicked.
+const Centred = ({zIndex, top = false, block = false, children}: {zIndex: number; top?: boolean; block?: boolean; children: React.ReactNode}) =>
     <div className={`pos-fixed inset-0 flex justify-center ${top ? '' : 'items-center'}`}
-         style={{zIndex, pointerEvents: 'none', ...(top ? {alignItems: 'flex-start', paddingTop: '10vh'} : {})}}>{children}</div>;
+         style={{zIndex, pointerEvents: block ? 'auto' : 'none', ...(block ? {backgroundColor: 'rgba(0, 0, 0, 0.5)'} : {}),
+             ...(top ? {alignItems: 'flex-start', paddingTop: '10vh'} : {})}}>{children}</div>;

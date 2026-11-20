@@ -109,7 +109,7 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                         </ul>
                         <label className="text sm text-gray flex flex-col gap-1">
                             {CERTIFICATION_TEXT.noteLabel}
-                            <textarea className="setting-text-input" rows={3} value={handIn.note}
+                            <textarea className="setting-text-input" rows={3} maxLength={2000} value={handIn.note}
                                       onChange={event => handIn.setNote(event.target.value)}/>
                         </label>
                         {/* The field keeps what was typed (no caret jumps); the preview shows what the file will hold. */}

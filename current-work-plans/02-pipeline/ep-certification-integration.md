@@ -1273,6 +1273,17 @@ Built:
   already uses; only a skellycertify issue address on github.com passes `safeIssueUrl`. It is opened once per send
   answer of this window, never from a re-shown state. Not checked in Electron.
 
+- The owner, verbatim: "include the line about helping FreeMoCap to the view report pop-up so it's clear what the
+  submit button actually does". Above the footer of the report pop-up: the sharing heading, then one sentence for
+  the right-hand button (coordinator's wording, awaiting the owner): "Submit report(s) sends this report to the
+  FreeMoCap team as a public issue on GitHub." or "Save file and open issue form saves this report and opens the
+  GitHub form to attach it to." (`footerActionText`, tested).
+- The owner, verbatim: "why does the popup have a bunch of black space at the bottom?" The fixed 80vh height is gone:
+  the main pop-up fits its content (max 80vh, scrolling inside) and is anchored 10vh from the top instead of centred,
+  so the one height step when the checks end grows it downward. Measured at scale 1.25: top 90 px (900 px window) and
+  108 px (1080 px), height 494 px while waiting and running, 720 / 774 px once complete and when opened later. Scale 1
+  was not measured.
+
 Commits: see `git log` for 2026-11-20 10:30 to 10:52.
 
 #### Second round commits

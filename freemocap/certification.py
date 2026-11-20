@@ -16,15 +16,24 @@ freemocap's reason codes (report format 5.4), besides the common ones:
 - `import-failed`: a module of the bundle did not import in the spawn child (`numbers.failed` names them).
 - `not-found`: no Blender executable was found.
 - an exception class name, for example `PermissionError`: the step raised it (never its message).
+
+The hand-in list, with the shapes of skellytracker's (`pending_reports`, `read_report`, `mark_reports`): `certify()`
+keeps each report with a check that ended `pass` or `fail` in `<base data folder>/certify/reports/<id>.json`, and its
+hand-in state in `<base data folder>/certify/hand-in.json`. A new quick report deletes each older report of a pass that
+it repeats, when the person did not hand that report in. Until the commit of a freemocap build is on a pushed branch of
+freemocap's public repository (report format 9), the reviewer treats its module as a record only (`commit-not-public`).
 """
 import importlib
 import importlib.util
+import json
+import logging
 import multiprocessing
 import os
 import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -32,7 +41,12 @@ from queue import Empty
 
 import freemocap
 
+logger = logging.getLogger(__name__)
+
 SCHEMA = "skellycertify.report/1.1.0"
+SCHEMA_PREFIX = "skellycertify.report/1."
+REPORT_STATES = ("pending", "opened", "covered")  # as skellytracker's: `opened` = issue form opened, `covered` = an issue holds it
+REPORT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$")  # a safe file name only; ids are v4 UUIDs, never parsed
 QUICK_CHECKS = ("build-identity", "spawn-child", "bundle-imports", "data-folder", "install-facts", "blender")
 FULL_CHECKS = ("reference-posthoc", "concurrent-runs", "exports", "live-numbers")
 # skellytracker first: it sets ONNX Runtime's telemetry switch before onnxruntime is imported (decision 3).
@@ -235,9 +249,126 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
         reasons.append("partial-run")
     if stopped == "cancelled":
         reasons.append("cancelled")
+    report = {"schema": SCHEMA, "id": str(uuid.uuid4()), "package": package, "kind": level, "created_utc": created,
+              "host": _host(), "checks": checks, "cleanup": [], "evidence": {"valid": not reasons, "reasons": reasons}}
+    if any(row["result"] in ("pass", "fail") for row in checks):  # only those reach the hand-in list
+        try:
+            _write_json(reports_dir() / f"{report['id']}.json", report)
+            _prune_reports()
+        except OSError:  # a data folder that cannot be written is the `data-folder` check's result, not a crash
+            logger.warning("freemocap's certify report could not be kept", exc_info=True)
     send("done", None)
-    return {"schema": SCHEMA, "id": str(uuid.uuid4()), "package": package, "kind": level, "created_utc": created,
-            "host": _host(), "checks": checks, "cleanup": [], "evidence": {"valid": not reasons, "reasons": reasons}}
+    return report
+
+
+# - The hand-in list (the shapes of skellytracker's `pending_reports`, `read_report` and `mark_reports`) -
+
+# shortcut: a lock in this process only, while the start check's child prunes and the server may mark at once. Upgrade
+# to a file lock if that race ever matters (only an older pass that a newer pass repeats can be pruned then).
+_store_lock = threading.Lock()
+
+
+def reports_dir() -> Path:
+    from freemocap.system.default_paths import get_default_freemocap_base_folder_path
+    return Path(get_default_freemocap_base_folder_path()) / "certify" / "reports"
+
+
+def _marks_path() -> Path:
+    return reports_dir().parent / "hand-in.json"
+
+
+def _read_json(path: Path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _write_json(path: Path, value) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(json.dumps(value, indent=1) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def _marks() -> dict:
+    marks = _read_json(_marks_path())
+    return marks if isinstance(marks, dict) else {}
+
+
+def pending_reports(include_handed_in: bool = False) -> list[dict]:
+    """freemocap's reports that the person did not hand in, the oldest first; with `include_handed_in`, each report in
+    each state. Each row is `{"report_id", "kind", "created_utc", "has_failure", "evidence_valid", "state", "reference"}`."""
+    marks, rows = _marks(), []
+    for path in sorted(reports_dir().glob("*.json")):
+        report = _read_json(path)
+        if not isinstance(report, dict) or not str(report.get("schema")).startswith(SCHEMA_PREFIX) or not REPORT_ID.match(path.stem):
+            continue
+        results = {check.get("result") for check in report.get("checks", ()) if isinstance(check, dict)}
+        if not results & {"pass", "fail"}:
+            continue
+        mark = marks.get(path.stem) if isinstance(marks.get(path.stem), dict) else {}
+        state = mark.get("state") if mark.get("state") in REPORT_STATES else "pending"
+        if state == "pending" or include_handed_in:
+            rows.append({"report_id": path.stem, "kind": report.get("kind"), "created_utc": report.get("created_utc"),
+                         "has_failure": "fail" in results, "evidence_valid": bool((report.get("evidence") or {}).get("valid")),
+                         "state": state, "reference": mark.get("reference") if state != "pending" else None})
+    return sorted(rows, key=lambda row: (row["created_utc"] or "", row["report_id"]))
+
+
+def read_report(report_id: str) -> dict:
+    """The module report of a row of `pending_reports()`, unchanged. An id that is not a report here raises `ValueError`."""
+    report = _read_json(reports_dir() / f"{report_id}.json") if REPORT_ID.match(str(report_id)) else None
+    if not isinstance(report, dict) or not str(report.get("schema")).startswith(SCHEMA_PREFIX):
+        raise ValueError(f"{report_id!r} is not a report of this host")
+    return report
+
+
+def mark_reports(report_ids, state: str, *, reference: str | None = None) -> None:
+    """Set the hand-in state: `covered` (an issue holds them, `reference` its address), `opened` (the person saved the
+    file and opened the issue form) or `pending` ("Not sent": back in the list, no reference). An unknown state, an id
+    that is not a report here, or a reference with `pending` raises `ValueError` and changes nothing."""
+    if isinstance(report_ids, str):
+        raise ValueError("report_ids is a list of report ids")
+    if state not in REPORT_STATES:
+        raise ValueError(f"the state must be one of {', '.join(REPORT_STATES)}, not {state!r}")
+    if state == "pending" and reference is not None:
+        raise ValueError("a pending report has no reference")
+    ids = list(dict.fromkeys(report_ids))
+    for report_id in ids:
+        read_report(report_id)
+    with _store_lock:
+        marks = _marks()
+        for report_id in ids:
+            if state == "pending":
+                marks.pop(report_id, None)
+            else:
+                marks[report_id] = {"state": state, "reference": reference}
+        _write_json(_marks_path(), marks)
+
+
+def _prune_reports() -> None:
+    """Delete each older quick report of a pass whose passed checks newer passes repeat (as skellytracker's). A report
+    stays when it has a failed check, when the person handed it in, or when it is not of the level `quick`."""
+    with _store_lock:
+        marks, found = _marks(), []
+        for path in reports_dir().glob("*.json"):
+            report = _read_json(path)
+            if not isinstance(report, dict) or not str(report.get("schema")).startswith(SCHEMA_PREFIX) \
+                    or path.stem in marks or report.get("kind") != "quick":
+                continue
+            checks = [check for check in report.get("checks", ()) if isinstance(check, dict)]
+            passed = {check.get("name") for check in checks if check.get("result") == "pass"}
+            if passed and not any(check.get("result") == "fail" for check in checks):
+                found.append((str(report.get("created_utc") or ""), path.stem, path, passed))
+        newer: set = set()
+        for _, _, path, passed in sorted(found, key=lambda item: item[:2], reverse=True):
+            if passed <= newer:
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+            newer |= passed
 
 
 def module_result(report: dict) -> tuple[str, str | None]:

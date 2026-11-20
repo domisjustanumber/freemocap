@@ -19,8 +19,9 @@ ERROR_STATUS = {"file-changed": 409, "relay-off": 409}  # every other refusal is
 
 
 class HandInReport(BaseModel):
-    """One report of skellytracker's hand-in list, in every state."""
+    """One report of the hand-in list (freemocap's own or skellytracker's), in every state."""
     report_id: str
+    package: str = Field(description="The package whose certify() made the report: `freemocap` or `skellytracker`.")
     kind: str | None
     created_utc: str | None
     has_failure: bool
@@ -92,12 +93,10 @@ def _refused(error: HandInError | ReportFileError) -> HTTPException:
 def get_hand_in() -> HandInList:
     """Every certify report on this host with its hand-in state, the files waiting in the outbox, and whether the
     relay is on (when it is off, only the issue form is offered)."""
-    import skellytracker
-
     return HandInList(
         relay_enabled=bool(relay.relay_url()),
         reports=[HandInReport(**{**row, "reference": relay.issue_url_or_none(row.get("reference"))})
-                 for row in skellytracker.pending_reports(include_handed_in=True)],
+                 for row in relay.hand_in_reports(include_handed_in=True)],
         outbox=[OutboxEntry(**entry) for entry in relay.outbox_entries()])
 
 

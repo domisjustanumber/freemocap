@@ -384,6 +384,72 @@ def test_not_sent_with_an_unknown_id_changes_nothing_and_the_route_lists_the_sta
     assert listed["outbox"] == [] and fake_relay.marks[-1] == ([ID_1], "pending", None)
 
 
+# - freemocap's own reports beside skellytracker's (J13, J18) -
+
+OWN = "9b1f6c2a-3d4e-4f5a-8b7c-6d5e4f3a2b1c"
+
+
+@pytest.fixture
+def own_report(fake_relay, monkeypatch):
+    """A failed freemocap report in freemocap's real store (the test's data folder) between skellytracker's two."""
+    from freemocap import certification
+
+    module = dict(MODULE, id=OWN, created_utc="2026-11-19T11:00:00Z", schema="skellycertify.report/1.1.0",
+                  package={"name": "freemocap", "version": "2.0.0-alpha.25", "commit": None, "tree_modified": None},
+                  checks=[{"name": "data-folder", "result": "fail", "reason": "PermissionError"}])
+    certification._write_json(certification.reports_dir() / f"{OWN}.json", module)
+    monkeypatch.setattr(skellytracker, "pending_reports", lambda include_handed_in=False: [
+        {"report_id": report_id, "kind": "quick", "created_utc": created, "has_failure": True, "evidence_valid": False,
+         "state": "pending", "reference": None} for report_id, created in ((ID_1, "2026-11-19T10:00:00Z"),
+                                                                         (ID_2, "2026-11-20T10:00:00Z"))])
+    return module
+
+
+def _own_states() -> list[tuple]:
+    from freemocap import certification
+    return [(row["state"], row["reference"]) for row in certification.pending_reports(include_handed_in=True)]
+
+
+def test_the_hand_in_list_and_the_file_merge_both_packages_and_keep_each_module(own_report):
+    assert [(row["package"], row["report_id"]) for row in relay.hand_in_reports()] == [
+        ("skellytracker", ID_1), ("freemocap", OWN), ("skellytracker", ID_2)]
+    _, body = relay.report_file_for([OWN, ID_1], None)
+    data = json.loads(body.decode("utf-8").split("```json\n")[1].rsplit("```", 1)[0])
+    assert data["schema"] == "skellycertify.report/1.1.0" and data["modules"] == [MODULE, own_report]
+    assert "| freemocap | data-folder | fail | PermissionError |" in body.decode("utf-8")
+
+
+def test_a_kept_file_retried_at_start_marks_each_report_covered_in_its_own_store(fake_relay, own_report):
+    ids, note, sha, _ = _viewed((ID_1, OWN))
+    server = fake_relay
+    server.answer(429, {"error": "busy", "retry": True, "detail": "the relay is busy"})
+    assert relay.send_report(ids, note, sha)["state"] == "kept"
+    assert server.marks == [] and _own_states() == [("pending", None)]
+    server.answer(200, {"issue_url": ISSUE, "issue_number": 7, "duplicate": False})
+    relay.retry_outbox()
+    assert server.marks == [([ID_1], "covered", ISSUE)] and _own_states() == [("covered", ISSUE)]
+    relay.mark_not_sent([OWN, ID_1])
+    assert server.marks[-1] == ([ID_1], "pending", None) and _own_states() == [("pending", None)]
+    relay.mark_opened(ids, note, sha)
+    assert server.marks[-1] == ([ID_1], "opened", None) and _own_states() == [("opened", None)]
+    with pytest.raises(HandInError) as unknown:
+        relay.mark_not_sent([OWN, ID_9])
+    assert unknown.value.code == "unknown-report" and _own_states() == [("opened", None)], "nothing changed"
+
+
+def test_the_route_lists_each_reports_package(own_report):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from freemocap.api.http.certify.certify_router import certify_router
+
+    app = FastAPI()
+    app.include_router(certify_router)
+    listed = TestClient(app).get("/certify/hand_in").json()
+    assert [(row["package"], row["report_id"]) for row in listed["reports"]] == [
+        ("skellytracker", ID_1), ("freemocap", OWN), ("skellytracker", ID_2)]
+
+
 def test_the_test_session_has_the_relay_off_and_the_start_up_retry_makes_no_call(tmp_path, monkeypatch):
     """The guard of freemocap/tests/conftest.py: no test can post to the real relay."""
     assert relay.relay_url() == ""

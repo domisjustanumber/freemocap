@@ -4793,7 +4793,7 @@ export interface components {
         };
         /**
          * HandInReport
-         * @description One report of skellytracker's hand-in list, in every state.
+         * @description One report of the hand-in list (freemocap's own or skellytracker's), in every state.
          */
         HandInReport: {
             /** Report Id */
@@ -4816,6 +4816,11 @@ export interface components {
              * @description The issue address, only when it is an issue of the relay's repository.
              */
             reference: string | null;
+            /**
+             * Package
+             * @description The package whose certify() made the report: `freemocap` or `skellytracker`.
+             */
+            package: string;
         };
         /** HandInSelection */
         HandInSelection: {

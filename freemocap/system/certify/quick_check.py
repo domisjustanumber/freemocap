@@ -191,7 +191,7 @@ class QuickCheckJob(BaseNode):
 
 def status_parts(status, pending: list[dict]) -> tuple[CertificationHost, tuple[CertificationItem, ...],
                                                        CertificationAuto, tuple[PendingReport, ...]]:
-    """The parts of the `certification` field that come from skellytracker's `eps.status()` and hand-in list."""
+    """The parts of the `certification` field that come from skellytracker's `eps.status()` and the hand-in list."""
     host = CertificationHost(name=socket.gethostname(), os=status.host.os_label or status.host.os_name)
     items = tuple(CertificationItem(execution_provider=row.key, label=row.label, device_key=check.device_key,
                                     device_name=check.name, certified=check.certified, local_result=check.local_result,
@@ -207,9 +207,9 @@ def status_parts(status, pending: list[dict]) -> tuple[CertificationHost, tuple[
 
 
 def read_status_parts():
-    import skellytracker
     from freemocap.core.tracking.execution_providers import execution_provider_status
-    return status_parts(execution_provider_status(), skellytracker.pending_reports())
+    from freemocap.system.certify.relay import hand_in_reports
+    return status_parts(execution_provider_status(), hand_in_reports())  # freemocap's and skellytracker's
 
 
 @dataclass

@@ -45,6 +45,9 @@ export const CERTIFICATION_TEXT = {
 /** Opens the Certification dialog from anywhere (the button, a failed check's "File report"; decisions 23, 25 to 27). */
 export const openCertification = () => window.dispatchEvent(new CustomEvent('open-certification'));
 
+/** The id of the dialog's "Reports to hand in" part, which a start check's "File report" scrolls to. */
+export const REPORTS_SECTION_ID = 'certification-reports';
+
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 /** Whether the backend runs on this machine; a remote one is named on the button (decision 25). */
@@ -70,12 +73,12 @@ export function pendingSummary(pending: readonly PendingReport[]): string {
     return `${plural(pending.length, 'report')} to hand in${failures ? `, ${failures} with a failure` : ''}`;
 }
 
-/** The pending reports, failures first, each with the facts the hand-in list gives (kind, time) when it has them. */
+/** The pending reports, failures first, each with the facts the hand-in list gives (package, time, kind) when it has them. */
 export function pendingRows(pending: readonly PendingReport[], list: HandInList | null): (PendingReport & {text: string})[] {
     const facts = new Map(list?.reports.map(report => [report.report_id, report]));
     return [...pending].sort((a, b) => Number(b.has_failure) - Number(a.has_failure)).map(report => {
         const row = facts.get(report.report_id);
-        return {...report, text: [row?.created_utc ?? report.report_id, row?.kind, report.has_failure ? 'with a failure' : 'no failure']
+        return {...report, text: [row?.package, row?.created_utc ?? report.report_id, row?.kind, report.has_failure ? 'with a failure' : 'no failure']
             .filter(Boolean).join(' · ')};
     });
 }

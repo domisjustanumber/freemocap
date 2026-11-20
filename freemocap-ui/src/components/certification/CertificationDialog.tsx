@@ -7,7 +7,7 @@ import {useAppSelector} from '@/store';
 import {useHandIn} from '@/hooks/useHandIn';
 import {
     certificationButtonSuffix, CERTIFICATION_TEXT, handedIn, ISSUE_FORM_URL, issueFormProminent, issueLabel, isLocalHost, openCertification, outboxLine,
-    pendingRows, pendingSummary,
+    pendingRows, pendingSummary, REPORTS_SECTION_ID,
 } from '@/services/server/certification-hand-in';
 import {quickCheckProgressText, requestQuickCheckCancel} from '@/services/server/execution-providers';
 import {StartCheckSection} from './StartCheckSection';
@@ -73,7 +73,7 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
 
                 <StartCheckSection required={required}/>
 
-                <div className={section}>
+                <div className={section} id={REPORTS_SECTION_ID}>
                     <SubactionHeader text={CERTIFICATION_TEXT.reports} className="text-gray"/>
                     {!pending.length && <p className="text sm text-gray">{CERTIFICATION_TEXT.nothingPending}</p>}
                     {pending.length > 0 && <>

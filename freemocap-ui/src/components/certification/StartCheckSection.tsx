@@ -4,6 +4,7 @@ import SubactionHeader from '@/components/ui-components/SubactionHeader';
 import {serverUrls} from '@/services';
 import {useAppSelector} from '@/store';
 import {QUICK_CHECK_TEXT} from '@/services/server/execution-providers';
+import {CERTIFICATION_TEXT, openCertification, REPORTS_SECTION_ID} from '@/services/server/certification-hand-in';
 import {
     type PackagePlan, planLines, requestStartCheck, requestStartCheckPlan, START_CHECK_TEXT, startResultLines,
 } from '@/services/server/start-check';
@@ -42,6 +43,10 @@ export function StartCheckSection({required}: {required: boolean}) {
     }, [endpoint, serverKey, blenderExePath]);
 
     const results = certification?.run ? [] : startResultLines(certification?.start_results ?? []);
+    const fileReport = () => {
+        openCertification();
+        document.getElementById(REPORTS_SECTION_ID)?.scrollIntoView({block: 'nearest'});
+    };
     return <div className="flex flex-col gap-2 bg-secondary p-2 br-1">
         <SubactionHeader text={START_CHECK_TEXT.heading} className="text-gray"/>
         <p className={`text sm ${required ? 'text-white' : 'text-gray'}`}>{required ? START_CHECK_TEXT.required : START_CHECK_TEXT.optional}</p>
@@ -51,7 +56,12 @@ export function StartCheckSection({required}: {required: boolean}) {
             <ButtonSm text={START_CHECK_TEXT.run} textColor="text-white" className="primary accent" onClick={run}/>
         </div>
         {mine.refusal && <p className="text sm settings-note-error" role="alert">{QUICK_CHECK_TEXT.couldNotStart}{mine.refusal}</p>}
-        {results.map(line => <p key={line.text} className={`text sm ${line.failed ? 'settings-note-error' : 'text-white'}`} role="status">
-            {line.text}</p>)}
+        {results.map(line => line.failed
+            // A failed package's report is in the hand-in list below (freemocap's own and skellytracker's, J13).
+            ? <div key={line.text} className="settings-note settings-note-dismissable" role="status">
+                <span className="settings-note-error">{line.text}</span>
+                <ButtonSm text={CERTIFICATION_TEXT.fileReport} className="setting-action-button" onClick={fileReport}/>
+            </div>
+            : <p key={line.text} className="text sm text-white" role="status">{line.text}</p>)}
     </div>;
 }

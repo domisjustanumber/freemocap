@@ -5,9 +5,13 @@ reports, the note and the SHA-256 of the file the person saw, and the file is re
 accepted bytes go to `<base data folder>/certify/outbox/` before the network call, and only those bytes are ever
 sent. A relay error with `retry: true` keeps the file for the next backend start; after the first send and 3
 retries failed, or on `retry: false` (413, 422 and the app-bug codes), the issue form is offered instead. A 200
-marks the reports covered in skellytracker with the issue address and deletes the outbox copy. A relay that is
+marks the reports covered with the issue address and deletes the outbox copy. A relay that is
 switched off (`GET /health` gives `enabled: false`, or the POST answers `relay-off`) is `HandInError("relay-off")`:
 the issue form at once, no new outbox copy, and no retry counted.
+
+The hand-in list merges every package's reports: freemocap's own (`freemocap.certification`) and skellytracker's,
+which keep the same states. One file may hold modules of both packages, each unchanged; each mark goes to the store
+that holds the report. Report ids are opaque v4 UUIDs, unique across both stores.
 """
 
 import hashlib
@@ -67,17 +71,46 @@ def outbox_folder() -> Path:
     return certify_folder() / "outbox"
 
 
-def report_file_for(report_ids: list[str], note: str | None) -> tuple[str, bytes]:
-    """The file name and bytes of the report file that would be sent for these reports and this note."""
+def _stores() -> dict:
+    """The packages whose reports this host hands in, each with `pending_reports`, `read_report` and `mark_reports`."""
     import skellytracker
 
+    from freemocap import certification
+    return {"freemocap": certification, "skellytracker": skellytracker}
+
+
+def hand_in_reports(include_handed_in: bool = False) -> list[dict]:
+    """Every package's `pending_reports()` rows in one list, each with its `package`, the oldest first."""
+    rows = [{**row, "package": package} for package, store in _stores().items()
+            for row in store.pending_reports(include_handed_in=include_handed_in)]
+    return sorted(rows, key=lambda row: (row.get("created_utc") or "", row["report_id"]))
+
+
+def _store_of(report_id: str):
+    """(the store that holds this report, the report), or `unknown-report`."""
+    for store in _stores().values():
+        try:
+            return store, store.read_report(report_id)
+        except ValueError:
+            continue
+    raise HandInError("unknown-report", f"{report_id!r} is not a report of this host")
+
+
+def _mark(report_ids: list[str], state: str, reference: str | None = None) -> None:
+    """`mark_reports` of each store for its own reports; an id that no store holds changes nothing."""
+    groups: dict = {}
+    for report_id in dict.fromkeys(report_ids):
+        groups.setdefault(_store_of(report_id)[0], []).append(report_id)
+    for store, ids in groups.items():
+        store.mark_reports(ids, state, reference=reference)
+
+
+def report_file_for(report_ids: list[str], note: str | None) -> tuple[str, bytes]:
+    """The file name and bytes of the report file that would be sent for these reports and this note."""
     modules = []
     for report_id in dict.fromkeys(report_ids):
-        try:
-            module = skellytracker.read_report(report_id)
-            modules.append((str(module.get("created_utc") or ""), report_id, module))
-        except ValueError:
-            raise HandInError("unknown-report", f"{report_id!r} is not a report of this host") from None
+        module = _store_of(report_id)[1]
+        modules.append((str(module.get("created_utc") or ""), report_id, module))
     # The relay finds duplicates by the file's SHA-256: the same reports give the same bytes in any caller order.
     modules.sort(key=lambda row: row[:2])
     return build_report_file([row[2] for row in modules], scrub_note(note), app_block())
@@ -179,8 +212,6 @@ def _outcome(state: str, error: dict | None = None, accepted: dict | None = None
 def send_entry(sha256: str) -> dict:
     """POST one outbox file to the relay and act on the answer. The outcome `state` is `covered`, `kept` (the file
     stays for the next start) or `refused` (never retried; the issue form is offered)."""
-    import skellytracker
-
     with _send_lock:
         meta = _read_entry(sha256)
         if meta is None:
@@ -197,10 +228,10 @@ def send_entry(sha256: str) -> dict:
         else:
             accepted = _accepted(response) if response.status_code == 200 else None
             if accepted is not None:
-                known = {row["report_id"] for row in skellytracker.pending_reports(include_handed_in=True)}
+                known = {row["report_id"] for row in hand_in_reports(include_handed_in=True)}
                 ids = [report_id for report_id in meta.get("report_ids") or () if report_id in known]
                 if ids:
-                    skellytracker.mark_reports(ids, "covered", reference=accepted["issue_url"])
+                    _mark(ids, "covered", reference=accepted["issue_url"])
                 for path in (outbox_folder() / f"{sha256}.json", outbox_folder() / f"{sha256}.md"):
                     path.unlink(missing_ok=True)
                 logger.info("Certify report %s handed in as issue %s", sha256[:12], accepted["issue_number"])
@@ -248,23 +279,19 @@ def send_report(report_ids: list[str], note: str | None, sha256: str) -> dict:
 
 def mark_opened(report_ids: list[str], note: str | None, sha256: str) -> None:
     """The person saved this file and opened the issue form: the reports are handed in, with no link."""
-    import skellytracker
-
     _accept(report_ids, note, sha256)
     ids = list(dict.fromkeys(report_ids))
     _drop_entries(ids)
-    skellytracker.mark_reports(ids, "opened")
+    _mark(ids, "opened")
 
 
 def mark_not_sent(report_ids: list[str]) -> None:
     """"Not sent" (decisions 22 to 24, F19, F20): the reports are pending again, from opened or covered, with no
     reference, and every kept outbox entry that holds one of them is deleted so that nothing is retried."""
-    import skellytracker
-
     ids = list(dict.fromkeys(report_ids))
     with _send_lock:  # an answer in flight must not mark them covered after this
         try:
-            skellytracker.mark_reports(ids, "pending")
+            _mark(ids, "pending")
         except ValueError:
             raise HandInError("unknown-report", "one of these is not a report of this host") from None
         _drop_entries(ids)

@@ -12,7 +12,7 @@ const ISSUE = 'https://github.com/domisjustanumber/skellycertify/issues/42';
 const BASE: Certification = {host: {name: 'lab-machine', os: 'Windows 11'}, items: [], gpu_held_by: [], pending_reports: []};
 const pending = (...failures: boolean[]) => failures.map((has_failure, index) => ({report_id: `r${index}`, has_failure}));
 const report = (report_id: string, state: 'pending' | 'opened' | 'covered', reference: string | null = null) =>
-    ({report_id, kind: 'quick', created_utc: `2026-11-19T12:0${report_id.slice(1)}:00Z`, has_failure: false, evidence_valid: true, state, reference});
+    ({report_id, package: 'freemocap', kind: 'quick', created_utc: `2026-11-19T12:0${report_id.slice(1)}:00Z`, has_failure: false, evidence_valid: true, state, reference});
 const LIST: HandInList = {relay_enabled: true, reports: [], outbox: []};
 const FILE = {file_name: 'certify-report-x.md', sha256: 'a'.repeat(64), size_bytes: 10, fits_relay: true, content: '# report'};
 const VIEW: ViewedReport = {reportIds: ['r0', 'r1'], note: '', file: FILE};
@@ -31,11 +31,11 @@ test('the button suffix follows the server state: progress, then failures, then 
     assert.deepEqual(['localhost', '127.0.0.1', '::1', 'LOCALHOST', '192.168.1.5', 'lab'].map(isLocalHost), [true, true, true, true, false, false]);
 });
 
-test('the pending reports are summed up and listed failures first, with the list facts when known', () => {
+test('the pending reports are summed up and listed failures first, with the list facts (package first) when known', () => {
     assert.equal(pendingSummary(pending(false)), '1 report to hand in');
     assert.equal(pendingSummary(pending(false, true, true)), '3 reports to hand in, 2 with a failure');
     const rows = pendingRows(pending(false, true), {...LIST, reports: [report('r0', 'pending')]});
-    assert.deepEqual(rows.map(row => row.text), ['r1 · with a failure', '2026-11-19T12:00:00Z · quick · no failure']);
+    assert.deepEqual(rows.map(row => row.text), ['r1 · with a failure', 'freemocap · 2026-11-19T12:00:00Z · quick · no failure']);
 });
 
 test('hand-ins made are grouped by issue, the issue form ones together, and only safe issue links are kept', () => {

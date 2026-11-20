@@ -41,7 +41,8 @@ def test_the_quick_level_runs_its_six_checks_in_order_and_obeys_the_report_forma
     assert rows["spawn-child"]["result"] == "pass" and rows["bundle-imports"]["result"] == "pass", rows
     assert rows["bundle-imports"]["numbers"] == {"failed": [], "from_bundle": None}  # not frozen
     assert rows["data-folder"]["result"] == "pass" and rows["data-folder"]["numbers"]["free_bytes"] > 0
-    assert list(base.iterdir()) == []  # the probe file is gone
+    assert [path.name for path in base.iterdir()] == ["certify"]  # the probe file is gone; the report is kept
+    assert [path.name for path in (base / "certify" / "reports").iterdir()] == [f"{report['id']}.json"]
     assert rows["install-facts"]["result"] == "record-only" and rows["install-facts"]["numbers"]["ui_remote"] is False
     assert rows["build-identity"]["result"] in ("pass", "record-only")
     assert report["schema"] == "skellycertify.report/1.1.0" and report["kind"] == "quick"
@@ -95,6 +96,82 @@ def test_the_full_level_is_not_built_not_evidence_and_a_bad_level_raises(base):
     assert certification.certify_plan("quick", ui_remote=True, blender_exe_path=None) == certification.certify_plan("quick")
     with pytest.raises(ValueError):
         certification.certify("medium")
+
+
+# - freemocap's own reports: kept with skellytracker's states (J13, J18) -
+
+ISSUE = "https://github.com/domisjustanumber/skellycertify/issues/7"
+PASSED = ({"failed": [], "from_bundle": None}, None)
+
+
+def _keep(created: str, results: dict, kind: str = "quick") -> str:
+    """A report in freemocap's store with these check results, as `certify()` keeps one."""
+    import uuid
+    report_id = str(uuid.uuid4())
+    certification._write_json(certification.reports_dir() / f"{report_id}.json", {
+        "schema": certification.SCHEMA, "id": report_id, "kind": kind, "created_utc": created,
+        "checks": [{"name": name, "result": result, "reason": None} for name, result in results.items()],
+        "evidence": {"valid": False, "reasons": ["no-commit"]}})
+    return report_id
+
+
+def test_own_reports_are_kept_with_the_hand_in_states_and_not_sent_makes_them_pending(base, no_blender, monkeypatch):
+    monkeypatch.setattr(certification, "_spawn_imports", lambda cancelled: ({"failed": ["cv2-ImportError"], "from_bundle": None}, None))
+    failed = certification.certify("quick")
+    [row] = certification.pending_reports()
+    assert row == {"report_id": failed["id"], "kind": "quick", "created_utc": failed["created_utc"], "has_failure": True,
+                   "evidence_valid": failed["evidence"]["valid"], "state": "pending", "reference": None}
+    assert certification.read_report(failed["id"]) == failed
+    certification.mark_reports([failed["id"]], "covered", reference=ISSUE)
+    assert certification.pending_reports() == []
+    [row] = certification.pending_reports(include_handed_in=True)
+    assert (row["state"], row["reference"]) == ("covered", ISSUE)
+    certification.mark_reports([failed["id"]], "opened")
+    assert [(row["state"], row["reference"]) for row in certification.pending_reports(True)] == [("opened", None)]
+    certification.mark_reports([failed["id"]], "pending")  # "Not sent", also from opened or covered
+    assert [(row["state"], row["reference"]) for row in certification.pending_reports()] == [("pending", None)]
+    for ids, state, reference in (([failed["id"]], "sent", None), (["no-such-report"], "covered", None),
+                                  ([failed["id"]], "pending", ISSUE), (failed["id"], "opened", None)):
+        with pytest.raises(ValueError):
+            certification.mark_reports(ids, state, reference=reference)
+    assert [row["state"] for row in certification.pending_reports(True)] == ["pending"], "a refused mark changes nothing"
+    with pytest.raises(ValueError):
+        certification.read_report("../start-check")
+    cancel = multiprocessing.Event()
+    cancel.set()
+    certification.certify("quick", None, cancel)
+    certification.certify("full")
+    assert len(list(certification.reports_dir().glob("*.json"))) == 1, "a run with no pass or fail is not kept"
+
+
+def test_a_new_quick_pass_prunes_older_passes_not_handed_in(base):
+    old = _keep("2026-11-19T10:00:00Z", {"spawn-child": "pass", "data-folder": "pass"})
+    smaller = _keep("2026-11-19T10:30:00Z", {"spawn-child": "pass"})
+    handed_in = _keep("2026-11-19T11:00:00Z", {"spawn-child": "pass", "data-folder": "pass"})
+    failure = _keep("2026-11-19T12:00:00Z", {"spawn-child": "pass", "data-folder": "fail"})
+    full = _keep("2026-11-19T09:00:00Z", {"spawn-child": "pass", "data-folder": "pass"}, kind="full")
+    other = _keep("2026-11-19T09:30:00Z", {"blender": "pass"})  # a pass that no newer report repeats
+    newest = _keep("2026-11-19T13:00:00Z", {"spawn-child": "pass", "data-folder": "pass"})
+    certification.mark_reports([handed_in], "opened")
+    certification._prune_reports()
+    kept = {path.stem for path in certification.reports_dir().glob("*.json")}
+    assert kept == {handed_in, failure, full, other, newest} and not kept & {old, smaller}
+
+
+def test_each_quick_pass_of_certify_replaces_the_one_before(base, no_blender, monkeypatch):
+    monkeypatch.setattr(certification, "_spawn_imports", lambda cancelled: PASSED)
+    certification.certify("quick")
+    certification.certify("quick")
+    assert len(certification.pending_reports()) == 1
+
+
+def test_a_data_folder_that_cannot_be_written_still_gives_the_report(tmp_path, no_blender, monkeypatch):
+    blocked = tmp_path / "a-file"
+    blocked.write_text("")
+    monkeypatch.setenv("FREEMOCAP_BASE_FOLDER", str(blocked))
+    monkeypatch.setattr(certification, "_spawn_imports", lambda cancelled: PASSED)
+    report = certification.certify("quick")
+    assert {row["name"]: row["result"] for row in report["checks"]}["data-folder"] == "fail"
 
 
 def test_import_freemocap_loads_no_certification_and_the_two_names_resolve_lazily():

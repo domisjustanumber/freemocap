@@ -11504,11 +11504,17 @@
             ],
             "title": "Reference",
             "description": "The issue address, only when it is an issue of the relay's repository."
+          },
+          "package": {
+            "type": "string",
+            "title": "Package",
+            "description": "The package whose certify() made the report: `freemocap` or `skellytracker`."
           }
         },
         "type": "object",
         "required": [
           "report_id",
+          "package",
           "kind",
           "created_utc",
           "has_failure",
@@ -11517,7 +11523,7 @@
           "reference"
         ],
         "title": "HandInReport",
-        "description": "One report of skellytracker's hand-in list, in every state."
+        "description": "One report of the hand-in list (freemocap's own or skellytracker's), in every state."
       },
       "HandInSelection": {
         "properties": {

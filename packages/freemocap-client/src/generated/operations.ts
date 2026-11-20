@@ -335,6 +335,31 @@ export const operationDefinitions = {
     "path": "/freemocap/certify/quick_check",
     "asset": false
   },
+  "get_start_check_plan_freemocap_certify_start_check_plan_get": {
+    "method": "GET",
+    "path": "/freemocap/certify/start_check/plan",
+    "asset": false
+  },
+  "start_start_check_freemocap_certify_start_check_post": {
+    "method": "POST",
+    "path": "/freemocap/certify/start_check",
+    "asset": false
+  },
+  "install_ep_pack_freemocap_certify_ep_pack_install_post": {
+    "method": "POST",
+    "path": "/freemocap/certify/ep_pack/install",
+    "asset": false
+  },
+  "remove_ep_pack_freemocap_certify_ep_pack_remove_post": {
+    "method": "POST",
+    "path": "/freemocap/certify/ep_pack/remove",
+    "asset": false
+  },
+  "cancel_ep_pack_freemocap_certify_ep_pack_delete": {
+    "method": "DELETE",
+    "path": "/freemocap/certify/ep_pack",
+    "asset": false
+  },
   "track_telemetry_event_freemocap_telemetry_track_post": {
     "method": "POST",
     "path": "/freemocap/telemetry/track",

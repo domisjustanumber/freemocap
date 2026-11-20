@@ -1204,6 +1204,114 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/freemocap/certify/start_check/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Start Check Plan
+         * @description What the start check runs on this machine: each package's checks, estimate, downloads and changes.
+         */
+        get: operations["get_start_check_plan_freemocap_certify_start_check_plan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/freemocap/certify/start_check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Start Check
+         * @description Start the quick check of this machine: freemocap's own checks, then skellytracker's quick check of every GPU EP
+         *     with no reviewed row (field-test EPs included), in a child process. Refused like a quick check; stop it with
+         *     `DELETE /certify/quick_check`. Follow it in `app_state.certification.run` (no `items`); `start_results` says how it
+         *     ended, and `start_required` turns false once it ended other than by a cancel.
+         */
+        post: operations["start_start_check_freemocap_certify_start_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/freemocap/certify/ep_pack/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Install Ep Pack
+         * @description Install the Windows ML package of one EP that is not installed; Windows may download it.
+         *
+         *     Refused while any work runs, a quick check runs, or another install or remove runs; while it runs every other start
+         *     is refused. Follow it in `app_state.certification.pack_run`; cancel it with `DELETE /certify/ep_pack`.
+         */
+        post: operations["install_ep_pack_freemocap_certify_ep_pack_install_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/freemocap/certify/ep_pack/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove Ep Pack
+         * @description Remove the Windows ML package of one EP that this app installed; a package that was on the machine before stays.
+         *
+         *     Refused like an install. How it ended shows in `app_state.certification.last_pack_result`.
+         */
+        post: operations["remove_ep_pack_freemocap_certify_ep_pack_remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/freemocap/certify/ep_pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Cancel Ep Pack
+         * @description Ask a running install to stop; Windows ML stops it when it can, and a remove runs to its end.
+         */
+        delete: operations["cancel_ep_pack_freemocap_certify_ep_pack_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/freemocap/telemetry/track": {
         parameters: {
             query?: never;
@@ -2370,6 +2478,10 @@ export interface components {
             devices: components["schemas"]["ExecutionProviderDevice"][];
             /** Checks */
             checks: components["schemas"]["ExecutionProviderCheck"][];
+            /** Source */
+            source: string;
+            /** State */
+            state: string;
         };
         /** ExecutionProviderSuggestion */
         ExecutionProviderSuggestion: {
@@ -2930,6 +3042,30 @@ export interface components {
             last_capture_timestamp_ns?: string | null;
             /** Error */
             error?: string | null;
+        };
+        /**
+         * PackagePlan
+         * @description One package's `certify_plan("quick")`, as the start check runs it.
+         */
+        PackagePlan: {
+            /** Package */
+            package: string;
+            /**
+             * Seconds Estimate
+             * @description A one-off upper estimate of the package's checks, in seconds.
+             */
+            seconds_estimate: number;
+            /** Downloads */
+            downloads: {
+                [key: string]: unknown;
+            }[];
+            /** System Changes */
+            system_changes: string[];
+            /**
+             * Checks
+             * @description The checks it runs: freemocap's check names, skellytracker's EP check names.
+             */
+            checks: string[];
         };
         /** PlaybackManifest */
         PlaybackManifest: {
@@ -3960,6 +4096,14 @@ export interface components {
             /** Message */
             message?: string | null;
         };
+        /** StartCheckPlan */
+        StartCheckPlan: {
+            /**
+             * Packages
+             * @description freemocap's own checks, then skellytracker's (skellycam's are not built).
+             */
+            packages: components["schemas"]["PackagePlan"][];
+        };
         /** StartMocapRecordingRequest */
         StartMocapRecordingRequest: {
             /** Mocaprecordingdirectory */
@@ -4841,6 +4985,33 @@ export interface components {
         QuickCheckCancel: {
             /** @description The check that was asked to stop; null when none was running. */
             run: components["schemas"]["QuickCheckRunState"] | null;
+        };
+        /** EpPackRequest */
+        EpPackRequest: {
+            /**
+             * Execution Provider
+             * @description skellytracker's key of a Windows ML EP of this host.
+             */
+            execution_provider: string;
+        };
+        /**
+         * EpPackRunState
+         * @description The running install or remove, as `certification.pack_run` of `app_state` carries it.
+         */
+        EpPackRunState: {
+            /** Action */
+            action: string;
+            /** Execution Provider */
+            execution_provider: string;
+            /** Phase */
+            phase: string | null;
+            /** Fraction */
+            fraction: number | null;
+        };
+        /** EpPackCancel */
+        EpPackCancel: {
+            /** @description The job that was asked to stop; null when none was running. */
+            run: components["schemas"]["EpPackRunState"] | null;
         };
         /**
          * CaptureMode
@@ -7207,6 +7378,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QuickCheckCancel"];
+                };
+            };
+        };
+    };
+    get_start_check_plan_freemocap_certify_start_check_plan_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartCheckPlan"];
+                };
+            };
+        };
+    };
+    start_start_check_freemocap_certify_start_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickCheckRunState"];
+                };
+            };
+            /** @description `pipelines-running` (with `gpu_held_by`: any work, not only pipelines) or `quick-check-running` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    install_ep_pack_freemocap_certify_ep_pack_install_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EpPackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EpPackRunState"];
+                };
+            };
+            /** @description `not-windows-ml` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `cannot-install` (the EP is not missing, or skellytracker refuses it, for example a field-test EP with no opt-in), `pipelines-running` (with `gpu_held_by`: any work), `quick-check-running`, or `ep-pack-running` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_ep_pack_freemocap_certify_ep_pack_remove_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EpPackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EpPackRunState"];
+                };
+            };
+            /** @description `not-windows-ml` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `pipelines-running` (with `gpu_held_by`: any work), `quick-check-running`, or `ep-pack-running` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_ep_pack_freemocap_certify_ep_pack_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EpPackCancel"];
                 };
             };
         };

@@ -293,6 +293,7 @@ export const CertificationSchema = z.object({
     done: z.number().int(),
     total: z.number().int().optional(),
     seconds_estimate: z.number().optional(),
+    package: z.string().optional(), // the package whose checks run now; a start check has no items
   }).optional(),
   last_result: CertificationPairSchema.extend({
     result: z.string(),
@@ -315,8 +316,29 @@ export const CertificationSchema = z.object({
     device_key: z.string().optional(),
     needs_check: z.array(CertificationPairSchema),
   }).optional(),
+  // The start check (F15 step 4): needed now, and how each package's part of the last one ended.
+  start_required: z.boolean().optional(),
+  start_results: z.array(z.object({
+    package: z.string().optional(),
+    result: z.string(),
+    reason: z.string().optional(),
+  })).optional(),
   gpu_held_by: z.array(z.object({ kind: z.string(), id: z.string() })),
   pending_reports: z.array(z.object({ report_id: z.string(), has_failure: z.boolean() })),
+  // A Windows ML EP install or remove (F15 step 5): `fraction` is Windows ML's 0 to 1, absent before its first value.
+  pack_run: z.object({
+    action: z.string(),
+    execution_provider: z.string(),
+    phase: z.string().optional(),
+    fraction: z.number().optional(),
+  }).optional(),
+  last_pack_result: z.object({
+    action: z.string(),
+    execution_provider: z.string(),
+    result: z.string(),
+    reason: z.string().optional(),
+    message: z.string().optional(),
+  }).optional(),
 });
 
 export const AppStateMessageSchema = z.object({

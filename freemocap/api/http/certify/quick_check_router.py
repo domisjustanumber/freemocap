@@ -1,4 +1,5 @@
-"""The quick check of one EP on one GPU (F9): its plan, start and cancel.
+"""The quick check of one EP on one GPU (F9) and the start check of every package (decisions 13 to 17): their plans,
+starts and cancel.
 
 The running check, its progress and every EP's state ride the `certification` field of `app_state`. A refusal answers
 this request with the current reason (other work runs, a check runs, the EP cannot run here); nothing is queued.
@@ -147,3 +148,50 @@ def cancel_quick_check() -> QuickCheckCancel:
     from freemocap.app.freemocap_application import get_freemocap_app
     run = get_freemocap_app().quick_checks.cancel()
     return QuickCheckCancel(run=None if run is None else QuickCheckRunState.of(run))
+
+
+class PackagePlan(BaseModel):
+    """One package's `certify_plan("quick")`, as the start check runs it."""
+    package: str
+    seconds_estimate: int = Field(description="A one-off upper estimate of the package's checks, in seconds.")
+    downloads: list[dict]
+    system_changes: list[str]
+    checks: list[str] = Field(description="The checks it runs: freemocap's check names, skellytracker's EP check names.")
+
+
+class StartCheckPlan(BaseModel):
+    packages: list[PackagePlan] = Field(description="freemocap's own checks, then skellytracker's (skellycam's are not built).")
+
+
+def _start_plans() -> list[PackagePlan]:
+    import skellytracker
+    from freemocap.system.certify.own_checks import certify_plan
+    return [PackagePlan(package=plan["package"], seconds_estimate=plan["seconds_estimate"], downloads=plan["downloads"],
+                        system_changes=plan.get("system_changes", []), checks=(plan.get("details") or {}).get("checks", []))
+            for plan in (certify_plan("quick"), skellytracker.certify_plan("quick"))]
+
+
+@quick_check_router.get("/start_check/plan")
+def get_start_check_plan() -> StartCheckPlan:
+    """What the start check runs on this machine: each package's checks, estimate, downloads and changes."""
+    return StartCheckPlan(packages=_start_plans())
+
+
+@quick_check_router.post("/start_check", status_code=202, responses={
+    409: {"description": "`pipelines-running` (with `gpu_held_by`: any work, not only pipelines) or `quick-check-running`"}})
+def start_start_check(request: Request) -> QuickCheckRunState:
+    """Start the quick check of this machine: freemocap's own checks, then skellytracker's quick check of every GPU EP
+    with no reviewed row (field-test EPs included), in a child process. Refused like a quick check; stop it with
+    `DELETE /certify/quick_check`. Follow it in `app_state.certification.run` (no `items`); `start_results` says how it
+    ended, and `start_required` turns false once it ended other than by a cancel."""
+    from freemocap.app.freemocap_application import get_freemocap_app
+    seconds = sum(plan.seconds_estimate for plan in _start_plans())
+    client = request.client.host if request.client else None
+    app = get_freemocap_app()
+    try:
+        run = app.quick_checks.start(pair=None, detector_type=_DEFAULTS.detector_type, rtmpose_model_name=None,
+                                     seconds_estimate=seconds, holds=app.pipeline_holds,
+                                     ui_remote=None if client is None else client not in ("127.0.0.1", "::1", "localhost"))
+    except StartRefused as error:
+        raise HTTPException(status_code=error.status, detail=error.detail) from None
+    return QuickCheckRunState.of(run)

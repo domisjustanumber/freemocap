@@ -694,6 +694,9 @@ class CertificationRun:
     total: int | None = None
     """None until the first progress message."""
     seconds_estimate: int | None = None
+    package: str | None = None
+    """The package whose checks run now (a start check runs freemocap's, then skellytracker's); None until the first
+    progress message. A start check has no `items`."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -702,6 +705,16 @@ class CertificationResult:
     report (`pass`, `fail` or `not-run`, which a cancel gives), or `crashed` / `error` when no report came back."""
     execution_provider: str = ""
     device_key: str | None = None
+    result: str = ""
+    reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class StartCheckResult:
+    """How one package's part of the last start check of this server session ended: `pass`, `fail`, `record-only` or
+    `not-run` (a cancel gives `cancelled`) by the section rule of its report, `error` (`reason` is the exception class),
+    or, with no package, `crashed` / `error` of the whole check. `reason` of a fail is the first failed check's name."""
+    package: str | None = None
     result: str = ""
     reason: str | None = None
 
@@ -734,7 +747,8 @@ class CertificationAuto:
 @dataclass(frozen=True, slots=True)
 class PipelineHold:
     """Running work that refuses a quick check (the class name is historical): `kind` is realtime, recording, cameras,
-    posthoc, sync or export; `id` is its id, or `starting` while its start is admitted."""
+    posthoc, sync, export or ep-pack (an EP install or remove; `id` is its EP key); `id` is its id, or `starting`
+    while its start is admitted."""
     kind: str = ""
     id: str = ""
 
@@ -743,6 +757,29 @@ class PipelineHold:
 class PendingReport:
     report_id: str = ""
     has_failure: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class EpPackRun:
+    """The running install or remove of a Windows ML EP: skellytracker's latest `InstallProgress` phase and its
+    `fraction` (0 to 1 from Windows ML; None before its first value, and for a remove)."""
+    action: str = "install"
+    """install or remove."""
+    execution_provider: str = ""
+    phase: str | None = None
+    fraction: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class EpPackResult:
+    """How the latest install or remove of this server session ended: `done`, `cancelled`, `failed` (`reason` is
+    skellytracker's error or reason codes, `message` its install text) or `error` (`reason` is an exception class
+    name). A remove that kept a package that was on the machine before is `done` with `reason` `was-present`."""
+    action: str = "install"
+    execution_provider: str = ""
+    result: str = ""
+    reason: str | None = None
+    message: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -756,6 +793,11 @@ class CertificationSnapshot:
     """Every running pipeline, CPU ones too: a check is refused while any runs."""
     pending_reports: tuple[PendingReport, ...] = ()
     """skellytracker's hand-in list, pending reports only."""
+    start_required: bool = False
+    """The start check is needed (decisions 13 to 15): the UI greys out and shows the Certification dialog for it."""
+    start_results: tuple[StartCheckResult, ...] = ()
+    pack_run: EpPackRun | None = None
+    last_pack_result: EpPackResult | None = None
 
 
 @dataclass(frozen=True, slots=True)

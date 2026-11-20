@@ -29,6 +29,8 @@ from freemocap.core.streaming.message_model import (
     CertificationResult,
     CertificationRun,
     CertificationSnapshot,
+    EpPackResult,
+    EpPackRun,
     PendingReport,
     PipelineHold,
     CalibratedCamera,
@@ -165,7 +167,8 @@ def build_frame_message() -> bytes:
 
 def build_app_state_message() -> bytes:
     # The `certification` field: a running quick check of one EP on one GPU, the latest result, one item per EP per
-    # GPU with skellytracker's facts, Auto's choice with a candidate that needs a check, what runs, the hand-in list.
+    # GPU with skellytracker's facts, Auto's choice with a candidate that needs a check, what runs, the hand-in list,
+    # a running EP install with Windows ML's fraction and how the last install or remove ended.
     pair = CertificationPair(execution_provider="golden-ep", device_key="gpu:10de:2484:0")
     certification = CertificationSnapshot(
         host=CertificationHost(name="golden-host", os="Windows 11 Home 26H2"),
@@ -183,6 +186,9 @@ def build_app_state_message() -> bytes:
         auto=CertificationAuto(execution_provider="cpu-ep", device_key=None, needs_check=(pair,)),
         gpu_held_by=(PipelineHold(kind="posthoc", id="abc123"),),
         pending_reports=(PendingReport(report_id="quick-20261119T120000Z", has_failure=True),),
+        pack_run=EpPackRun(action="install", execution_provider="golden-ml-ep", phase="download", fraction=0.25),
+        last_pack_result=EpPackResult(action="remove", execution_provider="golden-ml-ep", result="failed",
+                                      reason="package-not-removed"),
     )
     return encode_message(AppStateMessage(server_pid=4242, state=AppStateSnapshot(certification=certification)))
 

@@ -69,6 +69,11 @@ errors, aborts, cancellation and asset ownership; compatibility records list act
 | GET | `/freemocap/certify/quick_check/plan` | `get_quick_check_plan_freemocap_certify_quick_check_plan_get` | Core integration |
 | POST | `/freemocap/certify/quick_check` | `start_quick_check_freemocap_certify_quick_check_post` | Core integration |
 | DELETE | `/freemocap/certify/quick_check` | `cancel_quick_check_freemocap_certify_quick_check_delete` | Core integration |
+| GET | `/freemocap/certify/start_check/plan` | `get_start_check_plan_freemocap_certify_start_check_plan_get` | Core integration |
+| POST | `/freemocap/certify/start_check` | `start_start_check_freemocap_certify_start_check_post` | Core integration |
+| POST | `/freemocap/certify/ep_pack/install` | `install_ep_pack_freemocap_certify_ep_pack_install_post` | Core integration |
+| POST | `/freemocap/certify/ep_pack/remove` | `remove_ep_pack_freemocap_certify_ep_pack_remove_post` | Core integration |
+| DELETE | `/freemocap/certify/ep_pack` | `cancel_ep_pack_freemocap_certify_ep_pack_delete` | Core integration |
 | POST | `/freemocap/telemetry/track` | `track_telemetry_event_freemocap_telemetry_track_post` | Core integration |
 | POST | `/skellycam/camera/detect` | `cameras_detect_endpoint_skellycam_camera_detect_post` | SkellyCam |
 | GET | `/skellycam/camera/microphone/detect` | `microphone_detect_endpoint_skellycam_camera_microphone_detect_get` | SkellyCam |

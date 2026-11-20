@@ -37,6 +37,7 @@ from freemocap.core.streaming.message_model import (
     CertificationSnapshot,
     PendingReport,
     PipelineHold,
+    StartCheckResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,6 +84,10 @@ def refuse_unavailable_execution_provider(execution_provider: str | None, device
                                                  "local_cause": check.local_cause, "usable": check.usable}}) from None
 
 
+def _what(pair: CertificationPair | None) -> str:
+    return "the start check" if pair is None else f"the quick check of {pair.execution_provider} on {pair.device_key}"
+
+
 def _report_result(report: dict) -> tuple[str, str | None]:
     """The EP check's result and reason: the one check whose name has no `:` (decision 9's reader rule)."""
     row = next((row for row in report.get("checks", ()) if ":" not in str(row.get("name"))), None)
@@ -94,16 +99,18 @@ def _report_result(report: dict) -> tuple[str, str | None]:
 
 @dataclass
 class QuickCheckJob(BaseNode):
-    pair: CertificationPair = field(default_factory=CertificationPair)
+    pair: CertificationPair | None = None  # None: the start check of every package (start_check.py)
     progress_subscription: multiprocessing.queues.Queue | None = None
     result_subscription: multiprocessing.queues.Queue | None = None
     cancel: multiprocessing.synchronize.Event | None = None
     progress_received: int = 0
 
     @classmethod
-    def create(cls, *, pair: CertificationPair, detector_type: str, rtmpose_model_name: str | None,
-               worker_registry: WorkerRegistry, global_kill_flag: Synchronized, certify=None) -> "QuickCheckJob":
-        """`certify` replaces `skellytracker.certify` in the child (a module-level function, for tests)."""
+    def create(cls, *, pair: CertificationPair | None, detector_type: str, rtmpose_model_name: str | None,
+               worker_registry: WorkerRegistry, global_kill_flag: Synchronized, certify=None, own_certify=None,
+               ui_remote: bool | None = None) -> "QuickCheckJob":
+        """`certify` and `own_certify` replace `skellytracker.certify` and freemocap's own in the child (module-level
+        functions, for tests)."""
         ipc = PipelineIPC.create(global_kill_flag=global_kill_flag, heartbeat_timestamp=worker_registry.heartbeat_timestamp)
         progress_queue: multiprocessing.queues.Queue = multiprocessing.Queue()
         result_queue: multiprocessing.queues.Queue = multiprocessing.Queue()
@@ -113,16 +120,17 @@ class QuickCheckJob(BaseNode):
         shutdown_self_flag, worker = cls._create_worker(
             owner_shutdown_flag=ipc.pipeline_shutdown_flag, worker_mode=WorkerMode.PROCESS, target=cls._run,
             name=f"QuickCheck-{ipc.pipeline_id}", worker_registry=worker_registry, log_queue=ipc.ws_queue, daemon=False,
-            kwargs=dict(ipc=ipc, execution_provider=pair.execution_provider, device_key=pair.device_key,
+            kwargs=dict(ipc=ipc, execution_provider=pair and pair.execution_provider, device_key=pair and pair.device_key,
                         detector_type=detector_type, rtmpose_model_name=rtmpose_model_name,
-                        progress_pub=progress_queue, result_pub=result_queue, cancel=cancel, certify=certify))
+                        progress_pub=progress_queue, result_pub=result_queue, cancel=cancel, certify=certify,
+                        own_certify=own_certify, ui_remote=ui_remote))
         return cls(shutdown_self_flag=shutdown_self_flag, worker=worker, pair=pair, progress_subscription=progress_queue,
                    result_subscription=result_queue, cancel=cancel)
 
     @staticmethod
-    def _run(*, ipc: PipelineIPC, execution_provider: str, device_key: str | None, detector_type: str,
+    def _run(*, ipc: PipelineIPC, execution_provider: str | None, device_key: str | None, detector_type: str,
              rtmpose_model_name: str | None, progress_pub, result_pub, cancel, shutdown_self_flag: Synchronized,
-             certify=None) -> None:
+             certify=None, own_certify=None, ui_remote: bool | None = None) -> None:
         def watch() -> None:  # a stop, or the backend's exit or death, sets the cancel that certify() polls
             parent = multiprocessing.parent_process()
             # Poll, never `cancel.wait()`: a process that dies while waiting on a multiprocessing.Event makes the next
@@ -134,6 +142,11 @@ class QuickCheckJob(BaseNode):
 
         threading.Thread(target=watch, name="QuickCheckWatch", daemon=True).start()
         try:
+            if execution_provider is None:
+                from freemocap.system.certify.start_check import run_start_check
+                result_pub.put(run_start_check(progress_pub.put, cancel, ui_remote=ui_remote, own_certify=own_certify,
+                                               certify=certify))
+                return
             if certify is None:
                 from skellytracker import certify
             from freemocap.core.tracking.pipeline_runs import load_detector_pipeline
@@ -141,7 +154,7 @@ class QuickCheckJob(BaseNode):
                              device=device_key, pipeline=load_detector_pipeline(detector_type, rtmpose_model_name))
             result_pub.put(_report_result(report))
         except Exception as error:  # noqa: BLE001 - the class name only: an error text can hold a path
-            logger.exception("The quick check of %s on %s raised", execution_provider, device_key)
+            logger.exception("The quick check of %s on %s raised", execution_provider or "every package", device_key)
             result_pub.put(("error", type(error).__name__))
 
     def drain_progress(self) -> dict | None:
@@ -154,7 +167,7 @@ class QuickCheckJob(BaseNode):
                 return latest
             self.progress_received += 1
 
-    def poll_result(self) -> tuple[str, str | None] | None:
+    def poll_result(self) -> tuple | None:  # (result, reason), or ("start", per-package rows)
         try:
             return self.result_subscription.get_nowait()
         except (Empty, OSError, ValueError):
@@ -213,6 +226,11 @@ class QuickCheckManager:
     last_result: CertificationResult | None = None
     read_status: object = read_status_parts
     certify: object = None  # tests only: a module-level stand-in for `skellytracker.certify`
+    own_certify: object = None  # tests only: a module-level stand-in for freemocap's own `certify`
+    start_results: tuple[StartCheckResult, ...] = ()  # how the last start check of this server session ended
+    start_released: bool = False  # a start check ended other than by a cancel in this server session (decision 14)
+    read_start_needed: object = None  # tests: a stand-in for `start_check.start_check_needed`
+    _start_needed: bool = False
     _parts: tuple | None = None
     _parts_read_at: float = 0.0
 
@@ -224,13 +242,23 @@ class QuickCheckManager:
         """F7, H1: a start of work is refused while a check runs. The refusal is this request's answer, not a stored gate."""
         run = self.run
         if run is not None:
-            item = run.items[0]
+            item = run.items[0] if run.items else None
             raise StartRefused(409, {
                 "code": "quick-check-running",
-                "message": f"A quick check of {item.execution_provider} on {item.device_key} is running; the {kind} start "
-                           "was refused. Start again when the check ends.",
-                "run": {"execution_provider": item.execution_provider, "device_key": item.device_key,
+                "message": f"{_what(item).capitalize()} is running; the {kind} start was refused. Start again when the "
+                           "check ends.",
+                "run": {"execution_provider": item and item.execution_provider, "device_key": item and item.device_key,
                         "done": run.done, "total": run.total}})
+        for hold in self.claims:  # an EP pack install or remove refuses every start too (F16, H1); see ep_packs.py
+            if hold.kind == "ep-pack":
+                raise StartRefused(409, {
+                    "code": "ep-pack-running", "execution_provider": hold.id,
+                    "message": f"An install or remove of the {hold.id} EP is running; the {kind} start was refused. "
+                               "Start again when it ends."})
+
+    def status_changed(self) -> None:
+        """Read skellytracker's status again at the next refresh (an EP pack install or remove ended)."""
+        self._parts_read_at = float("-inf")
 
     def claim(self, kind: str) -> PipelineHold:
         """H2: refuse while a check runs, else register a claim that a check's admission sees until `release`."""
@@ -253,17 +281,20 @@ class QuickCheckManager:
         finally:
             self.release(claim)
 
-    def start(self, *, pair: CertificationPair, detector_type: str, rtmpose_model_name: str | None,
-              seconds_estimate: int | None, holds: Callable[[], tuple[PipelineHold, ...]]) -> CertificationRun:
-        """`holds` lists what runs (claims included); it is read under the admission lock and must not take it."""
+    def start(self, *, pair: CertificationPair | None, detector_type: str, rtmpose_model_name: str | None,
+              seconds_estimate: int | None, holds: Callable[[], tuple[PipelineHold, ...]],
+              ui_remote: bool | None = None) -> CertificationRun:
+        """`holds` lists what runs (claims included); it is read under the admission lock and must not take it.
+        `pair` None starts the start check of every package."""
         with self.lock:
             with self.admission_lock:
                 if self.run is not None:
-                    running = self.run.items[0]
+                    running = self.run.items[0] if self.run.items else None
                     raise StartRefused(409, {
                         "code": "quick-check-running",
-                        "message": f"A quick check of {running.execution_provider} on {running.device_key} is already running.",
-                        "run": {"execution_provider": running.execution_provider, "device_key": running.device_key}})
+                        "message": f"{_what(running).capitalize()} is already running.",
+                        "run": {"execution_provider": running and running.execution_provider,
+                                "device_key": running and running.device_key}})
                 held = holds()
                 if held:  # the names `pipelines-running` and `gpu_held_by` are historical: they cover all work (H1)
                     raise StartRefused(409, {
@@ -271,17 +302,17 @@ class QuickCheckManager:
                         "message": "A quick check cannot start while other work runs: "
                                    + ", ".join(f"{hold.kind} {hold.id}" for hold in held) + ". Stop it first.",
                         "gpu_held_by": [{"kind": hold.kind, "id": hold.id} for hold in held]})
-                self.run = CertificationRun(level="quick", items=(pair,), seconds_estimate=seconds_estimate)
+                self.run = CertificationRun(level="quick", items=(pair,) if pair else (), seconds_estimate=seconds_estimate)
             try:  # the spawn is outside the admission lock; the run set above refuses other starts meanwhile
                 job = QuickCheckJob.create(pair=pair, detector_type=detector_type, rtmpose_model_name=rtmpose_model_name,
                                            worker_registry=self.worker_registry, global_kill_flag=self.global_kill_flag,
-                                           certify=self.certify)
+                                           certify=self.certify, own_certify=self.own_certify, ui_remote=ui_remote)
                 job.start()
             except BaseException:
                 self.run = None
                 raise
             self.job = job
-            logger.info("Quick check of %s on %s started", pair.execution_provider, pair.device_key)
+            logger.info("%s started", _what(pair).capitalize())
             return self.run
 
     def cancel(self) -> CertificationRun | None:
@@ -300,22 +331,29 @@ class QuickCheckManager:
                 message = job.drain_progress()
                 if message is not None:
                     self.run = replace(self.run, state=str(message.get("state")), done=int(message.get("done", 0)),
-                                       total=message.get("total"))
+                                       total=message.get("total"), package=message.get("package"))
                 result = job.poll_result()
                 if result is None and not job.is_alive:
                     result = job.poll_result()  # a result sent just before the exit
                     if result is None:
                         result = ("crashed", f"exit-code-{job.worker.exitcode}")
                 if result is not None:
-                    self.last_result = CertificationResult(job.pair.execution_provider, job.pair.device_key, *result)
+                    if job.pair is not None:
+                        self.last_result = CertificationResult(job.pair.execution_provider, job.pair.device_key, *result)
+                    else:  # ("start", per-package results), or a crash or error of the whole child
+                        self.start_results = tuple(StartCheckResult(*row) for row in result[1]) if result[0] == "start" \
+                            else (StartCheckResult(None, *result),)
+                        self.start_released |= all(row.reason != "cancelled" for row in self.start_results)
                     self.job, self.run, ended = None, None, True
-                    logger.info("Quick check of %s on %s ended: %s %s (%d progress messages)", job.pair.execution_provider,
-                                job.pair.device_key, *result, job.progress_received)
+                    logger.info("%s ended: %s (%d progress messages)", _what(job.pair).capitalize(), result,
+                                job.progress_received)
         if ended:
             job.end()
         if ended or self._parts is None or time.monotonic() - self._parts_read_at >= STATUS_REFRESH_SECONDS:
             try:
                 parts = self.read_status()
+                from freemocap.system.certify.start_check import start_check_needed
+                self._start_needed = (self.read_start_needed or start_check_needed)()
             except Exception:  # noqa: BLE001 - the last good status stays; a broken store must not stop progress
                 logger.exception("skellytracker's EP status could not be read for the certification state")
             else:
@@ -327,12 +365,13 @@ class QuickCheckManager:
             return None
         host, items, auto, reports = parts
         return CertificationSnapshot(host=host, run=self.run, last_result=self.last_result, items=items, auto=auto,
-                                     gpu_held_by=holds, pending_reports=reports)
+                                     gpu_held_by=holds, pending_reports=reports,
+                                     start_required=self._start_needed and not self.start_released,
+                                     start_results=self.start_results)
 
     def shutdown(self) -> None:
         with self.lock:
             job, self.job, self.run = self.job, None, None
         if job is not None:
-            logger.info("Ending the quick check of %s on %s for the backend's exit", job.pair.execution_provider,
-                        job.pair.device_key)
+            logger.info("Ending %s for the backend's exit", _what(job.pair))
             job.end()

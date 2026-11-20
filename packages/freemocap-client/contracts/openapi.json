@@ -3309,6 +3309,171 @@
         }
       }
     },
+    "/freemocap/certify/start_check/plan": {
+      "get": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Get Start Check Plan",
+        "description": "What the start check runs on this machine: each package's checks, estimate, downloads and changes.",
+        "operationId": "get_start_check_plan_freemocap_certify_start_check_plan_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartCheckPlan"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/freemocap/certify/start_check": {
+      "post": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Start Start Check",
+        "description": "Start the quick check of this machine: freemocap's own checks, then skellytracker's quick check of every GPU EP\nwith no reviewed row (field-test EPs included), in a child process. Refused like a quick check; stop it with\n`DELETE /certify/quick_check`. Follow it in `app_state.certification.run` (no `items`); `start_results` says how it\nended, and `start_required` turns false once it ended other than by a cancel.",
+        "operationId": "start_start_check_freemocap_certify_start_check_post",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickCheckRunState"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`pipelines-running` (with `gpu_held_by`: any work, not only pipelines) or `quick-check-running`"
+          }
+        }
+      }
+    },
+    "/freemocap/certify/ep_pack/install": {
+      "post": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Install Ep Pack",
+        "description": "Install the Windows ML package of one EP that is not installed; Windows may download it.\n\nRefused while any work runs, a quick check runs, or another install or remove runs; while it runs every other start\nis refused. Follow it in `app_state.certification.pack_run`; cancel it with `DELETE /certify/ep_pack`.",
+        "operationId": "install_ep_pack_freemocap_certify_ep_pack_install_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EpPackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpPackRunState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`not-windows-ml`"
+          },
+          "409": {
+            "description": "`cannot-install` (the EP is not missing, or skellytracker refuses it, for example a field-test EP with no opt-in), `pipelines-running` (with `gpu_held_by`: any work), `quick-check-running`, or `ep-pack-running`"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/freemocap/certify/ep_pack/remove": {
+      "post": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Remove Ep Pack",
+        "description": "Remove the Windows ML package of one EP that this app installed; a package that was on the machine before stays.\n\nRefused like an install. How it ended shows in `app_state.certification.last_pack_result`.",
+        "operationId": "remove_ep_pack_freemocap_certify_ep_pack_remove_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EpPackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpPackRunState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`not-windows-ml`"
+          },
+          "409": {
+            "description": "`pipelines-running` (with `gpu_held_by`: any work), `quick-check-running`, or `ep-pack-running`"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/freemocap/certify/ep_pack": {
+      "delete": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Cancel Ep Pack",
+        "description": "Ask a running install to stop; Windows ML stops it when it can, and a remove runs to its end.",
+        "operationId": "cancel_ep_pack_freemocap_certify_ep_pack_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EpPackCancel"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/freemocap/telemetry/track": {
       "post": {
         "tags": [
@@ -5816,6 +5981,14 @@
             },
             "title": "Checks",
             "type": "array"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
           }
         },
         "required": [
@@ -5826,7 +5999,9 @@
           "install_hint",
           "uses_gpu",
           "devices",
-          "checks"
+          "checks",
+          "source",
+          "state"
         ],
         "title": "ExecutionProviderOption",
         "type": "object"
@@ -7126,6 +7301,52 @@
           "overflow_policy"
         ],
         "title": "OutputState"
+      },
+      "PackagePlan": {
+        "properties": {
+          "package": {
+            "type": "string",
+            "title": "Package"
+          },
+          "seconds_estimate": {
+            "type": "integer",
+            "title": "Seconds Estimate",
+            "description": "A one-off upper estimate of the package's checks, in seconds."
+          },
+          "downloads": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Downloads"
+          },
+          "system_changes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "System Changes"
+          },
+          "checks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Checks",
+            "description": "The checks it runs: freemocap's check names, skellytracker's EP check names."
+          }
+        },
+        "type": "object",
+        "required": [
+          "package",
+          "seconds_estimate",
+          "downloads",
+          "system_changes",
+          "checks"
+        ],
+        "title": "PackagePlan",
+        "description": "One package's `certify_plan(\"quick\")`, as the start check runs it."
       },
       "PlaybackManifest": {
         "properties": {
@@ -9174,6 +9395,23 @@
           "success"
         ],
         "title": "StartCalibrationRecordingResponse"
+      },
+      "StartCheckPlan": {
+        "properties": {
+          "packages": {
+            "items": {
+              "$ref": "#/components/schemas/PackagePlan"
+            },
+            "type": "array",
+            "title": "Packages",
+            "description": "freemocap's own checks, then skellytracker's (skellycam's are not built)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "packages"
+        ],
+        "title": "StartCheckPlan"
       },
       "StartMocapRecordingRequest": {
         "properties": {
@@ -11676,6 +11914,83 @@
           "run"
         ],
         "title": "QuickCheckCancel"
+      },
+      "EpPackRequest": {
+        "properties": {
+          "execution_provider": {
+            "type": "string",
+            "title": "Execution Provider",
+            "description": "skellytracker's key of a Windows ML EP of this host."
+          }
+        },
+        "required": [
+          "execution_provider"
+        ],
+        "title": "EpPackRequest",
+        "type": "object"
+      },
+      "EpPackRunState": {
+        "description": "The running install or remove, as `certification.pack_run` of `app_state` carries it.",
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "execution_provider": {
+            "type": "string",
+            "title": "Execution Provider"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "fraction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fraction"
+          }
+        },
+        "required": [
+          "action",
+          "execution_provider",
+          "phase",
+          "fraction"
+        ],
+        "title": "EpPackRunState",
+        "type": "object"
+      },
+      "EpPackCancel": {
+        "properties": {
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EpPackRunState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The job that was asked to stop; null when none was running."
+          }
+        },
+        "required": [
+          "run"
+        ],
+        "title": "EpPackCancel",
+        "type": "object"
       },
       "CaptureMode": {
         "properties": {

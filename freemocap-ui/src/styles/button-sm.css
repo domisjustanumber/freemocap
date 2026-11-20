@@ -111,6 +111,11 @@ button.quaternary:hover,
   background-color: var(--color-on-primary);
 }
 
+/* The loader is an image, not a mask: a fill behind it would turn with it as a box. */
+.accent > .loader-icon {
+  background-color: transparent;
+}
+
 .btn-danger {
   background-color: var(--color-danger-idle);
   border: 1px solid var(--color-danger);

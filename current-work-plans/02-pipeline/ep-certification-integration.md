@@ -47,6 +47,13 @@ the OS on this PC, and lets the person hand in certify reports. It does this thr
    `POST /shutdown` to exit on an idle backend: 1353, 1313, 1351 ms, no kill (decision 31; cameras unmeasured).
    Seen, not fixed: with stdout piped the backend prints `UnicodeEncodeError` logging errors (cp1252, from
    skellylogs' colored console handler); Electron pipes stdout too, the frozen app is unchecked.
+   MOVED 2026-11-20 to `e17761b4ad7d57c560badc1257e12dd01f3fb18f` (head of `origin/dom/sidecar-implementation`,
+   holds `669d9676`..`5020037f`, the 1.2.0 `summary` `0f233b5c` and the 0-to-1 install fraction). Still the
+   path source plus this record: the sibling checkout already sat at it (with 12 uncommitted files of the
+   skellytracker session in certification and `core/eps`), its `pyproject.toml` is unchanged since `4dcf2a66`,
+   and `uv lock --check` passes, so `uv.lock` does not change. Fast suite on it: 1718 passed, 7 failed (the old
+   baseline), 20 skipped; an earlier run under heavy load from other sessions also had 4 `test_quick_check`
+   timeouts (child sent nothing in 60 s) that pass alone and in the rerun. UI: `tsc` clean, 230/10/46 pass.
 2. After the migration, freemocap declares neither `onnx` nor `onnxruntime`; both arrive through
    skellytracker. `freemocap.spec:96-97` (collection), `:99-100` (stale `onnx` hidden import) and the
    onnxruntime excludes at `:151-156` move to a skellytracker PyInstaller hook. The dev pin `onnx==1.22.0`

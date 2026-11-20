@@ -52,7 +52,7 @@ the OS on this PC, and lets the person hand in certify reports. It does this thr
    path source plus this record: the sibling checkout already sat at it (with 12 uncommitted files of the
    skellytracker session in certification and `core/eps`), its `pyproject.toml` is unchanged since `4dcf2a66`,
    and `uv lock --check` passes, so `uv.lock` does not change. Fast suite on it: 1718 passed, 7 failed (the old
-   baseline), 20 skipped; an earlier run under heavy load from other sessions also had 4 `test_quick_check`
+   baseline; the worker-exit and VMC ones then fixed in `7d97b4ce`, `809d7448`), 20 skipped; an earlier run under heavy load from other sessions also had 4 `test_quick_check`
    timeouts (child sent nothing in 60 s) that pass alone and in the rerun. UI: `tsc` clean, 230/10/46 pass.
 2. After the migration, freemocap declares neither `onnx` nor `onnxruntime`; both arrive through
    skellytracker. `freemocap.spec:96-97` (collection), `:99-100` (stale `onnx` hidden import) and the

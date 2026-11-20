@@ -6,7 +6,8 @@ from freemocap.api.http.certify.quick_check_router import admitted
 from freemocap.api.http.mocap import mocap_router as mocap
 
 import_router = APIRouter(prefix='/recording-import', tags=['Recording import'])
-import_router.add_api_route('', mocap.import_videos, methods=['POST'], operation_id='import_recording')
+import_router.add_api_route('', mocap.import_videos, methods=['POST'], operation_id='import_recording',
+                            dependencies=[admitted('import')])
 import_router.add_api_route('/check-sync', mocap.check_video_sync, methods=['POST'],
                             operation_id='check_import_frame_counts', summary='Check video frame-count compatibility')
 

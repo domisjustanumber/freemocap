@@ -320,6 +320,8 @@ def test_the_routes_that_start_other_work_refuse_while_a_check_runs_and_stop_rou
         ("/exports/scientific", {"recording_path": "C:/recordings/take"}, "export"),
         ("/exports/tall-csv", {"recording_path": "C:/recordings/take"}, "export"),
         ("/blender/export", {"recordingFolderPath": "C:/recordings/take"}, "export"),
+        ("/mocap/recording/import", videos, "import"), ("/recording-import", videos, "import"),
+        ("/blender/addon/install", {}, "blender-addon"),
         ("/skellycam/camera/group/apply", None, "cameras"),
         ("/skellycam/camera/group/all/record/start", None, "recording"),
     ):

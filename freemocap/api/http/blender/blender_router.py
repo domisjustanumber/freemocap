@@ -151,7 +151,7 @@ def inspect_blender_endpoint(request: InspectBlenderRequest):
         raise HTTPException(status_code=500, detail=str(error)) from error
 
 
-@blender_router.post('/addon/install')
+@blender_router.post('/addon/install', dependencies=[admitted('blender-addon')])
 def install_addon(request: InstallAddonRequest) -> InstallAddonResponse:
     """Explicitly install a self-contained ZIP into the selected Blender profile."""
     try:

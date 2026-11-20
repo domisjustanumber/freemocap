@@ -302,7 +302,7 @@ async def get_synchronize_result(job_id: str) -> SyncResult:
     return job.result
 
 
-@mocap_router.post("/recording/import")
+@mocap_router.post("/recording/import", dependencies=[admitted("import")])
 async def import_videos(request: ImportVideosRequest) -> ImportVideosResponse:
     """Create a new recording folder from externally-recorded videos.
 

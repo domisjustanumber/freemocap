@@ -213,7 +213,7 @@ def _markdown(modules: list[dict], note: str | None, app: dict | None, created: 
                 for other, decode in items if other == index and decode.get("group") == "gpu-jpeg"
                 and (decode.get("name"), decode.get("device")) == (item.get("name"), device)]
     if eps:
-        lines += ["| GPU | EP | Result |", "|---|---|---|", *eps, ""]
+        lines += ["| GPU | Module | Result |", "|---|---|---|", *eps, ""]
     cameras = [_row([_cell(item.get("name")), _result(item.get("result"))]) for _, item in items
                if item.get("group") == "camera"]
     lines += ["| Camera | Result |", "|---|---|", *cameras, ""] if cameras else ["Cameras: not checked on this system.", ""]

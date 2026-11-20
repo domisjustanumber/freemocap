@@ -47,7 +47,7 @@ SUMMARY = [{"group": "ep", "name": "TensorRT RTX", "device": "10de:2484", "resul
            {"group": "ep", "name": "DirectML", "device": "10de:2484", "result": "pass"},
            {"group": "ep", "name": "DirectML", "device": "8086:a780", "result": "pass"},
            {"group": "ep", "name": "CPU", "device": None, "result": "record-only"}]
-TABLE = """| GPU | EP | Result |
+TABLE = """| GPU | Module | Result |
 |---|---|---|
 | NVIDIA RTX 3070 8 GB | TensorRT RTX | pass |
 | NVIDIA RTX 3070 8 GB | TensorRT RTX GPU decode | pass |
@@ -129,7 +129,7 @@ def test_a_module_without_summary_gives_no_ep_or_camera_rows():
     text = _head(build_report_file([_module(summary=None)], None, None)[1])
     assert "| GPU |" not in text and text.endswith(f"{SYSTEM}\nCameras: not checked on this system.\n")
     one = _head(build_report_file([_module(summary=SUMMARY[5:6])], None, None)[1])
-    assert "| GPU | EP | Result |\n|---|---|---|\n| Intel UHD 770 | DirectML | pass |\n\n" in one
+    assert "| GPU | Module | Result |\n|---|---|---|\n| Intel UHD 770 | DirectML | pass |\n\n" in one
 
 
 def test_a_long_note_line_is_wrapped_under_the_2000_character_rule():

@@ -125,4 +125,6 @@ test('the bottom button follows the server state: none while required, Continue 
     assert.equal(bottomButtonLabel({...BASE, start_required: true, start_results: [{package: 'freemocap', result: 'pass'}]}), null);
     assert.equal(bottomButtonLabel({...BASE, start_results: [{package: 'freemocap', result: 'fail'}]}), 'Continue');
     assert.equal(bottomButtonLabel({...BASE, run, start_results: [{package: 'freemocap', result: 'pass'}]}), 'Close');
+    assert.equal(bottomButtonLabel({...BASE, start_results: [{package: 'freemocap', result: 'pass'},
+        {package: 'skellytracker', result: 'not-run', reason: 'cancelled'}]}), 'Close');
 });

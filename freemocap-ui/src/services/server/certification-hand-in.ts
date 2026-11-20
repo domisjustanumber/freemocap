@@ -52,10 +52,12 @@ export const CERTIFICATION_TEXT = {
 } as const;
 
 /** The dialog's bottom button from the current server state: none while the start check is required, "Continue" once a
- * start check has ended and released the app, else "Close". */
+ * start check of this server session has ended and released the app, else "Close". */
 export function bottomButtonLabel(certification: Certification | null): string | null {
     if (certification?.start_required) return null;
-    return certification && !certification.run && certification.start_results?.length ? CERTIFICATION_TEXT.continue : CERTIFICATION_TEXT.close;
+    // As the server releases the app: a start check of this server session ended, and not by a cancel.
+    const results = certification?.run ? [] : certification?.start_results ?? [];
+    return results.length && results.every(row => row.reason !== 'cancelled') ? CERTIFICATION_TEXT.continue : CERTIFICATION_TEXT.close;
 }
 
 /** Opens the Certification dialog from anywhere (the button, a failed check's "File report"; decisions 23, 25 to 27). */

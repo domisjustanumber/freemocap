@@ -154,6 +154,8 @@ class PackagePlan(BaseModel):
     """One package's `certify_plan("quick")`, as the start check runs it."""
     package: str
     seconds_estimate: int = Field(description="A one-off upper estimate of the package's checks, in seconds.")
+    total: int = Field(description="The count of checks that the run will do (report format 2.6).")
+    risks: list[str] = Field(description="One fixed sentence for each thing the run can do to a device; empty at quick.")
     downloads: list[dict]
     system_changes: list[str]
     checks: list[str] = Field(description="The checks it runs: freemocap's check names, skellytracker's EP check names.")
@@ -166,8 +168,10 @@ class StartCheckPlan(BaseModel):
 def _start_plans() -> list[PackagePlan]:
     import skellytracker
     from freemocap.certification import certify_plan
-    return [PackagePlan(package=plan["package"], seconds_estimate=plan["seconds_estimate"], downloads=plan["downloads"],
-                        system_changes=plan.get("system_changes", []), checks=(plan.get("details") or {}).get("checks", []))
+    from freemocap.system.certify.start_check import plan_total
+    return [PackagePlan(package=plan["package"], seconds_estimate=plan["seconds_estimate"], total=plan_total(plan),
+                        risks=plan.get("risks", []), downloads=plan["downloads"], system_changes=plan.get("system_changes", []),
+                        checks=(plan.get("details") or {}).get("checks", []))
             for plan in (certify_plan("quick"), skellytracker.certify_plan("quick"))]
 
 

@@ -3066,6 +3066,16 @@ export interface components {
              * @description The checks it runs: freemocap's check names, skellytracker's EP check names.
              */
             checks: string[];
+            /**
+             * Total
+             * @description The count of checks that the run will do (report format 2.6).
+             */
+            total: number;
+            /**
+             * Risks
+             * @description One fixed sentence for each thing the run can do to a device; empty at quick.
+             */
+            risks: string[];
         };
         /** PlaybackManifest */
         PlaybackManifest: {

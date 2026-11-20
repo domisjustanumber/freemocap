@@ -1,8 +1,9 @@
 """The start check (decisions 12 to 15 and 17): every package's quick check of this machine, and whether the UI needs it.
 
 The UI needs it while freemocap's OS-level item has no reviewed row and no local quick pass for the current version set
-(freemocap, skellycam, skellytracker), and no start check finished in this server session (decision 14: any finished
-check, pass or fail, releases the UI; a cancel does not). skellycam's `certify()` is not built, so only freemocap's item
+(freemocap, skellycam, skellytracker), some package's quick plan has a check to run (report format 2.6: `total` above 0),
+and no start check finished in this server session (decision 14: any finished check, pass or fail, releases the UI; a
+cancel does not). skellycam's `certify()` is not built, so only freemocap's item
 counts; GPU EPs never do (decision 15).
 
 `run_start_check` runs in the quick check's spawn child: freemocap's own checks, then skellytracker's `certify("quick")`
@@ -59,16 +60,41 @@ def record_path() -> Path:
     return certify_folder() / "start-check.json"
 
 
+def plan_total(plan: dict) -> int:
+    """A plan's `total` (report format 2.6): the count of checks that the run will do."""
+    if plan.get("total") is not None:
+        return plan["total"]
+    # shortcut: skellytracker e17761b4 gives no `total`; its listed checks that can run count until its pin gives one.
+    details = plan.get("details") or {}
+    return sum(check not in (details.get("not_run") or {}) for check in details.get("checks") or ())
+
+
+def _has_checks() -> bool:
+    """Some package's quick plan has a check to run: the app never asks for a run that checks nothing (format 2.6, 2.7)."""
+    from freemocap.certification import certify_plan
+    if plan_total(certify_plan("quick")) > 0:
+        return True
+    try:
+        import skellytracker
+        return plan_total(skellytracker.certify_plan("quick")) > 0
+    except Exception:  # noqa: BLE001 - an unreadable plan must not keep the app "still starting"; ask as before
+        logger.exception("skellytracker's quick plan could not be read")
+        return True
+
+
 def start_check_needed() -> bool:
-    """No reviewed row matches this machine, and no local pass was recorded for the current version set."""
+    """No reviewed row matches this machine, no local pass was recorded for the current version set, and some package's
+    quick plan has a check to run."""
     key = os_key()
     if any(row.get("kind") == "full" and all(row.get(name) == key[name] for name in KEY_FIELDS) for row in REVIEWED_OS_ROWS):
         return False
     try:
         record = json.loads(record_path().read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return True
-    return not isinstance(record, dict) or record.get("versions") != version_set()
+        record = None
+    if isinstance(record, dict) and record.get("versions") == version_set():
+        return False
+    return _has_checks()
 
 
 def record_pass(report: dict) -> None:

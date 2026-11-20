@@ -6,9 +6,9 @@ import {planLines, requestStartCheck, requestStartCheckPlan, START_CHECK_TEXT, s
 
 test('each package\'s plan is one line with its checks, estimate, downloads and changes', () => {
     assert.deepEqual(planLines([
-        {package: 'freemocap', seconds_estimate: 30, downloads: [], system_changes: [], checks: ['a', 'b']},
-        {package: 'skellytracker', seconds_estimate: 90, downloads: [{name: 'x.whl', bytes: 1_500_000}], system_changes: ['Installs X.'], checks: ['ep@1']},
-        {package: 'skellytracker', seconds_estimate: 0, downloads: [], system_changes: [], checks: []},
+        {package: 'freemocap', seconds_estimate: 30, total: 2, risks: [], downloads: [], system_changes: [], checks: ['a', 'b']},
+        {package: 'skellytracker', seconds_estimate: 90, total: 1, risks: [], downloads: [{name: 'x.whl', bytes: 1_500_000}], system_changes: ['Installs X.'], checks: ['ep@1']},
+        {package: 'skellytracker', seconds_estimate: 0, total: 0, risks: [], downloads: [], system_changes: [], checks: []},
     ]), ['freemocap: 2 checks, up to about 30 seconds', 'skellytracker: 1 check, up to about 90 seconds, downloads about 2 MB, Installs X.',
         'skellytracker: nothing to check, up to about 0 seconds']);
 });

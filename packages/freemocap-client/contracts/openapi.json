@@ -7362,12 +7362,27 @@
             "type": "array",
             "title": "Checks",
             "description": "The checks it runs: freemocap's check names, skellytracker's EP check names."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "The count of checks that the run will do (report format 2.6)."
+          },
+          "risks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Risks",
+            "description": "One fixed sentence for each thing the run can do to a device; empty at quick."
           }
         },
         "type": "object",
         "required": [
           "package",
           "seconds_estimate",
+          "total",
+          "risks",
           "downloads",
           "system_changes",
           "checks"

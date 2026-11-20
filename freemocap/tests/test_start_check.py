@@ -206,6 +206,20 @@ def test_a_reviewed_row_for_this_machine_stops_the_start_check(base, monkeypatch
     assert not start_check.start_check_needed()
 
 
+def test_the_start_check_is_not_needed_when_no_packages_quick_plan_has_a_check_to_run(base, monkeypatch):
+    import skellytracker
+    tracker = {"package": "skellytracker", "details": {"checks": ["dml@x-0"], "not_run": {"dml@x-0": "ep-not-installed"}}}
+    monkeypatch.setattr(certification, "certify_plan", lambda level: {"package": "freemocap", "total": 0})
+    monkeypatch.setattr(skellytracker, "certify_plan", lambda level: tracker)
+    assert not start_check.start_check_needed(), "no total: only listed checks that can run count"
+    tracker["details"]["not_run"] = {}
+    assert start_check.start_check_needed()
+    tracker["total"] = 0  # a plan's own total wins over the count of its listed checks
+    assert not start_check.start_check_needed()
+    monkeypatch.setattr(certification, "certify_plan", lambda level: {"package": "freemocap", "total": 6})
+    assert start_check.start_check_needed()
+
+
 # - The job, in a real spawn child (module-level stand-ins, so the child can import them) -
 
 def own_pass(level, progress, cancel, *, ui_remote, blender_exe_path=None):
@@ -407,8 +421,8 @@ def test_the_start_check_routes_give_each_packages_plan_and_start_or_refuse(monk
     app.include_router(module.quick_check_router)
     client = TestClient(app)
     plan = client.get("/certify/start_check/plan").json()
-    assert [(row["package"], row["checks"]) for row in plan["packages"]] == [
-        ("freemocap", list(certification.QUICK_CHECKS)), ("skellytracker", ["dml@x-0"])]
+    assert [(row["package"], row["checks"], row["total"], row["risks"]) for row in plan["packages"]] == [
+        ("freemocap", list(certification.QUICK_CHECKS), 6, []), ("skellytracker", ["dml@x-0"], 1, [])]
     application.holds = (PipelineHold("realtime", "rt1"),)
     assert client.post("/certify/start_check").status_code == 409
     application.holds = ()

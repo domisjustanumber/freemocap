@@ -54,6 +54,14 @@ the OS on this PC, and lets the person hand in certify reports. It does this thr
    and `uv lock --check` passes, so `uv.lock` does not change. Fast suite on it: 1718 passed, 7 failed (the old
    baseline; the worker-exit and VMC ones then fixed in `7d97b4ce`, `809d7448`), 20 skipped; an earlier run under heavy load from other sessions also had 4 `test_quick_check`
    timeouts (child sent nothing in 60 s) that pass alone and in the rerun. UI: `tsc` clean, 230/10/46 pass.
+   MOVED 2026-11-20 to `9a5f3912f3627e8d32b37c31109aab22d6d2a61c` (named by the skellytracker session: a LOCAL
+   commit in its checkout `../skellytracker`, not pushed; holds `b9610a73`..`9a5f3912`: video and live rows,
+   quick only on unreviewed pairs within 75 s, report 1.4.0, `eps.certify()` removed, `certify_frames`). Source:
+   the clone `../skellytracker-pin`, fetched from the local path; its 22 ONNX hard links survive, the frames
+   zip is tracked. `pyproject.toml` unchanged, `uv lock --check` passes, `uv.lock` unchanged. Fast suite:
+   1750 passed, 0 failed, 20 skipped (340 s); UI: `tsc` clean, 230/10/46 pass. Isolated quick run (scratch EP
+   store, CPU and DirectML on both GPUs): plan `total` 10 = progress `total` 10, estimate 42 s, no downloads;
+   all 10 rows pass in 23.8 s.
 2. After the migration, freemocap declares neither `onnx` nor `onnxruntime`; both arrive through
    skellytracker. `freemocap.spec:96-97` (collection), `:99-100` (stale `onnx` hidden import) and the
    onnxruntime excludes at `:151-156` move to a skellytracker PyInstaller hook. The dev pin `onnx==1.22.0`
@@ -110,7 +118,8 @@ the OS on this PC, and lets the person hand in certify reports. It does this thr
    `no-commit` in `evidence.reasons`; the UI shows "not valid as evidence" as the expected state of development
    builds, not as a failed check.
    skellytracker check names (skellytracker-6c, 2026-11-19, local commit): each EP on each GPU gives `<ep>`,
-   `<ep>:probe` and `<ep>:image`, with `<ep>` = `<key>@<device>` (device key without `gpu:`, `-` for `:`, e.g.
+   `<ep>:probe` and `<ep>:image` (since `9a5f3912`: `cpu:video`, `cpu:live` first, then per pair `<ep>:probe`,
+   `<ep>:video`, `<ep>:live`, the JPEG rows and `<ep>`), with `<ep>` = `<key>@<device>` (device key without `gpu:`, `-` for `:`, e.g.
    `cuda@10de-2484-0`); `<key>` alone only when the EP has no GPU (`cpu`, a not-run row). Reader rule: a name
    with no `:` is the EP row; the EP key is the text before `@`; `details.eps.<ep>.device` is the real device
    key and `.gpu` the PCI id. Option `device=<device key or list>` (a named EP that cannot use a named GPU is
@@ -1748,6 +1757,12 @@ its issue. Each platform is validated independently; Linux and macOS do not wait
   skellytracker holds no ONNX file and the sidecars give no `url`. Move the clone only when the skellytracker
   session names a commit; its next commits rename `<label>:image` to `<label>:video` and `<label>:live`
   (fixtures `valid-quick.md` and `test_start_check.py` name the old rows).
+- Pin moved to `9a5f3912` (local to the skellytracker session's checkout, not pushed; record in decision 1).
+  freemocap now takes the plan's `total` (fallback removed), shows it as the "N checks" before the run so it
+  matches the run's "N of M", shows plain sentences for `models-missing`, `test-media-missing`, `over-budget`,
+  `video-not-passed`, `cpu-reference-missing`; `test_start_check.py` uses the new rows. `valid-quick.md` keeps
+  `:image`: it is a byte copy of skellycertify's sample at `9e6d575`, which still names them, and tests only the
+  writer's layout. Fast suite 1750 passed, 0 failed, 20 skipped; UI 230/10/46.
 - Fast suite on the clone: 1724 passed, 1 failed, 20 skipped. The failure,
   `test_the_relay_validator_accepts_the_built_file`, comes from the hardened relay code in `../skellycertify`
   (rule 18, clean note) and stays until the note cleaning is built here.

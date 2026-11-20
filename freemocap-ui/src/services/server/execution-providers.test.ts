@@ -164,7 +164,7 @@ test('a choice asks for the check of one pair only when it cannot run now (F1, F
 test('the six result lines, a cancel included, from last_result', () => {
     assert.equal(quickCheckResultText({result: 'pass'}), 'Quick check passed');
     assert.equal(quickCheckResultText({result: 'fail', reason: 'probe-l3-failed'}), 'Quick check failed: probe-l3-failed');
-    assert.equal(quickCheckResultText({result: 'not-run', reason: 'models-missing'}), 'Quick check did not run: models-missing');
+    assert.equal(quickCheckResultText({result: 'not-run', reason: 'models-missing'}), 'Quick check did not run: a model file it needs is not on this system');
     assert.equal(quickCheckResultText({result: 'crashed', reason: 'exit-code-3'}), 'Quick check stopped unexpectedly');
     assert.equal(quickCheckResultText({result: 'error', reason: 'ValueError'}), 'Quick check could not start: ValueError');
     assert.equal(quickCheckResultText({result: 'not-run', reason: 'cancelled'}), 'Quick check cancelled');

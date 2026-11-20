@@ -157,16 +157,26 @@ export const QUICK_CHECK_TEXT = {
     cancelled: 'Quick check cancelled',
 } as const;
 
+/** Plain sentences for skellytracker's reason codes (its REASON_CODES.md) that a person sees; any other code shows as sent. */
+const REASON_TEXT: Readonly<Record<string, string>> = {
+    'models-missing': 'a model file it needs is not on this system',
+    'test-media-missing': 'its test images are missing or damaged',
+    'over-budget': 'it did not fit in the time the quick check allows',
+    'video-not-passed': 'the video check did not pass',
+    'cpu-reference-missing': 'the CPU reference check did not pass',
+};
+export const reasonText = (reason: string): string => REASON_TEXT[reason] ?? reason;
+
 /**
  * How the last check ended, from `certification.last_result`. A cancel is skellytracker's `not-run` with the reason
  * `cancelled`; `error` (certify() raised; the reason is the exception class) and any new result say it could not start.
  */
 export function quickCheckResultText({result, reason}: {result: string; reason?: string}): string {
     if (result === 'pass') return QUICK_CHECK_TEXT.passed;
-    if (result === 'fail') return QUICK_CHECK_TEXT.failed + (reason ?? result);
-    if (result === 'not-run') return reason === 'cancelled' ? QUICK_CHECK_TEXT.cancelled : QUICK_CHECK_TEXT.notRun + (reason ?? result);
+    if (result === 'fail') return QUICK_CHECK_TEXT.failed + reasonText(reason ?? result);
+    if (result === 'not-run') return reason === 'cancelled' ? QUICK_CHECK_TEXT.cancelled : QUICK_CHECK_TEXT.notRun + reasonText(reason ?? result);
     if (result === 'crashed') return QUICK_CHECK_TEXT.crashed;
-    return QUICK_CHECK_TEXT.couldNotStart + (reason ?? result);
+    return QUICK_CHECK_TEXT.couldNotStart + reasonText(reason ?? result);
 }
 
 /** A check this window started for a choice, and the choice that a pass makes the selection (F6). */

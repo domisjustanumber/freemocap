@@ -208,14 +208,13 @@ def test_a_reviewed_row_for_this_machine_stops_the_start_check(base, monkeypatch
 
 def test_the_start_check_is_not_needed_when_no_packages_quick_plan_has_a_check_to_run(base, monkeypatch):
     import skellytracker
-    tracker = {"package": "skellytracker", "details": {"checks": ["dml@x-0"], "not_run": {"dml@x-0": "ep-not-installed"}}}
+    tracker = {"package": "skellytracker", "total": 0, "details": {"checks": ["dml@x-0"], "not_run": {}}}
     monkeypatch.setattr(certification, "certify_plan", lambda level: {"package": "freemocap", "total": 0})
     monkeypatch.setattr(skellytracker, "certify_plan", lambda level: tracker)
-    assert not start_check.start_check_needed(), "no total: only listed checks that can run count"
-    tracker["details"]["not_run"] = {}
+    assert not start_check.start_check_needed(), "a plan's total counts, not its listed checks"
+    tracker["total"] = 6
     assert start_check.start_check_needed()
-    tracker["total"] = 0  # a plan's own total wins over the count of its listed checks
-    assert not start_check.start_check_needed()
+    tracker["total"] = 0
     monkeypatch.setattr(certification, "certify_plan", lambda level: {"package": "freemocap", "total": 6})
     assert start_check.start_check_needed()
 
@@ -242,8 +241,11 @@ def tracker_quick(level, progress, cancel, **options):
     assert level == "quick" and options == {}  # no EP named: every GPU EP with no reviewed row, field-test ones included
     progress({"package": "skellytracker", "kind": level, "state": "running", "step": None, "checks": [], "done": 1,
               "total": 3, "seconds_left": 9})
-    return {"checks": [{"name": "dml@x-0:probe", "result": "pass", "reason": None},
-                       {"name": "dml@x-0", "result": "fail", "reason": "image-not-passed"}], "evidence": {"reasons": []}}
+    return {"checks": [{"name": "cpu:video", "result": "pass", "reason": None}, {"name": "cpu:live", "result": "pass", "reason": None},
+                       {"name": "dml@x-0:probe", "result": "pass", "reason": None},
+                       {"name": "dml@x-0:video", "result": "fail", "reason": "keypoints-differ"},
+                       {"name": "dml@x-0:live", "result": "not-run", "reason": "video-not-passed"},
+                       {"name": "dml@x-0", "result": "fail", "reason": "keypoints-differ"}], "evidence": {"reasons": []}}
 
 
 def _manager(own, needed=True):
@@ -275,7 +277,7 @@ def test_the_start_check_runs_both_packages_records_freemocaps_pass_and_releases
         assert manager.snapshot(()).start_required
         _run_to_end(manager)
         assert [(row.package, row.result, row.reason) for row in manager.start_results] == [
-            ("freemocap", "pass", None), ("skellytracker", "fail", "dml@x-0")]
+            ("freemocap", "pass", None), ("skellytracker", "fail", "dml@x-0:video")]
         assert not manager.snapshot(()).start_required, "a finished check releases the UI, pass or fail"
         assert manager.last_result is None, "the EP quick check's result stays as it was"
         assert (base / "certify" / "start-check.json").is_file()
@@ -403,7 +405,7 @@ def test_the_start_check_routes_give_each_packages_plan_and_start_or_refuse(monk
     import skellytracker
     from freemocap.api.http.certify import quick_check_router as module
     monkeypatch.setattr(skellytracker, "certify_plan", lambda level: {
-        "package": "skellytracker", "kind": level, "seconds_estimate": 90, "downloads": [], "system_changes": [],
+        "package": "skellytracker", "kind": level, "seconds_estimate": 90, "total": 6, "downloads": [], "system_changes": [],
         "questions": [], "details": {"execution_providers": ["dml"], "checks": ["dml@x-0"], "not_run": {}}})
     started = []
 
@@ -422,7 +424,7 @@ def test_the_start_check_routes_give_each_packages_plan_and_start_or_refuse(monk
     client = TestClient(app)
     plan = client.get("/certify/start_check/plan").json()
     assert [(row["package"], row["checks"], row["total"], row["risks"]) for row in plan["packages"]] == [
-        ("freemocap", list(certification.QUICK_CHECKS), 6, []), ("skellytracker", ["dml@x-0"], 1, [])]
+        ("freemocap", list(certification.QUICK_CHECKS), 6, []), ("skellytracker", ["dml@x-0"], 6, [])]  # the plan's total, not its count of pairs
     application.holds = (PipelineHold("realtime", "rt1"),)
     assert client.post("/certify/start_check").status_code == 409
     application.holds = ()

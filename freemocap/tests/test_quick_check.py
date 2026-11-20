@@ -473,7 +473,7 @@ def _refusing_eps(monkeypatch):
 
     def check_start(execution_provider, ep_options=None, device=None):
         raise EpUnavailableError(f"The EP '{execution_provider}' cannot run on 'GPU': no quick check passed.",
-                                 "Run `skellytracker-eps certify KEY --quick`.", execution_provider=execution_provider,
+                                 "Run `skellytracker-eps certify KEY`.", execution_provider=execution_provider,
                                  device_key=DEVICE, reason_code="quick-check-needed")  # the check rule names the GPU
 
     row = SimpleNamespace(key=EP, reason_code=None, checks=(SimpleNamespace(

@@ -1,7 +1,7 @@
 import {createHttpClient} from '@freemocap/client/http';
 import type {Certification, components} from '@freemocap/client';
 import {describeError} from '@/store/slices/thunk-helpers';
-import {type CertificationRun, QUICK_CHECK_TEXT, quickCheckResultText} from '@/services/server/execution-providers';
+import {type CertificationRun, QUICK_CHECK_TEXT, quickCheckResultText, reasonText} from '@/services/server/execution-providers';
 
 export type PackagePlan = components['schemas']['PackagePlan'];
 export type StartCheckResult = NonNullable<Certification['start_results']>[number];
@@ -19,10 +19,11 @@ export const START_CHECK_TEXT = {
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
-/** A package's checks, its one-off estimate, and any download or system change it would make. */
+/** A package's count of checks (its plan's `total`, the M of the run's "N of M"), its one-off estimate, and any download
+ * or system change it would make. */
 export function planDetail(plan: PackagePlan): string {
     const megabytes = plan.downloads.reduce((sum, download) => sum + (Number(download.bytes) || 0), 0) / 1e6;
-    return [plan.checks.length ? plural(plan.checks.length, 'check') : 'nothing to check',
+    return [plan.total ? plural(plan.total, 'check') : 'nothing to check',
         `up to about ${plan.seconds_estimate} seconds`, megabytes ? `downloads about ${Math.ceil(megabytes)} MB` : '',
         ...plan.system_changes].filter(Boolean).join(', ');
 }
@@ -56,9 +57,9 @@ export function startCheckRowStatus(packages: readonly string[], run: Certificat
         if (!ended) return required ? {kind: 'waiting', text: 'Waiting'} : {kind: 'not-run', text: 'Not run in this session'};
         const {result, reason} = ended;
         if (result === 'pass' || result === 'record-only') return {kind: 'passed', text: 'Passed'};
-        if (result === 'fail') return {kind: 'failed', text: `Failed: ${reason ?? result}`};
+        if (result === 'fail') return {kind: 'failed', text: `Failed: ${reasonText(reason ?? result)}`};
         if (result === 'not-run') return reason === 'cancelled' ? {kind: 'cancelled', text: 'Cancelled'}
-            : {kind: 'not-run', text: reason === 'no-check' ? 'Nothing to check' : `Not run: ${reason ?? result}`};
+            : {kind: 'not-run', text: reason === 'no-check' ? 'Nothing to check' : `Not run: ${reasonText(reason ?? result)}`};
         return {kind: 'failed', text: quickCheckResultText({result, reason})};
     });
 }

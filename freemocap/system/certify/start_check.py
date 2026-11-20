@@ -60,23 +60,14 @@ def record_path() -> Path:
     return certify_folder() / "start-check.json"
 
 
-def plan_total(plan: dict) -> int:
-    """A plan's `total` (report format 2.6): the count of checks that the run will do."""
-    if plan.get("total") is not None:
-        return plan["total"]
-    # shortcut: skellytracker e17761b4 gives no `total`; its listed checks that can run count until its pin gives one.
-    details = plan.get("details") or {}
-    return sum(check not in (details.get("not_run") or {}) for check in details.get("checks") or ())
-
-
 def _has_checks() -> bool:
     """Some package's quick plan has a check to run: the app never asks for a run that checks nothing (format 2.6, 2.7)."""
     from freemocap.certification import certify_plan
-    if plan_total(certify_plan("quick")) > 0:
+    if certify_plan("quick")["total"] > 0:
         return True
     try:
         import skellytracker
-        return plan_total(skellytracker.certify_plan("quick")) > 0
+        return skellytracker.certify_plan("quick")["total"] > 0
     except Exception:  # noqa: BLE001 - an unreadable plan must not keep the app "still starting"; ask as before
         logger.exception("skellytracker's quick plan could not be read")
         return True

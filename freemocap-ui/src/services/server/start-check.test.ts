@@ -7,9 +7,9 @@ import {planLines, requestStartCheck, requestStartCheckPlan, START_CHECK_TEXT, s
 test('each package\'s plan is one line with its checks, estimate, downloads and changes', () => {
     assert.deepEqual(planLines([
         {package: 'freemocap', seconds_estimate: 30, total: 2, risks: [], downloads: [], system_changes: [], checks: ['a', 'b']},
-        {package: 'skellytracker', seconds_estimate: 90, total: 1, risks: [], downloads: [{name: 'x.whl', bytes: 1_500_000}], system_changes: ['Installs X.'], checks: ['ep@1']},
+        {package: 'skellytracker', seconds_estimate: 75, total: 6, risks: [], downloads: [{name: 'x.whl', bytes: 1_500_000}], system_changes: ['Installs X.'], checks: ['ep@1']},
         {package: 'skellytracker', seconds_estimate: 0, total: 0, risks: [], downloads: [], system_changes: [], checks: []},
-    ]), ['freemocap: 2 checks, up to about 30 seconds', 'skellytracker: 1 check, up to about 90 seconds, downloads about 2 MB, Installs X.',
+    ]), ['freemocap: 2 checks, up to about 30 seconds', 'skellytracker: 6 checks, up to about 75 seconds, downloads about 2 MB, Installs X.',
         'skellytracker: nothing to check, up to about 0 seconds']);
 });
 
@@ -63,6 +63,9 @@ test("each package's status cell follows the current run, else how its part of t
     [['passed', 'Passed'], ['failed', 'Failed: dml@x-0']]);
     assert.deepEqual(startCheckRowStatus(packages, undefined, [{package: 'freemocap', result: 'not-run', reason: 'no-check'},
         {package: 'skellytracker', result: 'not-run', reason: 'cancelled'}]).map(row => row.text), ['Nothing to check', 'Cancelled']);
+    assert.deepEqual(startCheckRowStatus(packages, undefined, [{package: 'freemocap', result: 'not-run', reason: 'over-budget'},
+        {package: 'skellytracker', result: 'not-run', reason: 'models-missing'}]).map(row => row.text),
+    ['Not run: it did not fit in the time the quick check allows', 'Not run: a model file it needs is not on this system']);
     assert.deepEqual(startCheckRowStatus(packages, undefined, [{package: 'freemocap', result: 'pass'}, {result: 'crashed', reason: 'exit-code-3'}])
         .map(row => row.kind), ['passed', 'failed']);
     // An EP pair's quick check (a run with items) is not the start check: the rows keep the last start check's results.

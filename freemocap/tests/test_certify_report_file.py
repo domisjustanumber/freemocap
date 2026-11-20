@@ -14,10 +14,13 @@ from pathlib import Path
 import pytest
 
 from freemocap.system.certify import report_file
-from freemocap.system.certify.report_file import ReportFileError, build_report_file, privacy_rule, scrub_note
+from freemocap.system.certify.report_file import ReportFileError, build_report_file, clean_note, privacy_rule, scrub_note
 
 FIXTURES = Path(__file__).parent / "fixtures" / "certify"
 RELAY_SRC = Path(__file__).resolve().parents[3] / "skellycertify" / "relay" / "src"
+# The UI's `cleanNote` test reads the same cases, so the two cleanings cannot drift apart unnoticed.
+CLEAN_NOTE_CASES = json.loads((Path(__file__).parents[2] / "freemocap-ui" / "src" / "services" / "server"
+                               / "clean-note-cases.json").read_text(encoding="utf-8"))
 
 
 def _sample(name: str) -> tuple[str, dict]:
@@ -80,14 +83,14 @@ def test_one_module_all_pass_prints_the_short_summary():
     assert json.loads(body.decode("utf-8").split("```json\n")[1].rsplit("```", 1)[0])["schema"] == report_file.SCHEMA
 
 
-def test_a_failed_check_adds_the_failed_table_and_the_note_is_quoted_and_escaped():
+def test_a_failed_check_adds_the_failed_table_and_the_note_is_cleaned_and_quoted():
     module = _module(checks=[{"name": "directml@8086-a780-0", "result": "fail", "reason": "image-mismatch"},
                              {"name": "y", "result": "pass", "reason": None}], valid=False)
-    text = _head(build_report_file([module], "works | elsewhere\n# ![x](y)", None)[1])
+    text = _head(build_report_file([module], "works | elsewhere\n# ![x](y) a_b", None)[1])
     assert "· not valid as evidence: modified-tree" in text
     assert ("Checks that did not pass:\n\n| Package | Module | Test | Result | Reason |\n|---|---|---|---|---|\n"
             "| skellytracker | | directml@8086-a780-0 | fail | image-mismatch |\n\n") in text
-    assert text.endswith("Note of the person:\n\n> works \\| elsewhere\n> \\# \\!\\[x\\](y)\n")
+    assert text.endswith("Note of the person:\n\n> works   elsewhere\n>     x (y) a\\_b\n")
     assert "Checks that did not pass:" not in _head(build_report_file([_module()], None, None)[1])
 
 
@@ -144,7 +147,8 @@ def test_private_and_path_markers_show_without_angle_brackets_in_the_markdown():
 
 def test_two_modules_of_two_packages_print_the_system_once_and_a_line_for_each_module():
     camera = {"group": "camera", "name": "Logitech C922", "device": "046d:085c", "result": "fail"}
-    modules = [_module(), _module("skellycam", "2026-11-19T10:00:00Z", summary=[camera], valid=False)]
+    ticks = _module(checks=[{"name": "a ``` b", "result": "pass", "reason": None}])  # the fence outgrows a run of ticks
+    modules = [ticks, _module("skellycam", "2026-11-19T10:00:00Z", summary=[camera], valid=False)]
     name, body = build_report_file(modules, "a ``` b", {"name": "freemocap", "version": "2.0.0", "commit": None})
     text = body.decode("utf-8")
     assert name == "certify-report-20261119T100000Z.md"
@@ -153,7 +157,7 @@ def test_two_modules_of_two_packages_print_the_system_once_and_a_line_for_each_m
                            "- skellycam 2.0.0 · full run · not valid as evidence: modified-tree\n\n- OS: ")
     assert text.count("- CPU:") == 1 and "| Camera | Result |\n|---|---|\n| Logitech C922 | fail |\n" in text
     assert text.endswith("\n````\n") and "\n````json\n" in text and "\r" not in text
-    assert json.loads(text.split("````json\n")[1].rsplit("````", 1)[0])["note"] == "a ``` b"
+    assert json.loads(text.split("````json\n")[1].rsplit("````", 1)[0])["note"] == "a     b"
     own = _module("freemocap", summary=None, valid=False, host={key: HOST[key] for key in ("os", "cpu", "memory_bytes")})
     assert _head(build_report_file([own, _module()], None, {"name": "freemocap", "version": "2.0.0"})[1]) == (
         "# Certify report\n\nfreemocap 2.0.0 · 2026-11-20 00:25 UTC\n\n"
@@ -209,9 +213,9 @@ def test_the_note_and_the_privacy_rules_refuse_a_file():
     with pytest.raises(ReportFileError) as long_note:
         build_report_file(data["modules"], "x" * 2001, data["app"])
     assert long_note.value.code == "bad-note"
-    with pytest.raises(ReportFileError) as email:
-        build_report_file(data["modules"], "write to someone@example.org", data["app"])
-    assert (email.value.code, email.value.detail) == ("privacy-rule", "5")
+    with pytest.raises(ReportFileError) as mac:  # the cleaning keeps ":" and digits, so a MAC address is still refused
+        build_report_file(data["modules"], "adapter 00:1a:2b:3c:4d:5e", data["app"])
+    assert (mac.value.code, mac.value.detail) == ("privacy-rule", "4")
     _, refused = _sample("refused-privacy.md")
     assert privacy_rule([], refused) == 1
     assert privacy_rule(["![image](x)"], data) == 8
@@ -224,6 +228,31 @@ def test_scrub_note_removes_paths_and_this_hosts_names(monkeypatch):
     note = scrub_note("  Alice ran it on alice-pc from C:\\Users\\alice\\freemocap_data, malice stays\r\n")
     assert note == "<private> ran it on <private> from <path>, malice stays"
     assert scrub_note("   ") is None and scrub_note(None) is None
+
+
+@pytest.mark.parametrize(("note", "clean"), CLEAN_NOTE_CASES)
+def test_clean_note_keeps_what_the_relay_keeps_and_nothing_else(note, clean):
+    assert clean_note(note) == clean
+
+
+def test_the_file_holds_the_cleaned_note_and_refuses_only_a_note_too_long_after_cleaning():
+    _, data = _sample("valid.md")
+    built = json.loads(build_report_file(data["modules"], "mail someone@example.org!", data["app"])[1].decode("utf-8")
+                       .split("```json\n")[1].rsplit("```", 1)[0])
+    assert built["note"] == "mail someone example.org " and clean_note(None) is None
+    shortened = build_report_file(data["modules"], "www." + "x" * 1998, data["app"])[1].decode("utf-8")
+    assert f'"note": "{"x" * 1998}"' in shortened
+    with pytest.raises(ReportFileError) as long_note:
+        build_report_file(data["modules"], "!" * 2001, data["app"])
+    assert long_note.value.code == "bad-note"
+
+
+@pytest.mark.skipif(not RELAY_SRC.is_dir() or shutil.which("node") is None,
+                    reason="needs the skellycertify checkout beside freemocap and node")
+def test_the_relay_validator_accepts_each_cleaned_case():
+    _, data = _sample("valid.md")
+    _, body = build_report_file(data["modules"], "\n".join(note for note, _ in CLEAN_NOTE_CASES), data["app"])
+    assert _relay_verdict(body) == {"rule": 0}
 
 
 @pytest.mark.skipif(not RELAY_SRC.is_dir() or shutil.which("node") is None,

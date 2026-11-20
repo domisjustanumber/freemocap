@@ -2,7 +2,8 @@
 
 `build_report_file()` is pure: the same module reports, note and app block give the same bytes, so the file the
 person views is the file that is sent. It refuses a file that breaks privacy rules 1 to 11 of section 6, the rules
-the relay checks; `scrub_note()` applies rules 12 and 13 to the person's note before the file is built.
+the relay checks; `scrub_note()` applies rules 12 and 13 to the person's note before the file is built, and
+`clean_note()` (rules 18 and 20) cleans whatever note reaches `build_report_file()`.
 """
 
 import getpass
@@ -11,6 +12,7 @@ import re
 import socket
 import subprocess
 import textwrap
+import unicodedata
 from functools import cache
 from pathlib import Path
 
@@ -36,6 +38,11 @@ MEDIA_EXTENSIONS = (".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp", "
 REASON_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
 TRACEBACK = "Traceback (most recent call last)"
 NOTE_PATH_RE = re.compile(PATH_RE.pattern + r"[^\s\"'|,;]*", re.ASCII)
+# Rules 18 and 20 as relay/src/privacy.js and issue.js state them (re.ASCII: JavaScript's \b and \d without `u`).
+NOTE_KEPT = frozenset(" \n.,:;_+=()'%/?·-")  # rule 18, besides the Unicode categories L, M and N
+LINK_RE = re.compile(r"://|www\.", re.ASCII | re.IGNORECASE)
+IPV4_PART = r"(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)"
+IPV4_RE = re.compile(rf"\b(?:{IPV4_PART}\.){{3}}{IPV4_PART}\b", re.ASCII)
 
 
 class ReportFileError(ValueError):
@@ -75,6 +82,24 @@ def scrub_note(note: str | None) -> str | None:
     for name in sorted((name for name in names if name), key=len, reverse=True):
         note = re.sub(rf"(?<!\w){re.escape(name)}(?!\w)", "<private>", note, flags=re.IGNORECASE)
     return note
+
+
+def _no_ipv4(text: str) -> str:
+    """Each IPv4-looking string (rule 20) with its dots as spaces, again until none is left (`1.2.3.4.5.6.7`)."""
+    while (spaced := IPV4_RE.sub(lambda match: match.group().replace(".", " "), text)) != text:
+        text = spaced
+    return text
+
+
+def clean_note(note: str | None) -> str | None:
+    """A clean note (rule 18): each character the relay does not keep as a space, then each `://` and `www.` removed
+    until none is left; then no IPv4-looking string (rule 20). The UI mirrors it as `cleanNote` (shared test cases)."""
+    if note is None:
+        return None
+    note = "".join(c if c in NOTE_KEPT or unicodedata.category(c)[0] in "LMN" else " " for c in note)
+    while LINK_RE.search(note):
+        note = LINK_RE.sub("", note)
+    return _no_ipv4(note)
 
 
 def _string_rule(text: str) -> int:
@@ -260,11 +285,10 @@ def _markdown(modules: list[dict], note: str | None, app: dict | None, created: 
         lines += ["Checks that did not pass:", "", "| Package | Module | Test | Result | Reason |", "|---|---|---|---|---|",
                   *rows, ""]
     if note is not None:
-        # Markdown characters escaped so the note shows as typed; wrapped so no line passes the 2000-character rule.
-        quoted = [re.sub(r"([\\`*_\[\]<>!|~#])", r"\\\1", chunk)
-                  for line in note.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-                  for chunk in textwrap.wrap(line, 900) or [""]]
-        lines += ["Note of the person:", "", *(f"> {line}".rstrip() for line in quoted), ""]
+        # A clean note's one Markdown character, `_`, escaped so it shows as typed; wrapped under the 2000-character rule.
+        quoted = [chunk.replace("_", "\\_") for line in note.split("\n") for chunk in textwrap.wrap(line, 900) or [""]]
+        # Again without IPv4: the escape or a wrap can put a word boundary next to a number of the note.
+        lines += ["Note of the person:", "", *(_no_ipv4(f"> {line}".rstrip()) for line in quoted), ""]
     return lines[:-1]
 
 
@@ -276,6 +300,7 @@ def build_report_file(modules: list[dict], note: str | None, app: dict | None) -
     """
     if not modules:
         raise ReportFileError("bad-module", "a report file holds at least one module report")
+    note = clean_note(note)  # whatever a client sent, the file holds a clean note; only its length is refused
     if note is not None and len(note) > NOTE_MAX_CHARS:
         raise ReportFileError("bad-note", f"the note has more than {NOTE_MAX_CHARS} characters")
     times = [module.get("created_utc") for module in modules]

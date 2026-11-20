@@ -6,7 +6,7 @@ import {serverUrls} from '@/services';
 import {useAppSelector} from '@/store';
 import {useHandIn} from '@/hooks/useHandIn';
 import {
-    bottomButtonLabel, certificationButtonSuffix, footerActionText, reportFooterAction, reportsReady, sendAndOpenLabel, submitText, CERTIFICATION_TEXT, handedIn, ISSUE_FORM_URL, issueFormProminent, issueLabel, isLocalHost,
+    bottomButtonLabel, certificationButtonSuffix, cleanNote, footerActionText, reportFooterAction, reportsReady, sendAndOpenLabel, submitText, CERTIFICATION_TEXT, handedIn, ISSUE_FORM_URL, issueFormProminent, issueLabel, isLocalHost,
     openCertification, outboxLine, pendingRows, pendingSummary, REPORTS_SECTION_ID, submitLabel,
 } from '@/services/server/certification-hand-in';
 import {START_CHECK_TEXT} from '@/services/server/start-check';
@@ -112,6 +112,10 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                             <textarea className="setting-text-input" rows={3} value={handIn.note}
                                       onChange={event => handIn.setNote(event.target.value)}/>
                         </label>
+                        {/* The field keeps what was typed (no caret jumps); the preview shows what the file will hold. */}
+                        <p className="text sm text-darkgray">{CERTIFICATION_TEXT.noteKept}</p>
+                        {cleanNote(handIn.note) !== handIn.note && <p className="text sm text-gray" style={{whiteSpace: 'pre-wrap', overflowWrap: 'anywhere'}}>
+                            {CERTIFICATION_TEXT.noteCleaned}{cleanNote(handIn.note)}</p>}
                         <div className="flex flex-row gap-2 flex-wrap">
                             <SendButton phase={phase} text={submitText(phase, submitLabel(pending.length))} className={prominent ? '' : 'primary accent'}
                                         buttonType={prominent ? 'secondary' : ''} onClick={() => { setClosedView(null); handIn.submit(); }}/>

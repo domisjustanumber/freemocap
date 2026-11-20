@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import type {Certification} from '@freemocap/client';
 import {
-    bottomButtonLabel, certificationButtonSuffix, footerActionText, reportFooterAction, reportsReady, sendAndOpenLabel, submitLabel, submitText, handedIn, type HandInList, isLocalHost, issueFormProminent, outboxLine, pendingRows, pendingSummary,
+    bottomButtonLabel, certificationButtonSuffix, cleanNote, footerActionText, reportFooterAction, reportsReady, sendAndOpenLabel, submitLabel, submitText, handedIn, type HandInList, isLocalHost, issueFormProminent, outboxLine, pendingRows, pendingSummary,
     requestHandIn, requestNotSent, requestOpened, requestReportFile, requestSend, safeIssueUrl, sendAnswerMessage, viewIsCurrent,
     type ViewedReport,
 } from './certification-hand-in';
+import CLEAN_NOTE_CASES from './clean-note-cases.json';
 
 const ISSUE = 'https://github.com/domisjustanumber/skellycertify/issues/42';
 const BASE: Certification = {host: {name: 'lab-machine', os: 'Windows 11'}, items: [], gpu_held_by: [], pending_reports: []};
@@ -163,4 +164,8 @@ test('the report pop-up says what its right-hand button does, with the same plur
     assert.equal(footerActionText('submit', 1), 'Send report and open FreeMoCap sends this report to the FreeMoCap team as a public issue on GitHub.');
     assert.equal(footerActionText('submit', 3), 'Send reports and open FreeMoCap sends this report to the FreeMoCap team as a public issue on GitHub.');
     assert.equal(footerActionText('issue-form', 3), 'Save file and open issue form saves this report and opens the GitHub form to attach it to.');
+});
+
+test('the note is cleaned as the server cleans it (the cases the Python suite shares)', () => {
+    for (const [note, clean] of CLEAN_NOTE_CASES) assert.equal(cleanNote(note), clean, JSON.stringify(note));
 });

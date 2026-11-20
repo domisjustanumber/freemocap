@@ -27,6 +27,8 @@ export const CERTIFICATION_TEXT = {
     reports: 'Help FreeMoCap by sharing your (anonymous) results',
     nothingPending: 'Nothing to share right now.',
     noteLabel: "Anything you'd like to tell us?",
+    noteKept: 'Letters, numbers and basic punctuation are kept; links and other symbols are removed.',
+    noteCleaned: 'Your note will read: ',
     privacy: 'The note becomes part of the report, which is public. Do not write your name, contact details or other '
         + 'personal details. Paths and this system\'s user and host names are removed.',
     viewReport: 'View report',
@@ -54,6 +56,22 @@ export const CERTIFICATION_TEXT = {
     continue: 'Continue',
     doNotSend: 'Do not send and open FreeMoCap',
 } as const;
+
+const NOTE_DROP = /[^\p{L}\p{M}\p{N} \n.,:;_+=()'%/?·-]/gu;
+const NOTE_LINK = /:\/\/|www\./gi;
+const IPV4_PART = '(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)';
+const IPV4 = new RegExp(`\\b(?:${IPV4_PART}\\.){3}${IPV4_PART}\\b`, 'g');
+
+/** The note as the report file will hold it (rules 18 and 20 of skellycertify's privacy rules): the mirror of the
+ * server's `clean_note()`, checked against the same cases (`clean-note-cases.json`). Paths and this host's names are
+ * removed only by the server, so "View report" shows the exact file. */
+export function cleanNote(note: string): string {
+    let text = note.replace(NOTE_DROP, ' ');
+    while (text.search(NOTE_LINK) >= 0) text = text.replace(NOTE_LINK, '');
+    let spaced: string;
+    while ((spaced = text.replace(IPV4, match => match.replaceAll('.', ' '))) !== text) text = spaced;
+    return text;
+}
 
 /** "Submit report", or "Submit reports" when the server lists more than one pending report. */
 export type SendPhase = 'idle' | 'submitting' | 'sent';

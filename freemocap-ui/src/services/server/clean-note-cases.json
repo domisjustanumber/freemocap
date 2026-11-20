@@ -1,0 +1,19 @@
+[
+  ["Line one.\nLine two: 5 min, 30% (ok) - fine? yes/no; a_b + c = d · it's", "Line one.\nLine two: 5 min, 30% (ok) - fine? yes/no; a_b + c = d · it's"],
+  ["great!", "great "],
+  ["say \"hi\" & `code` *", "say  hi     code   "],
+  ["a\tb\r\nc\u0000d\u202ee\u00a0f", "a b \nc d e f"],
+  ["ok \ud83d\ude00", "ok  "],
+  ["it\u2019s \u2014 fine", "it s   fine"],
+  ["<b>@me #1 [x](y)", " b  me  1  x (y)"],
+  ["see https://example.com", "see httpsexample.com"],
+  ["www.example.com and WwW.Example", "example.com and Example"],
+  ["ww://w.", ""],
+  [":/:///", ""],
+  ["wwwww.w.", ""],
+  ["h:t/t/p://x", "h:t/t/px"],
+  ["\u65e5\u672c\u8a9e \u00dcn\u00efc\u00f6d\u00e9 e\u0301 \u0928\u092e\u0938\u094d\u0924\u0947 \u00b2\u00bd", "\u65e5\u672c\u8a9e \u00dcn\u00efc\u00f6d\u00e9 e\u0301 \u0928\u092e\u0938\u094d\u0924\u0947 \u00b2\u00bd"],
+  ["my address is 203.0.113.9.", "my address is 203 0 113 9."],
+  ["1.2.3.4.5.6.7", "1 2 3 4 5 6 7"],
+  ["version 1.2.3, 256.1.1.1, x1.2.3.4", "version 1.2.3, 256.1.1.1, x1.2.3.4"]
+]

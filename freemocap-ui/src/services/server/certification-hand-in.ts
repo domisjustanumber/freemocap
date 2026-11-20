@@ -55,6 +55,12 @@ export const CERTIFICATION_TEXT = {
 } as const;
 
 /** "Submit report", or "Submit reports" when the server lists more than one pending report. */
+export type SendPhase = 'idle' | 'submitting' | 'sent';
+
+/** The send button's label: "Submitting..." while this window's send is in flight, "Sent!" just after it was accepted. */
+export const submitText = (phase: SendPhase, pendingCount: number) =>
+    phase === 'submitting' ? 'Submitting...' : phase === 'sent' ? 'Sent!' : submitLabel(pendingCount);
+
 export const submitLabel = (pendingCount: number) => pendingCount > 1 ? CERTIFICATION_TEXT.submitReports : CERTIFICATION_TEXT.submitReport;
 
 /** The reports to share show once no check runs and the start check, when required, has ended (passed, failed or

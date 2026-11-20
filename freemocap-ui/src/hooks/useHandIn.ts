@@ -1,13 +1,14 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 import type {Certification} from "@freemocap/client";
 import {
-    type HandInList, type HandInMessage, CERTIFICATION_TEXT, ISSUE_FORM_URL, requestHandIn, requestNotSent, requestOpened,
+    type HandInList, type HandInMessage, type SendPhase, CERTIFICATION_TEXT, ISSUE_FORM_URL, requestHandIn, requestNotSent, requestOpened,
     requestReportFile, requestSend, type ViewedReport, viewIsCurrent,
 } from "@/services/server/certification-hand-in";
 import {describeError} from "@/store/slices/thunk-helpers";
 
-interface Local {list: HandInList | null; note: string; view: ViewedReport | null; message: HandInMessage | null}
-const NONE: Local = {list: null, note: '', view: null, message: null};
+/** `phase`: this window's send in flight or just accepted; held per server identity, so a reconnect clears it. */
+interface Local {list: HandInList | null; note: string; view: ViewedReport | null; message: HandInMessage | null; phase: SendPhase}
+const NONE: Local = {list: null, note: '', view: null, message: null, phase: 'idle'};
 
 const errorText = (error: unknown) => describeError(error instanceof Error ? error.message : error) || String(error);
 
@@ -64,10 +65,14 @@ export function useHandIn(endpoint: string, serverKey: string, open: boolean, ce
         if (sending.current) return;
         const key = serverKey;
         sending.current = true;
+        update({phase: 'submitting'});
         requestSend(endpoint, target)
             .catch(error => ({text: CERTIFICATION_TEXT.couldNotSend + errorText(error), error: true, offerIssueForm: false}))
             .then(answer(key, (message: HandInMessage) => {
-                update(message.viewAgain ? {message, view: null} : {message});
+                const phase: SendPhase = message.error ? 'idle' : 'sent';
+                update(message.viewAgain ? {message, view: null, phase} : {message, phase});
+                // The issue this send created or matched, in the system's browser (same mechanism as the issue form).
+                if (!message.error && message.issueUrl) window.open(message.issueUrl, '_blank', 'noopener');
                 requestHandIn(endpoint).then(answer(key, list => update({list})), () => undefined);
             }))
             .finally(() => { sending.current = false; });
@@ -119,6 +124,8 @@ export function useHandIn(endpoint: string, serverKey: string, open: boolean, ce
         message: local.message,
         viewReport: view,
         submit,
+        phase: local.phase,
+        clearPhase: useCallback(() => update({phase: 'idle'}), [update]),
         issueForm,
         notSent,
     };

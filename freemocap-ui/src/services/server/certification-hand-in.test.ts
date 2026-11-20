@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import type {Certification} from '@freemocap/client';
 import {
-    bottomButtonLabel, certificationButtonSuffix, reportFooterAction, reportsReady, submitLabel, handedIn, type HandInList, isLocalHost, issueFormProminent, outboxLine, pendingRows, pendingSummary,
+    bottomButtonLabel, certificationButtonSuffix, reportFooterAction, reportsReady, submitLabel, submitText, handedIn, type HandInList, isLocalHost, issueFormProminent, outboxLine, pendingRows, pendingSummary,
     requestHandIn, requestNotSent, requestOpened, requestReportFile, requestSend, safeIssueUrl, sendAnswerMessage, viewIsCurrent,
     type ViewedReport,
 } from './certification-hand-in';
@@ -151,4 +151,9 @@ test('the report pop-up offers Submit while the relay can take the file, else th
     assert.equal(reportFooterAction(LIST, large, null, 1), 'issue-form');
     assert.equal(reportFooterAction(LIST, small, {text: 'x', error: true, offerIssueForm: true}, 1), 'issue-form');
     assert.equal(reportFooterAction(LIST, small, null, 0), null);
+});
+
+test('the send button says Submitting... while the send is in flight and Sent! once accepted', () => {
+    assert.deepEqual([submitText('idle', 2), submitText('submitting', 2), submitText('sent', 1), submitText('idle', 1)],
+        ['Submit reports', 'Submitting...', 'Sent!', 'Submit report']);
 });

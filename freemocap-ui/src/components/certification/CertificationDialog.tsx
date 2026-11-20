@@ -6,7 +6,7 @@ import {serverUrls} from '@/services';
 import {useAppSelector} from '@/store';
 import {useHandIn} from '@/hooks/useHandIn';
 import {
-    bottomButtonLabel, certificationButtonSuffix, reportFooterAction, reportsReady, CERTIFICATION_TEXT, handedIn, ISSUE_FORM_URL, issueFormProminent, issueLabel, isLocalHost,
+    bottomButtonLabel, certificationButtonSuffix, reportFooterAction, reportsReady, submitText, CERTIFICATION_TEXT, handedIn, ISSUE_FORM_URL, issueFormProminent, issueLabel, isLocalHost,
     openCertification, outboxLine, pendingRows, pendingSummary, REPORTS_SECTION_ID, submitLabel,
 } from '@/services/server/certification-hand-in';
 import {START_CHECK_TEXT} from '@/services/server/start-check';
@@ -51,6 +51,14 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
         setClosedView(shown);
         viewButton.current?.querySelector('button')?.focus();
     }, [shown]);
+
+    // "Sent!" shows for 1.5 s, then the pop-ups close so the app is in view; the timer goes with the dialog.
+    const {phase, clearPhase} = handIn;
+    useEffect(() => {
+        if (phase !== 'sent') return;
+        const timer = setTimeout(() => { clearPhase(); setReportAsked(false); setClosedView(shown); if (!required) onClose(); }, 1500);
+        return () => clearTimeout(timer);
+    }, [phase, clearPhase, shown, required, onClose]);
 
     useEffect(() => {
         if (!open || (required && !showReport)) return;
@@ -100,8 +108,8 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                                       onChange={event => handIn.setNote(event.target.value)}/>
                         </label>
                         <div className="flex flex-row gap-2 flex-wrap">
-                            <ButtonSm text={submitLabel(pending.length)} textColor="text-white" className={prominent ? '' : 'primary accent'}
-                                      buttonType={prominent ? 'secondary' : ''} onClick={() => { setClosedView(null); handIn.submit(); }}/>
+                            <SendButton phase={phase} text={submitText(phase, pending.length)} className={prominent ? '' : 'primary accent'}
+                                        buttonType={prominent ? 'secondary' : ''} onClick={() => { setClosedView(null); handIn.submit(); }}/>
                             <span ref={viewButton}>
                                 <ButtonSm text={CERTIFICATION_TEXT.viewReport} buttonType="secondary" onClick={() => {
                                     setReportAsked(true);
@@ -167,8 +175,8 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                                     : !shown.file.fits_relay ? CERTIFICATION_TEXT.tooLarge : '') : ''}</p>
                         <div className="flex flex-row gap-2" style={{justifyContent: 'space-between'}}>
                             <ButtonSm text={CERTIFICATION_TEXT.close} buttonType="secondary" textColor="text-white" onClick={closeReport}/>
-                            {footer === 'submit' && <ButtonSm text={submitLabel(pending.length)} textColor="text-white" className="primary accent"
-                                                              onClick={handIn.submit}/>}
+                            {footer === 'submit' && <SendButton phase={phase} text={submitText(phase, pending.length)} className="primary accent"
+                                                                buttonType="" onClick={handIn.submit}/>}
                             {footer === 'issue-form' && <ButtonSm text={CERTIFICATION_TEXT.issueForm} textColor="text-white"
                                                                   className="primary accent" onClick={handIn.issueForm}/>}
                         </div>
@@ -179,6 +187,14 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
         </>}
     </>;
 }
+
+/** The single send action's button: dimmed, busy and not clickable with the turning icon while the send is in flight. */
+const SendButton = ({phase, text, className, buttonType, onClick}: {phase: string; text: string; className: string; buttonType: string;
+                     onClick: () => void}) =>
+    <span className="certify-busy" aria-busy={phase === 'submitting'} style={phase === 'submitting' ? {opacity: 0.6} : undefined}>
+        <ButtonSm text={text} textColor="text-white" className={className} buttonType={buttonType} disabled={phase !== 'idle'}
+                  iconClass={phase === 'submitting' ? 'loader-icon' : ''} onClick={onClick}/>
+    </span>;
 
 /** The settings-modal centres itself with translate(-50%, -50%), which puts the text on half pixels (blurred) whenever
  * the height or the display scale makes the half odd; these dialogs are centred by a flex layer instead. */

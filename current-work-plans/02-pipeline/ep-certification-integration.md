@@ -121,7 +121,8 @@ the OS on this PC, and lets the person hand in certify reports. It does this thr
     at hand-in.
     Built for hand-in (`208ae320`): the file is made at hand-in from `read_report()` of the chosen reports, not
     at run time, so no lookup by `created_utc`/`kind` exists. It is kept under `certify/` when it is accepted
-    ("send" or "opened"). freemocap's own module and skellycam's are not in it (their `certify()` is not built).
+    ("send" or "opened"). freemocap's own modules are in it since `8659b5d2` (see [freemocap's own module and reports:
+    built](#freemocaps-own-module-and-reports-built)); skellycam's are not (its `certify()` is not built).
 11. freemocap's `package.commit` comes from `freemocap/build_info.py` (`BUILD_GIT_SHA`, written by the
     installer workflow); in a source tree it tries git, else `no-commit`. The workflow must compute a new
     `BUILD_TREE_MODIFIED` before it writes `build_info.py`, because writing that file dirties the tree.
@@ -753,6 +754,12 @@ files nothing.
     "Handed in as issue #N: <link>" and a line "Handed in as issue #N · 7 reports" with "Not sent". The button suffix
     is gone. Clicking the link opens the issue. ("Not sent" afterwards only marks the reports pending here; the issue
     stays on GitHub.)
+14. freemocap's own reports (after any start check that ended, pass or fail; step 4 checklist): open the dialog. Each
+    line under "Reports to hand in" starts with the package, "freemocap · ..." or "skellytracker · ...".
+15. Click "View report". The file holds a freemocap module and the skellytracker modules together; its table has rows
+    starting "| freemocap |".
+16. Click "Save file and open issue form", close the GitHub tab WITHOUT submitting, then "Not sent". The freemocap line is
+    listed again with the skellytracker lines (each package's store got the mark).
 
 ### F15 step 4: built
 
@@ -824,12 +831,12 @@ What step 4 is, from decisions 9, 12 to 15, 17, 27 and "freemocap's own checks",
   1. A failed start check releases the UI for this server session only (decision 14), and only a pass is recorded
      (decision 13), so the box returns at the next start until a pass. Recommended: keep (literal reading); the
      alternative is to record any finished check.
-  2. freemocap's own module report is kept only inside `start-check.json` (on a pass) and is not in the hand-in list;
+  2. (Resolved by J13/J18, `8659b5d2`.) freemocap's own module report is kept only inside `start-check.json` (on a pass) and is not in the hand-in list;
      the hand-in reads skellytracker's store only. So a freemocap failure shows as a failure line but has no report to
      file. Recommended: freemocap keeps its module reports under `certify/reports/` with its own pending state, and the
      hand-in routes merge them with skellytracker's (one file per hand-in, decision 22). Needs a decision because it
      changes the hand-in routes.
-  3. skellycertify's report format lists only skellytracker and skellycam as packages (section 9); freemocap's module
+  3. (Resolved: skellycertify `f89c711` lists freemocap.) skellycertify's report format lists only skellytracker and skellycam as packages (section 9); freemocap's module
      needs a row there (reason codes: the docstring of `freemocap/certification.py`). Recommended: ask the skellycertify session.
   4. skellycam's `certify()` is not built, so only freemocap's item gates the box. Recommended: add skellycam's item when
      it exists; no placeholder now.
@@ -866,6 +873,12 @@ To see the box again later, delete that file.
    Record is refused with "The start check is running; ...".
 10. Restart the backend while the dialog shows a running check. The page recovers without a refresh; no old progress or
     red line stays.
+11. After a start check where a package failed, its red line "<package>: Quick check failed: <check>" has "File report".
+    Clicking it scrolls the dialog to "Reports to hand in", where that package's report is listed. The label never
+    changes and the button is never greyed out.
+12. After a passed start check, `<data folder>/certify/reports/` holds one `<uuid>.json` (a second pass replaces it, the
+    older pass is pruned) and the button's suffix counts it ("· N to file").
+13. Quit and restart the app: the same freemocap report is still listed (the list is read from the data folder).
 
 ### F15 step 5: built
 
@@ -977,6 +990,62 @@ machine: Windows downloads, installs or removes a package for your user.
    stays; the AMD GPU line shows the state skellytracker reports (an install stopped by the exit stays "not
    installed"; "Remove" clears what it added).
 9. The "Install", "Remove", "Keep" and "Cancel install" labels never change and are never greyed out.
+
+### freemocap's own module and reports: built
+
+2026-11-19, decisions J13, J18, J19 (skellycertify main `f89c711` lists freemocap as a package). Commits: `f2909099`
+(the module), `8659b5d2` (its reports and the merged hand-in).
+
+- The module: `freemocap/certification.py` (moved with `git mv` from `freemocap/system/certify/own_checks.py`, check names
+  unchanged) holds `certify`, `certify_plan` and the reason codes (its module docstring, "freemocap's reason codes", report
+  format 5.4). `freemocap.certify` and `freemocap.certify_plan` are exported lazily by a module `__getattr__` in
+  `freemocap/__init__.py`; `import freemocap` does not import `freemocap.certification` (tested in a fresh interpreter).
+  `freemocap/system/certify/` keeps only the app role: the start check, the quick-check job, the file and the hand-in.
+- Level `full` stays callable; its checks are `not-run` `not-built` and its report carries `partial-run` and is not valid
+  (format 7.1 statement 4). `certify_plan(level, *, ui_remote=None, blender_exe_path=None)` takes `certify`'s options
+  (format 2.2); neither changes the plan.
+- The store, in the data folder: `certify()` keeps each report with a `pass` or `fail` check as
+  `<base data folder>/certify/reports/<id>.json` and the hand-in states in `<base data folder>/certify/hand-in.json`, with
+  skellytracker's function shapes and rules: `pending_reports(include_handed_in=False)`, `read_report(id)`,
+  `mark_reports(ids, state, *, reference=None)` (states `pending`, `opened`, `covered`; "Not sent" = `pending`, which
+  clears the reference; an unknown state or id, or a reference with `pending`, raises `ValueError` and changes nothing),
+  and pruning of each older quick pass whose passed checks newer passes repeat (failures, handed-in reports and `full`
+  reports stay). Ids are v4 UUIDs, matched only as safe file names, never parsed. A run with no pass or fail (cancelled,
+  `full`) is not kept. A data folder that cannot be written logs a warning; `certify()` still returns the report.
+- The merge (`freemocap/system/certify/relay.py`): `hand_in_reports()` joins freemocap's and skellytracker's
+  `pending_reports()` rows, each with `package`, the oldest first; `report_file_for` reads each id from the store that holds
+  it (freemocap's, then skellytracker's), so one file holds modules of both packages, each unchanged (top-level schema rule
+  as before: 1.1.0 once any module has an `id`). Every mark (send's 200, the outbox retry's 200, "opened", "Not sent") groups
+  the ids by store and calls that store's `mark_reports`; an id no store holds is `unknown-report` before anything changes.
+- Message and API: `certification.pending_reports` now holds freemocap's reports too, with its existing fields (no message
+  model, golden or Zod change: the UI takes the package from the hand-in list). `GET /freemocap/certify/hand_in` rows gain a
+  required `package`; `openapi.json` and `schema.ts` refreshed; no operation added, so `operations.json`/`coverage.md`
+  unchanged.
+- UI: the dialog's report lines start with the package (`pendingRows`); a failed package line of the start-check result
+  (freemocap's, and skellytracker's, whose report is in its store too) has "File report", which fires `open-certification`
+  and scrolls to "Reports to hand in" (`REPORTS_SECTION_ID`).
+- Until a freemocap build's commit is on a pushed branch of freemocap's public repository (format 9:
+  `domisjustanumber/freemocap`), the reviewer treats its module as a record only (`commit-not-public`). Pushing is the
+  user's decision; the note is also in `freemocap/certification.py`'s docstring.
+- Tests: `test_start_check.py` (the store's states, not-sent, refused marks, pruning, one pass replacing the one before, an
+  unwritable data folder, the lazy import, `partial-run`, `certify_plan` options), `test_certify_relay.py` (the merged list
+  and file with two packages, the outbox retry's 200 and "Not sent"/"opened" reaching each store, the route's `package`;
+  fake relay only), `test_certify_report_file.py` (freemocap's real `certify()` quick and full, with stand-ins for the
+  spawn child and Blender, in one file with two skellytracker modules, through the Python privacy rules and the relay's
+  own validator in node). Suite: 1707 passed, 7 failed (exactly the known baseline), 20 skipped, relay URL empty; skellytracker at 8b9caace.
+- Not verified: a real start check (it writes this machine's EP store), the rendered dialog and the scroll (no DOM test
+  renderer), a real relay send of a two-package file.
+- Open points (smallest option taken):
+  1. skellycertify's section 9 still names `freemocap.system.certify.own_checks.certify` and the docstring of
+     `own_checks.py`; it should say `freemocap.certify` / `freemocap.certify_plan` and the docstring of
+     `freemocap/certification.py`. It also lists only `ui_remote`; freemocap also takes `blender_exe_path` (J16).
+     Recommended: ask the skellycertify session to update the row.
+  2. The store lock is per process: the start check's child prunes while the server may mark. Only an older pass that a
+     newer pass repeats can be pruned in that window. Recommended: keep (`shortcut:` comment in the code).
+  3. "File report" also shows for a failed skellytracker part of the start check (its report is in its store). Recommended:
+     keep.
+  4. A freemocap pass is still also copied into `start-check.json` (the start check's record); the store keeps its own copy.
+     Recommended: keep; they serve different rules (decision 13 against the hand-in).
 
 ## Environment on the dev PC
 
@@ -1126,8 +1195,11 @@ Update 2026-11-19, after the fourth grilling (decisions J1 to J20, above):
 also runs DirectML checks and writes this machine's EP store.
 (b) Which repository holds freemocap's commits for `package.commit` is the user's open decision: the branch is local
 with no upstream, and the remotes are the user's fork and the organisation's repository.
-(c) To do next: the user's manual checklists for steps 2 to 5; then the full-check grilling; freemocap's own reports
-after the skellycertify spec change (J13, J19); the pin move after the user's version numbers (H4).
+(c) To do next: the user's manual checklists for steps 2 to 5 (steps 3 and 4 gained freemocap-report steps); then the
+full-check grilling; the pin move after the user's version numbers (H4). Done: freemocap's own module and reports (J13,
+J18, J19; `f2909099`, `8659b5d2`); open: ask skellycertify to update section 9's freemocap row (the new import path).
+(d) A freemocap module is a record only (`commit-not-public`) until this branch is pushed to freemocap's public
+repository; pushing is the user's decision.
 
 Settled by the third grilling (see below): freemocap says "machine" for the computer (G1); dependency bumps are
 out of this plan (G8), so there is nothing to wait for from the user except the F15 step 2 checklist (G7).
@@ -1263,9 +1335,10 @@ All confirmed by the user.
 - J12. After a cancel the app stays blocked if freemocap's own part had not passed.
 - J13. freemocap will keep its own reports and pending state, and the hand-in routes will merge them with skellytracker's.
   J18: stored under `certify/` in the data folder, with the same states as skellytracker's (pending, handed in, "Not sent"
-  returns to pending) and the same pruning of older duplicate passes. NOT built yet. J19: it waits for skellycertify's
-  spec to list freemocap as a package (asked; that spec change is the user's decision in the skellycertify session). Until
-  then a freemocap failure shows a red line with no "File report".
+  returns to pending) and the same pruning of older duplicate passes. J19: it waited for skellycertify's spec to list
+  freemocap as a package (done in skellycertify main `f89c711`). BUILT: J13, J18 and J19 in `f2909099` (module) and
+  `8659b5d2` (reports and merged hand-in); see [freemocap's own module and reports:
+  built](#freemocaps-own-module-and-reports-built). A failed package line of the start check now has "File report".
 - J14. skellycertify was asked to add freemocap as a package. Facts from its reply: one file may hold modules of two
   packages (the normal case; report-format 4.1 and 4.3); the relay checks each module on its own; the issue title uses
   `app.name`/`app.version`, the OS label of `modules[0]` and the GPU names of all modules; the issue body limit is 65,536

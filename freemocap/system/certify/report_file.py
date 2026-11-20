@@ -161,16 +161,17 @@ def _gb(size: object) -> str:
     return f"{round(size / 2**30)} GB" if isinstance(size, int) and size >= 2**30 else ""
 
 
-def _host_lines(host: dict) -> list[str]:
-    """The system list (OS, CPU, RAM); a line is absent when `host` lacks its key. The GPUs are in the EP table."""
-    lines = []
-    if (host.get("os") or {}).get("label"):
-        lines.append(f"- OS: {os_display_name(host['os']['label'])}")
-    if (host.get("cpu") or {}).get("name"):
-        lines.append(f"- CPU: {cpu_display_name(host['cpu']['name'])}")
-    if _gb(host.get("memory_bytes")):
-        lines.append(f"- RAM: {_gb(host['memory_bytes'])}")
-    return lines
+def _host_lines(hosts: list[dict]) -> list[str]:
+    """The one system list of the file (spec 4.2 item 3): each value from the first host that has its key."""
+    os_label = next((host["os"]["label"] for host in hosts if (host.get("os") or {}).get("label")), None)
+    cpu = next((host["cpu"]["name"] for host in hosts if (host.get("cpu") or {}).get("name")), None)
+    ram = next((_gb(host["memory_bytes"]) for host in hosts if _gb(host.get("memory_bytes"))), None)
+    return [line for line in (os_label and f"- OS: {os_display_name(os_label)}", cpu and f"- CPU: {cpu_display_name(cpu)}",
+                              ram and f"- RAM: {ram}") if line]
+
+
+def _gpu_cell(gpu: dict) -> str:
+    return " ".join(filter(None, (gpu_display_name(gpu.get("name")), _gb(gpu.get("vram_bytes")))))
 
 
 def _markdown(modules: list[dict], note: str | None, app: dict | None, created: str) -> list[str]:
@@ -195,8 +196,7 @@ def _markdown(modules: list[dict], note: str | None, app: dict | None, created: 
         lines += [" · ".join(([f"{_cell(app.get('name'))} {_cell(app.get('version'))}"] if app else []) + [when(created)]),
                   "", *(f"- {run(module)} · {validity(module)}" for module in modules), ""]
     hosts = [module.get("host") or {} for module in modules]
-    # Owner ruling (ahead of the spec): one system block for the file, from the first module that has one; no GPU lines.
-    lines += [*next((block for block in map(_host_lines, hosts) if block), []), ""]
+    lines += [*_host_lines(hosts), ""]
     # The writer prints the summary items; it never computes them from checks (spec 3.7).
     items = [(index, item) for index, module in enumerate(modules) for item in module.get("summary") or ()
              if isinstance(item, dict)]
@@ -206,12 +206,18 @@ def _markdown(modules: list[dict], note: str | None, app: dict | None, created: 
             continue
         gpus = {gpu.get("id"): gpu for gpu in hosts[index].get("gpus") or ()}
         device = item.get("device")
-        gpu = gpus.get(device, {"name": device})
-        cell = " ".join(filter(None, (gpu_display_name(gpu.get("name")), _gb(gpu.get("vram_bytes"))))) if device else "-"
+        cell = _gpu_cell(gpus.get(device, {"name": device})) if device else "-"
         eps.append(_row([cell, _cell(item.get("name")), _result(item.get("result"))]))
         eps += [_row([cell, f"{_cell(item.get('name'))} GPU decode", _result(decode.get("result"))])
                 for other, decode in items if other == index and decode.get("group") == "gpu-jpeg"
                 and (decode.get("name"), decode.get("device")) == (item.get("name"), device)]
+    named = {item.get("device") for _, item in items if item.get("group") == "ep"}
+    unchecked = {}  # spec 4.2 item 4: one `not checked` row for each GPU id of the file that no `ep` item names
+    for host in hosts:
+        for gpu in host.get("gpus") or ():
+            if gpu.get("id") not in named:
+                unchecked.setdefault(gpu.get("id"), _row([_gpu_cell(gpu), "", "not checked"]))
+    eps += unchecked.values()
     if eps:
         lines += ["| GPU | Module | Result |", "|---|---|---|", *eps, ""]
     cameras = [_row([_cell(item.get("name")), _result(item.get("result"))]) for _, item in items

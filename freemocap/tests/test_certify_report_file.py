@@ -125,11 +125,21 @@ def test_display_names_shorten_only_the_markdown():
     assert '"NVIDIA GeForce RTX 3070"' in body.decode("utf-8")  # the JSON keeps the driver's name
 
 
-def test_a_module_without_summary_gives_no_ep_or_camera_rows():
-    text = _head(build_report_file([_module(summary=None)], None, None)[1])
-    assert "| GPU |" not in text and text.endswith(f"{SYSTEM}\nCameras: not checked on this system.\n")
-    one = _head(build_report_file([_module(summary=SUMMARY[5:6])], None, None)[1])
-    assert "| GPU | Module | Result |\n|---|---|---|\n| Intel UHD 770 | DirectML | pass |\n\n" in one
+def test_a_gpu_that_no_ep_item_names_gets_one_not_checked_row():
+    none = _head(build_report_file([_module(summary=None), _module(summary=[])], None, None)[1])
+    assert none.endswith(f"{SYSTEM}\n| GPU | Module | Result |\n|---|---|---|\n| NVIDIA RTX 3070 8 GB | | not checked |\n"
+                         "| Intel UHD 770 | | not checked |\n\nCameras: not checked on this system.\n")
+    one = _head(build_report_file([_module(summary=SUMMARY[2:3])], None, None)[1])
+    assert ("| GPU | Module | Result |\n|---|---|---|\n| NVIDIA RTX 3070 8 GB | CUDA | pass |\n"
+            "| Intel UHD 770 | | not checked |\n\n") in one
+    bare = _head(build_report_file([_module(summary=None, host={"cpu": HOST["cpu"]})], None, None)[1])
+    assert "| GPU |" not in bare and "- CPU: Intel Core i7-14700K\n\nCameras:" in bare
+
+
+def test_the_system_list_takes_each_value_from_the_first_host_that_has_it():
+    text = _head(build_report_file([_module(summary=None, host={"cpu": {"name": "AMD Ryzen 7 7700X 8-Core Processor"}}),
+                                    _module()], None, None)[1])
+    assert "\n- OS: Windows 11 26H2\n- CPU: AMD Ryzen 7 7700X\n- RAM: 64 GB\n\n" in text
 
 
 def test_a_long_note_line_is_wrapped_under_the_2000_character_rule():

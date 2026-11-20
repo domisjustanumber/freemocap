@@ -87,7 +87,7 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
         {/* Anchored at a fixed top, so the one step when the reports appear grows downward and nothing above moves. */}
         <Centred zIndex={1000} top block={required}>
         <div className="settings-modal bg-primary border-1 border-black elevated-sharp p-1 flex flex-col br-2" role="dialog" ref={dialogRef} tabIndex={-1}
-             aria-label={CERTIFICATION_TEXT.title} style={{...UNTRANSFORMED, width: 560}}>
+             aria-label={CERTIFICATION_TEXT.title} style={{...UNTRANSFORMED, width: 560, outline: 'none'}}>
             <div className="flex flex-col p-2 gap-2 bg-middark br-1">
                 <div className="flex justify-content-space-between items-center">
                     <SubactionHeader text={CERTIFICATION_TEXT.title}/>

@@ -16,9 +16,9 @@ import {StartCheckSection} from './StartCheckSection';
 export function CertificationButton() {
     const {isConnected, certification} = useAppSelector(state => state.connection);
     const suffix = certificationButtonSuffix(certification, !isLocalHost(serverUrls.getHost()));
-    const color = !isConnected ? 'text-darkgray' : certification?.pending_reports.length || certification?.run ? 'text-white' : 'text-gray';
-    return <div className="main-tab-bar pos-abs top-0 right-0">
-        <ButtonSm text={suffix ? `${CERTIFICATION_TEXT.button} ${suffix}` : CERTIFICATION_TEXT.button} buttonType="quaternary" textColor={color}
+    // Dimmed by opacity: the quaternary button's own rule sets its text colour, so a colour class has no effect.
+    return <div className="main-tab-bar pos-abs top-0 right-0" style={isConnected ? undefined : {opacity: 0.5}}>
+        <ButtonSm text={suffix ? `${CERTIFICATION_TEXT.button} ${suffix}` : CERTIFICATION_TEXT.button} buttonType="quaternary"
                   onClick={openCertification}/>
     </div>;
 }

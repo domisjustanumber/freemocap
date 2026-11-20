@@ -754,6 +754,117 @@ files nothing.
     is gone. Clicking the link opens the issue. ("Not sent" afterwards only marks the reports pending here; the issue
     stays on GitHub.)
 
+### F15 step 4: built
+
+Backend and UI, 2026-11-19, on skellytracker `19b70775` (read-only). Commits: `9a0f83a9` (backend, routes, client contract,
+golden) and `829c5c3f` (UI). Before it, `c366e0bf` used skellytracker
+`19b70775`'s new interface: the quick-check child passes its `multiprocessing.Event` straight to `certify()` (the
+`threading.Event` mirror is gone; the watcher still polls, never `wait()`s); the F4 refusal takes the refused GPU and the
+reason code from `EpUnavailableError.device_key` / `.reason_code` (so a refusal with no device chosen now names the GPU and
+carries its check facts); `certification.items[].reason_code` is now the GPU's `DeviceCheck.reason_code` (same shape;
+`reason` stays the EP row's text), and the menu filter shows a pair that is usable or has a check-rule code.
+
+What step 4 is, from decisions 9, 12 to 15, 17, 27 and "freemocap's own checks", with F13/G12 (no full-check controls):
+- freemocap's own checks (`freemocap/system/certify/own_checks.py`): `certify(level, progress, cancel, *, ui_remote=None)`
+  and `certify_plan(level)` per skellycertify report format 1.1.0. Quick: `build-identity` (pass with SemVer and a 40-hex
+  commit, else record-only with the evidence reasons), `spawn-child` (a `spawn` child answers and exits within 120 s;
+  else fail with `crashed`/`timed-out`/`hung-at-exit` and every later check `not-run` `spawn-failed`), `bundle-imports`
+  (numpy, cv2, pyarrow, av, scipy, numba if shipped, skellyforge, skellytracker, then onnxruntime, in that child;
+  `numbers.failed` as `<module>-<ExceptionClass>`, `from_bundle` when frozen), `data-folder` (create, read, delete a file
+  under the base data folder; `free_bytes`), `install-facts` (record-only: install dir writable, per-user install when
+  frozen, space or non-ASCII in the install, data or home path, `ui_remote`), `blender` (record-only: found, and the
+  version from `blender --version`). Full: the four full checks are `not-run` `not-built`. Reason codes are listed in
+  the module docstring (format 5.4). The report has `id` (UUID4), no path (tested against privacy rule 1), and the host
+  block from skellytracker's `probe_host()`; no GPU facts.
+- The start check (`freemocap/system/certify/start_check.py`): runs in the quick-check job's spawn child: freemocap's
+  `certify("quick")`, then skellytracker's `certify("quick")` with no EP named (every GPU EP with no reviewed row, the
+  field-test ones included; their pass is the opt-in, decision 17). A module that raises is `error` with the class name;
+  after a cancel skellytracker is `not-run` `cancelled`. A freemocap pass is written to
+  `<base data folder>/certify/start-check.json` with the version set (freemocap, skellycam, skellytracker) and the OS key.
+  `start_check_needed()`: no reviewed row (`REVIEWED_OS_ROWS`, empty; key `os_name, os_release, os_arch, build_family,
+  freemocap` major.minor, `kind: full`) and no recorded pass for the current version set. Build family: the Windows
+  build, the macOS major, the Linux `ID-VERSION_ID`. The rows are a Python constant, not the proposed YAML, so a frozen
+  build needs no data file.
+- Job and busy rule (`quick_check.py`): `QuickCheckManager.start(pair=None, ...)` starts the start check through the same
+  admission lock, refusals and claims as a pair check (H1, H2), in both directions; `DELETE /certify/quick_check` cancels
+  it. A start check's run has no `items` and a new `run.package` (the package whose checks run now). Refusal texts now say
+  "The quick check of X on Y ..." or "The start check is running; ...", and the run facts carry null EP and device for a
+  start check.
+- Message (`certification`): `start_required` (bool: needed and no start check ended other than by a cancel in this server
+  session; decision 14) and `start_results` (`[{package, result, reason}]`: each package's part by the section rule, a
+  cancelled run `not-run`/`cancelled`, nothing to check `not-run`/`no-check`, a fail's reason is the first failed check's
+  name; a crash of the whole child has no package). `last_result` (the EP quick check's) is not touched by a start check.
+- Routes (Certification tag): `GET /freemocap/certify/start_check/plan` (`{packages: [{package, seconds_estimate,
+  downloads, system_changes, checks}]}`, freemocap then skellytracker) and `POST /freemocap/certify/start_check` (202 with
+  the run; 409 `pipelines-running` or `quick-check-running`). `ui_remote` comes from the request's client address.
+  Contract: these paths and `PackagePlan`, `StartCheckPlan` in `openapi.json`, `operations.json`, `coverage.md`, the
+  generated client; `start_required`, `start_results` and `run.package` in the Zod schema (optional).
+- UI: `freemocap-ui/src/services/server/start-check.ts` (`START_CHECK_TEXT`, `planLines`, `startResultLines`, the two
+  requests), `components/certification/StartCheckSection.tsx` (in the Certification dialog: the plan per package, "Run
+  quick check", the server's refusal of this window's start, how each package's part ended; progress and "Cancel check"
+  are the dialog's running check, now worded "Quick check of this machine (freemocap): 2 of 6 checks done ..."). While
+  `start_required`: `AppContent` opens the dialog in required mode (no overlay, no cross, no Close, no Escape); the main
+  panel and the sidebar sections are `inert` and dimmed (`BasePanelLayout.tsx`, `SidePanelContent.tsx`); the server
+  connection, the log terminal and the Electron menu stay usable. When the check ends the dialog stays open (now
+  closable) so its results show. Everything comes from the current server state; a restart without a recorded pass
+  brings the box back.
+- Real run on this machine: `own_checks.certify("quick")` in 1.7 s (warm): spawn-child, bundle-imports, data-folder
+  pass; build-identity record-only with evidence `modified-tree` (BUILD_TREE_MODIFIED is None outside CI); `blender`
+  found 5.2.3; module result pass. skellytracker's quick plan with no EP
+  named lists `directml` on both GPUs (RTX 3070 and the Intel iGPU), up to about 90 s. The whole start check was not run
+  for real (it would run DirectML checks and write this machine's EP store).
+- Tests: `freemocap/tests/test_start_check.py` (12: the real quick level, cancel, spawn failure, data folder failure,
+  full level, local pass and version change, reviewed row, the job in a real spawn child for pass / fail / cancel, the
+  busy rule both ways, the routes); `test_quick_check.py` 24 (F4 case with no device added); golden test passes (the
+  golden was regenerated on the combined tree with step 5's fields); `start-check.test.ts` (4); UI suite 220 tests, 219
+  pass, 1 skipped; `tsc --noEmit` clean; client `npm test` 146 pass.
+- Not covered: the rendered required mode (no browser tool, no DOM renderer); "File report" for a start-check failure
+  (see open questions); the collapsed sidebar's icon buttons are not greyed.
+- Open questions, with the recommendation used or proposed:
+  1. A failed start check releases the UI for this server session only (decision 14), and only a pass is recorded
+     (decision 13), so the box returns at the next start until a pass. Recommended: keep (literal reading); the
+     alternative is to record any finished check.
+  2. freemocap's own module report is kept only inside `start-check.json` (on a pass) and is not in the hand-in list;
+     the hand-in reads skellytracker's store only. So a freemocap failure shows as a failure line but has no report to
+     file. Recommended: freemocap keeps its module reports under `certify/reports/` with its own pending state, and the
+     hand-in routes merge them with skellytracker's (one file per hand-in, decision 22). Needs a decision because it
+     changes the hand-in routes.
+  3. skellycertify's report format lists only skellytracker and skellycam as packages (section 9); freemocap's module
+     needs a row there (reason codes: the docstring of `own_checks.py`). Recommended: ask the skellycertify session.
+  4. skellycam's `certify()` is not built, so only freemocap's item gates the box. Recommended: add skellycam's item when
+     it exists; no placeholder now.
+  5. "skellyforge native parts": skellyforge has no compiled modules here, so the check imports `skellyforge`.
+     Recommended: keep until it ships native code.
+  6. `blender` uses freemocap's best-guess Blender path, not the path chosen in the Blender settings (the backend does
+     not hold that). Recommended: keep (record-only).
+
+#### MANUAL CHECKLIST (step 4)
+
+The start check writes to this machine's EP store (DirectML results) and to `<data folder>/certify/start-check.json`.
+To see the box again later, delete that file.
+
+1. Start the app (backend from this checkout). The Certification dialog opens by itself with "Quick check of this
+   machine" and the text "This machine has no checked result for this version of freemocap...". It has no cross and no
+   Close button, and Escape does nothing.
+2. The rest of the app is dimmed and does not react to clicks. The server connection panel at the top left, the log
+   terminal at the bottom and the window menu still work.
+3. The dialog lists "freemocap: 6 checks, up to about 30 seconds" and a skellytracker line (on the dev machine: 2
+   checks, up to about 90 seconds).
+4. Click "Run quick check". The "Running check" part says "Quick check of this machine (freemocap): 1 of 6 checks
+   done ..." and later "(skellytracker)". The button is never greyed out.
+5. Click "Cancel check". The check stops; the dialog shows "freemocap: Quick check cancelled" (or freemocap passed and
+   "skellytracker: Quick check cancelled") and, if freemocap had not passed yet, the app stays dimmed.
+6. Click "Run quick check" again and let it end. The app is no longer dimmed. The dialog stays open with one line per
+   package ("Quick check passed", or "Quick check failed: <check>" in red) and now has its cross and Close.
+7. Close the dialog. Quit and restart the app. The dialog does not open by itself (the pass is recorded).
+8. With the dialog closed, open it with "Certification": the "Quick check of this machine" part is there and can run
+   again.
+9. Busy rule: with cameras connected, click "Run quick check". A red line says "Quick check could not start: A quick
+   check cannot start while other work runs: cameras ...". While a start check runs, connecting cameras or pressing
+   Record is refused with "The start check is running; ...".
+10. Restart the backend while the dialog shows a running check. The page recovers without a refresh; no old progress or
+    red line stays.
+
 ## Environment on the dev PC
 
 Found 2026-11-19 while measuring decision 31; nothing was changed. `freemocap/.venv` dates from August 2026

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import type {Certification} from '@freemocap/client';
 import {
-    bottomButtonLabel, certificationButtonSuffix, submitLabel, handedIn, type HandInList, isLocalHost, issueFormProminent, outboxLine, pendingRows, pendingSummary,
+    bottomButtonLabel, certificationButtonSuffix, reportFooterAction, reportsReady, submitLabel, handedIn, type HandInList, isLocalHost, issueFormProminent, outboxLine, pendingRows, pendingSummary,
     requestHandIn, requestNotSent, requestOpened, requestReportFile, requestSend, safeIssueUrl, sendAnswerMessage, viewIsCurrent,
     type ViewedReport,
 } from './certification-hand-in';
@@ -129,6 +129,26 @@ test('the bottom button follows the server state: none while required, Continue 
         {package: 'skellytracker', result: 'not-run', reason: 'cancelled'}]}), 'Close');
 });
 
-test('Submit Report is plural while the server lists more than one pending report', () => {
-    assert.deepEqual([0, 1, 2, 5].map(submitLabel), ['Submit Report', 'Submit Report', 'Submit Reports', 'Submit Reports']);
+test('Submit report is plural while the server lists more than one pending report', () => {
+    assert.deepEqual([0, 1, 2, 5].map(submitLabel), ['Submit report', 'Submit report', 'Submit reports', 'Submit reports']);
+});
+
+test('the reports show once no check runs and a required start check has ended', () => {
+    const run = {level: 'quick', items: [], state: 'running', done: 0};
+    assert.equal(reportsReady(null), false);
+    assert.equal(reportsReady({...BASE, start_required: true}), false);
+    assert.equal(reportsReady({...BASE, start_required: true, run}), false);
+    assert.equal(reportsReady({...BASE, run}), false);
+    assert.equal(reportsReady({...BASE, start_required: true, start_results: [{package: 'freemocap', result: 'not-run', reason: 'cancelled'}]}), true);
+    assert.equal(reportsReady(BASE), true);
+});
+
+test('the report pop-up offers Submit while the relay can take the file, else the issue form, and nothing when none is pending', () => {
+    const small = {...FILE, fits_relay: true}, large = {...FILE, fits_relay: false};
+    assert.equal(reportFooterAction(LIST, small, null, 2), 'submit');
+    assert.equal(reportFooterAction(null, small, null, 1), 'submit');
+    assert.equal(reportFooterAction({...LIST, relay_enabled: false}, small, null, 1), 'issue-form');
+    assert.equal(reportFooterAction(LIST, large, null, 1), 'issue-form');
+    assert.equal(reportFooterAction(LIST, small, {text: 'x', error: true, offerIssueForm: true}, 1), 'issue-form');
+    assert.equal(reportFooterAction(LIST, small, null, 0), null);
 });

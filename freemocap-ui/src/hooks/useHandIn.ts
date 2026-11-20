@@ -114,6 +114,8 @@ export function useHandIn(endpoint: string, serverKey: string, open: boolean, ce
         setNote: useCallback((note: string) => update({note}), [update]),
         /** The viewed file while it is still everything pending with the current note. */
         view: viewed,
+        /** The last viewed file, also after a send changed what is pending (the report pop-up keeps showing it). */
+        shownView: local.view,
         message: local.message,
         viewReport: view,
         submit,

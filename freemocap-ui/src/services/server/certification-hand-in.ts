@@ -18,7 +18,7 @@ export const CERTIFICATION_TEXT = {
     button: 'Certification',
     title: 'Certify FreeMoCap on this system',
     invitation: "We'd love your help to know this is a good configuration for FreeMoCap to run on in the future. If you'd "
-        + 'like to submit your anonymous certification report, click the Submit Report button below. If you want to see '
+        + 'like to submit your anonymous certification report, click the Submit report button below. If you want to see '
         + "what we'll get before it sends, click the View report button first.",
     fullBenchmark: 'Full benchmark',
     fullBenchmarkInvitation: "If you have the time (approx 5 to 10 mins), we'd really appreciate the results from a full "
@@ -30,8 +30,9 @@ export const CERTIFICATION_TEXT = {
     privacy: 'The note becomes part of the report, which is public. Do not write your name, contact details or other '
         + 'personal details. Paths and this system\'s user and host names are removed.',
     viewReport: 'View report',
-    submitReport: 'Submit Report',
-    submitReports: 'Submit Reports',
+    submitReport: 'Submit report',
+    submitReports: 'Submit reports',
+    resultsLater: 'Your results appear here when the checks are done.',
     startNow: 'Start now',
     issueForm: 'Save file and open issue form',
     issueFormHelp: 'Attach the saved file to the issue form. If GitHub does not accept the .md file, rename it to .txt.',
@@ -53,8 +54,21 @@ export const CERTIFICATION_TEXT = {
     continue: 'Continue',
 } as const;
 
-/** "Submit Report", or "Submit Reports" when the server lists more than one pending report. */
+/** "Submit report", or "Submit reports" when the server lists more than one pending report. */
 export const submitLabel = (pendingCount: number) => pendingCount > 1 ? CERTIFICATION_TEXT.submitReports : CERTIFICATION_TEXT.submitReport;
+
+/** The reports to share show once no check runs and the start check, when required, has ended (passed, failed or
+ * cancelled), from the server's current state. */
+export const reportsReady = (certification: Certification | null): boolean =>
+    Boolean(certification && !certification.run && (!certification.start_required || certification.start_results?.length));
+
+/** The report pop-up's right-hand button: Submit while the relay can take this file, else the issue form; a send answer
+ * that offers the issue form (the relay refused, or gave up) switches to it too. None when nothing is pending. */
+export function reportFooterAction(list: HandInList | null, file: ReportFile, message: HandInMessage | null, pendingCount: number):
+    'submit' | 'issue-form' | null {
+    if (!pendingCount) return null;
+    return list?.relay_enabled === false || !file.fits_relay || message?.offerIssueForm ? 'issue-form' : 'submit';
+}
 
 /** The dialog's bottom button from the current server state: none while the start check is required, "Continue" once a
  * start check of this server session has ended and released the app, else "Close". */

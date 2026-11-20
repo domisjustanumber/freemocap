@@ -92,9 +92,11 @@ export function StartCheckSection() {
             </span>
         </div>
         {/* Reserved below the buttons, so the progress and a refusal never move the table or the buttons. */}
-        <div className="text sm" style={{minHeight: '3em'}}>
-            {running && <p className="text sm text-gray">{quickCheckProgressText(running, certification?.items, START_CHECK_TEXT.progressName)}</p>}
-            {mine.refusal && <p className="text sm settings-note-error" role="alert">{QUICK_CHECK_TEXT.couldNotStart}{mine.refusal}</p>}
+        <div className="text sm" style={{height: '1.5em', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis'}}
+             title={mine.refusal ? QUICK_CHECK_TEXT.couldNotStart + mine.refusal : undefined}>
+            {mine.refusal ? <span className="settings-note-error" role="alert">{QUICK_CHECK_TEXT.couldNotStart}{mine.refusal}</span>
+                // An EP pair's check is not in the table; the start check's progress is in its status cells.
+                : running?.items.length ? <span className="text-gray">{quickCheckProgressText(running, certification?.items)}</span> : null}
         </div>
     </div>;
 }

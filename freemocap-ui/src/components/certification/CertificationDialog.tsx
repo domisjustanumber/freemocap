@@ -6,7 +6,7 @@ import {serverUrls} from '@/services';
 import {useAppSelector} from '@/store';
 import {useHandIn} from '@/hooks/useHandIn';
 import {
-    bottomButtonLabel, certificationButtonSuffix, CERTIFICATION_TEXT, handedIn, ISSUE_FORM_URL, issueFormProminent, issueLabel, isLocalHost,
+    bottomButtonLabel, certificationButtonSuffix, reportFooterAction, reportsReady, CERTIFICATION_TEXT, handedIn, ISSUE_FORM_URL, issueFormProminent, issueLabel, isLocalHost,
     openCertification, outboxLine, pendingRows, pendingSummary, REPORTS_SECTION_ID, submitLabel,
 } from '@/services/server/certification-hand-in';
 import {START_CHECK_TEXT} from '@/services/server/start-check';
@@ -42,14 +42,15 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
     const {list, view, message} = handIn;
     // The report pop-up: opened by "View report", or by Submit Report's issue-form fallback; closed for this file only.
     const [reportAsked, setReportAsked] = useState(false);
-    const [closedView, setClosedView] = useState<typeof view>(null);
+    const [closedView, setClosedView] = useState<typeof handIn.shownView>(null);
     const viewButton = useRef<HTMLSpanElement>(null);
-    const showReport = Boolean(view && view !== closedView && (reportAsked || message?.offerIssueForm));
+    const shown = handIn.shownView;
+    const showReport = Boolean(shown && shown !== closedView && (reportAsked || message?.offerIssueForm));
     const closeReport = useCallback(() => {
         setReportAsked(false);
-        setClosedView(view);
+        setClosedView(shown);
         viewButton.current?.querySelector('button')?.focus();
-    }, [view]);
+    }, [shown]);
 
     useEffect(() => {
         if (!open || (required && !showReport)) return;
@@ -65,6 +66,8 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
     const pending = certification?.pending_reports ?? [];
     const prominent = issueFormProminent(list, message, view);
     const bottom = required ? null : bottomButtonLabel(certification);
+    const ready = reportsReady(certification);
+    const footer = shown ? reportFooterAction(list, shown.file, message, pending.length) : null;
     const section = 'flex flex-col gap-2 bg-secondary p-2 br-1';
 
     return <>
@@ -83,8 +86,9 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
 
                 <div className={section} id={REPORTS_SECTION_ID}>
                     <SubactionHeader text={CERTIFICATION_TEXT.reports} className="text-gray"/>
-                    {!pending.length && <p className="text sm text-gray">{CERTIFICATION_TEXT.nothingPending}</p>}
-                    {pending.length > 0 && <>
+                    {!ready && <p className="text sm text-gray">{CERTIFICATION_TEXT.resultsLater}</p>}
+                    {ready && !pending.length && <p className="text sm text-gray">{CERTIFICATION_TEXT.nothingPending}</p>}
+                    {ready && pending.length > 0 && <>
                         <p className="text sm text-white">{CERTIFICATION_TEXT.invitation}</p>
                         <p className="text sm text-white">{pendingSummary(pending)}</p>
                         <ul className="text sm text-gray">
@@ -143,25 +147,31 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
         </div>
         </Centred>
 
-        {showReport && view && <>
+        {showReport && shown && <>
             <div className="pos-fixed inset-0 bg-surface-overlay" style={{zIndex: 1001}} onClick={closeReport}/>
             <Centred zIndex={1002}>
             <div className="settings-modal bg-primary border-1 border-black elevated-sharp p-1 flex flex-col br-2" role="dialog"
                  aria-label={CERTIFICATION_TEXT.viewReport} style={{...UNTRANSFORMED, width: 800, maxHeight: '90vh'}}>
                 <div className="flex flex-col p-2 gap-2 bg-middark br-1">
                     <div className="flex justify-content-space-between items-center">
-                        <p className="text sm text-gray">{view.file.file_name} ({view.file.size_bytes} bytes)</p>
+                        <p className="text sm text-gray">{shown.file.file_name} ({shown.file.size_bytes} bytes)</p>
                         <IconButton icon="close-icon" onClick={closeReport}/>
                     </div>
                     {/* The exact file the server returned, read as Markdown; never rebuilt here. */}
-                    <ReportMarkdown text={view.file.content}/>
-                    {list?.relay_enabled === false && <p className="text sm text-gray">{CERTIFICATION_TEXT.relayNotSetUp}</p>}
-                    {!view.file.fits_relay && <p className="text sm text-gray">{CERTIFICATION_TEXT.tooLarge}</p>}
-                    <div className="flex flex-row gap-2 flex-wrap" style={{justifyContent: 'space-between'}}>
-                        <ButtonSm text={CERTIFICATION_TEXT.issueForm} textColor="text-white"
-                                  className={prominent ? 'primary accent' : ''} buttonType={prominent ? '' : 'secondary'}
-                                  onClick={handIn.issueForm}/>
-                        <ButtonSm text={CERTIFICATION_TEXT.close} buttonType="secondary" textColor="text-white" onClick={closeReport}/>
+                    <ReportMarkdown text={shown.file.content}/>
+                    {/* Sticky footer: the answer line (reserved, so nothing jumps), then Close left and the action right. */}
+                    <div className="flex flex-col gap-1 bg-middark pt-1" style={{position: 'sticky', bottom: 0}}>
+                        <p className={`text sm ${message?.error ? 'settings-note-error' : 'text-white'}`} role="status" style={{minHeight: '3em'}}>
+                            {message ? <>{message.text}{message.issueUrl && <>: {link(message.issueUrl, message.issueUrl)}</>}</>
+                                : footer === 'issue-form' ? (list?.relay_enabled === false ? CERTIFICATION_TEXT.relayNotSetUp
+                                    : !shown.file.fits_relay ? CERTIFICATION_TEXT.tooLarge : '') : ''}</p>
+                        <div className="flex flex-row gap-2" style={{justifyContent: 'space-between'}}>
+                            <ButtonSm text={CERTIFICATION_TEXT.close} buttonType="secondary" textColor="text-white" onClick={closeReport}/>
+                            {footer === 'submit' && <ButtonSm text={submitLabel(pending.length)} textColor="text-white" className="primary accent"
+                                                              onClick={handIn.submit}/>}
+                            {footer === 'issue-form' && <ButtonSm text={CERTIFICATION_TEXT.issueForm} textColor="text-white"
+                                                                  className="primary accent" onClick={handIn.issueForm}/>}
+                        </div>
                     </div>
                 </div>
             </div>

@@ -848,6 +848,8 @@ To see the box again later, delete that file.
    Close button, and Escape does nothing.
 2. The rest of the app is dimmed and does not react to clicks. The server connection panel at the top left, the log
    terminal at the bottom and the window menu still work.
+   With the sidebar collapsed, its expand button is dimmed and does not react either (J17); the compact connection
+   status stays usable. (Not unit tested: no test renders the layout.)
 3. The dialog lists "freemocap: 6 checks, up to about 30 seconds" and a skellytracker line (on the dev machine: 2
    checks, up to about 90 seconds).
 4. Click "Run quick check". The "Running check" part says "Quick check of this machine (freemocap): 1 of 6 checks

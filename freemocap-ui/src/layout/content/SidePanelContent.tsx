@@ -168,15 +168,19 @@ interface SidePanelContentProps {
 
 const CollapsedToolbar: React.FC<{ onToggleCollapse: () => void }> = ({ onToggleCollapse }) => {
     const { t } = useTranslation();
+    // Decision 14, as the expanded sections: greyed out and inert while the start check is needed.
+    const startRequired = useAppSelector(state => state.connection.certification?.start_required === true);
     return (
         <div className="collapsed-sidebar items-center flex flex-col items-center w-full h-full pt-1 gap-1">
-            <IconButton
-                icon="expand-icon"
-                onClick={onToggleCollapse}
-                tooltip={true}
-                tooltipText={t('expandSidebar')}
-                tooltipPosition="pos-right"
-            />
+            <div inert={startRequired} style={startRequired ? {opacity: 0.4} : undefined}>
+                <IconButton
+                    icon="expand-icon"
+                    onClick={onToggleCollapse}
+                    tooltip={true}
+                    tooltipText={t('expandSidebar')}
+                    tooltipPosition="pos-right"
+                />
+            </div>
             <ServerConnectionStatus compact />
         </div>
     );

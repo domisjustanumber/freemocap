@@ -1293,6 +1293,18 @@ Built:
   and open issue form". In flight both send buttons say "Sending..." (the main pop-up too; awaiting the owner). The
   helping sentence names the new label. `sendAndOpenLabel`, `submitText`, tested.
 
+- The owner, verbatim (demo, Electron, fresh reset): "the certify popup is not blocking the initial screen - you can
+  still click start cameras and they still start even with the pop-up showing". Built: while `required`, the
+  dialog's full-window layer takes every pointer event and dims the app (rgba(0,0,0,0.5)), covering the connection
+  panel and log terminal too (coordinator's reading, awaiting the owner; it replaces decision 14's exception for
+  pointer input). Opened later, the dismiss layer now sits at z-index 999 above the app, so a click beside the dialog
+  only closes it. The `inert` wrappers stay. Cause not reproduced: in the browser build with `start_required` true
+  every camera, recording, real-time, tab and Certification control was inside an `inert` wrapper and no pointer hit
+  reached any of them; Tab reaches only the connection panel and log terminal controls. Most likely the owner's
+  window showed the dialog while the server's `start_required` was false (the dialog stays open after it turns false),
+  which removes `inert` and, by design, this layer too; not verified in Electron. The server refuses a camera start
+  only while a check runs (`refuse_pipeline_start`), not while `start_required` is true: to be fixed after the demo.
+
 Commits: see `git log` for 2026-11-20 10:30 to 10:52.
 
 #### Second round commits

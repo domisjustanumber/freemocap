@@ -1093,6 +1093,69 @@ error banner shown the real-time toolbar is under the banner (as before). Seen a
 `StartCheckSection.tsx` also stays after the work ends; every other bordered quick-check note (running check, prompt,
 offer) keeps the red border of `.settings-note-dismissable`; the EP pack refusals still name the EP by its key.
 
+### Certify pop-up revision, 2026-11-20 (owner's notes)
+
+The owner's notes, verbatim:
+
+> Title: "Certify FreeMoCap on this system"
+>
+> Sub-title: "FreeMoCap has not run on this type of system before, so we need to run a check to confirm things work
+> before launching."
+>
+> Content: "We'd love your help to know this is a good configuration for FreeMoCap to run on in the future, if you'd
+> like to submit your anonymous certification report click the Submit Report button below. If you want to see what
+> we'll get before it sends, click the View report button first."
+>
+> Notes: "Close button turns into a Continue button when complete. Buttons must look like buttons, not just text. The
+> UI needs to not bounce around as much when tests are running, there needs to be a clear table of tests that need to
+> run and status, and a moving icon to show things haven't frozen, are still happening."
+
+A later ruling of the owner: show the "Full benchmark" paragraph with its button greyed out (text tidied: "If you have
+the time (approx 5 to 10 mins), we'd really appreciate the results from a full benchmark run on your system. Click
+the "Full benchmark" button to run that now.").
+
+Built (UI only; no Python or message-contract change, the owner's backend kept running):
+
+- Title "Certify FreeMoCap on this system", the host name as a small second line. Sub-title: the owner's sentence
+  while `start_required`, else the describing sentence ("freemocap's own checks and every GPU execution provider that
+  has no reviewed result on this system.").
+- A table of the start check, one row per package (freemocap, skellytracker: from the plan route, the two names
+  before it answers), columns package, what it checks (the plan line; the check names as the row's tooltip) and status:
+  Waiting, Starting / "Running, N of M" with the turning `loader-icon` (stopped under `prefers-reduced-motion`),
+  Done, Passed, "Failed: reason" with "File report", Cancelled, "Not run: reason", "Nothing to check", and "Not run in
+  this session" when nothing is required. The rule is `startCheckRowStatus` in `start-check.ts`, tested.
+  Per-package rows, because the snapshot carries only package-level progress (`run.package`, `done`, `total`) and
+  per-package results (`start_results`). Per-check rows would need the server to send, per package, each check's
+  name and state (waiting, running, passed, failed with reason) in the `certification` snapshot, e.g. a `checks` list
+  in `run` and in each `start_results` row.
+- No jumping: fixed 560 px width, the table's rows present from the start, one reserved line block (3 lines) for the
+  progress and the refusal, "Run quick check" and "Cancel check" in a fixed row (Cancel hidden with its space kept
+  while nothing runs; neither changes label). Measured in the browser build: dialog 560x720 and table 96 px high in
+  every sample while waiting, running and done.
+- Buttons: `ButtonSm` everywhere, filled `primary accent` for the main action, `secondary` (outlined) for the rest.
+- Bottom button: none while required; "Continue" (filled) once a start check of this server session ended without a
+  cancel (as the server releases the app), else "Close" (`bottomButtonLabel`, tested). It stays in sight (sticky) while
+  the dialog scrolls.
+- Reports: the owner's paragraph, the pending list and note, "Submit Report" and "View report", the privacy line.
+  "Submit Report" sends the viewed file, or builds it first and sends it; with the relay off or a file too large it
+  shows the file and the existing issue-form fallback. The old "Send report" is gone; there is one send action. All
+  hand-in rules (marks, "Not sent", retries, refusal texts) unchanged.
+- Full benchmark: the paragraph and a disabled "Full benchmark" button (tooltip "Not available yet"); no route.
+- "system" for the computer in this dialog's texts only.
+
+Awaiting the owner's confirmation: the host name kept as a second line under the title; the describing sentence as the
+sub-title when nothing is required; "Submit Report" without a prior view; "system" only in this dialog for now (the
+owner ruled "system everywhere" for the whole app, to be done after the demo); the "5 to 10 mins" figure (316 s
+measured on the dev PC, plan estimate about 8 minutes); "Continue" also shown when the dialog is reopened later in the
+same server session after a start check.
+
+Not done: per-check rows (needs the server change above); the full benchmark itself; Electron not seen (browser build
+only, scratch backend, relay URL empty, sends blocked); the restart-recovery of the new controls was not exercised in
+one page (the plan and refusal keep their server-identity keys as before).
+
+Commits: `73c87235`, `ded74c33`, `1087a6f7`, `826936fa`, `6500ff6a`. Tests: `tsc --noEmit` clean; UI unit suite 223
+tests, 0 failures, plus its 10 and 46; `check-ui-styles` 30 errors (unchanged, none in the changed files).
+
 ## Environment on the dev PC
 
 Found 2026-11-19 while measuring decision 31; nothing was changed. `freemocap/.venv` dates from August 2026

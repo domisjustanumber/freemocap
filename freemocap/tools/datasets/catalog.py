@@ -77,38 +77,50 @@ def acquire_recording(
         with TemporaryDirectory(prefix=f".{dataset.name}-", dir=root) as temporary:
             staging = Path(temporary)
             archive_path = staging / "download.zip"
-            with requests.get(
-                dataset.url, stream=True, timeout=(10, 300)
-            ) as response:
-                response.raise_for_status()
-                with archive_path.open("wb") as output:
-                    for chunk in response.iter_content(chunk_size=1024 * 1024):
-                        output.write(chunk)
-
-            extracted = staging / "extracted"
-            extracted.mkdir()
-            with ZipFile(archive_path) as archive:
-                for member in archive.infolist():
-                    name = member.filename.replace("\\", "/")
-                    target = (extracted / name).resolve()
-                    if ":" in name or not target.is_relative_to(extracted.resolve()):
-                        raise ValueError(f"Archive member escapes extraction: {name}")
-                archive.extractall(extracted)
-
-            candidates = set()
-            for folder in extracted.rglob("*"):
-                if not folder.is_dir():
-                    continue
-                if folder.name == "synchronized_videos":
-                    candidates.add(folder.parent)
-                elif folder.name == "synchronized" and folder.parent.name == "videos":
-                    candidates.add(folder.parent.parent)
-            if len(candidates) != 1:
-                raise ValueError(
-                    f"Expected one recording in {dataset.url}; "
-                    f"found {len(candidates)}"
-                )
-            recording = candidates.pop()
-            synchronized_video_directory(recording)
+            download(dataset.url, archive_path)
+            recording = extract_recording(archive_path, staging / "extracted", dataset.url)
             recording.rename(destination)
     return destination
+
+
+def download(url: str, path: Path, cancelled=None) -> str:
+    """Stream `url` to `path` and return the file's SHA-256 (lower-case hex). `cancelled()` true stops it with
+    `CancelledError` between chunks, leaving the partial file to the caller."""
+    import hashlib
+    from concurrent.futures import CancelledError
+    digest = hashlib.sha256()
+    with requests.get(url, stream=True, timeout=(10, 300)) as response:
+        response.raise_for_status()
+        with path.open("wb") as output:
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                if cancelled is not None and cancelled():
+                    raise CancelledError("download cancelled")
+                output.write(chunk)
+                digest.update(chunk)
+    return digest.hexdigest()
+
+
+def extract_recording(archive_path: Path, extracted: Path, source: str) -> Path:
+    """Extract an archive that holds one recording into the new folder `extracted` and return the recording folder."""
+    extracted.mkdir()
+    with ZipFile(archive_path) as archive:
+        for member in archive.infolist():
+            name = member.filename.replace("\\", "/")
+            target = (extracted / name).resolve()
+            if ":" in name or not target.is_relative_to(extracted.resolve()):
+                raise ValueError(f"Archive member escapes extraction: {name}")
+        archive.extractall(extracted)
+
+    candidates = set()
+    for folder in extracted.rglob("*"):
+        if not folder.is_dir():
+            continue
+        if folder.name == "synchronized_videos":
+            candidates.add(folder.parent)
+        elif folder.name == "synchronized" and folder.parent.name == "videos":
+            candidates.add(folder.parent.parent)
+    if len(candidates) != 1:
+        raise ValueError(f"Expected one recording in {source}; found {len(candidates)}")
+    recording = candidates.pop()
+    synchronized_video_directory(recording)
+    return recording

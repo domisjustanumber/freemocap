@@ -43,6 +43,18 @@ def get_default_freemocap_base_folder_path() -> str:
     return str(Path(os_independent_home_dir()) / DEFAULT_FREEMOCAP_BASE_FOLDER_NAME)
 
 
+TEST_MEDIA_DIR_ENV_VAR = "FREEMOCAP_TEST_MEDIA_DIR"
+
+
+def get_test_media_dir() -> str:
+    """The shared test media folder of every package's certify run (skellycertify report format 2.8): per user, outside
+    freemocap's data folder. The environment variable overrides it (tests, measurements)."""
+    override = os.environ.get(TEST_MEDIA_DIR_ENV_VAR)
+    if override:
+        return str(Path(override))
+    return str(Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".cache") / "skellycertify" / "test-media")
+
+
 def get_default_freemocap_recordings_path() -> str:
     return str(Path(get_default_freemocap_base_folder_path()) / "recordings")
 

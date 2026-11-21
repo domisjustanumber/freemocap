@@ -404,13 +404,24 @@ class QuickCheckManager:
             if hold.kind == "ep-pack":
                 raise StartRefused(409, {
                     "code": "ep-pack-running", "execution_provider": hold.id,
-                    "message": f"An install or remove of the {hold.id} EP is running; the {kind} start was refused. "
+                    "message": f"An install or remove of the {self.ep_name(hold.id)} EP is running; the {kind} start was "
+                               "refused. "
                                "Start again when it ends."})
 
     def describe(self, pair: CertificationPair | None) -> str:
         """`_what` with the labels of the cached status, capitalised for the start of a sentence."""
         text = _what(pair, self._parts[1] if self._parts else ())
         return text[0].upper() + text[1:]  # not str.capitalize(): it lowercases the labels
+
+    def ep_name(self, key: str) -> str:
+        """An EP's name by skellytracker's label in the cached status, else its key (owner, Q74)."""
+        return next((item.label for item in (self._parts[1] if self._parts else ()) if item.execution_provider == key
+                     and item.label), key)
+
+    def held_text(self, held: tuple[PipelineHold, ...]) -> str:
+        """The running work in a refusal: an EP pack's by its EP's name (owner, Q74), any other by its kind and id."""
+        return ", ".join(f"the provider pack install or remove of {self.ep_name(hold.id)}" if hold.kind == "ep-pack"
+                         else f"{hold.kind} {hold.id}" for hold in held)
 
     def describe_run(self, run: CertificationRun) -> str:
         return "The full benchmark" if run.level == "full" else self.describe(run.items[0] if run.items else None)
@@ -466,8 +477,8 @@ class QuickCheckManager:
                 if held:  # the names `pipelines-running` and `gpu_held_by` are historical: they cover all work (H1)
                     raise StartRefused(409, {
                         "code": "pipelines-running",
-                        "message": f"The {what} cannot start while other work runs: "
-                                   + ", ".join(f"{hold.kind} {hold.id}" for hold in held) + ". Stop it first.",
+                        "message": f"The {what} cannot start while other work runs: {self.held_text(held)}. Stop it "
+                                   "first.",
                         "gpu_held_by": [{"kind": hold.kind, "id": hold.id} for hold in held]})
                 self.run = CertificationRun(level=level, items=(pair,) if pair else (), seconds_estimate=seconds_estimate)
                 if level == "full":

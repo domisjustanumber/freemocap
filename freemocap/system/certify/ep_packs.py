@@ -62,13 +62,13 @@ class EpPackManager:
         """`holds` lists what runs (claims included); it is read under the admission lock and must not take it."""
         checks = self.quick_checks
         with checks.admission_lock:
-            checks.refuse_pipeline_start(EP_PACK_KIND)  # a check, or another install or remove, runs
+            checks.refuse_pipeline_start(f"provider pack {action}")  # a check, or another install or remove, runs
             held = holds()
             if held:  # `pipelines-running` and `gpu_held_by` are the historical names of any work (H1)
                 raise StartRefused(409, {
                     "code": "pipelines-running",
-                    "message": f"The {action} of {key} cannot start while other work runs: "
-                               + ", ".join(f"{hold.kind} {hold.id}" for hold in held) + ". Stop it first.",
+                    "message": f"The provider pack {action} of {checks.ep_name(key)} cannot start while other work "
+                               f"runs: {checks.held_text(held)}. Stop it first.",
                     "gpu_held_by": [{"kind": hold.kind, "id": hold.id} for hold in held]})
             self._claim = PipelineHold(EP_PACK_KIND, key)
             checks.claims.append(self._claim)

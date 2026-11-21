@@ -14,7 +14,8 @@ from skellycam.core.ipc.process_management.managed_worker import WorkerMode
 from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 
 from freemocap.core.streaming.message_model import (
-    AppStateMessage, CertificationPair, CertificationRun, CertificationSnapshot, EpPackResult, PipelineHold, encode_message,
+    AppStateMessage, CertificationItem, CertificationPair, CertificationRun, CertificationSnapshot, EpPackResult, PipelineHold,
+    encode_message,
 )
 from freemocap.system.certify import ep_packs
 from freemocap.system.certify.ep_packs import EpPackManager
@@ -135,6 +136,32 @@ def test_while_an_install_runs_every_start_a_check_and_another_install_are_refus
     gate.release.set()
     _until_ended(manager)
     checks.release(checks.claim("realtime"))  # admitted again once the install ended
+
+
+def test_refusals_name_the_provider_pack_and_its_ep_by_name():
+    """Owner, Q74: "provider pack install" and the EP's display name, never the kind `ep-pack` or the EP's key."""
+    gate = Gate()
+    manager = _manager(gate)
+    checks = manager.quick_checks
+    checks.read_status = lambda: ("host", (CertificationItem(execution_provider=KEY, label="AMD GPU", device_key="gpu:0"),),
+                                  None, ())
+    checks.refresh()
+    manager.start("install", KEY, _holds(manager))
+    with pytest.raises(StartRefused) as second:
+        manager.start("install", KEY, _holds(manager))
+    assert second.value.detail["message"] == ("An install or remove of the AMD GPU EP is running; the provider pack install "
+                                              "start was refused. Start again when it ends.")
+    with pytest.raises(StartRefused) as check:
+        checks.start(pair=CertificationPair("other-ep", "gpu:0"), detector_type="rtmpose", rtmpose_model_name=None,
+                     seconds_estimate=None, holds=_holds(manager))
+    assert check.value.detail["message"] == ("The quick check cannot start while other work runs: the provider pack install "
+                                             "or remove of AMD GPU. Stop it first.")
+    gate.release.set()
+    _until_ended(manager)
+    with pytest.raises(StartRefused) as busy:
+        manager.start("remove", KEY, _holds(manager, PipelineHold("cameras", "g1")))
+    assert busy.value.detail["message"] == ("The provider pack remove of AMD GPU cannot start while other work runs: "
+                                            "cameras g1. Stop it first.")
 
 
 def test_shutdown_cancels_a_running_install():

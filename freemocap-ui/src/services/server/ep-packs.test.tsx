@@ -48,7 +48,7 @@ test('progress and results say what the server says, with "machine" for the comp
 test('a start posts to its route and gives the server reason of a refusal; cancel deletes', async () => {
     const calls: {url: string; method: string; body: unknown}[] = [];
     const answers = [new Response(JSON.stringify({action: 'install', execution_provider: 'amdgpu', phase: null, fraction: null}), {status: 202}),
-        new Response(JSON.stringify({detail: {code: 'pipelines-running', message: 'The remove of amdgpu cannot start while other work runs.'}}),
+        new Response(JSON.stringify({detail: {code: 'pipelines-running', message: 'The provider pack remove of AMD GPU cannot start while other work runs.'}}),
             {status: 409}),
         new Response(JSON.stringify({run: null}), {status: 200})];
     const request = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -57,7 +57,7 @@ test('a start posts to its route and gives the server reason of a refusal; cance
         return answers.shift() as Response;
     }) as typeof fetch;
     assert.equal(await requestEpPack('http://server', 'install', 'amdgpu', request), null);
-    assert.equal(await requestEpPack('http://server', 'remove', 'amdgpu', request), 'The remove of amdgpu cannot start while other work runs.');
+    assert.equal(await requestEpPack('http://server', 'remove', 'amdgpu', request), 'The provider pack remove of AMD GPU cannot start while other work runs.');
     await requestEpPackCancel('http://server', request);
     assert.deepEqual(calls, [
         {url: 'http://server/freemocap/certify/ep_pack/install', method: 'POST', body: {execution_provider: 'amdgpu'}},

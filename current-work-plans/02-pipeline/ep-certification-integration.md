@@ -2351,6 +2351,89 @@ Reading list: `../skellytracker-pin/skellytracker/certification.py` `certify`, `
 `certify_frames`; `core/eps/certification.py` `frames_record` (the fallback); `system/certify/quick_check.py` `_run`;
 `freemocap/certification.py` `_frames_media`, `_posthoc`.
 
+### Realtime session quick check, 2026-11-21
+
+Owner's answer to Q57, relayed by the coordinator: the realtime quick check runs "in a fresh copy of the app started just
+for the check, fed the bundled frames through a stand-in camera group"; the guard of `PubSubTopicManager.create` stays.
+Tests and direct runs only, no real window, no frozen build.
+
+- `ecc46563` `realtime-session`, the sixth of freemocap's eight quick checks (`module` and `component` item "Realtime
+  session"), right after `posthoc-session`; the two run one after the other. The plan's `total` is 8; its
+  `seconds_estimate` stays `QUICK_BUDGET_SECONDS` (25 s). The check starts only when `REALTIME_SECONDS` (10) fits what is
+  left of the budget, else `not-run`/`over-budget`. `not-run` also for `models-missing` and `test-media-missing`;
+  `fail` with `crashed`, `timed-out`, `hung-at-exit`, `session-failed`, `untracked` (new code: no frame after frame 0
+  tracked) or an exception class name. `test_media` lists `quick_frames.zip` once when either session check used it
+  (`interrupted_media` too).
+- Fresh copy (start mode): `--certify-realtime [<test media folder>]`, an argument of `run_main` in
+  `freemocap/__main__.py`, parsed before anything starts a server; it calls `certification.realtime_session_main` and
+  returns. Dev: `python -m freemocap --certify-realtime` (`certification._app_command`: `sys.executable -m freemocap`).
+  Built app: `freemocap_server --certify-realtime` (`sys.frozen`: `sys.executable` is the PyInstaller onedir executable,
+  whose entry is `freemocap/__main__.py`; `freeze_support()` runs first, so the copy's own spawn workers re-enter as the
+  backend's do). Started with `subprocess.Popen`, so `multiprocessing.parent_process()` is None in the copy. It starts no
+  HTTP server, opens no port or camera, starts no Electron, reads no app settings and calls no `configure_logging`; its
+  worker processes write their log files as any worker does (two files per run, seen in the scratch log folder). The
+  copy prints one JSON line (the parent takes the line that parses as a result; `__main__` still prints `Done!` after
+  it). Not tested in a frozen build.
+- Stop: the parent closes the copy's stdin; the copy polls `_stdin_closed()` every 50 ms while it drives frames and ends
+  its session itself, then `REALTIME_STOP_GRACE_SECONDS` (3 s) before a kill of its tree. A peek (`PeekNamedPipe` on
+  Windows, `select` elsewhere), not a read: a thread blocked reading stdin stalled the copy's DLL loading (numpy's, at
+  import; seen with `faulthandler`). The parent's death closes the pipe too. The copy calls
+  `skellytracker.note_exit_requested()` after its session ended, since `__main__` ends with `os._exit(0)`, which skips
+  the atexit removal of skellytracker's session marker.
+- Stand-in camera group (`freemocap/system/certify/stand_in_cameras.py`): a subclass of skellycam's `CameraGroup` with
+  its own `__init__`, one camera config (`CameraConfig`, `ImageResolution`) of the frames' size (720x1280), and the group
+  shared memory from `CameraGroupSharedMemory.create(camera_configs, timebase_mapping=TimebaseMapping(), read_only=False)`
+  (the call and layout of `CameraGroup._start`, 388 slots, about 1 GiB, 1.5 ms to create). Frames are written with
+  `CameraSharedMemoryRingBuffer.put_frame` in a `create_frame_dtype` record, frame N at ring index N, as the test
+  `MockCameraGroup` does. What skellycam lacks: a public constructor of a `CameraGroup` without its `CameraManager` (whose
+  `create` makes camera workers), so the subclass sets `ipc.group_id`, `configs`, `shm`, `started` and `transport_error`
+  itself. Not exercised compared with real cameras: capture, camera workers and their processes, the orchestrator,
+  `frame_slot`/`commit_frame` writes, camera settings updates, frame pacing (frames go in lockstep), multi-camera
+  grouping, recording.
+- Session: `RealtimePipelineManager.create_pipeline` with `RealtimePipelineConfig()` (worker processes, RTMPose, Charuco
+  on, Auto EP), `InferenceService` and `WorkerRegistry` as the backend makes them, `CaptureGroup` around the stand-in.
+  Each frame is written once `get_latest_aggregator_output` gave the one before it. It passes once a frame after frame 0
+  is tracked and stops at `REALTIME_TRACKED` (3) tracked frames; providers from `InferenceService.provider_status()`.
+  The aggregator reads the latest calibration file when one exists, as the backend's session does (none in the scratch
+  folder). Shutdown: `manager.shutdown()`, `service.close()`, `registry.shutdown_all()`, `group.close()` (unlink).
+
+Measured (this PC: i7-14700K, RTX 3070, UHD 770; scratch EP store, so Auto chose CPU; other sessions' test runs were on
+the PC at the same time):
+
+| Run | spawn-child | posthoc-session | realtime-session (copy start, session) | Blender | freemocap total |
+|---|---|---|---|---|---|
+| 1 | 0.81 s | 10.03 s | 8.71 s (3.35, 5.35) | 0.59 s | 20.16 s |
+| 2 | 0.82 s | 9.17 s | 8.48 s (3.01, 5.47) | 0.28 s | 18.77 s |
+| 3 | 0.96 s | 9.84 s | 8.62 s (3.27, 5.35) | 0.25 s | 19.71 s |
+
+Each run: realtime 4 frames, 3 tracked (frame 0 untracked), post-hoc 3 frames; `person` and `wholebody` on CPU in both
+checks. 18.8 to 20.2 s against the 25 s share. Cancel (parent-side, from the cancel to `_realtime`'s return): 0.3 to
+2.7 s with a clean end once the session runs; before the session (imports, worker start) the copy is killed after the
+3 s grace, before any model loads. Session shutdown after a stop: 0.2 to 2.0 s. After each direct run no process of
+this checkout's venv and no `--certify-realtime` process remained; the real test checks no new child process of the
+test process. Shared memory: after a real session in a main process, none of the 9 shared memory names of the stand-in group could be opened, and no spawn worker was left with a dead parent.
+
+Suites on `ecc46563`: Python fast suite 1824 passed, 0 failed, 20 skipped (19 new fast tests; the race test passed). UI `npx tsc --noEmit` clean; main run 246 of 247 with 1 skipped, plus 10 and 46.
+The real check is the `slow` test `test_the_realtime_check_runs_the_apps_realtime_session_in_a_fresh_copy_and_leaves_no_process`
+(8.5 s; passed); the real whole-module test stubs the realtime check to keep its time.
+
+New text a user can read: `REASON_TEXT['realtime-session']` "a real-time processing session did not start and run on
+this system" (owner to review); the component row "Realtime session" in the report file.
+
+Not verified: the frozen build (the start mode, `sys.executable`, stdin pipe and PeekNamedPipe there), a real window, a
+GPU EP run of the check (the marker path), Linux and macOS (the `select` branch).
+
+Owner's calls: the reason sentence; whether the realtime check should also run when the post-hoc one used most of the
+budget on a slow PC (today `over-budget`); whether `REALTIME_TRACKED` 3 is enough "run"; the aggregator reading the
+person's latest calibration in the check.
+
+Reading list: `freemocap/certification.py` `_realtime_session`, `realtime_session_main`, `_stdin_closed`, `_fresh_app`,
+`_realtime` (the check); `freemocap/system/certify/stand_in_cameras.py` (what the stand-in sets and why);
+`freemocap/__main__.py` `run_main` (the start mode); `freemocap.spec` (the frozen entry); `../skellycam-sfn26-pins/
+skellycam/core/camera_group/camera_group.py` `_start` (the shared memory call it mirrors).
+
+Next action: the owner reviews the sentence and the calls above; a frozen build runs the start check once.
+
 ## Next actions
 
 All as local commits on `sidecar-implementation`, in this order:

@@ -36,6 +36,7 @@ const initialState: CamerasState = {
     autoApply: true,
     filterVirtualCameras: loadFromStorage('cameras.filterVirtualCameras', true),
     error: null,
+    errorCode: null,
 };
 
 export const cameraSlice = createSlice({
@@ -44,6 +45,7 @@ export const cameraSlice = createSlice({
     reducers: {
         cameraErrorCleared: (state) => {
             state.error = null;
+            state.errorCode = null;
         },
         cameraBackendSelected: (state, action: PayloadAction<CameraBackend>) => {
             if (!state.isLoading && !state.cameras.some(camera => camera.connectionStatus === 'connected')) {
@@ -152,6 +154,7 @@ export const cameraSlice = createSlice({
             .addCase(detectCameras.pending, (state) => {
                 state.isLoading = true;
                 state.error = null;
+                state.errorCode = null;
             })
             .addCase(detectCameras.fulfilled, (state, action) => {
                 state.isLoading = false;
@@ -161,6 +164,7 @@ export const cameraSlice = createSlice({
             .addCase(detectCameras.rejected, (state, action) => {
                 state.isLoading = false;
                 state.error = action.error.message || 'Failed to detect cameras';
+                state.errorCode = null;
             })
 
             // ========== Recommend Exposure Sent ==========
@@ -177,6 +181,7 @@ export const cameraSlice = createSlice({
             .addCase(camerasConnectOrUpdate.pending, (state) => {
                 state.isLoading = true;
                 state.error = null;
+                state.errorCode = null;
             })
             .addCase(camerasConnectOrUpdate.fulfilled, (state, action) => {
                 state.isLoading = false;
@@ -197,6 +202,7 @@ export const cameraSlice = createSlice({
             .addCase(camerasConnectOrUpdate.rejected, (state, action) => {
                 state.isLoading = false;
                 state.error = action.error.message || 'Failed to connect to cameras';
+                state.errorCode = action.error.code ?? null;
             })
 
 
@@ -218,6 +224,11 @@ export const cameraSlice = createSlice({
             // ========== Server state snapshot (authoritative) ==========
             // Reconcile observed connection + pause state from the pushed snapshot.
             .addCase(serverStateReceived, (state, action) => {
+                // A refusal for the required start check goes once the server no longer requires it; it never gates.
+                if (state.errorCode === 'start-check-required' && action.payload.state.certification?.start_required !== true) {
+                    state.error = null;
+                    state.errorCode = null;
+                }
                 const group = Object.values(action.payload.state.camera_groups)[0];
                 if (group) state.backend = group.backend ?? 'python';
                 const groups = Object.values(action.payload.state.camera_groups);

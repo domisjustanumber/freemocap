@@ -152,8 +152,10 @@ export const camerasConnectOrUpdate = createAsyncThunk<
         }
 
         if (!response.ok) {
-            // A refusal's detail can be an object with the server's sentence in `message`.
-            throw new Error(describeError(await response.json()) || 'Failed to connect to cameras');
+            // A refusal's detail can be an object with the server's sentence in `message` and its `code`.
+            const answer = await response.json();
+            throw Object.assign(new Error(describeError(answer) || 'Failed to connect to cameras'),
+                {code: typeof answer?.detail?.code === 'string' ? answer.detail.code : undefined});
         }
 
         return response.json() as Promise<ConnectCamerasResponse>;

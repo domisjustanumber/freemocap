@@ -110,6 +110,8 @@ export interface CamerasState {
     autoApply: boolean;
     filterVirtualCameras: boolean;
     error: string | null;
+    /** The server's code of the refusal in `error`, so it goes once the server's current state no longer holds it. */
+    errorCode: string | null;
 }
 
 // ==================== API Types ====================

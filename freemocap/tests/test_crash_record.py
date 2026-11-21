@@ -174,7 +174,7 @@ def test_a_crashed_gpu_check_is_skellytrackers_failed_quick_check_of_that_pair(m
     monkeypatch.setattr(tracker, "record_failed_pair", record_failed_pair)
     crash_record.record_provider_failure("cpu:video")  # no pair: nothing stored
     crash_record.record_provider_failure("posthoc-session")
-    crash_record.record_provider_failure("cuda@10de-2484-0:video")
-    crash_record.record_provider_failure("cuda@10de-9999-0")  # a GPU this system does not have
+    crash_record.record_provider_failure("fake-ep@10de-2484-0:video")
+    crash_record.record_provider_failure("fake-ep@10de-9999-0")  # a GPU this system does not have
     crash_record.record_provider_failure("gone@10de-2204-0")  # skellytracker refuses it; logged, not raised
-    assert stored == [("cuda", "gpu:10de:2484:0")]
+    assert stored == [("fake-ep", "gpu:10de:2484:0")]

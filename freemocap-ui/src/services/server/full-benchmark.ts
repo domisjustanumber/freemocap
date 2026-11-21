@@ -81,14 +81,16 @@ export function fullRowName(row: FullRunRow, items: readonly CertificationItem[]
 }
 
 /** A progress row's status: waiting, running (with the turning icon), partly done (some checks ended, the rest come later
- * in the run, as the CPU's timings after the pairs), or how it ended; a check that a cancel stopped reads "Cancelled". */
+ * in the run, as the CPU's timings after the pairs), or how it ended; a check that a cancel stopped reads "Cancelled", and
+ * one not run because its program is not installed (Blender) reads "Skipped" (owner, Q69). */
 export function fullRowStatus(row: FullRunRow): {kind: 'waiting' | 'running' | 'passed' | 'failed' | 'done'; text: string} {
     if (row.state === 'running') return {kind: 'running', text: 'Running'};
     if (row.state === 'partly-done') return {kind: 'waiting', text: 'Partly done'};
     if (row.state !== 'done') return {kind: 'waiting', text: 'Waiting'};
     if (row.result === 'pass') return {kind: 'passed', text: 'Passed'};
     if (row.result === 'fail') return {kind: 'failed', text: 'Failed'};
-    return {kind: 'done', text: row.result !== 'not-run' ? 'Done' : row.reason === 'cancelled' ? 'Cancelled' : 'Not run'};
+    return {kind: 'done', text: row.result !== 'not-run' ? 'Done' : row.reason === 'cancelled' ? 'Cancelled'
+        : row.reason === 'not-installed' ? 'Skipped' : 'Not run'};
 }
 
 /** The count of finished checks; no percentage and no time remaining. */

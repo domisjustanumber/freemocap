@@ -669,7 +669,7 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
             return
         try:
             progress({"package": "freemocap", "kind": level, "state": state, "step": step and {"name": step},
-                      "checks": [{"name": row["name"], "result": row["result"]} for row in checks],
+                      "checks": [{"name": row["name"], "result": row["result"], "reason": row["reason"]} for row in checks],
                       "done": sum(row["result"] is not None for row in checks), "total": len(checks), "seconds_left": None})
         except Exception:  # noqa: BLE001 - the contract: stop calling it and continue the run
             progress = None

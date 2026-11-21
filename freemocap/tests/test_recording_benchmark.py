@@ -14,6 +14,7 @@ import pytest
 
 from freemocap import certification
 from freemocap.system.certify import start_check
+from freemocap.system.certify.quick_check import _full_rows
 from freemocap.tools.datasets.catalog import download as real_download  # before the guard and the stand-in wrap it
 
 PAIRS = [("fake-ep@10de-2484-0", "fake-ep", "gpu:10de:2484:0", "Fake EP"), ("cpu", "cpu", None, "CPU")]
@@ -99,11 +100,14 @@ def test_a_successful_run_benchmarks_the_usable_pairs_and_removes_only_what_it_d
     bench.media.mkdir()
     (bench.media / "kept-before.zip").write_bytes(b"another package's file")
     plan = certification.certify_plan("full", test_media_dir=bench.media)
-    report = certification.certify("full", None, None, test_media_dir=bench.media, remove_data=True)
+    messages = []
+    report = certification.certify("full", messages.append, None, test_media_dir=bench.media, remove_data=True)
     rows = {row["name"]: row for row in report["checks"]}
     assert [(name, row["result"], row["reason"]) for name, row in rows.items()] == [
         ("data-folder", "pass", None), ("recording", "pass", None), ("posthoc:fake-ep@10de-2484-0", "not-run", "ep-not-passed"),
         ("posthoc:cpu", "pass", None), ("blender", "not-run", "not-installed")]
+    # the progress carries the reasons, so the UI's row of a Blender that is not installed reads "Skipped" (owner, Q69)
+    assert _full_rows(messages[-1], ())[-1].reason == "not-installed"
     assert _counted(rows) == plan["total"] and all(row["result"] for row in rows.values())
     assert (rows["posthoc:cpu"]["module"], rows["blender"]["module"]) == ("CPU", "Blender")
     assert rows["recording"]["numbers"]["downloaded"] is True and len(bench.downloads) == 1

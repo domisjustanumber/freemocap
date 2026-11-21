@@ -82,7 +82,7 @@ class QuickCheckRunRow(BaseModel):
     device_key: str | None
     state: str
     result: str | None
-    reason: str | None = Field(default=None, description="`cancelled` for a check that a cancel stopped, else null.")
+    reason: str | None = Field(default=None, description="`cancelled` for a check that a cancel stopped, else the reason that its progress gave (freemocap's), or null.")
 
 
 class QuickCheckRunState(BaseModel):

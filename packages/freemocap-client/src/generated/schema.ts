@@ -5140,7 +5140,7 @@ export interface components {
             result: string | null;
             /**
              * Reason
-             * @description `cancelled` for a check that a cancel stopped, else null.
+             * @description `cancelled` for a check that a cancel stopped, else the reason that its progress gave (freemocap's), or null.
              */
             reason?: string | null;
         };

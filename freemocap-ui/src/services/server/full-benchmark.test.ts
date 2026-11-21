@@ -41,6 +41,8 @@ test('the progress has one row per EP and GPU with its state, and a count of fin
         ['Passed', 'Failed', 'Not run']);
     assert.equal(fullRowStatus({name: 'x', package: 'p', state: 'done', result: 'not-run', reason: 'cancelled'}).text, 'Cancelled',
         'a check that a cancel stopped');
+    assert.equal(fullRowStatus({name: 'blender', package: 'freemocap', state: 'done', result: 'not-run', reason: 'not-installed'}).text,
+        'Skipped', 'Blender not installed (owner, Q69)');
     assert.equal(finishedText({level: 'full', items: [], state: 'running', done: 1, rows: []}), '1 check finished');
 });
 

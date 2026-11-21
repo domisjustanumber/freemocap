@@ -688,7 +688,7 @@ class CertificationRunRow:
     """One row of a full benchmark's progress: an EP on a GPU, or the CPU, by skellytracker's check label (`name`, with
     its EP key and device key), or one other package as a whole. `state` is waiting, running, partly-done (some of its
     checks ended, the rest come later in the run) or done; `result` is the row's result once done (its EP check's, else
-    by the section rule of its checks); `reason` is `cancelled` for a check that a cancel stopped, else null."""
+    by the section rule of its checks); `reason` is `cancelled` for a check that a cancel stopped, else the reason that its progress gave (freemocap's), or null."""
     name: str = ""
     package: str = ""
     execution_provider: str | None = None

@@ -334,6 +334,7 @@ def test_the_routes_view_send_and_list_the_hand_in(fake_relay, monkeypatch):
          "evidence_valid": False, "state": "covered", "reference": "https://evil.example/issues/7"}])
     listed = client.get("/certify/hand_in").json()
     assert listed["relay_enabled"] and listed["reports"][0]["reference"] is None
+    assert listed["reports"][0]["incomplete"] is False, "its run ended (no `cancelled` or `interrupted` reason)"
     assert listed["outbox"][0]["last_error"]["error"] == "privacy-rule" and listed["outbox"][0]["offer_issue_form"]
     opened = client.post("/certify/hand_in/opened", json={**selection, "sha256": viewed["sha256"]}).json()
     assert opened["outbox"] == [] and fake_relay.marks[-1] == ([ID_1], "opened", None)

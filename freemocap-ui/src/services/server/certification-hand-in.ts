@@ -140,12 +140,14 @@ export function pendingSummary(pending: readonly PendingReport[]): string {
     return `Share ${plural(pending.length, 'report')} with FreeMoCap${failures ? `, ${failures} with a failure` : ''}`;
 }
 
-/** The pending reports, failures first, each with the facts the hand-in list gives (package, time, kind) when it has them. */
+/** The pending reports, failures first, each with the facts the hand-in list gives (package, time, kind, "incomplete" for
+ * a run that did not end) when it has them. */
 export function pendingRows(pending: readonly PendingReport[], list: HandInList | null): (PendingReport & {text: string})[] {
     const facts = new Map(list?.reports.map(report => [report.report_id, report]));
     return [...pending].sort((a, b) => Number(b.has_failure) - Number(a.has_failure)).map(report => {
         const row = facts.get(report.report_id);
-        return {...report, text: [row?.package, row?.created_utc ?? report.report_id, row?.kind, report.has_failure ? 'with a failure' : 'no failure']
+        return {...report, text: [row?.package, row?.created_utc ?? report.report_id, row?.kind, row?.incomplete && 'incomplete',
+            report.has_failure ? 'with a failure' : 'no failure']
             .filter(Boolean).join(' · ')};
     });
 }

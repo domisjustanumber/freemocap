@@ -4876,6 +4876,11 @@ export interface components {
              * @description The package whose certify() made the report: `freemocap` or `skellytracker`.
              */
             package: string;
+            /**
+             * Incomplete
+             * @description The run did not end: the report's evidence reasons hold `cancelled` or `interrupted`, as the report file's header says.
+             */
+            incomplete: boolean;
         };
         /** HandInSelection */
         HandInSelection: {

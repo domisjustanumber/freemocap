@@ -11621,6 +11621,11 @@
             "type": "string",
             "title": "Package",
             "description": "The package whose certify() made the report: `freemocap` or `skellytracker`."
+          },
+          "incomplete": {
+            "type": "boolean",
+            "title": "Incomplete",
+            "description": "The run did not end: the report's evidence reasons hold `cancelled` or `interrupted`, as the report file's header says."
           }
         },
         "type": "object",
@@ -11631,6 +11636,7 @@
           "created_utc",
           "has_failure",
           "evidence_valid",
+          "incomplete",
           "state",
           "reference"
         ],

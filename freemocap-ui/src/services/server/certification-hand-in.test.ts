@@ -13,7 +13,8 @@ const ISSUE = 'https://github.com/domisjustanumber/skellycertify/issues/42';
 const BASE: Certification = {host: {name: 'lab-machine', os: 'Windows 11'}, items: [], gpu_held_by: [], pending_reports: []};
 const pending = (...failures: boolean[]) => failures.map((has_failure, index) => ({report_id: `r${index}`, has_failure}));
 const report = (report_id: string, state: 'pending' | 'opened' | 'covered', reference: string | null = null) =>
-    ({report_id, package: 'freemocap', kind: 'quick', created_utc: `2026-11-19T12:0${report_id.slice(1)}:00Z`, has_failure: false, evidence_valid: true, state, reference});
+    ({report_id, package: 'freemocap', kind: 'quick', created_utc: `2026-11-19T12:0${report_id.slice(1)}:00Z`, has_failure: false, evidence_valid: true,
+        incomplete: false, state, reference});
 const LIST: HandInList = {relay_enabled: true, reports: [], outbox: []};
 const FILE = {file_name: 'certify-report-x.md', sha256: 'a'.repeat(64), size_bytes: 10, fits_relay: true, content: '# report'};
 const VIEW: ViewedReport = {reportIds: ['r0', 'r1'], note: '', file: FILE};
@@ -38,6 +39,9 @@ test('the pending reports are summed up and listed failures first, with the list
     assert.equal(pendingSummary(pending(false, true, true)), 'Share 3 reports with FreeMoCap, 2 with a failure');
     const rows = pendingRows(pending(false, true), {...LIST, reports: [report('r0', 'pending')]});
     assert.deepEqual(rows.map(row => row.text), ['r1 · with a failure', 'freemocap · 2026-11-19T12:00:00Z · quick · no failure']);
+    const cancelled = {...report('r0', 'pending'), kind: 'full', incomplete: true};
+    assert.equal(pendingRows(pending(false), {...LIST, reports: [cancelled]})[0].text, 'freemocap · 2026-11-19T12:00:00Z · full · incomplete · no failure',
+        'a cancelled or interrupted run, by the rule of the report file header');
 });
 
 test('hand-ins made are grouped by issue, the issue form ones together, and only safe issue links are kept', () => {

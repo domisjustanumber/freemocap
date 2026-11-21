@@ -218,6 +218,12 @@ def _gpu_cell(gpu: dict) -> str:
     return " ".join(filter(None, (gpu_display_name(gpu.get("name")), _gb(gpu.get("vram_bytes")))))
 
 
+def incomplete(module: dict) -> bool:
+    """The module's run did not end: its evidence reasons hold `cancelled` or `interrupted` (spec 4.2 part 2)."""
+    reasons = (module.get("evidence") or {}).get("reasons") or ()
+    return "cancelled" in reasons or "interrupted" in reasons
+
+
 def _markdown(modules: list[dict], note: str | None, app: dict | None, created: str) -> list[str]:
     """The Markdown part before `## Data`: the short summary for a person (spec 4.2 parts 1 to 8)."""
     def run(module: dict) -> str:
@@ -227,10 +233,10 @@ def _markdown(modules: list[dict], note: str | None, app: dict | None, created: 
     def validity(module: dict) -> str:
         evidence = module.get("evidence") or {}
         reasons = evidence.get("reasons") or ()
-        incomplete = "incomplete · " if "cancelled" in reasons or "interrupted" in reasons else ""
+        unfinished = "incomplete · " if incomplete(module) else ""
         if evidence.get("valid"):
-            return incomplete + "valid as evidence"
-        return incomplete + "not valid as evidence: " + ", ".join(_cell(reason) for reason in reasons)
+            return unfinished + "valid as evidence"
+        return unfinished + "not valid as evidence: " + ", ".join(_cell(reason) for reason in reasons)
 
     def when(time: str) -> str:
         return f"{time[:10]} {time[11:16]} UTC"

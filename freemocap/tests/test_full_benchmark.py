@@ -20,7 +20,7 @@ from freemocap import certification
 from freemocap.core.streaming.message_model import CertificationHost, CertificationItem, CertificationRun, StartCheckResult
 from freemocap.system.certify import crash_record
 from freemocap.system.certify.quick_check import QuickCheckJob, QuickCheckManager, StartRefused, _counted, _ended, _full_rows
-from freemocap.system.certify.relay import hand_in_reports, report_file_for
+from freemocap.system.certify.relay import hand_in_reports, report_file_for, report_incomplete
 
 EP, DEVICE = "fake-ep", "gpu:10de:2484:0"
 LABEL = "fake-ep@10de-2484-0"
@@ -248,6 +248,7 @@ def test_every_start_is_refused_while_it_runs_and_a_cancel_leaves_an_incomplete_
         assert (new["package"], new["kind"]) == ("skellytracker", "full")
         text = report_file_for([new["report_id"]], None)[1].decode("utf-8")
         assert "full run · incomplete · not valid as evidence:" in text  # the rest of its checks are `not-run`, `cancelled`
+        assert report_incomplete(new["report_id"]), "the share list says incomplete by the same rule"
     finally:
         manager.shutdown()
 

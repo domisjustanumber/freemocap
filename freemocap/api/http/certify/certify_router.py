@@ -26,6 +26,8 @@ class HandInReport(BaseModel):
     created_utc: str | None
     has_failure: bool
     evidence_valid: bool
+    incomplete: bool = Field(description="The run did not end: the report's evidence reasons hold `cancelled` or "
+                             "`interrupted`, as the report file's header says.")
     state: Literal["pending", "opened", "covered"]
     reference: str | None = Field(description="The issue address, only when it is an issue of the relay's repository.")
 
@@ -95,7 +97,8 @@ def get_hand_in() -> HandInList:
     relay is on (when it is off, only the issue form is offered)."""
     return HandInList(
         relay_enabled=bool(relay.relay_url()),
-        reports=[HandInReport(**{**row, "reference": relay.issue_url_or_none(row.get("reference"))})
+        reports=[HandInReport(**{**row, "reference": relay.issue_url_or_none(row.get("reference")),
+                                 "incomplete": relay.report_incomplete(row["report_id"])})
                  for row in relay.hand_in_reports(include_handed_in=True)],
         outbox=[OutboxEntry(**entry) for entry in relay.outbox_entries()])
 

@@ -24,7 +24,7 @@ from pathlib import Path
 
 import requests
 
-from freemocap.system.certify.report_file import ReportFileError, app_block, build_report_file, scrub_note
+from freemocap.system.certify.report_file import ReportFileError, app_block, build_report_file, incomplete, scrub_note
 from freemocap.system.default_paths import get_default_freemocap_base_folder_path
 
 logger = logging.getLogger(__name__)
@@ -85,6 +85,14 @@ def hand_in_reports(include_handed_in: bool = False) -> list[dict]:
     rows = [{"package": package, **row} for package, store in _stores().items()
             for row in store.pending_reports(include_handed_in=include_handed_in)]
     return sorted(rows, key=lambda row: (row.get("created_utc") or "", row["report_id"]))
+
+
+def report_incomplete(report_id: str) -> bool:
+    """The report's run did not end, by the rule of the report file's header; false when no store holds it any more."""
+    try:
+        return incomplete(_store_of(report_id)[1])
+    except HandInError:
+        return False
 
 
 def _store_of(report_id: str):

@@ -2160,6 +2160,60 @@ before and after; no `%LOCALAPPDATA%\skellycertify`.
 Real window: the "Skipped" Blender row, the crash marker after a real crash, the new refusal sentences, the log export
 name.
 
+### Format 1.5.0 and reported-only failures, 2026-11-21
+
+Owner's answers of 2026-11-21, relayed by the coordinator: Q77 agree (move to skellycertify format 1.5.0, `0966552`,
+ADR-VV80), Q62 agree (a full benchmark's failed JPEG checks and timings are reported only), Q79 and Q80 agree (below).
+Commit messages from here on carry no attribution line. Tests only, no real window.
+
+- `20896503` format 1.5.0. freemocap's module and the file declare `skellycertify.report/1.5.0`. Each check of freemocap's
+  own module has `module` (`certification.COMPONENTS`: Build identity, Child process, Bundle imports, Data folder,
+  Post-hoc session, Install facts, Sample recording, Blender; `posthoc:<label>` keeps the EP's name). Each such check
+  that ended `pass`, `fail` or `record-only` gets a `component` item (`device` null) with its result. A `not-run` check
+  gets none, and neither does Blender when it is not installed (`not-found` at quick, `not-run`/`not-installed` at full;
+  a "skipped: not installed" row is not in the spec). The writer prints `| Module | Result |` directly after the
+  benchmark table (4.2 part 6). Each module keeps its own schema id. skellytracker at the pin still writes 1.4.0, and
+  the relay checks each module against `1.x` on its own. Spec 8 says "the module reports and the report file of one run
+  use the same schema id"; the writer does not rewrite a package's report. Rule 20 was already a loop until stable
+  (`_no_ipv4`, tested with `1.2.3.4.5.6.7`), so no change there. ms/frame was already one frame set and is unchanged: a
+  stage's total time over the run divided by `PerformanceReport.frames`. That counter is the synchronized frames, 300,
+  not the 900 images. FPS is frame sets per second; Blender's is its export time over 300. The samples in
+  `relay/samples` are unchanged at 1.4.0; the byte-for-byte tests swap only the file's schema line. New fixture
+  `valid-component.md`, built by the writer: a freemocap 1.5.0 module beside skellytracker's 1.4.0 one. The local relay
+  validator (`0966552`) accepts it. `ReportMarkdown` renders any table, so it gets a parser test only.
+- `7139815a` Q62. Reported only, by name shape (spec 3.6; no field of skellytracker's marks them; `module` is the EP
+  name for both an EP's and its JPEG checks): `<label>:jpeg`, `<label>:jpeg:<name>`, `<label>:pipeline-<n>`
+  (`start_check.REPORTED_ONLY`). `full_result()`: when every failed check of a package matches, the result is that of
+  its other checks. `StartCheckResult.reported_only` (new message field; client contract updated by hand, as before;
+  no OpenAPI or golden change) names them. So freemocap's clean-up still runs. A failed probe, video or live check, or
+  a failed freemocap pair, still gives "finished with failed checks" and lists nothing apart. A row with no roll-up
+  check (the CPU) takes no result from those checks; pair rows keep their roll-up. UI line under the package's
+  "finished": "Reported only: JPEG checks on <pair>, timings on CPU: they did not pass, and they do not change the
+  result."
+- `d82a5d6c` Q79. `start_check_needed(crash_skips=False)` treats a crash marker as no pass. The manager's
+  `_full_needed` gates `POST /certify/full_benchmark` with the existing `start-check-not-passed` sentence. A reviewed
+  row or "nothing to check" still admits it. `start_required` is unchanged, so the app and the button stay usable.
+- `1449b6eb` Q80. A start check whose freemocap module ends `fail` (a crashed check is `fail`/`crashed`) writes the
+  crash marker with its first failed check. skellytracker's failures write no freemocap marker. A later pass
+  overwrites it. Not covered: freemocap's `certify()` raising (`error`) writes no marker.
+
+The closed owner's call under "Owner's answers of 2026-11-21": Q79 and Q80 answer both points. The full benchmark rejects
+a run started after a crash marker, and a failed freemocap check now writes the marker.
+
+Live relay: switched off (503 `relay-off`, retryable; the app keeps the file). Its deployed code predates 1.4.0. Once it
+is on, a pre-1.5.0 relay would refuse each freemocap file with 422 `bad-value` at the summary `group` (every freemocap
+module now has `component` items), and the app offers the issue form at once. Not verified against the deployed code.
+
+Suites: after format 1.5.0, Python 1793 passed, 0 failed, 20 skipped; UI main run 245 of 246 with 1 skipped, plus 10 and
+46; `npx tsc --noEmit` clean. After Q62: Python 1792 passed, 1 failed (`test_pipeline_timing.py::
+test_maybe_flush_publishes_and_clears`, a `Queue.empty()` race; it passed 3 reruns alone); UI 246 of 247 with 1
+skipped; client package 148 of 148. After Q79 and Q80: Python 1795 passed, 0 failed, 20 skipped (the race test passed);
+UI main run 246 of 247 with 1 skipped, plus 10 and 46; `npx tsc --noEmit` clean.
+
+Reading list: `../skellycertify/report-format.md` 3.6, 3.7, 4.2, 8 (what 1.5.0 requires);
+`freemocap/certification.py` docstring (component items, ms/frame); `system/certify/start_check.py` `full_result`,
+`start_check_needed` (Q62, Q79, Q80).
+
 ## Next actions
 
 All as local commits on `sidecar-implementation`, in this order:

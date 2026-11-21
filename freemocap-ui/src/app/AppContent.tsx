@@ -65,7 +65,8 @@ export const AppContent = function () {
                             <BasePanelLayout onOpenWelcome={() => setWelcomeOpen(true)}>
                                 <BaseContentRouter />
                             </BasePanelLayout>
-                            <WelcomeModal open={welcomeOpen} onClose={() => setWelcomeOpen(false)} />
+                            {/* Not under the Certification dialog: a first launch shows it once the dialog is closed. */}
+                            <WelcomeModal open={welcomeOpen && !certificationOpen && !locked} onClose={() => setWelcomeOpen(false)} />
                             <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
                         </div>
                         <CertificationDialog open={certificationOpen || locked} onClose={closeCertification} required={locked} />

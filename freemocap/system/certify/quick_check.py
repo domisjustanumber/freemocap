@@ -105,10 +105,12 @@ def _what(pair: CertificationPair | None, items: tuple[CertificationItem, ...] =
 
 def _full_rows(message: dict, items: tuple[CertificationItem, ...]) -> tuple[CertificationRunRow, ...]:
     """A full benchmark's progress rows from one package's progress message: for skellytracker one per EP on a GPU and one
-    for the CPU, by the label before the first `:` of its check names; one for any other package."""
+    for the CPU, by the label before the first `:` of its check names; for freemocap one per check, its `posthoc:<label>`
+    rows named by skellytracker's label of the pair; one for any other package."""
     package = str(message.get("package"))
     step = message.get("step") if message.get("state") == "running" and isinstance(message.get("step"), dict) else {}
-    group = (lambda name: name.split(":")[0]) if package == "skellytracker" else (lambda name: package)
+    group = (lambda name: name.split(":")[0]) if package == "skellytracker" else (lambda name: name) \
+        if package == "freemocap" else (lambda name: package)
     groups: dict[str, list[dict]] = {}
     for row in message.get("checks") or ():
         if isinstance(row, dict) and isinstance(row.get("name"), str):
@@ -117,11 +119,13 @@ def _full_rows(message: dict, items: tuple[CertificationItem, ...]) -> tuple[Cer
     for name, checks in groups.items():
         results = [check.get("result") for check in checks]
         rollup = next((check.get("result") for check in checks if check["name"] == name), None)
-        key, device_key = (name.split("@")[0], None) if package == "skellytracker" else (None, None)
-        if "@" in name:
+        pair = package == "skellytracker" or name.startswith("posthoc:")
+        label = name.split(":")[-1]
+        key, device_key = (label.split("@")[0], None) if pair else (None, None)
+        if pair and "@" in label:
             from skellytracker.certification import _label  # shortcut: skellytracker's private label rule, as crash_record
             device_key = next((item.device_key for item in items
-                               if item.execution_provider == key and _label(key, item.device_key) == name), None)
+                               if item.execution_provider == key and _label(key, item.device_key) == label), None)
         # partly-done: some of its checks ended and the rest come later in the run (the CPU's timings follow the pairs)
         state = "running" if isinstance(step.get("name"), str) and group(step["name"]) == name \
             else "done" if None not in results else "waiting" if set(results) == {None} else "partly-done"

@@ -51,3 +51,15 @@ test('after a full benchmark ends its rows stay with how each ended, from the se
     assert.match(html, /CPU Passed skellytracker: cancelled/);
     assert.ok(!/Cancel check/.test(html), html);
 });
+
+test('the rows of one pair stay apart: each package\'s rows come under its name', () => {
+    const run = {level: 'full', items: [], state: 'running', done: 3, package: 'freemocap', rows: [
+        {name: 'cpu', package: 'skellytracker', execution_provider: 'cpu', state: 'done', result: 'pass'},
+        {name: 'posthoc:cpu', package: 'freemocap', execution_provider: 'cpu', state: 'running'},
+        {name: 'blender', package: 'freemocap', state: 'waiting'}]};
+    const certification = {host: {name: 'h', os: 'o'}, items: [], gpu_held_by: [], pending_reports: [], run};
+    const store = configureStore({reducer: () => ({connection: {isConnected: false, serverPid: null, certification}})});
+    const html = renderToStaticMarkup(<Provider store={store}><FullBenchmarkSection/></Provider>);
+    assert.match(text(html), /skellytracker CPU Passed freemocap CPU Running /);
+    assert.equal(html.match(/<th /g)?.length, 2, 'one heading per package');
+});

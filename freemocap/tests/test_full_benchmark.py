@@ -133,9 +133,16 @@ def test_the_progress_has_one_row_per_ep_and_gpu_with_its_state_and_result():
     ended["checks"][3]["result"] = "fail"  # its video check failed; the EP check gives the row's result
     ended["checks"][7]["result"] = "fail"
     assert [(row.state, row.result) for row in _full_rows(ended, items)] == [("done", "pass"), ("done", "fail")]
-    own = _full_rows({"package": "freemocap", "state": "running", "step": {"name": "exports"},
-                      "checks": [{"name": "exports", "result": None}]}, items)
-    assert [(row.name, row.execution_provider, row.state) for row in own] == [("freemocap", None, "running")]
+    # freemocap's checks: a row each, its benchmark of a pair named by the pair, apart from skellytracker's by its package
+    names = ["data-folder", "recording", f"posthoc:{LABEL}", "posthoc:cpu", "blender"]
+    own = _full_rows({"package": "freemocap", "state": "running", "step": {"name": "posthoc:cpu"},
+                      "checks": [{"name": name, "result": "pass" if index < 3 else None} for index, name in enumerate(names)]},
+                     items)
+    assert [(row.package, row.name, row.execution_provider, row.device_key, row.state, row.result) for row in own] == [
+        ("freemocap", "data-folder", None, None, "done", "pass"), ("freemocap", "recording", None, None, "done", "pass"),
+        ("freemocap", f"posthoc:{LABEL}", EP, DEVICE, "done", "pass"), ("freemocap", "posthoc:cpu", "cpu", None, "running", None),
+        ("freemocap", "blender", None, None, "waiting", None)]
+    assert len(own) == _counted({"checks": [{"name": name} for name in names]})[1], "a row for each counted check"
 
 
 def test_the_count_of_checks_counts_what_the_plan_counts_and_never_passes_its_total():

@@ -98,9 +98,13 @@ export function FullBenchmarkSection() {
             : <p className="text sm text-gray">{mine.planError ? FULL_BENCHMARK_TEXT.couldNotReadPlan + mine.planError : FULL_BENCHMARK_TEXT.loadingPlan}</p>)}
         {rows.length > 0 && <table className="certify-table text sm" style={table}>
             <tbody>
-            {rows.map(row => {
+            {rows.map((row, index) => {
                 const status = fullRowStatus(row);
-                return <tr key={`${row.package}:${row.name}`} className="border-1">
+                // Each package's rows under its name: skellytracker's checks and freemocap's benchmark of one pair stay apart.
+                return <React.Fragment key={`${row.package}:${row.name}`}>
+                {row.package !== rows[index - 1]?.package && <tr><th colSpan={2} style={{...cell, textAlign: 'left'}}
+                    className="text-gray">{row.package}</th></tr>}
+                <tr className="border-1">
                     <td style={{...cell, width: '62%'}} className="text-white">{fullRowName(row, certification?.items)}</td>
                     <td style={cell} role="status">
                         <span className="flex flex-row items-center gap-1">
@@ -109,7 +113,8 @@ export function FullBenchmarkSection() {
                                 : 'text-white'}>{status.text}</span>
                         </span>
                     </td>
-                </tr>;
+                </tr>
+                </React.Fragment>;
             })}
             </tbody>
         </table>}

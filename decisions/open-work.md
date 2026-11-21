@@ -5,17 +5,13 @@ task. Delete an item when its work is done. The PR that closes an item records t
 
 - **Private data in tracked files.** On 2026-11-21, `tools/check_private_data.py` reported 32
   findings on `sfn26`. The kit PR removed the user-folder paths from the bench scripts,
-  `current-work-plans/` and `experiments/`, and the check now skips the npm lock files. 10 findings
+  `current-work-plans/` and `experiments/`, and the check now skips the npm lock files. 8 findings
   stay. Thus `test_repository_has_no_private_data`, the `private-data` hook and the doc-checks
   workflow fail. The user decides each redaction. Git history keeps the old text
   ([ADR-0001](entries/0001-decision-log-agents-md-and-private-data.md)).
   - `freemocap-ui/src/hooks/floatingOnboarding.tsx:1` and `useDraggableTooltips.tsx:1`: the
     personal email address of a contributor in the author comment. Remove the address and keep the
     name, or use the GitHub noreply address of the contributor.
-  - `freemocap/core/pipeline/posthoc/video_group_helper.py:447` and
-    `freemocap/core/viz/blender/blender_trajectory_loader.py:397`: a user-folder path in the
-    `__main__` example block. Use a command-line argument or a `Path.home()` path, or remove the
-    example block.
   - `packages/freemocap-client/contracts/openapi.json:3303,4059,7119` and
     `packages/freemocap-client/src/generated/schema.ts:1527,3045`: user-folder paths in the request
     examples. The server writes these examples from the home folder when it starts.

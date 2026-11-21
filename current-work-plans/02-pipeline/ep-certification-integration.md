@@ -1792,7 +1792,8 @@ Steps 1 to 4 of the order of work are done. Step 5 has started. Nothing is runni
 ### Built since "After the grilling"
 
 - Pin: `pyproject.toml` names `../skellytracker-pin`, this session's own clone, detached at `9a5f3912`
-  (a local, unpushed commit of the skellytracker session), commit `9bd1a4bc`. A git-URL pin fails because an
+  (a local, unpushed commit of the skellytracker session), commit `9bd1a4bc`; moved to `346b77eb` on 2026-11-21
+  (see "Owner's answers of 2026-11-21 and the pin at 346b77eb"). A git-URL pin fails because an
   installed skellytracker holds no ONNX file; the clone has them hard-linked from `../skellytracker`.
   Move it with `git -C ../skellytracker-pin fetch ../skellytracker <hash>` and `git checkout --detach`.
 - Report format 1.4.0 (owner confirmed): head layout, benchmark table, five-column failed-checks table,
@@ -2096,6 +2097,68 @@ of 245 with 1 skipped, plus 10 and 46; `npx tsc --noEmit` clean; `node --test` o
 Real window: the banner clearing after the start check passes, Welcome after "Continue" on a fresh profile, note
 borders in the dialog and the EP panel, the EP menu right after connect, the strip at 1000 px and 1100 px on
 Streaming, and Save snapshot.
+
+### Owner's answers of 2026-11-21 and the pin at 346b77eb
+
+The owner's answers, as relayed by the coordinator. Tests only, no real window.
+
+| Q | Owner's answer | Built |
+|---|---|---|
+| Q58 | yes: freemocap's quick share 15 s to 25 s; skellytracker's cap 75 s to 65 s in its own repository | `907484b9`: `QUICK_BUDGET_SECONDS = 25`. It sets the quick plan's `seconds_estimate` and the `over-budget` guard of `posthoc-session`; the UI's "up to about N seconds" comes from the plan. freemocap neither passes nor assumes skellytracker's cap (its tests use stand-in estimates 75 and 90). |
+| Q59 | yes: a start check that crashed in freemocap's own part is skipped for good until a package version changes | `95ac9536`: `crash_record.recover` writes `{"versions", "os", "crashed": <check>}` to `start-check.json` (`start_check.record_crash`) when the crash record is a start check (level quick, no pair) whose progress names freemocap (or no package). `start_check_needed()` then reads false for that version set. The report stays in the hand-in list; the Certification button still runs the check; a later pass overwrites the record. A crash in skellytracker's part writes nothing. |
+| Q61 | yes | `da90e7ef`: `REASON_TEXT.crashed` "it stopped unexpectedly while it ran and is not run again by itself" → "it stopped unexpectedly and will not run again automatically". |
+| Q68 | "use freemocap instead of skellycertify" | `f09687cc`: default `%LOCALAPPDATA%\freemocap\test-media` (else `~/.cache/freemocap/test-media`, the Blender storage pattern); `FREEMOCAP_TEST_MEDIA_DIR` still overrides. Checked: no code removes `%LOCALAPPDATA%\freemocap` or `storage_root()` (Blender only creates `packages`, `built`, `profiles` under `freemocap\blender`); the NSIS uninstaller has `deleteAppDataOnUninstall: false` and a per-user install lives in `%LOCALAPPDATA%\Programs\…`. The real folder also holds `TensorRT-RTX-EP-ABI-v0.1.0` (not written by these tests). |
+| Q69 | "skipped is ok for this" | `ca0146e6`: the row reads "Skipped". freemocap's progress now carries each check's `reason` (a field the spec's progress table does not list), so `run.rows`/`full_rows` give the `blender` row `reason: "not-installed"`; `CertificationRunRow.reason` description refreshed in OpenAPI and the client schema. The report keeps `not-run`/`not-installed`: spec 3.7 allows `skipped` only for a summary item and only with `busy` or `reviewed`, and part 8 prints no row for a `not-run` check without a partial or failed item, so the Markdown cannot say "skipped" without a spec change. |
+| Q74 | yes | `a60801b9`, sentences below. |
+| Q75 | yes | `d8b94cfb`: `freemocap-logs-<YYYYMMDD-HHMMSS>.txt` in local time (was `toISOString()` with `-` for `:` and `.`); calibration export names unchanged. |
+
+Q74 sentences (key `amdgpu`, display name "AMD GPU" from skellytracker's label in the cached status, else the key):
+
+- "<check> is running; the ep-pack start was refused. Start again when the check ends." → "…; the provider pack
+  install start was refused. …" ("provider pack remove" for a remove).
+- "An install or remove of the amdgpu EP is running; the <kind> start was refused. Start again when it ends." → "An
+  install or remove of the AMD GPU EP is running; the <kind> start was refused. …"
+- "The quick check cannot start while other work runs: ep-pack amdgpu. Stop it first." → "…: the provider pack install
+  or remove of AMD GPU. Stop it first." (the same list in every `pipelines-running` sentence; the running pack's action
+  is not in its claim, so it says "install or remove").
+- "The install of amdgpu cannot start while other work runs: cameras g1. Stop it first." → "The provider pack install
+  of AMD GPU cannot start while other work runs: cameras g1. Stop it first."
+
+Codes, `gpu_held_by` kinds (`ep-pack`) and the other quick-check and full-benchmark sentences are unchanged.
+
+Confirmed with no change (owner's yes): Q63 (the button stays clickable after a failed start check; the server refuses
+with its sentence), Q64 (consent inline; rows grouped under package headings), Q66 ("Partly done"), Q67 (a crashed row
+reads "Failed", `8a2167a2` stays), Q72 (the download guard compares names only). Still open, not built: Q57, Q60, Q62,
+Q70, Q71.
+
+Owner's call, found while building Q59: the full benchmark's gate is `start_check_needed()` false, so after a crash
+marker the full benchmark is admitted although the start check never passed. Not covered by Q59: a freemocap check that
+ends `fail`/`crashed` inside an ordinary run (a crashed spawn child) records nothing, so the start check is asked again.
+
+Pin: skellytracker `dom/sidecar-implementation` at `346b77eb`. CI on that commit, all green: Fast tests (ubuntu), EP
+pack (windows, ubuntu, macos), Lint, Secret scan; the full test suite runs only on a pull request or by hand and did
+not run. `../skellytracker-pin` fetched and detached there; its model files are the same set as `../skellytracker`'s
+(no new ONNX or model file; the MediaPipe smoke check reads `holistic_landmarker.task` from
+`~/.freemocap/skellytracker-models` and downloads nothing). Commit `45e4ec09` updates the `pyproject.toml` comment; no
+`uv sync`/`uv lock` (an editable path; skellytracker's `pyproject.toml` did not change). Nothing in freemocap needed
+adapting to `mediapipe:smoke`: the start check uses package-level rows and skellytracker's done/total, crash_record
+ignores a label without `@`, and freemocap does not read `details.skipped`.
+
+Isolated quick run after the pin (scratch EP store, cache, base folder, logs, test media; RTX 3070 and UHD 770,
+DirectML):
+
+| Package | Checks | Results | Plan estimate | Seconds |
+|---|---|---|---|---|
+| freemocap | 7 | 4 pass (`posthoc-session` 8.7 s), 3 record-only (`build-identity` `modified-tree`, `install-facts`, `blender`) | 25 s | 10.2 |
+| skellytracker | 11 | 11 pass: CPU video/live, DirectML on both GPUs (probe, video, live, roll-up), `mediapipe:smoke` 2.9 s; evidence valid | 48 s | 24.4 |
+
+Suites: after the rulings Python 1791 passed, 0 failed, 20 skipped; UI main run 244 of 245 with 1 skipped, plus 10 and
+46; `npx tsc --noEmit` clean; client package 148 of 148. After the pin: Python 1791 passed, 0 failed, 20 skipped; UI
+the same; `npx tsc --noEmit` clean. `%LOCALAPPDATA%\freemocap` held only `blender` and `TensorRT-RTX-EP-ABI-v0.1.0`
+before and after; no `%LOCALAPPDATA%\skellycertify`.
+
+Real window: the "Skipped" Blender row, the crash marker after a real crash, the new refusal sentences, the log export
+name.
 
 ## Next actions
 

@@ -1907,6 +1907,72 @@ run" (the EP check's result). Not tried in the real window: the menu gate, the r
 Suites: Python 1774 passed, 0 failed, 20 skipped; UI 240 of 241 with 1 skipped; `npx tsc --noEmit` clean; client
 package 148 of 148.
 
+### Recording benchmark, 2026-11-21
+
+freemocap's level full is built (`freemocap/certification.py`; docstring has the rules). Checks: `data-folder` (write
+access only), `recording`, one `posthoc:<label>` per pair, `blender`; all names have at most one `:`, so the count
+matches the plan's `total`. No UI change.
+
+Decisions and facts:
+
+- Recording: the freemocap sample recording, `freemocap_sample_data.zip`, 166 958 457 bytes, sha256
+  `c23d6a24…acf4f`, from the URL the dataset tools already use (`tools/datasets/catalog.py` `SAMPLE_DATA`,
+  github.com release). `utilities/download_sample_data.py` is dead code (its imports no longer exist). The download
+  and zip-safety code of `acquire_recording` became `catalog.download` (streams, hashes, polls a cancel) and
+  `catalog.extract_recording`. Spec 2.8 holds the recording as written: the archive is one file,
+  `<sha256>.zip` in the shared folder. The extracted, cut copy lives in freemocap's work folder
+  `<data>/certify/benchmark` (spec 2.5 "its own work folder"). The cut writes the first 300 frames of each of the 3 videos
+  in the sample's own codec (MPEG-4 Part 2, `mp4v`, no B-frames).
+- Shared test media folder: `default_paths.get_test_media_dir()`, `%LOCALAPPDATA%\skellycertify\test-media` (else
+  `~/.cache/...`), override `FREEMOCAP_TEST_MEDIA_DIR`. The plan route and `run_full_check` pass it to both packages at
+  level full. skellytracker reads its frames only from `<dir>/<sha>.zip` when it gets the option and does not copy them
+  there, so `start_check.seed_test_media` copies its bundled file there first (`frames_record`/`frames_file`). That
+  file is bundled, so the clean-up keeps it. The level quick does not get the folder yet.
+- Pairs and order: the labels that skellytracker's `certify_plan("full")` runs (`details.checks` minus `not_run`),
+  matched to `eps.status()` rows. Reviewed state is `DeviceCheck.certified`. The known-fastest is the first reviewed
+  pair in the `status().eps` order, which skellytracker documents as its order of preference. The CPU is the status row
+  with `uses_gpu` false. A pair runs when its `DeviceCheck.usable` (the CPU row: `usable`) is true after
+  skellytracker's own run (its `_record` writes the local pass or fail), else `not-run`/`ep-not-passed`. A reviewed
+  pair that failed in this run therefore does not run. Labels use skellytracker's private `_label`, as `crash_record`
+  does.
+- Measuring: the session's own `PerformanceReport` line "Processing performance:" is captured in the spawn child and
+  read with `tools/datasets/reporting.parse_performance` and `normalized_stages`, the code `machine_benchmarks.py` uses.
+  Summary items are written for 7 stages: inference, tracking, triangulation, filtering, reconstruction, saving and
+  exports (channel exports only, so Blender is not mixed in). Every stage is kept in `numbers.stages`; the one-off
+  `inference.session_setup` is in `numbers.startup_seconds`. Blender is the app's `export_to_blender` on the first
+  finished pair's recording, in its own child. It gets the item `Blender`/`export` and the check is `record-only`.
+  When Blender is not found the check is `not-run`/`not-installed`.
+- Frame count 300: in the 150-frame trial on this PC the CPU session took 19.5 s. With 300 frames the CPU pair takes
+  40.1 and 38.7 s from start to end (2 runs). Estimates: download 20 s, prepare 10 s, 45 s per pair, Blender 20 s. The
+  plan gave 165 s; the freemocap part measured 147.7 and 144.5 s.
+- Clean-up: `certify(..., remove_data=True)` removes the work folder, and the archive only when this run downloaded
+  it. It does this only after a run with no failed check and no cancel. `run_full_check` passes `remove_data` only when
+  every earlier package passed. Failures go in `cleanup`. A partial or wrong download is always deleted. The start of
+  a run replaces an earlier run's work folder.
+- `host.gpus` is now in freemocap's report (the benchmark GPU cells need it). A file with freemocap's module alone
+  therefore lists the GPUs as "not checked".
+
+Measured (scratch store, RTX 3070 + UHD 770, DirectML a field-test EP that skellytracker's full pass opted in; CUDA and
+TensorRT RTX not installed in the scratch store, so not measured). Cancel during a pair ended the run 0.31 s later. The
+work folder stayed, the rest of the checks were `not-run`/`cancelled`, and no child process was left.
+
+Tests run: `test_recording_benchmark.py` (new: plan, success and clean-up, fail/cancel/no choice, archive kept or wrong
+hash, timing read-out, `run_full_check` options) and the updated `test_start_check`, `test_full_benchmark`,
+`test_certify_report_file`. A cancelled full run now also lists freemocap as `not-run`/`cancelled`. Full fast suite:
+1782 passed, 0 failed, 20 skipped (baseline 1774); no download, real folders untouched.
+
+Open (owner's decisions or gaps):
+
+- The Markdown head has no place for "Blender: not installed". The JSON has it (check `blender`, `not-installed`). A
+  line needs the skellycertify spec.
+- The UI shows freemocap's failed check names raw (`posthoc:cpu`, `recording`, `blender`), and the progress has one
+  freemocap row, not one row per pair.
+- The folder name `skellycertify/test-media` and the env variable are this session's choice.
+- The plan route and the full run do not pass the Blender path chosen in settings (the best guess is used).
+- No real download was timed through the app. A pair's timeout is 600 s; Blender's is 600 s.
+- macOS `coreml` (no device key) is not in the pair list. A test stand-in is needed so that no test runs the real full
+  level: one did, and downloaded the archive twice before it was stubbed.
+
 ## Next actions
 
 All as local commits on `sidecar-implementation`, in this order:

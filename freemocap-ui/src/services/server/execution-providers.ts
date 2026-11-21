@@ -62,8 +62,12 @@ export function executionProviderOptions(selected: ExecutionProviderName | null,
         return marker ? `${provider.label} (${marker})` : provider.label;
     };
     const options = [{label: 'Auto', value: null}, ...shown.map(provider => ({label: label(provider), value: provider.key}))];
-    return selected === null || shown.some(({key}) => key === selected)
-        ? options : [...options, {label: providers.find(({key}) => key === selected)?.label ?? selected, value: selected}];
+    if (selected === null || shown.some(({key}) => key === selected)) return options;
+    // A saved choice's name comes from the EPs or the certification items, whichever arrived first; before either (no
+    // EPs read yet) a placeholder, never its key. A key the server's EPs do not list keeps showing as saved.
+    const savedLabel = providers.find(({key}) => key === selected)?.label
+        || items?.find(item => item.execution_provider === selected)?.label || (providers.length ? selected : '…');
+    return [...options, {label: savedLabel, value: selected}];
 }
 
 /** F12's five states of one EP on one GPU, worded with "machine" for the computer (G1). A reviewed pair has no marker. */

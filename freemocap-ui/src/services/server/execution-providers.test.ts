@@ -58,10 +58,13 @@ test('the explanation marks a pair that passed here and has no reviewed row, and
     assert.match(text([ep([pair('failed', true, false)])]), /Runs on a GPU\. Not usable here\./);
 });
 
-test('before the server answers RTMW shows the provider row with Auto and the saved key; then the server decides', () => {
+test('before the server answers RTMW shows the provider row with Auto and the saved choice by name, never by key', () => {
     assert.equal(detectorShowsExecutionProvider(null, 'rtmpose'), true);
     assert.equal(detectorShowsExecutionProvider(null, 'mediapipe'), false);
-    assert.deepEqual(executionProviderOptions('saved-ep', []), [{label: 'Auto', value: null}, {label: 'saved-ep', value: 'saved-ep'}]);
+    assert.deepEqual(executionProviderOptions('saved-ep', []), [{label: 'Auto', value: null}, {label: '…', value: 'saved-ep'}]);
+    // The certification items of the first app_state carry the name before the EPs are read.
+    const item = {execution_provider: 'saved-ep', label: 'Saved EP', device_key: 'gpu:1', certified: true, usable: true};
+    assert.deepEqual(executionProviderOptions('saved-ep', [], [item]).at(-1), {label: 'Saved EP', value: 'saved-ep'});
     assert.equal(detectorShowsExecutionProvider({rtmpose: false, mediapipe: true}, 'rtmpose'), false, 'the answer decides');
     assert.equal(detectorShowsExecutionProvider({rtmpose: true, mediapipe: true}, 'mediapipe'), true);
     assert.equal(detectorShowsExecutionProvider({}, 'rtmpose'), false, 'a detector the answer does not list');

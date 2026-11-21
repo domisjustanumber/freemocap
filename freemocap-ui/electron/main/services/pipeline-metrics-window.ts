@@ -11,7 +11,10 @@ const PIPELINE_METRICS_SNAPSHOT_URL = 'freemocap-snapshot:pipeline-metrics';
 /** Capture the window as a PNG and save it where the user picks, defaulting to Downloads. */
 async function saveSnapshot(window: BrowserWindow): Promise<void> {
     const image = await window.webContents.capturePage();
-    const stamp = new Date().toISOString().replace(/\.\d+Z$/, '').replace(/[-:]/g, '').replace('T', '-');
+    // Local time, as recording names are: the ISO text of the clock shifted by the local offset.
+    const now = new Date();
+    const stamp = new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString()
+        .replace(/\.\d+Z$/, '').replace(/[-:]/g, '').replace('T', '-');
     const {canceled, filePath} = await dialog.showSaveDialog(window, {
         defaultPath: path.join(app.getPath('downloads'), `pipeline-metrics-${stamp}.png`),
         filters: [{name: 'PNG image', extensions: ['png']}],

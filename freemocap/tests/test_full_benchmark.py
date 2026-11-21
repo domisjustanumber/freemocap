@@ -216,6 +216,22 @@ def test_the_full_benchmark_is_refused_until_the_start_check_passed(base):
         manager.shutdown()
 
 
+def test_after_a_crash_marker_the_app_is_released_but_the_full_benchmark_is_refused(base):
+    """Owner, Q79: a crash marker skips the start check (Q59) but is no pass; the server refuses with its sentence."""
+    manager = _manager(tracker_until_cancelled)
+    manager.read_full_needed = lambda: True
+    try:
+        manager.refresh()
+        assert not manager.snapshot(()).start_required  # the app and the Certification button stay usable
+        with pytest.raises(StartRefused) as refused:
+            _start(manager)
+        assert refused.value.detail == {"code": "start-check-not-passed",
+                                        "message": "The full benchmark can start once the start check has passed on this system."}
+        assert not manager.running and manager.run is None
+    finally:
+        manager.shutdown()
+
+
 def test_every_start_is_refused_while_it_runs_and_a_cancel_leaves_an_incomplete_report_to_share(base, failures):
     manager = _manager(tracker_until_cancelled)
     before = {row["report_id"] for row in hand_in_reports()}

@@ -213,6 +213,19 @@ def test_a_local_pass_stops_the_start_check_until_a_version_changes(base, monkey
     assert start_check.start_check_needed()
 
 
+def test_a_crash_marker_skips_the_start_check_but_is_no_pass_for_the_full_benchmark(base, monkeypatch):
+    start_check.record_crash("posthoc-session")
+    assert not start_check.start_check_needed() and start_check.start_check_needed(crash_skips=False)  # owner, Q79
+    start_check.record_pass({"checks": []})  # a later pass overwrites the marker
+    assert not start_check.start_check_needed(crash_skips=False)
+    start_check.record_crash("posthoc-session")
+    monkeypatch.setattr(start_check, "REVIEWED_OS_ROWS", ({**start_check.os_key(), "kind": "full"},))
+    assert not start_check.start_check_needed(crash_skips=False), "a reviewed row still admits the full benchmark"
+    monkeypatch.setattr(start_check, "REVIEWED_OS_ROWS", ())
+    monkeypatch.setattr(start_check, "_has_checks", lambda: False)
+    assert not start_check.start_check_needed(crash_skips=False), "so does nothing to check"
+
+
 def test_a_reviewed_row_for_this_machine_stops_the_start_check(base, monkeypatch):
     key = start_check.os_key()
     assert key["freemocap"].count(".") == 1 and key["build_family"]

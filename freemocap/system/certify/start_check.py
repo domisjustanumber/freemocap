@@ -76,9 +76,10 @@ def _has_checks() -> bool:
         return True
 
 
-def start_check_needed() -> bool:
+def start_check_needed(*, crash_skips: bool = True) -> bool:
     """No reviewed row matches this machine, no local pass was recorded for the current version set, and some package's
-    quick plan has a check to run."""
+    quick plan has a check to run. A crash marker for the current version set (`record_crash`) counts as a pass only
+    with `crash_skips`: it skips the start check, but the full benchmark needs a real pass (owner, Q79)."""
     key = os_key()
     if any(row.get("kind") == "full" and all(row.get(name) == key[name] for name in KEY_FIELDS) for row in REVIEWED_OS_ROWS):
         return False
@@ -86,7 +87,7 @@ def start_check_needed() -> bool:
         record = json.loads(record_path().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         record = None
-    if isinstance(record, dict) and record.get("versions") == version_set():
+    if isinstance(record, dict) and record.get("versions") == version_set() and (crash_skips or "crashed" not in record):
         return False
     return _has_checks()
 

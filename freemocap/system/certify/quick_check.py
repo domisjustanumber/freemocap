@@ -356,7 +356,9 @@ class QuickCheckManager:
     full_results: tuple[StartCheckResult, ...] = ()  # how the last full benchmark of this server session ended
     full_rows: tuple[CertificationRunRow, ...] = ()  # its rows as it ended, until the next one starts
     read_start_needed: object = None  # tests: a stand-in for `start_check.start_check_needed`
+    read_full_needed: object = None  # tests: a stand-in for it with `crash_skips=False`; else `read_start_needed`'s answer
     _start_needed: bool | None = None  # None until the first status read: the gated starts are refused until then
+    _full_needed: bool | None = None  # the same, but a crash marker is no pass: the full benchmark's gate (owner, Q79)
     _parts: tuple | None = None
     _parts_read_at: float = 0.0
 
@@ -472,7 +474,7 @@ class QuickCheckManager:
                                    "again when the check ends.",
                         "run": {"execution_provider": running and running.execution_provider,
                                 "device_key": running and running.device_key}})
-                if level == "full" and self._start_needed is not False:  # a fact of now: the start check's pass is recorded
+                if level == "full" and self._full_needed is not False:  # a fact of now: a real pass is recorded (Q79)
                     raise StartRefused(409, {
                         "code": "start-check-not-passed",
                         "message": "The full benchmark can start once the start check has passed on this system."})
@@ -563,7 +565,11 @@ class QuickCheckManager:
             try:
                 parts = self.read_status()
                 from freemocap.system.certify.start_check import start_check_needed
-                self._start_needed = (self.read_start_needed or start_check_needed)()
+                needed = self.read_start_needed or start_check_needed
+                full = self.read_full_needed or (needed if self.read_start_needed else
+                                                 lambda: start_check_needed(crash_skips=False))
+                self._start_needed = needed()
+                self._full_needed = self._start_needed or full()
             except Exception:  # noqa: BLE001 - the last good status stays; a broken store must not stop progress
                 logger.exception("skellytracker's EP status could not be read for the certification state")
             else:

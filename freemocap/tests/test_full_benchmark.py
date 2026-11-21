@@ -2,9 +2,12 @@
 check passed, the lock of every start while it runs, a cancel that leaves an incomplete report in the share list, and its
 crash record at level full. Both packages' `certify` are stand-ins: nothing is downloaded and the real level full never
 runs."""
+import contextlib
 import multiprocessing
+import os
 import time
 import uuid
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -16,7 +19,7 @@ from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 from freemocap import certification
 from freemocap.core.streaming.message_model import CertificationHost, CertificationItem, CertificationRun, StartCheckResult
 from freemocap.system.certify import crash_record
-from freemocap.system.certify.quick_check import QuickCheckManager, StartRefused, _counted, _full_rows
+from freemocap.system.certify.quick_check import QuickCheckJob, QuickCheckManager, StartRefused, _counted, _full_rows
 from freemocap.system.certify.relay import hand_in_reports, report_file_for
 
 EP, DEVICE = "fake-ep", "gpu:10de:2484:0"
@@ -53,6 +56,30 @@ def tracker_crash(level, progress, cancel, **options):
     progress(_message(f"{LABEL}:pipeline-1", 5))
     time.sleep(1.0)  # the backend's refresh takes the message before the child dies
     os._exit(3)
+
+
+def tracker_marks_its_report(level, progress, cancel, **options):
+    """skellytracker's level full until a cancel, then a mark where its cancelled report would be written."""
+    progress(_message(f"{LABEL}:video", 3))
+    while not cancel.is_set():
+        time.sleep(0.05)
+    (Path(os.environ["FREEMOCAP_BASE_FOLDER"]) / "cancelled-report").write_text("written")
+    return {}
+
+
+def backend_that_dies(pids):
+    """A backend that starts the full benchmark's child and dies while it runs."""
+    from skellylogs.handlers.websocket_log_queue_handler import create_websocket_log_queue
+    create_websocket_log_queue()  # as the backend does at its start
+    flag = multiprocessing.Value("b", False)
+    job = QuickCheckJob.create(pair=None, detector_type="rtmpose", rtmpose_model_name=None, global_kill_flag=flag,
+                               worker_registry=WorkerRegistry(global_kill_flag=flag, worker_mode=WorkerMode.PROCESS),
+                               certify=tracker_marks_its_report, level="full")
+    job.start()
+    job.progress_subscription.get(timeout=120)  # certify() runs
+    pids.put(job.worker.pid)
+    time.sleep(0.5)  # the queue's feeder hands the pid over before the exit
+    os._exit(9)
 
 
 @pytest.fixture
@@ -231,3 +258,21 @@ def test_the_full_benchmark_routes_give_the_plans_in_run_order_and_start_with_th
     assert (started[0]["level"], started[0]["remove_data"], started[0]["seconds_estimate"], started[0]["pair"]) == (
         "full", False, 333, None)  # the total of the plans' estimates
     assert started[0]["not_counted"] == ["openvino@8086-a780-0"], "the pairs the plan does not run are not counted"
+
+
+def test_a_child_whose_backend_died_ends_by_itself_at_once_and_writes_no_report(base):
+    """The crash record is the one report of a crash of the app: the orphaned child does not cancel into a second one."""
+    import psutil
+    pids = multiprocessing.Queue()
+    backend = multiprocessing.Process(target=backend_that_dies, args=(pids,))
+    backend.start()
+    pid = pids.get(timeout=180)
+    backend.join(timeout=30)
+    with contextlib.suppress(psutil.NoSuchProcess):
+        child = psutil.Process(pid)
+        try:
+            child.wait(timeout=3)  # its watch polls every 0.2 s
+        except psutil.TimeoutExpired:
+            child.kill()
+            pytest.fail("the orphaned child did not end by itself")
+    assert not (base / "cancelled-report").exists()

@@ -17,6 +17,7 @@ import logging
 import multiprocessing
 import multiprocessing.queues
 import multiprocessing.synchronize
+import os
 import socket
 import threading
 import time
@@ -147,6 +148,20 @@ def _report_result(report: dict) -> tuple[str, str | None]:
     return str(row.get("result")), row.get("reason")
 
 
+def _end_orphan() -> None:
+    """The backend died: end now with certify()'s own children and write no report. The backend's crash record becomes
+    the run's one report at the next launch; a cancel here would write a second, `cancelled` one. shortcut: what
+    certify() undoes on a cancel (a field-test EP's opt-in during its check) stays; ask skellytracker for a cancel that
+    writes no report if that matters."""
+    import psutil
+    try:
+        for child in psutil.Process().children(recursive=True):
+            child.kill()
+    except psutil.Error:
+        pass
+    os._exit(1)
+
+
 @dataclass
 class QuickCheckJob(BaseNode):
     pair: CertificationPair | None = None  # None: the start check of every package (start_check.py)
@@ -188,12 +203,14 @@ class QuickCheckJob(BaseNode):
              rtmpose_model_name: str | None, progress_pub, result_pub, cancel, shutdown_self_flag: Synchronized,
              certify=None, own_certify=None, ui_remote: bool | None = None, blender_exe_path: str | None = None,
              level: str = "quick", remove_data: bool = False) -> None:
-        def watch() -> None:  # a stop, or the backend's exit or death, sets the cancel that certify() polls
+        def watch() -> None:  # a stop or the backend's exit sets the cancel that certify() polls; its death ends the child
             parent = multiprocessing.parent_process()
             # Poll, never `cancel.wait()`: a process that dies while waiting on a multiprocessing.Event makes the next
             # `set()` block forever (its Condition waits for the dead waiter to wake).
-            while not cancel.is_set():
-                if shutdown_self_flag.value or not ipc.should_continue or (parent is not None and not parent.is_alive()):
+            while True:
+                if parent is not None and not parent.is_alive():
+                    _end_orphan()
+                if not cancel.is_set() and (shutdown_self_flag.value or not ipc.should_continue):
                     cancel.set()
                 time.sleep(0.2)
 

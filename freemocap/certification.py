@@ -1,6 +1,6 @@
 """freemocap's own certify checks (skellycertify report format 1.6.0; ep-certification-integration.md, "freemocap's own
 checks"): only what freemocap owns. No check uses a camera. Only `posthoc-session` loads models, on the EP that the app
-selects by default, and it runs on skellytracker's bundled test frames (`certify_frames`), downloading none.
+selects by default, and it runs on skellytracker's test frames (`certify_frames`), downloading none.
 
     import freemocap
     plan = freemocap.certify_plan("quick")          # show the plan, then get the consent of the person
@@ -39,8 +39,10 @@ check that did not run has no item, except Blender when it is not installed: its
 (format 1.6.0, 3.7), at both levels.
 
 `test_media` (format 1.6.0, 3.9) names each file that a check of the run used, with the SHA-256 of the bytes it used:
-skellytracker's bundled `quick_frames.zip` when `posthoc-session` ran its session on them, `pass` or `fail`
-(`certify_frames()` reads them only from a file whose SHA-256 is the one of skellytracker's record), and
+skellytracker's `quick_frames.zip` once `posthoc-session` started its session on them (`pass`, `fail`, or cancelled while
+it ran), from the shared test media folder (`shared`) when it holds the file, else the package's own (`bundled`), the
+file skellytracker's run reads too (`certify_frames()` reads only a file whose SHA-256 is the one of skellytracker's
+record), and
 `freemocap_sample_data.zip` (`shared`) once the `recording` check has checked the archive's SHA-256.
 
 freemocap's reason codes (report format 5.4), besides the common ones (`models-missing`, `test-media-missing`,
@@ -369,12 +371,15 @@ def _posthoc_child(queue, frames: list[bytes], work: str) -> None:
     queue.put(answer)
 
 
-def _frames_media() -> dict:
-    """The `test_media` item (format 3.9) of skellytracker's bundled frames file, from its record (`frames_record`): the
-    SHA-256 that `certify_frames()` checks the file's bytes against before it gives a frame."""
+def _frames_media(test_media_dir) -> dict:
+    """The `test_media` item (format 3.9) of skellytracker's frames file, from its record (`frames_record`): the SHA-256
+    that `certify_frames()` checks the file's bytes against before it gives a frame, and the file it reads: the shared
+    folder's when the folder holds it (`dir`), else the package's. shortcut: `frames_record` is in skellytracker's
+    `core.eps.certification`, not its top-level interface, which has no such record; switch when it gets one."""
     from skellytracker.core.eps.certification import frames_record
-    record = frames_record()
-    return {"name": Path(record["path"]).name, "sha256": record["sha256"], "bytes": record["bytes"], "source": "bundled"}
+    record = frames_record(test_media_dir)
+    return {"name": Path(record["path"]).name, "sha256": record["sha256"], "bytes": record["bytes"],
+            "source": "bundled" if record["dir"] is None else "shared"}
 
 
 def _recording_media(sha256: str, size: int) -> dict:
@@ -384,21 +389,25 @@ def _recording_media(sha256: str, size: int) -> dict:
 
 def interrupted_media(checks: list[dict]) -> list[dict]:
     """`test_media` of an interrupted run (`crash_record`): its progress keeps results only, so a `posthoc-session` that
-    ended `pass` or `fail` (a crash included) used the bundled frames, and a passed `recording` the checked archive."""
+    ended `pass` or `fail` (a crash included) used the frames, and a passed `recording` the checked archive. A cancelled
+    `posthoc-session` is not listed: its progress does not tell whether its session had started."""
+    from freemocap.system.default_paths import get_test_media_dir
     results = {row.get("name"): row.get("result") for row in checks}
     sample = _recording_media(SAMPLE_RECORDING["sha256"], SAMPLE_RECORDING["bytes"])
-    return [*([_frames_media()] if results.get("posthoc-session") in ("pass", "fail") else []),
+    return [*([_frames_media(get_test_media_dir())] if results.get("posthoc-session") in ("pass", "fail") else []),
             *([sample] if results.get("recording") == "pass" else [])]
 
 
-def _posthoc(cancelled, cleanup: list, media: list) -> tuple[str, str | None, dict | None]:
+def _posthoc(cancelled, cleanup: list, media: list, test_media_dir=None) -> tuple[str, str | None, dict | None]:
     """Run `posthoc-session` in its own spawn child, with scratch files in a work folder of freemocap's certify folder that
-    is removed afterwards; a removal that fails is a row of `cleanup` (report format 2.5). The frames file is a row of
-    `media` when the session ran on its frames (the check ended `pass` or `fail`)."""
+    is removed afterwards; a removal that fails is a row of `cleanup` (report format 2.5). The frames file, the one
+    skellytracker's run reads from `test_media_dir` (else its own), is a row of `media` when the session child got its
+    frames and did not answer `not-run` (`models-missing`): a pass, a fail, a crash, or a cancel while it ran."""
     from skellytracker.certification import certify_frames
     from skellytracker.core.eps.certification import FramesUnavailableError
     try:
-        frames = certify_frames()  # hash checked; the quick level downloads nothing
+        item = _frames_media(test_media_dir)  # before the read: the file the frames come from
+        frames = certify_frames(test_media_dir)  # hash checked; the quick level downloads nothing
     except FramesUnavailableError:
         return "not-run", "test-media-missing", None
     started = time.monotonic()
@@ -420,8 +429,8 @@ def _posthoc(cancelled, cleanup: list, media: list) -> tuple[str, str | None, di
     else:
         result, reason = answer["result"], answer["reason"]
         numbers = {**answer.get("numbers", {}), "seconds": round(time.monotonic() - started, 3)}
-    if result in ("pass", "fail"):  # the session ran on the frames, a crash included (as `interrupted_media`)
-        media.append(_frames_media())
+    if answer is None or result != "not-run":  # `_spawn` started the child with the frames before anything could stop it
+        media.append(item)
     return result, reason, numbers
 
 
@@ -798,7 +807,7 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
             if time.monotonic() - begun + POSTHOC_SECONDS > QUICK_BUDGET_SECONDS:  # it would not end in the budget
                 record(row, "not-run", "over-budget")
             else:
-                record(row, *_posthoc(cancelled, cleanup, media))
+                record(row, *_posthoc(cancelled, cleanup, media, test_media_dir))
                 if row["reason"] == "cancelled":
                     stopped = "cancelled"
         elif name == "install-facts":

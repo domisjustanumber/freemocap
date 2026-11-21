@@ -346,7 +346,7 @@ def test_freemocaps_own_modules_obey_the_privacy_rules_and_the_relay_validator_b
 
     monkeypatch.setenv("FREEMOCAP_BASE_FOLDER", str(tmp_path))
     monkeypatch.setattr(certification, "_spawn_imports", lambda cancelled: ({"failed": [], "from_bundle": None}, None))
-    monkeypatch.setattr(certification, "_posthoc", lambda cancelled, cleanup, media: (
+    monkeypatch.setattr(certification, "_posthoc", lambda cancelled, cleanup, media, test_media_dir: (
         "pass", None, {"frames": 3, "execution_providers": {"person": "cpu", "wholebody": "cpu"}, "seconds": 8.5}))
     monkeypatch.setattr(certification, "_blender", lambda cancelled, path=None: (
         "record-only", None, {"found": True, "version_major": 5, "version_minor": 2, "version_patch": 3}))

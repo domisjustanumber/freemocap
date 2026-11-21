@@ -33,7 +33,7 @@ def no_blender(monkeypatch):
 
 @pytest.fixture
 def no_posthoc(monkeypatch):
-    monkeypatch.setattr(certification, "_posthoc", lambda cancelled, cleanup, media: ("not-run", "models-missing", None))
+    monkeypatch.setattr(certification, "_posthoc", lambda cancelled, cleanup, media, test_media_dir: ("not-run", "models-missing", None))
 
 
 # - freemocap's own checks -
@@ -51,7 +51,7 @@ def test_the_quick_level_runs_its_seven_checks_in_order_and_obeys_the_report_for
     if posthoc["reason"] != "models-missing":  # an installed skellytracker without its model files
         assert (posthoc["result"], posthoc["reason"]) == ("pass", None), posthoc
         assert posthoc["numbers"]["frames"] == 3 and set(posthoc["numbers"]["execution_providers"]) == {"person", "wholebody"}
-        assert report["test_media"] == [certification._frames_media()]
+        assert report["test_media"] == [certification._frames_media(None)]
     assert report["cleanup"] == []
     assert [path.name for path in base.iterdir()] == ["certify"]  # the probe file and the session's work folder are gone
     assert [path.name for path in (base / "certify").iterdir()] == ["reports"]
@@ -271,7 +271,8 @@ def own_until_cancelled(level, progress, cancel, *, ui_remote, blender_exe_path=
 
 
 def tracker_quick(level, progress, cancel, **options):
-    assert level == "quick" and options == {}  # no EP named: every GPU EP with no reviewed row, field-test ones included
+    # no EP named: every GPU EP with no reviewed row, field-test ones included
+    assert level == "quick" and set(options) == {"test_media_dir", "abandon"}
     progress({"package": "skellytracker", "kind": level, "state": "running", "step": None, "checks": [], "done": 1,
               "total": 3, "seconds_left": 9})
     return {"checks": [{"name": "cpu:video", "result": "pass", "reason": None}, {"name": "cpu:live", "result": "pass", "reason": None},
@@ -281,9 +282,9 @@ def tracker_quick(level, progress, cancel, **options):
                        {"name": "dml@x-0", "result": "fail", "reason": "keypoints-differ"}], "evidence": {"reasons": []}}
 
 
-def test_the_start_check_passes_the_test_media_folder_only_to_find_media_already_there(base, monkeypatch):
-    """The quick level downloads and writes nothing there; skellytracker reads its frames only from a folder it is given,
-    so it gets the folder once its frames file is there (the full benchmark puts it there)."""
+def test_the_start_check_passes_the_test_media_folder_to_both_packages_and_writes_nothing_there(base, monkeypatch):
+    """The quick level downloads and writes nothing there; skellytracker reads its own frames file when the folder does
+    not hold it (format 2.8), so it always gets the folder."""
     media = base / "test-media"
     monkeypatch.setenv("FREEMOCAP_TEST_MEDIA_DIR", str(media))
     calls = []
@@ -296,16 +297,11 @@ def test_the_start_check_passes_the_test_media_folder_only_to_find_media_already
         calls.append(("freemocap", options))
         return own_fail(level, progress, cancel, **options)
 
-    for present in (False, True):
-        calls.clear()
-        start_check.run_start_check(lambda message: None, multiprocessing.Event(), ui_remote=False, own_certify=own,
-                                    certify=tracker)
-        assert calls == [("freemocap", {"ui_remote": False, "blender_exe_path": None, "test_media_dir": str(media)}),
-                         ("skellytracker", {"test_media_dir": str(media)} if present else {})]
-        if not present:
-            assert not media.exists(), "the quick level writes nothing in the shared folder"
-            start_check.seed_test_media(media)  # as the full benchmark does
-    assert [path.name for path in media.iterdir()] == [start_check._frames_target(media).name]
+    start_check.run_start_check(lambda message: None, multiprocessing.Event(), ui_remote=False, own_certify=own,
+                                certify=tracker)
+    assert calls == [("freemocap", {"ui_remote": False, "blender_exe_path": None, "test_media_dir": str(media)}),
+                     ("skellytracker", {"test_media_dir": str(media)})]
+    assert not media.exists(), "the quick level writes nothing in the shared folder"
 
 
 def _manager(own, needed=True):

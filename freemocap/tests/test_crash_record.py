@@ -144,7 +144,7 @@ def test_a_start_check_found_at_launch_releases_the_gated_starts(failures):
     assert failures == ["posthoc-session"]  # no pair: `record_provider_failure` stores nothing for it (next test)
     report = _new_report(before)
     assert [check["result"] for check in report["checks"]] == ["pass", "fail", "not-run"]
-    assert report["test_media"] == [certification._frames_media()]  # the crashed session had its frames (format 3.9)
+    assert report["test_media"] == [certification._frames_media(None)]  # the crashed session had its frames (format 3.9)
     # owner, Q59: not asked for again until a package version changes; the report stays in the hand-in list
     record = json.loads(start_check.record_path().read_text(encoding="utf-8"))
     assert (record["versions"], record["crashed"]) == (start_check.version_set(), "posthoc-session")

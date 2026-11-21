@@ -116,9 +116,9 @@ def _write_record(entry: dict) -> None:
 def run_start_check(progress, cancel, *, ui_remote: bool | None, blender_exe_path: str | None = None, own_certify=None,
                     certify=None) -> tuple:
     """Each package's quick check in turn; `("start", ((package, result, reason), ...))`. A module that raises is
-    `error` with the exception class name; after a cancel the next module is `not-run` with `cancelled`. The shared test
-    media folder lets a package find media already there; the quick level downloads and writes nothing in it, so
-    skellytracker, which then reads its frames only from that folder, gets it only when its frames file is there."""
+    `error` with the exception class name; after a cancel the next module is `not-run` with `cancelled`. Both get the
+    shared test media folder; the quick level downloads and writes nothing in it, and skellytracker reads its own frames
+    file when the folder does not hold it (format 2.8)."""
     from freemocap.certification import certify as freemocap_certify, module_result
     from freemocap.system.default_paths import get_test_media_dir
     media = get_test_media_dir()
@@ -141,31 +141,11 @@ def run_start_check(progress, cancel, *, ui_remote: bool | None, blender_exe_pat
         try:
             if certify is None:
                 from skellytracker import certify
-            options = {"test_media_dir": media} if _frames_target(media).is_file() else {}
-            results.append(("skellytracker", *module_result(certify("quick", progress, cancel, **options))))
+            results.append(("skellytracker", *module_result(certify("quick", progress, cancel, test_media_dir=media))))
         except Exception as error:  # noqa: BLE001
             logger.exception("skellytracker's quick check raised")
             results.append(("skellytracker", "error", type(error).__name__))
     return "start", tuple(results)
-
-
-def _frames_target(test_media_dir) -> Path:
-    """skellytracker's test frames file in the shared test media folder, by the name rule of report format 2.8."""
-    from skellytracker.core.eps.certification import frames_record
-    record = frames_record()
-    return Path(test_media_dir) / f"{record['sha256']}{Path(record['path']).suffix}"
-
-
-def seed_test_media(test_media_dir) -> None:
-    """Put skellytracker's bundled test frames file in the shared test media folder, where skellytracker's
-    `certify(test_media_dir=...)` reads it; a bundled file, so the clean-up keeps it."""
-    from skellytracker.core.eps.certification import frames_file, frames_record
-    target = _frames_target(test_media_dir)
-    if not target.is_file():
-        target.parent.mkdir(parents=True, exist_ok=True)
-        temporary = target.with_name(target.name + ".tmp")
-        temporary.write_bytes(frames_file({"frames": frames_record()}))
-        temporary.replace(target)
 
 
 # Owner, Q62: a full benchmark's failed JPEG checks and timings are reported only. They are known by the shape of their
@@ -193,7 +173,7 @@ def run_full_check(progress, cancel, *, remove_data: bool, blender_exe_path: str
     overrides its own staging. A package whose full plan has no check does not run; after a cancel each later package is
     `not-run` with `cancelled`. `remove_data`: the person's choice to remove the benchmark data after a successful run;
     freemocap, which runs last, gets it only when every earlier package succeeded (skellytracker downloads and keeps
-    nothing, and the frames file it reads is a bundled one). `blender_exe_path`: the path chosen in Blender settings, for
+    nothing, and reads its own frames file when the shared folder does not hold one). `blender_exe_path`: the path chosen in Blender settings, for
     freemocap's Blender export (None: the best guess)."""
     from freemocap.certification import certify as freemocap_certify, certify_plan
     from freemocap.system.default_paths import get_test_media_dir
@@ -216,8 +196,6 @@ def run_full_check(progress, cancel, *, remove_data: bool, blender_exe_path: str
         if package == "freemocap" and certify_plan("full", test_media_dir=media, blender_exe_path=blender_exe_path)["total"] == 0:
             continue
         try:
-            if package == "skellytracker":
-                seed_test_media(media)
             results.append((package, *full_result(run("full", progress, cancel))))
         except Exception as error:  # noqa: BLE001 - the class name only: an error text can hold a path
             logger.exception("%s's full level raised", package)

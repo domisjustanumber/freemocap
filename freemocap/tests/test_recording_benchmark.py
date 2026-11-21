@@ -212,8 +212,7 @@ def test_the_full_check_passes_the_test_media_folder_and_the_clean_up_choice_onl
         assert calls == [("skellytracker", {"test_media_dir": media}),  # the Blender path chosen in settings is freemocap's
                          ("freemocap", {"test_media_dir": media, "blender_exe_path": "C:/chosen/blender.exe",
                                         "remove_data": removes})]
-    from skellytracker.core.eps.certification import frames_record
-    assert (bench.media / f"{frames_record()['sha256']}.zip").is_file(), "skellytracker's bundled frames, where it reads them"
+    assert not any(bench.media.glob("*.zip")), "nothing copied there: skellytracker reads its own frames file instead"
 
     # owner, Q62: failed JPEG checks and timings are reported only; the package finished and the clean-up still happens
     def reported(level, progress, cancel, **options):

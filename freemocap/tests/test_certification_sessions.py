@@ -64,21 +64,28 @@ def test_missing_or_damaged_frames_are_test_media_missing(quick, monkeypatch):
 
 
 @pytest.mark.parametrize("ending", [(None, "crashed"), ({"result": "pass", "reason": None}, None)])
-def test_the_frames_file_the_session_ran_on_is_listed_with_the_hash_of_the_bytes_of_its_frames(quick, monkeypatch, ending):
+@pytest.mark.parametrize("shared", [False, True])
+def test_the_frames_file_the_session_ran_on_is_listed_with_the_hash_of_the_bytes_of_its_frames(quick, monkeypatch, tmp_path,
+                                                                                               ending, shared):
     """Format 3.9 (owner: "it's very important to know which files the test ran on"): the frames given to the session's
-    child are the first frames of the bundled file whose SHA-256 and size `test_media` lists, computed here from its bytes."""
+    child are the first frames of the file whose SHA-256 and size `test_media` lists, computed here from its bytes: the
+    shared folder's when it holds the file (`shared`, the file skellytracker's run reads too), else the package's."""
     import hashlib
     import io
     import zipfile
     from skellytracker.core.eps.certification import frames_file, frames_record
+    data = frames_file({"frames": frames_record()})  # the bundled file, as skellytracker reads it
+    media = tmp_path / "test-media"
+    media.mkdir()
+    if shared:
+        (media / f"{hashlib.sha256(data).hexdigest()}.zip").write_bytes(data)
     given = []
     monkeypatch.setattr(certification, "_spawn", lambda target, args, *rest: given.append(args[0]) or ending)
-    rows, report = quick()
-    data = frames_file({"frames": frames_record()})  # the bundled file, as skellytracker reads it
+    report = certification.certify("quick", test_media_dir=str(media))
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         assert given == [[archive.read(name) for name in sorted(archive.namelist())][:certification.POSTHOC_FRAMES]]
     assert report["test_media"] == [{"name": "quick_frames.zip", "sha256": hashlib.sha256(data).hexdigest(),
-                                     "bytes": len(data), "source": "bundled"}]
+                                     "bytes": len(data), "source": "shared" if shared else "bundled"}]
 
 
 def test_a_session_that_does_not_fit_the_budget_is_over_budget_and_not_started(quick, monkeypatch):
@@ -143,4 +150,6 @@ def test_an_abandon_ends_the_session_as_a_cancel_does_wins_over_the_cancel_and_k
     rows = {row["name"]: row for row in report["checks"]}
     assert (rows["posthoc-session"]["result"], rows["posthoc-session"]["reason"]) == ("not-run", "cancelled")
     assert rows["data-folder"]["result"] == "pass" and ended.exists(), "the session ended by itself, not by a kill"
+    # its child got the frames before the cancel: they are listed, as a crash record lists a crashed session's
+    assert [item["name"] for item in report["test_media"]] == ["quick_frames.zip"]
     assert [path.name for path in certification.reports_dir().glob("*.json")] == ([] if abandoned else [f"{report['id']}.json"])

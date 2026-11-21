@@ -1716,7 +1716,7 @@ export interface components {
         /**
          * CalibrateRecordingRequest
          * @example {
-         *       "calibrationRecordingDirectory": "C:\\Users\\jonma\\freemocap_data\\recordings\\freemocap_test_data",
+         *       "calibrationRecordingDirectory": "~/freemocap_data/recordings/freemocap_test_data",
          *       "calibrationTaskConfig": {
          *         "boardMode": "auto",
          *         "charucoBoard": {
@@ -2893,7 +2893,7 @@ export interface components {
         /**
          * OpenInBlenderRequest
          * @example {
-         *       "recordingFolderPath": "C:\\Users\\jonma\\freemocap_data\\recordings\\freemocap_test_data"
+         *       "recordingFolderPath": "~/freemocap_data/recordings/freemocap_test_data"
          *     }
          */
         OpenInBlenderRequest: {

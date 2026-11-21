@@ -21,7 +21,7 @@ from freemocap.core.blender.helpers.install_blender_addon import \
     install_freemocap_blender_addon
 from freemocap.core.blender.helpers.get_best_guess_of_blender_path import get_best_guess_of_blender_path
 from freemocap.system.recording_status.recording_status import compute_recording_status
-from freemocap.system.default_paths import FREEMOCAP_TEST_DATA_PATH
+from freemocap.system.default_paths import FREEMOCAP_TEST_DATA_EXAMPLE, FREEMOCAP_TEST_DATA_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class ExportToBlenderRequest(BaseModel):
         populate_by_name=True,
         json_schema_extra={
             "example": {
-                "recordingFolderPath": FREEMOCAP_TEST_DATA_PATH,
+                "recordingFolderPath": FREEMOCAP_TEST_DATA_EXAMPLE,
                 "blenderExePath": None,
                 "autoOpenBlendFile": True,
             }
@@ -97,7 +97,7 @@ class OpenInBlenderRequest(BaseModel):
         populate_by_name=True,
         json_schema_extra={
             "example": {
-                "recordingFolderPath": FREEMOCAP_TEST_DATA_PATH,
+                "recordingFolderPath": FREEMOCAP_TEST_DATA_EXAMPLE,
                 "blenderExePath": None,
             }
         },

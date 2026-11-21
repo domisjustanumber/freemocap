@@ -24,7 +24,7 @@ from freemocap.pubsub.pubsub_topics import (
     CalibrationRecordingStateMessage,
     CalibrationRecordingStateTopic,
 )
-from freemocap.system.default_paths import FREEMOCAP_TEST_DATA_PATH
+from freemocap.system.default_paths import FREEMOCAP_TEST_DATA_EXAMPLE
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +157,7 @@ class CalibrateRecordingRequest(BaseModel):
         config.charuco_board.squares_y = 5
         config.charuco_board.square_length_mm = 54
         return cls(calibration_config=config,
-                   calibration_recording_directory=FREEMOCAP_TEST_DATA_PATH)
+                   calibration_recording_directory=FREEMOCAP_TEST_DATA_EXAMPLE)
 
 
 class StopCalibrationRecordingRequest(BaseModel):

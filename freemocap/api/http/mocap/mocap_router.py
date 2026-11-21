@@ -20,7 +20,7 @@ from freemocap.app.freemocap_application import get_freemocap_app
 from freemocap.system.certify.quick_check import StartRefused
 from freemocap.api.http.certify.quick_check_router import admitted
 from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
-from freemocap.system.default_paths import FREEMOCAP_TEST_DATA_PATH, default_recording_name, get_default_freemocap_recordings_path
+from freemocap.system.default_paths import FREEMOCAP_TEST_DATA_EXAMPLE, default_recording_name, get_default_freemocap_recordings_path
 
 logger = logging.getLogger(__name__)
 
@@ -77,11 +77,11 @@ class ProcessMocapRecordingRequest(BaseModel):
     def create_test_data_request(cls) -> "ProcessMocapRecordingRequest":
         config = PosthocMocapPipelineConfig(
             calibration_toml_path=str(
-                Path(FREEMOCAP_TEST_DATA_PATH) / "freemocap_test_data_camera_calibration.toml"
+                Path(FREEMOCAP_TEST_DATA_EXAMPLE) / "freemocap_test_data_camera_calibration.toml"
             ),
         )
         return cls(
-            mocap_recording_directory=FREEMOCAP_TEST_DATA_PATH,
+            mocap_recording_directory=FREEMOCAP_TEST_DATA_EXAMPLE,
             mocap_config=config,
         )
 

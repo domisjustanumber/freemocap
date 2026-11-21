@@ -1785,6 +1785,63 @@ before the run; the app shows "Camera <name>: wedged, please replug" from a `cle
 `release:<camera>` (reason `camera-wedged` or `camera-not-restored`), name found through the summary item
 with the same `device`.
 
+## State after the pin move, 2026-11-20 evening (read after "After the grilling")
+
+Steps 1 to 4 of the order of work are done. Step 5 has started. Nothing is running.
+
+### Built since "After the grilling"
+
+- Pin: `pyproject.toml` names `../skellytracker-pin`, this session's own clone, detached at `9a5f3912`
+  (a local, unpushed commit of the skellytracker session), commit `9bd1a4bc`. A git-URL pin fails because an
+  installed skellytracker holds no ONNX file; the clone has them hard-linked from `../skellytracker`.
+  Move it with `git -C ../skellytracker-pin fetch ../skellytracker <hash>` and `git checkout --detach`.
+- Report format 1.4.0 (owner confirmed): head layout, benchmark table, five-column failed-checks table,
+  `incomplete` word, file schema `skellycertify.report/1.4.0` (`freemocap/system/certify/report_file.py`).
+- Note cleaning (owner: "yes to both"): `clean_note()` in `report_file.py`, mirrored as `cleanNote` in
+  `freemocap-ui/src/services/server/certification-hand-in.ts`, shared cases in `clean-note-cases.json`.
+  The dialog shows the cleaned text as the person types; the field stops at 2000 characters.
+  IPv4-looking values and link markup are printed harmlessly in the Markdown part only; the JSON keeps
+  each value.
+- Reason sentences in `freemocap-ui/src/services/server/execution-providers.ts` (`REASON_TEXT`) for
+  `models-missing`, `test-media-missing`, `over-budget`, `video-not-passed`, `cpu-reference-missing`.
+  The owner has not reviewed the wording.
+- Post-hoc session quick check `posthoc-session` in `freemocap/certification.py`, commit `8be2785e`:
+  3 bundled frames as a small video, the app's `MocapPipeline` to `stop_stage="observations"`, the run
+  record read back, scratch folder under `<data>/certify/` removed. `not-run` with `models-missing` or
+  `over-budget`, never a failure for those. Whole freemocap quick module: 10.4, 9.5, 9.5 s on CPU here
+  (17 s inside pytest).
+- Test isolation: `freemocap/tests/conftest.py` points the EP store, EP cache and base folder at temp
+  folders for the whole run.
+
+Suites at `8be2785e`: Python 1758 passed, 0 failed, 20 skipped; UI 230 of 231 with 1 skipped;
+`npx tsc --noEmit` clean. Never run pytest with `-p no:logging`.
+
+### Open with the owner
+
+- Q57: the realtime session quick check cannot run in the certify child process, because
+  `PubSubTopicManager.create` (`freemocap/pubsub/pubsub_manager.py:45`) refuses any process but the main
+  one. Proposed: run it in a fresh copy of the app started for the check; the guard stays. Not built.
+  A camera-less realtime session in a main process took about 7.4 s; frame 0 is untracked because the
+  models load slower than the aggregator's 2 s wait.
+- Q58: freemocap's quick share 15 s to 25 s, skellytracker's cap 75 s to 65 s. If yes, the skellytracker
+  session gets it for the owner to confirm there.
+- Push: one push was approved and done at `68381103`. Everything later is local. Ask before pushing.
+- Wording of the five reason sentences.
+
+### From peer sessions (facts, no ruling)
+
+- skellytracker's local head (unpushed, after `9a5f3912`) adds `mediapipe:smoke` (`module: "MediaPipe"`,
+  last check, about 3 s, no summary item) to the default quick selection. It is `not-run` with
+  `models-missing` when MediaPipe or `holistic_landmarker.task` in `~/.freemocap/skellytracker-models` is
+  absent, and it counts in the plan `total` when MediaPipe is installed. It matters for Q58 and for the
+  installer. The pin does not hold it yet.
+- The skellycertify relay is switched off until its hardening is deployed.
+
+### Next action
+
+The crash record for both levels (fifth grilling, "Crash, both levels"), then the consent step and the
+lock of the Full benchmark. The realtime check waits for Q57.
+
 ## Next actions
 
 All as local commits on `sidecar-implementation`, in this order:

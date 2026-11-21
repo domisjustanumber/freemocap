@@ -251,8 +251,10 @@ class QuickCheckJob(BaseNode):
         abandon, running = threading.Event(), threading.Event()
         from freemocap.certification import certify as freemocap_certify
         own_certify = _abandonable(own_certify or freemocap_certify, abandon, running)
+        if certify is None:
+            from skellytracker import certify
         # skellytracker at the pin 346b77eb takes no `abandon`; at the next pin move this one line passes it:
-        # certify = _abandonable(certify or skellytracker_certify, abandon, running)
+        # certify = _abandonable(certify, abandon, running)
 
         def watch() -> None:  # a stop or the backend's exit sets the cancel that certify() polls; its death abandons the run
             parent = multiprocessing.parent_process()
@@ -290,8 +292,6 @@ class QuickCheckJob(BaseNode):
                 publish(run_start_check(progress_pub.put, cancel, ui_remote=ui_remote, blender_exe_path=blender_exe_path,
                                         own_certify=own_certify, certify=certify))
                 return
-            if certify is None:
-                from skellytracker import certify
             from freemocap.core.tracking.pipeline_runs import load_detector_pipeline
             report = certify("quick", progress_pub.put, cancel, execution_providers=[execution_provider],
                              device=device_key, pipeline=load_detector_pipeline(detector_type, rtmpose_model_name))

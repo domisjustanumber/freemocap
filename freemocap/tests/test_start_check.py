@@ -32,14 +32,20 @@ def no_blender(monkeypatch):
 
 
 @pytest.fixture
-def no_posthoc(monkeypatch):
+def no_realtime(monkeypatch):
+    monkeypatch.setattr(certification, "_realtime", lambda cancelled, media, test_media_dir: ("not-run", "models-missing", None))
+
+
+@pytest.fixture
+def no_sessions(monkeypatch, no_realtime):
     monkeypatch.setattr(certification, "_posthoc", lambda cancelled, cleanup, media, test_media_dir: ("not-run", "models-missing", None))
 
 
 # - freemocap's own checks -
 
-def test_the_quick_level_runs_its_seven_checks_in_order_and_obeys_the_report_format(base, no_blender):
-    """The real checks, the post-hoc session on skellytracker's bundled frames and models included (about 10 s)."""
+def test_the_quick_level_runs_its_eight_checks_in_order_and_obeys_the_report_format(base, no_blender, no_realtime):
+    """The real checks, the post-hoc session on skellytracker's bundled frames and models included (about 10 s); the
+    realtime session's real run is the `slow` test of test_certification_sessions.py."""
     messages = []
     report = certification.certify("quick", messages.append, None, ui_remote=False)
     assert [row["name"] for row in report["checks"]] == list(certification.QUICK_CHECKS)
@@ -69,7 +75,7 @@ def test_the_quick_level_runs_its_seven_checks_in_order_and_obeys_the_report_for
     assert [item["name"] for item in report["summary"]][:4] == ["Build identity", "Child process", "Bundle imports", "Data folder"]
     assert report["package"]["name"] == "freemocap" and re.fullmatch(r"[0-9a-f-]{36}", report["id"])
     assert report["evidence"]["valid"] is (not report["evidence"]["reasons"])
-    assert messages[0]["state"] == "starting" and messages[-1]["state"] == "done" and messages[-1]["done"] == 7
+    assert messages[0]["state"] == "starting" and messages[-1]["state"] == "done" and messages[-1]["done"] == 8
     assert not PATH.search(json.dumps(report)), "no path in a report (privacy rule 1)"
     assert certification.module_result(report) == ("pass", None)
 
@@ -109,12 +115,12 @@ def test_a_data_folder_that_cannot_be_written_fails_with_the_class_name(tmp_path
     assert result == "fail" and re.fullmatch(r"[A-Za-z]+Error", reason) and numbers == {}
 
 
-def test_the_quick_plan_counts_its_seven_checks_and_a_bad_level_raises(base):
+def test_the_quick_plan_counts_its_eight_checks_and_a_bad_level_raises(base):
     """The level full: test_recording_benchmark.py."""
     plan = certification.certify_plan("quick")
     assert plan["details"]["checks"] == list(certification.QUICK_CHECKS)
     # format 2.6: `total` counts the checks that run, and a quick plan has no risks and no download
-    assert (plan["total"], plan["risks"], plan["downloads"]) == (7, [], [])
+    assert (plan["total"], plan["risks"], plan["downloads"]) == (8, [], [])
     assert certification.certify_plan("quick", ui_remote=True, blender_exe_path=None) == plan
     with pytest.raises(ValueError):
         certification.certify("medium")
@@ -137,7 +143,7 @@ def _keep(created: str, results: dict, kind: str = "quick") -> str:
     return report_id
 
 
-def test_own_reports_are_kept_with_the_hand_in_states_and_not_sent_makes_them_pending(base, no_blender, no_posthoc,
+def test_own_reports_are_kept_with_the_hand_in_states_and_not_sent_makes_them_pending(base, no_blender, no_sessions,
                                                                                      monkeypatch):
     monkeypatch.setattr(certification, "_spawn_imports", lambda cancelled: ({"failed": ["cv2-ImportError"], "from_bundle": None}, None))
     failed = certification.certify("quick")
@@ -180,14 +186,14 @@ def test_a_new_quick_pass_prunes_older_passes_not_handed_in(base):
     assert kept == {handed_in, failure, full, other, newest} and not kept & {old, smaller}
 
 
-def test_each_quick_pass_of_certify_replaces_the_one_before(base, no_blender, no_posthoc, monkeypatch):
+def test_each_quick_pass_of_certify_replaces_the_one_before(base, no_blender, no_sessions, monkeypatch):
     monkeypatch.setattr(certification, "_spawn_imports", lambda cancelled: PASSED)
     certification.certify("quick")
     certification.certify("quick")
     assert len(certification.pending_reports()) == 1
 
 
-def test_a_data_folder_that_cannot_be_written_still_gives_the_report(tmp_path, no_blender, no_posthoc, monkeypatch):
+def test_a_data_folder_that_cannot_be_written_still_gives_the_report(tmp_path, no_blender, no_sessions, monkeypatch):
     blocked = tmp_path / "a-file"
     blocked.write_text("")
     monkeypatch.setenv("FREEMOCAP_BASE_FOLDER", str(blocked))
@@ -498,7 +504,7 @@ def test_the_start_check_routes_give_each_packages_plan_and_start_or_refuse(monk
     client = TestClient(app)
     plan = client.get("/certify/start_check/plan").json()
     assert [(row["package"], row["checks"], row["total"], row["risks"]) for row in plan["packages"]] == [
-        ("freemocap", list(certification.QUICK_CHECKS), 7, []), ("skellytracker", ["dml@x-0"], 6, [])]  # the plan's total, not its count of pairs
+        ("freemocap", list(certification.QUICK_CHECKS), 8, []), ("skellytracker", ["dml@x-0"], 6, [])]  # the plan's total, not its count of pairs
     application.holds = (PipelineHold("realtime", "rt1"),)
     assert client.post("/certify/start_check").status_code == 409
     application.holds = ()

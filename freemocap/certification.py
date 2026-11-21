@@ -1,6 +1,7 @@
 """freemocap's own certify checks (skellycertify report format 1.6.0; ep-certification-integration.md, "freemocap's own
-checks"): only what freemocap owns. No check uses a camera. Only `posthoc-session` loads models, on the EP that the app
-selects by default, and it runs on skellytracker's test frames (`certify_frames`), downloading none.
+checks"): only what freemocap owns. No check uses a camera. Only `posthoc-session` and `realtime-session` load models,
+on the EP that the app selects by default, and they run on skellytracker's test frames (`certify_frames`), downloading
+none.
 
     import freemocap
     plan = freemocap.certify_plan("quick")          # show the plan, then get the consent of the person
@@ -8,7 +9,7 @@ selects by default, and it runs on skellytracker's test frames (`certify_frames`
 
 `certify(level, progress, cancel, *, ui_remote=None, blender_exe_path=None, abandon=None)` returns freemocap's module
 report; `certify_plan(level)` takes the same options but `abandon` and gives its plan. `import freemocap` does not
-import this module: the two names load it on first use. The level `quick` runs the seven checks below within
+import this module: the two names load it on first use. The level `quick` runs the eight checks below within
 `QUICK_BUDGET_SECONDS`.
 
 The level `full` (fifth grilling, "Full benchmark") is the end-to-end post-hoc benchmark on the freemocap sample
@@ -30,8 +31,16 @@ archive when this run downloaded it.
 `posthoc-session` (report format 2.7 rule 3) proves freemocap's side around the tracker, in its own spawn child: the app's
 post-hoc session (`MocapPipeline`, as the backend starts it) reads a 3-frame video of skellytracker's test frames, hands each frame
 to skellytracker's run and writes the observations to the recording's Parquet file, from which the check reads the run
-record back. skellytracker's own quick run proves its pipeline on these frames. A realtime session check is not built:
-freemocap's pub/sub refuses to start a realtime pipeline outside the backend's main process, and certify runs in a child.
+record back. skellytracker's own quick run proves its pipeline on these frames.
+
+`realtime-session` (the same rule; owner, Q57) runs in a fresh copy of the app started just for the check
+(`_app_command("--certify-realtime")`, `realtime_session_main`): freemocap's pub/sub accepts a realtime pipeline only
+in a main process, and certify runs in a child. The copy starts the app's realtime session (`RealtimePipelineManager`,
+the default settings) on a stand-in camera group (`system/certify/stand_in_cameras.py`): skellycam's group shared memory
+with no camera, into which it writes the test frames one at a time. It passes once a frame after frame 0 is tracked
+(frame 0 can be untracked: the models load slower than the aggregator waits), ends after `REALTIME_TRACKED` tracked
+frames, and names the EP each model ran on. It ends its session itself when its stdin closes (a cancel, or its parent
+is gone). The two session checks run one after the other.
 
 Each check of freemocap's own module has `module` set to the name of its part (`COMPONENTS`; a `posthoc:<label>` check
 has the EP's name) and, when it ran, one summary item of the group `component` with its result (format 1.5.0, 3.7). A
@@ -39,17 +48,17 @@ check that did not run has no item, except Blender when it is not installed: its
 (format 1.6.0, 3.7), at both levels.
 
 `test_media` (format 1.6.0, 3.9) names each file that a check of the run used, with the SHA-256 of the bytes it used:
-skellytracker's `quick_frames.zip` once `posthoc-session` started its session on them (`pass`, `fail`, or cancelled while
-it ran), from the shared test media folder (`shared`) when it holds the file, else the package's own (`bundled`), the
-file skellytracker's run reads too (`certify_frames()` reads only a file whose SHA-256 is the one of skellytracker's
-record), and
-`freemocap_sample_data.zip` (`shared`) once the `recording` check has checked the archive's SHA-256.
+skellytracker's `quick_frames.zip` (once) when `posthoc-session` or `realtime-session` started its session on them
+(`pass`, `fail`, or cancelled while it ran), from the shared test media folder (`shared`) when it holds the file, else
+the package's own (`bundled`), the file skellytracker's run reads too (`certify_frames()` reads only a file whose
+SHA-256 is the one of skellytracker's record), and `freemocap_sample_data.zip` (`shared`) once the `recording` check has checked the archive's SHA-256.
 
 freemocap's reason codes (report format 5.4), besides the common ones (`models-missing`, `test-media-missing`,
 `over-budget`, `timed-out`, `crashed`, `hung-at-exit`):
 - `spawn-failed`: the spawn child of `spawn-child` gave no answer, so the later checks did not run.
 - `import-failed`: a module of the bundle did not import in the spawn child (`numbers.failed` names them).
-- `session-failed`: the post-hoc session ended without completing.
+- `session-failed`: the post-hoc session ended without completing, or the realtime session stopped while it ran.
+- `untracked`: the realtime session tracked no frame after frame 0 of the test frames.
 - `bad-hash`: the recording archive's SHA-256 is not the expected one (format 2.6); a downloaded one is deleted.
 - `recording-missing`: the recording was not ready, so the post-hoc benchmarks and the Blender export did not run.
 - `ep-not-passed`: skellytracker's status does not call the EP on that GPU usable after its checks of this run.
@@ -79,7 +88,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from queue import Empty
+from queue import Empty, Queue
 
 import freemocap
 
@@ -89,11 +98,12 @@ SCHEMA = "skellycertify.report/1.6.0"  # `summary`: the `component` items, and a
 SCHEMA_PREFIX = "skellycertify.report/1."
 REPORT_STATES = ("pending", "opened", "covered")  # as skellytracker's: `opened` = issue form opened, `covered` = an issue holds it
 REPORT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$")  # a safe file name only; ids are v4 UUIDs, never parsed
-QUICK_CHECKS = ("build-identity", "spawn-child", "bundle-imports", "data-folder", "posthoc-session", "install-facts", "blender")
+QUICK_CHECKS = ("build-identity", "spawn-child", "bundle-imports", "data-folder", "posthoc-session", "realtime-session",
+                "install-facts", "blender")
 FULL_CHECKS = ("data-folder", "recording")  # then one `posthoc:<label>` for each pair, then `blender`
 COMPONENTS = {"build-identity": "Build identity", "spawn-child": "Child process", "bundle-imports": "Bundle imports",
-              "data-folder": "Data folder", "posthoc-session": "Post-hoc session", "install-facts": "Install facts",
-              "recording": "Sample recording", "blender": "Blender"}  # check -> `module` and `component` item name
+              "data-folder": "Data folder", "posthoc-session": "Post-hoc session", "realtime-session": "Realtime session",
+              "install-facts": "Install facts", "recording": "Sample recording", "blender": "Blender"}  # check -> `module` and `component` item name
 SAMPLE_RECORDING = {"name": "freemocap_sample_data.zip", "bytes": 166958457, "sha256":
                     "c23d6a24f9ed8cca74bccf171128543d661b47e5780df5b446d60063ac4acf4f"}  # its `source`: catalog.SAMPLE_DATA
 # 300 frames (10 s of the 30 fps sample, three cameras): measured on one Windows PC (i7-14700K, RTX 3070, 2026-11-21), the CPU
@@ -119,6 +129,16 @@ QUICK_BUDGET_SECONDS = 25  # freemocap's share of the level quick (owner, Q53 to
 POSTHOC_SECONDS = 10  # its estimate (8.5 to 9.1 s measured on one Windows PC, CPU): it starts only when it fits the budget
 POSTHOC_TIMEOUT_SECONDS = 30
 POSTHOC_FRAMES = 3
+# Its estimate: 8.5 to 8.7 s from the start of the fresh copy to its end (one Windows PC, CPU, 2026-11-21); it starts only
+# when it fits the budget.
+REALTIME_SECONDS = 10
+REALTIME_TIMEOUT_SECONDS = 40  # the fresh copy's start, the drive and the clean end
+REALTIME_DRIVE_SECONDS = 20  # the copy ends its session itself after this, with `timed-out`
+# A copy ends its session in 0.2 to 2.0 s after a stop (the same PC; the inference thread can be loading models). Within
+# the job's CANCEL_GRACE_SECONDS (5 s), after which the job ends its whole process tree.
+REALTIME_STOP_GRACE_SECONDS = 3
+REALTIME_FRAMES = 30  # at most each of skellytracker's test frames
+REALTIME_TRACKED = 3  # it ends once this many frames after frame 0 are tracked
 SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
 
@@ -131,8 +151,8 @@ def _check_level(level: str) -> None:
 def certify_plan(level: str, *, ui_remote: bool | None = None, blender_exe_path: str | None = None,
                  test_media_dir: str | os.PathLike | None = None, remove_data: bool = False) -> dict:
     """What `certify(level)` runs: no change outside freemocap's data folder and the test media folder, no question, no
-    risk to a device. `total` counts the checks that run. At `quick`: its seven checks, no download, and the budget that
-    `posthoc-session` keeps to. At `full`: its checks for the pairs of this system, the sample recording in `downloads`
+    risk to a device. `total` counts the checks that run. At `quick`: its eight checks, no download, and the budget that
+    its two session checks keep to. At `full`: its checks for the pairs of this system, the sample recording in `downloads`
     when it is not yet in the test media folder, and the measured estimate. It takes the options of `certify` (report
     format 2.2)."""
     _check_level(level)
@@ -268,18 +288,23 @@ def _spawn(target, args: tuple, name: str, timeout: int | float, cancelled) -> t
             stop.set()
             child.join(timeout=STOP_GRACE_SECONDS)
         if child.is_alive():
-            import psutil
-            try:
-                descendants = psutil.Process(child.pid).children(recursive=True)  # a session's worker processes
-            except psutil.Error:
-                descendants = []
-            child.kill()
+            _kill(child.pid, child.kill)
             child.join()
-            for process in descendants:
-                try:
-                    process.kill()
-                except psutil.Error:
-                    pass
+
+
+def _kill(pid: int, kill) -> None:
+    """`kill()` a child, then each process that it started (a session's worker processes)."""
+    import psutil
+    try:
+        descendants = psutil.Process(pid).children(recursive=True)
+    except psutil.Error:
+        descendants = []
+    kill()
+    for process in descendants:
+        try:
+            process.kill()
+        except psutil.Error:
+            pass
 
 
 # - The post-hoc session check, on skellytracker's test frames -
@@ -388,13 +413,15 @@ def _recording_media(sha256: str, size: int) -> dict:
 
 
 def interrupted_media(checks: list[dict]) -> list[dict]:
-    """`test_media` of an interrupted run (`crash_record`): its progress keeps results only, so a `posthoc-session` that
-    ended `pass` or `fail` (a crash included) used the frames, and a passed `recording` the checked archive. A cancelled
-    `posthoc-session` is not listed: its progress does not tell whether its session had started."""
+    """`test_media` of an interrupted run (`crash_record`): its progress keeps results only, so a session check
+    (`posthoc-session`, `realtime-session`) that ended `pass` or `fail` (a crash included) used the frames, and a passed
+    `recording` the checked archive. A cancelled session check is not listed: its progress does not tell whether its
+    session had started."""
     from freemocap.system.default_paths import get_test_media_dir
     results = {row.get("name"): row.get("result") for row in checks}
     sample = _recording_media(SAMPLE_RECORDING["sha256"], SAMPLE_RECORDING["bytes"])
-    return [*([_frames_media(get_test_media_dir())] if results.get("posthoc-session") in ("pass", "fail") else []),
+    used = any(results.get(name) in ("pass", "fail") for name in ("posthoc-session", "realtime-session"))
+    return [*([_frames_media(get_test_media_dir())] if used else []),
             *([sample] if results.get("recording") == "pass" else [])]
 
 
@@ -430,6 +457,185 @@ def _posthoc(cancelled, cleanup: list, media: list, test_media_dir=None) -> tupl
         result, reason = answer["result"], answer["reason"]
         numbers = {**answer.get("numbers", {}), "seconds": round(time.monotonic() - started, 3)}
     if answer is None or result != "not-run":  # `_spawn` started the child with the frames before anything could stop it
+        media.append(item)
+    return result, reason, numbers
+
+
+# - The realtime session check, in a fresh copy of the app fed the test frames through a stand-in camera group -
+
+def _realtime_session(frames: list[bytes], stopping) -> dict:
+    """The app's realtime session (`RealtimePipelineManager` with the default settings, as the backend starts it) on a
+    stand-in camera group (`stand_in_cameras.py`) fed `frames` (JPEG bytes) one at a time: each frame is written once the
+    result of the one before it was taken, as the backend's frame relay takes it. Frame 0 can come back untracked: the
+    models load slower than the aggregator waits for a frame, as in any realtime session today. So it passes once a
+    later frame is tracked."""
+    import cv2
+    import numpy as np
+    from skellycam.core.ipc.process_management.managed_worker import WorkerMode
+    from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
+    from skellylogs.handlers.websocket_log_queue_handler import create_websocket_log_queue
+    from freemocap.core.pipeline.inference_service import InferenceService
+    from freemocap.core.pipeline.realtime.capture_group import CaptureGroup
+    from freemocap.core.pipeline.realtime.realtime_pipeline_config import RealtimePipelineConfig
+    from freemocap.core.pipeline.realtime.realtime_pipeline_manager import RealtimePipelineManager
+    from freemocap.system.certify.stand_in_cameras import StandInCameraGroup
+    config = RealtimePipelineConfig()  # the app's defaults
+    if _models_missing(config.camera_node_config.detector_type, config.camera_node_config.rtmpose_model_name):
+        return {"result": "not-run", "reason": "models-missing"}
+    images = [cv2.imdecode(np.frombuffer(frame, np.uint8), cv2.IMREAD_COLOR) for frame in frames]
+    create_websocket_log_queue()  # each pipeline's IPC takes the app's log queue; nothing reads it in this copy
+    flag = multiprocessing.Value("b", False)
+    registry = WorkerRegistry(global_kill_flag=flag, worker_mode=WorkerMode.PROCESS)  # as the app's backend makes it
+    registry.start_heartbeat()
+    service = InferenceService(worker_registry=registry)
+    manager = RealtimePipelineManager(worker_registry=registry, inference_service=service)
+    group = StandInCameraGroup(*images[0].shape[:2])
+    started = time.monotonic()
+    try:
+        service.start()
+        pipeline = manager.create_pipeline(camera_group=CaptureGroup(group, flag), pipeline_config=config)
+        providers, tracked = {}, 0
+        for number, image in enumerate(images):
+            group.write(number, image)
+            output = None
+            while output is None:
+                if stopping():
+                    return {"result": "not-run", "reason": "cancelled"}
+                if not pipeline.alive:
+                    return {"result": "fail", "reason": "session-failed"}
+                if time.monotonic() - started > REALTIME_DRIVE_SECONDS:
+                    return {"result": "fail", "reason": "timed-out"}
+                pipeline.result_ready_event.wait(0.05)
+                output = pipeline.get_latest_aggregator_output(if_newer_than=number - 1)
+            providers = providers or {model["node"]: model["execution_provider"]
+                                      for client in service.provider_status() for model in client["models"]}
+            tracked += bool(number) and all(camera.skeleton_observation is not None
+                                            for camera in output.camera_node_outputs.values())
+            if tracked == REALTIME_TRACKED:
+                break
+        return {"result": "pass", "reason": None, "numbers": {
+            "frames": number + 1, "tracked_frames": tracked, "session_seconds": round(time.monotonic() - started, 3),
+            "execution_providers": providers}} if tracked else {"result": "fail", "reason": "untracked"}
+    finally:
+        try:
+            manager.shutdown()
+            service.close()
+        finally:
+            registry.shutdown_all()
+            group.close()
+
+
+def realtime_session_main(test_media_dir: str | None) -> None:
+    """The fresh copy of the app that runs `realtime-session` (`python -m freemocap --certify-realtime [<test media
+    folder>]`; the built app: `freemocap_server --certify-realtime ...`) and prints its answer as one JSON line. It is a
+    main process, as the backend is, so the realtime pipeline's pub/sub accepts it; it starts no server and opens no port
+    or camera. Its stdin closing (its parent asks it to end, or is gone) ends its session."""
+    import skellytracker
+    from skellytracker.certification import certify_frames
+    try:
+        answer = _realtime_session(certify_frames(test_media_dir)[:REALTIME_FRAMES], _stdin_closed)
+    except Exception as error:  # noqa: BLE001 - the class name only: an error text can hold a path
+        logger.exception("freemocap's realtime session check raised")
+        answer = {"result": "fail", "reason": type(error).__name__}
+    skellytracker.note_exit_requested()  # it ended its session itself: its end is not an unclean exit of an EP
+    print(json.dumps(answer), flush=True)
+
+
+def _stdin_closed() -> bool:
+    """True once the writer of this process's stdin pipe closed it. A peek, never a read: on Windows a thread blocked
+    reading the pipe stalls the loading of a DLL in the others (seen: numpy's, at import). Not a pipe: false."""
+    if sys.stdin is None:
+        return False
+    if sys.platform == "win32":
+        import _winapi
+        import msvcrt
+        try:
+            _winapi.PeekNamedPipe(msvcrt.get_osfhandle(sys.stdin.fileno()), 0)
+        except BrokenPipeError:
+            return True
+        except OSError:  # a console, not a pipe
+            pass
+        return False
+    import select
+    return bool(select.select([sys.stdin], [], [], 0)[0]) and not os.read(sys.stdin.fileno(), 1)
+
+
+def _app_command(*args: str) -> list[str]:
+    """The command of a fresh copy of this app: the built app's executable (its entry point is `freemocap/__main__.py`,
+    `freemocap.spec`), else `python -m freemocap` with this interpreter."""
+    return [sys.executable, *([] if getattr(sys, "frozen", False) else ["-m", "freemocap"]), *args]
+
+
+def _fresh_app(command: list[str], timeout: int | float, cancelled) -> tuple[dict | None, str | None]:
+    """Run `command` (`_app_command`) and take the JSON line it prints, as `_spawn` takes a child's answer. It is a new
+    main process, not a spawn child. A process still alive at the end is asked to end (its stdin is closed), and after
+    `REALTIME_STOP_GRACE_SECONDS` killed with the processes it started."""
+    child = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, encoding="utf-8",
+                             errors="replace")
+    answers: Queue = Queue()
+
+    def read() -> None:
+        for line in child.stdout:
+            try:
+                value = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(value, dict) and "result" in value:
+                answers.put(value)
+    reader = threading.Thread(target=read, daemon=True)
+    reader.start()
+    deadline, answer, reason = time.monotonic() + timeout, None, None
+    try:
+        while answer is None:
+            try:
+                answer = answers.get(timeout=0.2)
+            except Empty:
+                if cancelled():
+                    reason = "cancelled"
+                elif time.monotonic() > deadline:
+                    reason = "timed-out"
+                elif child.poll() is not None:
+                    reader.join(timeout=1)  # the answer of a copy that printed it just before it ended
+                    answer = None if answers.empty() else answers.get()
+                    reason = None if answer else "crashed"
+                if reason:
+                    return None, reason
+        try:
+            child.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            return None, "hung-at-exit"
+        return (answer, None) if child.returncode == 0 else (None, "crashed")
+    finally:
+        try:
+            child.stdin.close()  # a copy still running ends its session
+        except OSError:
+            pass
+        try:
+            child.wait(timeout=REALTIME_STOP_GRACE_SECONDS)
+        except subprocess.TimeoutExpired:
+            _kill(child.pid, child.kill)
+            child.wait()
+
+
+def _realtime(cancelled, media: list, test_media_dir=None) -> tuple[str, str | None, dict | None]:
+    """Run `realtime-session` in a fresh copy of the app. The frames file, the one skellytracker's run reads, is a row
+    of `media` (once, when `posthoc-session` listed it already) on the rule of `_posthoc`."""
+    from skellytracker.certification import certify_frames
+    from skellytracker.core.eps.certification import FramesUnavailableError
+    try:
+        item = _frames_media(test_media_dir)
+        certify_frames(test_media_dir)  # hash checked here: the copy reads the same file
+    except FramesUnavailableError:
+        return "not-run", "test-media-missing", None
+    started = time.monotonic()
+    command = _app_command("--certify-realtime", *([str(test_media_dir)] if test_media_dir is not None else []))
+    answer, reason = _fresh_app(command, REALTIME_TIMEOUT_SECONDS, cancelled)
+    if answer is None:
+        result, numbers = ("not-run" if reason == "cancelled" else "fail"), None
+    else:
+        result, reason = answer["result"], answer["reason"]
+        numbers = {**answer.get("numbers", {}), "seconds": round(time.monotonic() - started, 3)}
+    if (answer is None or result != "not-run") and item not in media:
         media.append(item)
     return result, reason, numbers
 
@@ -801,11 +1007,13 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
                    {"failed": answer["failed"], "from_bundle": answer["from_bundle"]})
         elif name == "data-folder":
             record(row, *_data_folder())
-        elif name == "posthoc-session":
-            if time.monotonic() - begun + POSTHOC_SECONDS > QUICK_BUDGET_SECONDS:  # it would not end in the budget
-                record(row, "not-run", "over-budget")
+        elif name in ("posthoc-session", "realtime-session"):
+            posthoc = name == "posthoc-session"
+            if time.monotonic() - begun + (POSTHOC_SECONDS if posthoc else REALTIME_SECONDS) > QUICK_BUDGET_SECONDS:
+                record(row, "not-run", "over-budget")  # it would not end in the budget
             else:
-                record(row, *_posthoc(cancelled, cleanup, media, test_media_dir))
+                record(row, *(_posthoc(cancelled, cleanup, media, test_media_dir) if posthoc
+                              else _realtime(cancelled, media, test_media_dir)))
                 if row["reason"] == "cancelled":
                     stopped = "cancelled"
         elif name == "install-facts":

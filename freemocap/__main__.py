@@ -174,7 +174,13 @@ def run_main() -> None:
     parser.add_argument('--reload', action='store_true', help='Developer mode: restart after Python edits; interrupts active jobs')
     parser.add_argument('--port', type=int, help='Bind this port without terminating another server')
     parser.add_argument('--route-inventory', help='Write the registered HTTP and WebSocket route inventory as JSON')
+    parser.add_argument('--certify-realtime', nargs='?', const='', metavar='TEST_MEDIA_DIR',
+                        help="Run only certify's realtime session check and print its result as one JSON line; no server")
     args = parser.parse_args()
+    if args.certify_realtime is not None:
+        from freemocap.certification import realtime_session_main
+        realtime_session_main(args.certify_realtime or None)
+        return
     if args.reload:
         if args.port is not None or args.route_inventory is not None:
             parser.error('--reload cannot be combined with --port or --route-inventory')

@@ -20,7 +20,7 @@ import multiprocessing.synchronize
 import socket
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, replace
 from multiprocessing.sharedctypes import Synchronized
@@ -129,6 +129,15 @@ def _full_rows(message: dict, items: tuple[CertificationItem, ...]) -> tuple[Cer
     return tuple(rows)
 
 
+def _counted(message: dict, not_counted: frozenset[str] = frozenset()) -> tuple[int, int]:
+    """(done, total) of the checks that a package's `certify_plan("full")["total"]` counts: names with at most one `:`
+    (skellytracker's `<label>:jpeg:<name>` and `<check>:exit` rows are parts of one check), and none of a pair that the
+    plan lists as not running (`details.not_run`, whose checks the report still lists)."""
+    rows = [row for row in message.get("checks") or () if isinstance(row, dict) and isinstance(row.get("name"), str)
+            and row["name"].count(":") <= 1 and row["name"].split(":")[0] not in not_counted]
+    return sum(row.get("result") is not None for row in rows), len(rows)
+
+
 def _report_result(report: dict) -> tuple[str, str | None]:
     """The EP check's result and reason: the one check whose name has no `:` (decision 9's reader rule)."""
     row = next((row for row in report.get("checks", ()) if ":" not in str(row.get("name"))), None)
@@ -147,7 +156,8 @@ class QuickCheckJob(BaseNode):
     progress_received: int = 0
     record: dict | None = None  # the crash record's content (crash_record.py)
     level: str = "quick"
-    packages: dict = field(default_factory=dict)  # level full: each package's (rows, done) from its newest message
+    packages: dict = field(default_factory=dict)  # level full: each package's newest progress message
+    not_counted: frozenset[str] = frozenset()  # level full: the check labels that the plans list as not running
 
     @classmethod
     def create(cls, *, pair: CertificationPair | None, detector_type: str, rtmpose_model_name: str | None,
@@ -377,10 +387,10 @@ class QuickCheckManager:
     def start(self, *, pair: CertificationPair | None, detector_type: str, rtmpose_model_name: str | None,
               seconds_estimate: int | None, holds: Callable[[], tuple[PipelineHold, ...]],
               ui_remote: bool | None = None, blender_exe_path: str | None = None, level: str = "quick",
-              remove_data: bool = False) -> CertificationRun:
+              remove_data: bool = False, not_counted: Collection[str] = ()) -> CertificationRun:
         """`holds` lists what runs (claims included); it is read under the admission lock and must not take it.
         `pair` None starts the start check of every package; `level` full the full benchmark (`pair` None), with
-        `remove_data` the person's clean-up choice."""
+        `remove_data` the person's clean-up choice and `not_counted` the labels its plans list as not running."""
         what = "full benchmark" if level == "full" else "quick check"
         with self.lock:
             with self.admission_lock:
@@ -416,6 +426,7 @@ class QuickCheckManager:
             job.record = {"level": level, "pair": asdict(pair) if pair else None,
                           "created_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "message": None}
             crash_record.write(job.record)
+            job.not_counted = frozenset(not_counted)
             self.job = job
             logger.info("%s started", self.describe_run(self.run))
             return self.run
@@ -438,14 +449,15 @@ class QuickCheckManager:
                 if message is not None:
                     job.record["message"] = message
                     crash_record.write(job.record)
-                    done, rows = int(message.get("done", 0)), ()
-                    if job.level == "full":
-                        job.packages[message.get("package")] = (_full_rows(message, self._parts[1] if self._parts else ()),
-                                                                done)
-                        rows = tuple(row for package_rows, _ in job.packages.values() for row in package_rows)
-                        done = sum(package_done for _, package_done in job.packages.values())
+                    done, total, rows = int(message.get("done", 0)), message.get("total"), ()
+                    if job.level == "full":  # every package so far, counted as their plans count
+                        job.packages[message.get("package")] = message
+                        counts = [_counted(package, job.not_counted) for package in job.packages.values()]
+                        done, total = sum(done for done, _ in counts), sum(total for _, total in counts)
+                        rows = tuple(row for package in job.packages.values()
+                                     for row in _full_rows(package, self._parts[1] if self._parts else ()))
                     self.run = replace(self.run, state="cancelling" if job.cancel.is_set() else str(message.get("state")),
-                                       done=done, total=message.get("total"), package=message.get("package"), rows=rows)
+                                       done=done, total=total, package=message.get("package"), rows=rows)
                 result = job.poll_result()
                 if result is None and not job.is_alive:
                     result = job.poll_result()  # a result sent just before the exit

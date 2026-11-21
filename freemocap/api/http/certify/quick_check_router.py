@@ -179,15 +179,19 @@ class StartCheckPlan(BaseModel):
     packages: list[PackagePlan] = Field(description="Each package's plan in its run order (skellycam's are not built).")
 
 
-def _plans(level: str = "quick") -> list[PackagePlan]:
+def _raw_plans(level: str) -> tuple[dict, ...]:
     """Each package's plan in its run order: freemocap then skellytracker at quick, skellytracker then freemocap at full."""
     import skellytracker
     from freemocap.certification import certify_plan
     plans = (certify_plan(level), skellytracker.certify_plan(level))
+    return plans if level == "quick" else plans[::-1]
+
+
+def _plans(level: str = "quick") -> list[PackagePlan]:
     return [PackagePlan(package=plan["package"], seconds_estimate=plan["seconds_estimate"], total=plan["total"],
                         risks=plan.get("risks", []), downloads=plan["downloads"], system_changes=plan.get("system_changes", []),
                         checks=(plan.get("details") or {}).get("checks", []))
-            for plan in (plans if level == "quick" else plans[::-1])]
+            for plan in _raw_plans(level)]
 
 
 @quick_check_router.get("/start_check/plan")
@@ -243,10 +247,13 @@ def start_full_benchmark(body: FullBenchmarkRequest) -> QuickCheckRunState:
     the hand-in list."""
     from freemocap.app.freemocap_application import get_freemocap_app
     app = get_freemocap_app()
+    plans = _raw_plans("full")
     try:
         run = app.quick_checks.start(pair=None, detector_type=_DEFAULTS.detector_type, rtmpose_model_name=None,
-                                     seconds_estimate=sum(plan.seconds_estimate for plan in _plans("full")),
-                                     holds=app.pipeline_holds, level="full", remove_data=body.remove_data)
+                                     seconds_estimate=sum(plan["seconds_estimate"] for plan in plans),
+                                     holds=app.pipeline_holds, level="full", remove_data=body.remove_data,
+                                     not_counted=[label for plan in plans
+                                                  for label in (plan.get("details") or {}).get("not_run", ())])
     except StartRefused as error:
         raise HTTPException(status_code=error.status, detail=error.detail) from None
     return QuickCheckRunState.of(run)

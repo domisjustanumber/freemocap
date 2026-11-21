@@ -16,7 +16,7 @@ from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 from freemocap import certification
 from freemocap.core.streaming.message_model import CertificationHost, CertificationItem, CertificationRun, StartCheckResult
 from freemocap.system.certify import crash_record
-from freemocap.system.certify.quick_check import QuickCheckManager, StartRefused, _full_rows
+from freemocap.system.certify.quick_check import QuickCheckManager, StartRefused, _counted, _full_rows
 from freemocap.system.certify.relay import hand_in_reports, report_file_for
 
 EP, DEVICE = "fake-ep", "gpu:10de:2484:0"
@@ -104,6 +104,20 @@ def test_the_progress_has_one_row_per_ep_and_gpu_with_its_state_and_result():
     assert [(row.name, row.execution_provider, row.state) for row in own] == [("freemocap", None, "running")]
 
 
+def test_the_count_of_checks_counts_what_the_plan_counts_and_never_passes_its_total():
+    """skellytracker's plan counts each check of a pair that runs and the CPU's; a JPEG run adds its own checks
+    `<label>:jpeg:<name>` and a child's `<check>:exit` to the report, and a pair the plan does not run is still listed."""
+    other = "fake-ep@1002-73bf-0"  # a pair the plan lists in `details.not_run`
+    message = _message(None, len(CHECKS))
+    jpeg = message["checks"].index({"name": f"{LABEL}:jpeg", "result": "pass"}) + 1
+    message["checks"][jpeg:jpeg] = [{"name": f"{LABEL}:jpeg:{part}.{index}", "result": "pass"}
+                                    for part in ("cpu_decode", "gpu_decode") for index in range(33)]
+    message["checks"] += [{"name": f"{LABEL}:video:exit", "result": "record-only"},
+                          *({"name": name, "result": None} for name in (f"{other}:probe", f"{other}:video", other))]
+    assert _counted(message, frozenset({other})) == (len(CHECKS), len(CHECKS))
+    assert _counted(_message(f"{LABEL}:video", 3)) == (3, len(CHECKS))
+
+
 def test_the_full_benchmark_is_refused_until_the_start_check_passed(base):
     manager = _manager(tracker_until_cancelled, needed=True)
     try:
@@ -138,7 +152,7 @@ def test_every_start_is_refused_while_it_runs_and_a_cancel_leaves_an_incomplete_
             manager.start(pair=None, detector_type="rtmpose", rtmpose_model_name=None, seconds_estimate=1, holds=lambda: ())
         _wait(manager, lambda: manager.run is not None and manager.run.rows)
         snapshot = manager.snapshot(())
-        assert snapshot.run.level == "full" and snapshot.run.done == 3
+        assert snapshot.run.level == "full" and (snapshot.run.done, snapshot.run.total) == (3, len(CHECKS))
         assert [(row.name, row.state) for row in snapshot.run.rows] == [("cpu", "waiting"), (LABEL, "running")]
         assert manager.cancel().state == "cancelling"  # the UI's lock ends at once
         _wait(manager, lambda: not manager.running)
@@ -187,7 +201,8 @@ def test_the_full_benchmark_routes_give_the_plans_in_run_order_and_start_with_th
     download = {"name": "test-video.mp4", "bytes": 12_000_000, "source": "https://media.example/v.mp4", "sha256": "ab" * 32}
     monkeypatch.setattr(skellytracker, "certify_plan", lambda level: {
         "package": "skellytracker", "kind": level, "seconds_estimate": 333, "total": 38, "risks": [], "downloads": [download],
-        "system_changes": [], "questions": [], "details": {"checks": [LABEL], "not_run": {}}})
+        "system_changes": [], "questions": [], "details": {"checks": [LABEL, "openvino@8086-a780-0"],
+                                                           "not_run": {"openvino@8086-a780-0": "ep-not-installed"}}})
     started = []
 
     def start(**kwargs):
@@ -215,3 +230,4 @@ def test_the_full_benchmark_routes_give_the_plans_in_run_order_and_start_with_th
     assert accepted.status_code == 202 and accepted.json()["level"] == "full" and accepted.json()["rows"] == []
     assert (started[0]["level"], started[0]["remove_data"], started[0]["seconds_estimate"], started[0]["pair"]) == (
         "full", False, 333, None)  # the total of the plans' estimates
+    assert started[0]["not_counted"] == ["openvino@8086-a780-0"], "the pairs the plan does not run are not counted"

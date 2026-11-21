@@ -19,6 +19,22 @@ These entries are `accepted`.
 | # | Decision | Status |
 |---|----------|--------|
 | [0001](entries/0001-decision-log-agents-md-and-private-data.md) | Decision log and its rules; `AGENTS.md` files hold the instructions; `plans/` is local; no private data | accepted |
+| [4TK3](entries/4TK3-certification-work-division-run-order-and-platforms.md) | Certification: what each package checks, the run order, validation in freemocap builds on each platform | accepted |
+| [H3ZJ](entries/H3ZJ-onnx-runtime-hardware-facts-and-build-identity.md) | ONNX Runtime and hardware facts through skellytracker; SemVer version; build commit; UTF-8 output | accepted |
+| [FS1H](entries/FS1H-exit-notice-and-shutdown.md) | Electron close sends `POST /shutdown` first; exit notice; a child ends its GPU session before a kill | accepted |
+| [FG8V](entries/FG8V-busy-rule-and-admission-lock.md) | Busy rule: no work during a check, no check during work; refusals answer one request; one lock | accepted |
+| [WKE6](entries/WKE6-unchecked-pairs-in-the-ep-setting.md) | Unchecked EP and GPU pairs: shown and marked, two-choice prompt, one-pair quick check, states, texts | accepted |
+| [YZC3](entries/YZC3-start-check-required-run-and-lock.md) | Start check: reviewed OS rows, when it is required, what it runs, lock, release, crash marker | accepted |
+| [WKC0](entries/WKC0-quick-level-budget-and-session-checks.md) | Level quick: 2 minutes in all, 25 s for freemocap, session checks, realtime check in a fresh copy | accepted |
+| [5ZRX](entries/5ZRX-full-benchmark-offer-consent-lock-and-clean-up.md) | Full benchmark: offer, consent step, downloads guard, lock, cancel, clean-up | accepted |
+| [HT08](entries/HT08-full-benchmark-stages-order-measures-and-rows.md) | Full benchmark: pair order, sample recording, 300 frames, measures, Blender, reported-only failures, rows | accepted |
+| [FS03](entries/FS03-crash-record-and-incomplete-reports.md) | Crash record at both levels; no automatic re-run; incomplete reports; `abandon` | accepted |
+| [GZ9H](entries/GZ9H-report-file-and-format-1-6-0.md) | Report file: format 1.6.0, built at hand-in, components, test media, note cleaning, privacy | accepted |
+| [5XXN](entries/5XXN-hand-in-relay-and-test-mode.md) | Hand-in: report stores, send after view, outbox and retry, relay off, issue form, test mode | accepted |
+| [X2KK](entries/X2KK-skellytracker-pin-in-a-separate-clone.md) | skellytracker pin: the clone `../skellytracker-pin`; when and how to move it | accepted |
+| [WP3Z](entries/WP3Z-shared-test-media-folder.md) | Shared test media folder for each user; the app passes it to each package | accepted |
+| [NG3E](entries/NG3E-user-facing-wording-of-certification.md) | User text says "system"; the confirmed sentences; plain reason sentences | accepted |
+| [BMA1](entries/BMA1-windows-ml-ep-pack-install-and-remove.md) | Windows ML EP pack controls: which EPs, Remove always, no Repair, busy rule, texts | accepted |
 
 ### Evidence
 
@@ -35,6 +51,7 @@ These entries wait for a decision of the user. Section is the section or area of
 
 | # | Decision | Section | Status |
 |---|----------|---------|--------|
+| [ENY6](entries/ENY6-test-isolation-for-certification.md) | Test isolation of the certification work: scratch stores, no relay, no download, no hardware | none | proposed |
 
 The entries that are `rejected`, `superseded by XXXX`, `absorbed into <path>#<anchor>`,
 `evidence; used by XXXX` or `done` are in [historical.md](historical.md).

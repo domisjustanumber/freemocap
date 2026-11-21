@@ -1,5 +1,32 @@
 # EP management, certification and report hand-in
 
+> **Migrated, 2026-11-21.** The decisions of this file are in the decision log:
+> [ADR-4TK3](../../decisions/entries/4TK3-certification-work-division-run-order-and-platforms.md),
+> [ADR-H3ZJ](../../decisions/entries/H3ZJ-onnx-runtime-hardware-facts-and-build-identity.md),
+> [ADR-FS1H](../../decisions/entries/FS1H-exit-notice-and-shutdown.md),
+> [ADR-FG8V](../../decisions/entries/FG8V-busy-rule-and-admission-lock.md),
+> [ADR-WKE6](../../decisions/entries/WKE6-unchecked-pairs-in-the-ep-setting.md),
+> [ADR-YZC3](../../decisions/entries/YZC3-start-check-required-run-and-lock.md),
+> [ADR-WKC0](../../decisions/entries/WKC0-quick-level-budget-and-session-checks.md),
+> [ADR-5ZRX](../../decisions/entries/5ZRX-full-benchmark-offer-consent-lock-and-clean-up.md),
+> [ADR-HT08](../../decisions/entries/HT08-full-benchmark-stages-order-measures-and-rows.md),
+> [ADR-FS03](../../decisions/entries/FS03-crash-record-and-incomplete-reports.md),
+> [ADR-GZ9H](../../decisions/entries/GZ9H-report-file-and-format-1-6-0.md),
+> [ADR-5XXN](../../decisions/entries/5XXN-hand-in-relay-and-test-mode.md),
+> [ADR-X2KK](../../decisions/entries/X2KK-skellytracker-pin-in-a-separate-clone.md),
+> [ADR-WP3Z](../../decisions/entries/WP3Z-shared-test-media-folder.md),
+> [ADR-NG3E](../../decisions/entries/NG3E-user-facing-wording-of-certification.md),
+> [ADR-BMA1](../../decisions/entries/BMA1-windows-ml-ep-pack-install-and-remove.md) and
+> [ADR-JDH9](../../freemocap-ui/decisions/entries/JDH9-certification-dialog-layout-and-owner-texts.md), with the
+> measurements [ADR-1S0R](../../decisions/entries/1S0R-quick-level-run-times-evidence.md),
+> [ADR-G28R](../../decisions/entries/G28R-full-benchmark-run-times-evidence.md) and
+> [ADR-44ZC](../../decisions/entries/44ZC-stop-and-cancel-times-evidence.md), and the proposal
+> [ADR-ENY6](../../decisions/entries/ENY6-test-isolation-for-certification.md). The open questions and the work not
+> built are in the root [open work](../../decisions/open-work.md#certification). The log is now the source of the
+> rules. Where this file and an entry differ, the entry is right. This file stays as the history of those decisions
+> and as the task checkpoint that "Recover the current task" of [`AGENTS.md`](../../AGENTS.md#recover-the-current-task)
+> describes.
+
 **State (2026-11-19): APPROVED PLAN; the Electron shutdown fix (decision 31) the hardware cleanup (6 to 8), the version change (4), `BUILD_TREE_MODIFIED` (11) and the backend of the relay hand-in (10, 22 to 24, R1 to R5; see [Relay hand-in: built](#relay-hand-in-built)) and F15 step 1 (see [F15 step 1: built](#f15-step-1-built)) are built; the rest is not.** The user settled every decision below in a grilling
 round in this session and in the skellytracker session (`skellytracker-6c`, the session that owns
 ONNX Runtime, EP packs and EP certification). The skellytracker interfaces this plan needs do not exist yet;

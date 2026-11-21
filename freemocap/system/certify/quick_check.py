@@ -132,19 +132,29 @@ def _full_rows(message: dict, items: tuple[CertificationItem, ...]) -> tuple[Cer
         result = rollup or next((result for result in ("fail", "pass", "record-only", "not-run") if result in results), None)
         if any(check.get("crashed") for check in checks):  # a crashed timing check fails its row, not its pair (owner: TBC)
             result = "fail"
+        source = next((check for check in checks if check["name"] == name), None)             or next((check for check in checks if check.get("result") == result), {})
         rows.append(CertificationRunRow(name=name, package=package, execution_provider=key, device_key=device_key,
-                                        state=state, result=result if state == "done" else None))
+                                        state=state, result=result if state == "done" else None,
+                                        reason=source.get("reason") if state == "done" and result == "not-run" else None))
     return tuple(rows)
 
 
-def _ended(message: dict, crashed: bool) -> dict:
+def _ended(message: dict, crashed: bool, cancelled: Collection[str] = ()) -> dict:
     """A package's newest progress message as its run ended, for the final rows: each unfinished check `not-run`, and the
-    running one `fail` after a crash, as the crash record has them, marked so that its row reads failed."""
+    running one `fail` after a crash, as the crash record has them, marked so that its row reads failed. `cancelled`: the
+    checks that had not ended when a cancel was asked; those that ended `not-run` get the reason `cancelled` (progress
+    messages carry no reasons)."""
     step = message.get("step") if crashed and message.get("state") == "running" else None
     step = step.get("name") if isinstance(step, dict) else None
-    return {**message, "state": "done", "checks": [
-        {**row, "result": "fail", "crashed": True} if row.get("name") == step else {**row, "result": "not-run"}
-        if isinstance(row, dict) and row.get("result") is None else row for row in message.get("checks") or ()]}
+
+    def end(row):
+        if not isinstance(row, dict):
+            return row
+        if row.get("name") == step:
+            return {**row, "result": "fail", "crashed": True}
+        row = {**row, "result": "not-run"} if row.get("result") is None else row
+        return {**row, "reason": "cancelled"} if row["result"] == "not-run" and row.get("name") in cancelled else row
+    return {**message, "state": "done", "checks": [end(row) for row in message.get("checks") or ()]}
 
 
 def _counted(message: dict, not_counted: frozenset[str] = frozenset()) -> tuple[int, int]:
@@ -190,6 +200,7 @@ class QuickCheckJob(BaseNode):
     level: str = "quick"
     packages: dict = field(default_factory=dict)  # level full: each package's newest progress message
     not_counted: frozenset[str] = frozenset()  # level full: the check labels that the plans list as not running
+    cancelled: dict = field(default_factory=dict)  # level full: each package's checks that had not ended at the cancel
 
     @classmethod
     def create(cls, *, pair: CertificationPair | None, detector_type: str, rtmpose_model_name: str | None,
@@ -483,6 +494,9 @@ class QuickCheckManager:
         with self.lock:
             if self.job is not None:
                 self.job.cancel.set()
+                self.job.cancelled = {package: {row.get("name") for row in message.get("checks") or ()
+                                                if isinstance(row, dict) and row.get("result") is None}
+                                      for package, message in self.job.packages.items()}
                 self.run = replace(self.run, state="cancelling")  # the UI's lock of a full benchmark ends at once
             return self.run
 
@@ -515,8 +529,10 @@ class QuickCheckManager:
                     elif job.level == "full":  # ("full", per-package results), or a crash or error of the whole child
                         self.full_results = tuple(StartCheckResult(*row) for row in result[1]) if result[0] == "full" \
                             else (StartCheckResult(None, *result),)
-                        self.full_rows = tuple(row for package in job.packages.values() for row in _full_rows(
-                            _ended(package, result[0] == "crashed"), self._parts[1] if self._parts else ()))
+                        crashed = result[0] == "crashed"  # after a crash the unfinished checks stay `not-run`
+                        self.full_rows = tuple(row for name, package in job.packages.items() for row in _full_rows(
+                            _ended(package, crashed, () if crashed else job.cancelled.get(name, ())),
+                            self._parts[1] if self._parts else ()))
                     else:  # ("start", per-package results), or a crash or error of the whole child
                         self.start_results = tuple(StartCheckResult(*row) for row in result[1]) if result[0] == "start" \
                             else (StartCheckResult(None, *result),)

@@ -5128,6 +5128,11 @@ export interface components {
             state: string;
             /** Result */
             result: string | null;
+            /**
+             * Reason
+             * @description `cancelled` for a check that a cancel stopped, else null.
+             */
+            reason?: string | null;
         };
     };
     responses: never;

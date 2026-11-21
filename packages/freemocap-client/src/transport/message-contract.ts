@@ -292,6 +292,7 @@ const CertificationRunRowSchema = z.object({
   device_key: z.string().optional(),
   state: z.string(),
   result: z.string().optional(),
+  reason: z.string().optional(),
 });
 
 export const CertificationSchema = z.object({

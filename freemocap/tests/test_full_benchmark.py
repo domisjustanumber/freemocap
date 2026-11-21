@@ -19,7 +19,7 @@ from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 from freemocap import certification
 from freemocap.core.streaming.message_model import CertificationHost, CertificationItem, CertificationRun, StartCheckResult
 from freemocap.system.certify import crash_record
-from freemocap.system.certify.quick_check import QuickCheckJob, QuickCheckManager, StartRefused, _counted, _full_rows
+from freemocap.system.certify.quick_check import QuickCheckJob, QuickCheckManager, StartRefused, _counted, _ended, _full_rows
 from freemocap.system.certify.relay import hand_in_reports, report_file_for
 
 EP, DEVICE = "fake-ep", "gpu:10de:2484:0"
@@ -186,6 +186,17 @@ def test_the_count_of_checks_counts_what_the_plan_counts_and_never_passes_its_to
     assert _counted(_message(f"{LABEL}:video", 3)) == (3, len(CHECKS))
 
 
+def test_the_checks_a_cancel_stopped_read_cancelled_and_the_rest_keep_how_they_ended():
+    message = {"package": "freemocap", "state": "running", "step": {"name": "posthoc:cpu"}, "checks": [
+        {"name": "data-folder", "result": "pass"}, {"name": "posthoc:other", "result": "not-run"},
+        {"name": "posthoc:cpu", "result": None}, {"name": "blender", "result": None}]}
+    ended = lambda crashed, cancelled: [(row.name, row.result, row.reason) for row in _full_rows(_ended(message, crashed, cancelled), ())]  # noqa: E731
+    assert ended(False, {"posthoc:cpu", "blender"}) == [("data-folder", "pass", None), ("posthoc:other", "not-run", None),
+                                                        ("posthoc:cpu", "not-run", "cancelled"), ("blender", "not-run", "cancelled")]
+    assert ended(True, ()) == [("data-folder", "pass", None), ("posthoc:other", "not-run", None), ("posthoc:cpu", "fail", None),
+                               ("blender", "not-run", None)], "after a crash: failed and not run, as before"
+
+
 def test_the_full_benchmark_is_refused_until_the_start_check_passed(base):
     manager = _manager(tracker_until_cancelled, needed=True)
     try:
@@ -227,9 +238,10 @@ def test_every_start_is_refused_while_it_runs_and_a_cancel_leaves_an_incomplete_
         assert manager.full_results == (StartCheckResult("skellytracker", "not-run", "cancelled"),
                                         StartCheckResult("freemocap", "not-run", "cancelled"))  # its benchmark did not start
         assert manager.snapshot(()).full_results == manager.full_results and manager.start_results == ()
-        # The rows stay as the run ended, each done, in the server's state until the next full benchmark starts.
-        assert [(row.name, row.state, row.result) for row in manager.snapshot(()).full_rows] == [
-            ("cpu", "done", "pass"), (LABEL, "done", "not-run")]
+        # The rows stay as the run ended, each done, in the server's state until the next full benchmark starts; the
+        # pair that ran at the cancel reads cancelled.
+        assert [(row.name, row.state, row.result, row.reason) for row in manager.snapshot(()).full_rows] == [
+            ("cpu", "done", "pass", None), (LABEL, "done", "not-run", "cancelled")]
         assert not crash_record.path().exists() and failures == []
         manager.release(manager.claim("cameras"))  # the lock ended with the run
         (new,) = [row for row in hand_in_reports() if row["report_id"] not in before]
@@ -266,7 +278,8 @@ def test_a_crash_during_the_full_benchmark_keeps_its_report_and_fails_no_pair_fo
         assert manager.full_results == (StartCheckResult(None, "crashed", "exit-code-3"),)
         assert failures == [], "a crashed timing check does not fail its pair at level full"
         # the pair's crashed timing check fails its row; its EP check did not run
-        assert [(row.name, row.state, row.result) for row in manager.full_rows] == [("cpu", "done", "pass"), (LABEL, "done", "fail")]
+        assert [(row.name, row.state, row.result, row.reason) for row in manager.full_rows] == [
+            ("cpu", "done", "pass", None), (LABEL, "done", "fail", None)]
         (row,) = [row for row in certification.pending_reports() if row["kind"] == "full"]  # kept in freemocap's folder
         assert row["package"] == "skellytracker", "the share list names the report's own package, not its folder's"
         assert next(new for new in hand_in_reports() if new["report_id"] == row["report_id"])["package"] == "skellytracker"

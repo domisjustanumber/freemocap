@@ -39,6 +39,8 @@ test('the progress has one row per EP and GPU with its state, and a count of fin
     assert.deepEqual(fullRowStatus({name: 'cpu', package: 'p', state: 'partly-done'}), {kind: 'waiting', text: 'Partly done'});
     assert.deepEqual(['pass', 'fail', 'not-run'].map(result => fullRowStatus({name: 'x', package: 'p', state: 'done', result}).text),
         ['Passed', 'Failed', 'Not run']);
+    assert.equal(fullRowStatus({name: 'x', package: 'p', state: 'done', result: 'not-run', reason: 'cancelled'}).text, 'Cancelled',
+        'a check that a cancel stopped');
     assert.equal(finishedText({level: 'full', items: [], state: 'running', done: 1, rows: []}), '1 check finished');
 });
 

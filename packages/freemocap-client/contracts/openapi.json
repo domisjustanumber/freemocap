@@ -12262,6 +12262,18 @@
               }
             ],
             "title": "Result"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "`cancelled` for a check that a cancel stopped, else null."
           }
         },
         "type": "object",

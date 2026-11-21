@@ -34,6 +34,7 @@ def _isolate_user_folders() -> None:
     os.environ[store.STORE_VARIABLE] = str(scratch_store)
     os.environ[store.CACHE_VARIABLE] = str(scratch / "ep-cache")
     os.environ.setdefault("FREEMOCAP_BASE_FOLDER", str(scratch / "freemocap_data"))
+    os.environ.setdefault("FREEMOCAP_TEST_MEDIA_DIR", str(scratch / "test-media"))  # not the real shared folder
 
 
 def pytest_configure(config):
@@ -61,6 +62,25 @@ def websocket_log_queue() -> None:
     file forgetting a fixture it has no reason to know about. The call is idempotent.
     """
     create_websocket_log_queue()
+
+
+@pytest.fixture(autouse=True)
+def no_real_download(request, monkeypatch):
+    """No fast test downloads a recording: the real `catalog.download` raises unless the test stubs it or `requests.get`
+    (an earlier test ran the real level full and downloaded the 167 MB sample twice). shortcut: in-process only; a spawn
+    child (the full benchmark's job) needs its stand-in for freemocap's `certify` instead."""
+    if request.node.get_closest_marker("e2e") or request.node.get_closest_marker("slow"):
+        return
+    import requests
+    from freemocap.tools.datasets import catalog
+    real_get, real_download = requests.get, catalog.download
+
+    def guarded(url, *args, **kwargs):
+        if requests.get is real_get:
+            raise AssertionError(f"a test reached a real download of {url}; stub catalog.download")
+        return real_download(url, *args, **kwargs)
+
+    monkeypatch.setattr(catalog, "download", guarded)
 
 
 def pytest_sessionfinish(session, exitstatus):

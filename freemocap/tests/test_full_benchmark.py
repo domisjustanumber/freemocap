@@ -67,6 +67,11 @@ def tracker_marks_its_report(level, progress, cancel, **options):
     return {}
 
 
+def own_stand_in(level, progress, cancel, **options):
+    """freemocap's level full in the job's child: a stand-in, so that no test runs the real one (it downloads the sample)."""
+    return {"checks": [], "evidence": {"reasons": []}}
+
+
 def backend_that_dies(pids):
     """A backend that starts the full benchmark's child and dies while it runs."""
     from skellylogs.handlers.websocket_log_queue_handler import create_websocket_log_queue
@@ -74,7 +79,7 @@ def backend_that_dies(pids):
     flag = multiprocessing.Value("b", False)
     job = QuickCheckJob.create(pair=None, detector_type="rtmpose", rtmpose_model_name=None, global_kill_flag=flag,
                                worker_registry=WorkerRegistry(global_kill_flag=flag, worker_mode=WorkerMode.PROCESS),
-                               certify=tracker_marks_its_report, level="full")
+                               certify=tracker_marks_its_report, own_certify=own_stand_in, level="full")
     job.start()
     job.progress_subscription.get(timeout=120)  # certify() runs
     pids.put(job.worker.pid)
@@ -102,7 +107,7 @@ def _manager(certify, needed=False):
     items = (CertificationItem(execution_provider=EP, label="Fake EP", device_key=DEVICE, device_name="GPU 1"),)
     return QuickCheckManager(global_kill_flag=flag, worker_registry=WorkerRegistry(global_kill_flag=flag, worker_mode=WorkerMode.PROCESS),
                              read_status=lambda: (CertificationHost(), items, None, ()), read_start_needed=lambda: needed,
-                             certify=certify)
+                             certify=certify, own_certify=own_stand_in)
 
 
 def _start(manager, remove_data=True):

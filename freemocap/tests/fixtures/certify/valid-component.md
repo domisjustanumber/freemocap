@@ -22,7 +22,7 @@ freemocap 2.0.0 · 2026-11-19 10:00 UTC
 | Data folder | pass |
 | Post-hoc session | pass |
 | Install facts | record |
-| Blender | record |
+| Blender | skipped (not installed) |
 
 Cameras: not checked on this system.
 
@@ -71,7 +71,8 @@ Note of the person:
       "name": "NVIDIA GeForce RTX 3070",
       "id": "10de:2484",
       "driver_version": "610.88",
-      "vram_bytes": 8589934592
+      "vram_bytes": 8589934592,
+      "shared_memory_bytes": null
      }
     ]
    },
@@ -114,9 +115,12 @@ Note of the person:
     },
     {
      "name": "blender",
-     "result": "record-only",
-     "reason": null,
-     "module": "Blender"
+     "result": "not-run",
+     "reason": "not-installed",
+     "module": "Blender",
+     "numbers": {
+      "found": false
+     }
     }
    ],
    "cleanup": [],
@@ -165,7 +169,16 @@ Note of the person:
      "group": "component",
      "name": "Blender",
      "device": null,
-     "result": "record-only"
+     "result": "skipped",
+     "reason": "not-installed"
+    }
+   ],
+   "test_media": [
+    {
+     "name": "quick_frames.zip",
+     "sha256": "a973456f417eab8e24ea8aa3f118a48142aa55143af69c73ee6799cb4f94c1f4",
+     "bytes": 6215661,
+     "source": "bundled"
     }
    ]
   },

@@ -3,8 +3,8 @@
 `fixtures/certify/valid.md`, `valid-quick.md` and `refused-privacy.md` are copies of skellycertify `relay/samples/` at
 `9e6d575` (format 1.4.0, unchanged at `0966552`, format 1.5.0, and at `ba9a071`, format 1.6.0); `build_report_file`
 reproduces the two valid files byte for byte but for the file's schema id, which is now 1.6.0. `valid-component.md` is
-freemocap's own: the writer built it (format 1.6.0) from a freemocap module with `component` items and the first
-skellytracker module of `valid-quick.md`.
+freemocap's own: the writer built it (format 1.6.0) from a freemocap module with `component` items (Blender `skipped`
+with `not-installed`) and a `test_media` list, and the first skellytracker module of `valid-quick.md`.
 When the skellycertify checkout and node are present, the relay's own validator (`relay/src/report.js`, `relay/src/privacy.js`) checks the built file.
 """
 
@@ -257,8 +257,14 @@ def test_the_component_sample_is_the_file_the_writer_builds_and_the_relay_accept
     assert [module["schema"] for module in data["modules"]] == ["skellycertify.report/1.6.0", "skellycertify.report/1.4.0"]
     _, body = build_report_file(data["modules"], data["note"], data["app"])
     assert body.decode("utf-8") == text and "| Module | Result |\n|---|---|\n| Build identity | pass |\n" in text
+    assert "| Install facts | record |\n| Blender | skipped (not installed) |\n\n" in text  # format 1.6.0
+    assert data["modules"][0]["test_media"] == [{"name": "quick_frames.zip", "sha256":
+                                                 "a973456f417eab8e24ea8aa3f118a48142aa55143af69c73ee6799cb4f94c1f4",
+                                                 "bytes": 6215661, "source": "bundled"}]
     if RELAY_SRC.is_dir() and shutil.which("node") is not None:
         assert _relay_verdict(body) == {"rule": 0}
+        bad = body.replace(b'"name": "quick_frames.zip"', b'"name": "media/quick_frames.zip"')
+        assert _relay_verdict(bad) == {"refused": "bad-value", "detail": "report.modules[0].test_media[0].name"}
 
 
 def test_the_note_and_the_privacy_rules_refuse_a_file():

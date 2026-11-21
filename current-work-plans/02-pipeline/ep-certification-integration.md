@@ -2033,6 +2033,11 @@ Tests only, no real window since. Commits:
    or a spec question.
 6. Start under the Close bar (`42b0de49`): `scrollPaddingBottom: '4em'` on the dialog. Keyboard focus and
    scrollIntoView now keep Start clear of the bar. A mouse scroll still slides content under a sticky bar, by design.
+7. Cancel latency (`62fbf72d`): the 31 s was the UI script's `getByText(...).innerText()`, which waits 30 s for text that is
+   gone; the server ended the run 0.27 s after the DELETE. Direct runs: 0.05 to 0.27 s at every point of a pair. The real
+   defect: the kill left skellytracker's unclean-exit markers, and two cancels marked DirectML on the RTX `unclean-exits`
+   (`ep-not-passed` next run). A pair child now ends its session itself (`STOP_GRACE_SECONDS` 1.5, then the kill): 0.8 to
+   1.7 s, no marker, the next run ran every pair.
 
 Suites: Python 1787 passed, 0 failed, 20 skipped (`%LOCALAPPDATA%\skellycertify` absent before and after); UI main run
 244 of 245 with 1 skipped; `npx tsc --noEmit` clean; client package 148 of 148.

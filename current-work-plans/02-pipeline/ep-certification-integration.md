@@ -1877,6 +1877,36 @@ and CUDA on the RTX. The clean-up choice reaches the child and removes nothing: 
 output yet, and skellytracker's has no clean-up interface. Suites: Python 1772 passed, 0 failed, 20 skipped; UI 238
 of 239 with 1 skipped; `npx tsc --noEmit` clean. No real full run yet.
 
+### Defects of the first real run, 2026-11-21
+
+Fixed (tests only; no real window since):
+
+1. Count past the plan total (`41737ccc`): the count and total of a full run take only names with at most one `:`
+   (skellytracker's `<label>:jpeg:<name>` and `:exit` rows are parts of a check) and skip the pairs the plan lists in
+   `details.not_run`, which the route passes as `not_counted`. Total is now the sum over packages so far.
+2. Menu and Shift+Space past the lock (`749b4950`): one gate `appLocked` (start check required or a running full
+   benchmark) for the inert layer, `useKeyboardShortcuts` and `useMenuActions`; Shift+Space reaches the renderer as
+   the Camera menu's accelerator, so the menu gate covers it.
+3. Two reports per crash (`0985dd39`): a child whose backend died kills its own children and `os._exit`s, without
+   the cancel that made certify() write a `cancelled` report; the watch now also runs after a cancel.
+4. Wrong package in the share list (`f33b4625`): freemocap's `pending_reports` rows carry the report's own package.
+5. "Quick check" during a full run (`87cae0a0`): "A recording can start once the full benchmark ends. " and "Full
+   benchmark of …" in the progress text; quick wording unchanged.
+6. Rows (`aea44601`): new row state `partly-done`, shown "Partly done" (grey, no icon); new message field
+   `certification.full_rows`, the rows as the run ended (unfinished checks `not-run`, the running one `fail` after a
+   crash), cleared when the next full run starts. Golden fixtures regenerated.
+
+Not changed, per skellycertify `report-format.md`: the GPU table has one row per `ep` item of each module report (4.2
+part 4), so repeated rows across reports are required; `modified-tree` is the reason whenever `tree_modified` is not
+`false`, null included (7.1 item 3, reason table), so the freemocap report and its JSON agree.
+
+Open: the orphan's `os._exit` skips what certify() undoes on a cancel (a field-test EP's opt-in during its check); a
+cancel that writes no report would need skellytracker. The lingering ≥3 s was not reproduced with the stand-in. No
+final rows after a restart (the crash record gives the result line only). A crashed timing check's row reads "Not
+run" (the EP check's result). Not tried in the real window: the menu gate, the record line, the kept rows.
+Suites: Python 1774 passed, 0 failed, 20 skipped; UI 240 of 241 with 1 skipped; `npx tsc --noEmit` clean; client
+package 148 of 148.
+
 ## Next actions
 
 All as local commits on `sidecar-implementation`, in this order:

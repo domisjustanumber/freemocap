@@ -139,13 +139,15 @@ def seed_test_media(test_media_dir) -> None:
         temporary.replace(target)
 
 
-def run_full_check(progress, cancel, *, remove_data: bool, own_certify=None, certify=None) -> tuple:
+def run_full_check(progress, cancel, *, remove_data: bool, blender_exe_path: str | None = None, own_certify=None,
+                   certify=None) -> tuple:
     """Each package's level full in the run order (fifth grilling): skellycam (not built; it will run first), skellytracker,
     then freemocap; `("full", ((package, result, reason), ...))`. Each gets the shared test media folder and nothing that
     overrides its own staging. A package whose full plan has no check does not run; after a cancel each later package is
     `not-run` with `cancelled`. `remove_data`: the person's choice to remove the benchmark data after a successful run;
     freemocap, which runs last, gets it only when every earlier package succeeded (skellytracker downloads and keeps
-    nothing, and the frames file it reads is a bundled one)."""
+    nothing, and the frames file it reads is a bundled one). `blender_exe_path`: the path chosen in Blender settings, for
+    freemocap's Blender export (None: the best guess)."""
     from freemocap.certification import certify as freemocap_certify, certify_plan, module_result
     from freemocap.system.default_paths import get_test_media_dir
     media = get_test_media_dir()
@@ -157,14 +159,14 @@ def run_full_check(progress, cancel, *, remove_data: bool, own_certify=None, cer
     def own(level, progress, cancel):
         succeeded = all(result in ("pass", "record-only") for _, result, _ in results)
         return (own_certify or freemocap_certify)(level, progress, cancel, test_media_dir=media,
-                                                  remove_data=remove_data and succeeded)
+                                                  blender_exe_path=blender_exe_path, remove_data=remove_data and succeeded)
 
     results = []
     for package, run in (("skellytracker", tracker), ("freemocap", own)):
         if cancel.is_set():
             results.append((package, "not-run", "cancelled"))
             continue
-        if package == "freemocap" and certify_plan("full", test_media_dir=media)["total"] == 0:
+        if package == "freemocap" and certify_plan("full", test_media_dir=media, blender_exe_path=blender_exe_path)["total"] == 0:
             continue
         try:
             if package == "skellytracker":

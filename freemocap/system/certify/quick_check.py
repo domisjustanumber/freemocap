@@ -233,8 +233,8 @@ class QuickCheckJob(BaseNode):
         try:
             if level == "full":
                 from freemocap.system.certify.start_check import run_full_check
-                result_pub.put(run_full_check(progress_pub.put, cancel, remove_data=remove_data, own_certify=own_certify,
-                                              certify=certify))
+                result_pub.put(run_full_check(progress_pub.put, cancel, remove_data=remove_data,
+                                              blender_exe_path=blender_exe_path, own_certify=own_certify, certify=certify))
                 return
             if execution_provider is None:
                 from freemocap.system.certify.start_check import run_start_check

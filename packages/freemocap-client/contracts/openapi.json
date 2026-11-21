@@ -3960,8 +3960,38 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "blenderExePath",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The Blender path chosen in Blender settings; absent uses freemocap's best guess.",
+              "title": "Blenderexepath"
+            },
+            "description": "The Blender path chosen in Blender settings; absent uses freemocap's best guess."
+          }
+        ]
       }
     },
     "/freemocap/certify/full_benchmark": {
@@ -12166,6 +12196,18 @@
             "type": "boolean",
             "title": "Remove Data",
             "description": "Remove what the run downloaded and its processing output after a successful run; the report, bundled test images and files that were there before stay."
+          },
+          "blenderExePath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blenderexepath",
+            "description": "The Blender path chosen in Blender settings; null uses freemocap's best guess."
           }
         },
         "type": "object",

@@ -192,8 +192,9 @@ def test_the_full_check_passes_the_test_media_folder_and_the_clean_up_choice_onl
     for result, removes in (("pass", True), ("fail", False)):
         calls.clear()
         start_check.run_full_check(lambda message: None, multiprocessing.Event(), remove_data=True, own_certify=own,
-                                   certify=tracker(result))
-        assert calls == [("skellytracker", {"test_media_dir": media}),
-                         ("freemocap", {"test_media_dir": media, "remove_data": removes})]
+                                   certify=tracker(result), blender_exe_path="C:/chosen/blender.exe")
+        assert calls == [("skellytracker", {"test_media_dir": media}),  # the Blender path chosen in settings is freemocap's
+                         ("freemocap", {"test_media_dir": media, "blender_exe_path": "C:/chosen/blender.exe",
+                                        "remove_data": removes})]
     from skellytracker.core.eps.certification import frames_record
     assert (bench.media / f"{frames_record()['sha256']}.zip").is_file(), "skellytracker's bundled frames, where it reads them"

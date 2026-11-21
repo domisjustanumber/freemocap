@@ -117,20 +117,23 @@ export const fullBenchmarkLocks = (certification: Certification | null): boolean
 export const appLocked = (certification: Certification | null): boolean =>
     certification?.start_required === true || fullBenchmarkLocks(certification);
 
-/** What the full benchmark runs on this system, per package in the run order. */
-export async function requestFullBenchmarkPlan(baseUrl: string, signal?: AbortSignal, request: typeof fetch = fetch): Promise<PackagePlan[]> {
+/** What the full benchmark runs on this system, per package in the run order, with the Blender path chosen in settings. */
+export async function requestFullBenchmarkPlan(baseUrl: string, signal?: AbortSignal, request: typeof fetch = fetch,
+    blenderExePath: string | null = null): Promise<PackagePlan[]> {
     const response = await createHttpClient({baseUrl, fetch: request}).responses
-        .get_full_benchmark_plan_freemocap_certify_full_benchmark_plan_get({signal});
+        .get_full_benchmark_plan_freemocap_certify_full_benchmark_plan_get({query: blenderExePath ? {blenderExePath} : {}, signal});
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     if (!Array.isArray(data.packages)) throw new Error('Invalid full benchmark plan');
     return data.packages;
 }
 
-/** Start the full benchmark with the clean-up choice. Null when accepted, else the server's one sentence. */
-export async function requestFullBenchmark(baseUrl: string, removeData: boolean, request: typeof fetch = fetch): Promise<string | null> {
+/** Start the full benchmark with the clean-up choice and the Blender path chosen in settings (null: the server's best
+ * guess). Null when accepted, else the server's one sentence. */
+export async function requestFullBenchmark(baseUrl: string, removeData: boolean, request: typeof fetch = fetch,
+    blenderExePath: string | null = null): Promise<string | null> {
     const response = await createHttpClient({baseUrl, fetch: request}).responses
-        .start_full_benchmark_freemocap_certify_full_benchmark_post({body: {remove_data: removeData}});
+        .start_full_benchmark_freemocap_certify_full_benchmark_post({body: {remove_data: removeData, blenderExePath}});
     if (response.ok) return null;
     const body: unknown = await response.json().catch(() => null);
     return describeError(body) || `HTTP ${response.status}`;

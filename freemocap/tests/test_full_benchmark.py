@@ -249,7 +249,8 @@ def test_the_full_benchmark_routes_give_the_plans_in_run_order_and_start_with_th
     download = {"name": "test-video.mp4", "bytes": 12_000_000, "source": "https://media.example/v.mp4", "sha256": "ab" * 32}
     monkeypatch.setenv("FREEMOCAP_TEST_MEDIA_DIR", str(tmp_path))
     monkeypatch.setattr(certification, "_pairs", lambda: [])
-    monkeypatch.setattr(certification, "_blender_path", lambda path: None)
+    blender_paths = []
+    monkeypatch.setattr(certification, "_blender_path", lambda path: blender_paths.append(path))
     monkeypatch.setattr(skellytracker, "certify_plan", lambda level, **options: {
         "package": "skellytracker", "kind": level, "seconds_estimate": 333, "total": 38, "risks": [], "downloads": [download],
         "system_changes": [], "questions": [], "details": {"checks": [LABEL, "openvino@8086-a780-0"],
@@ -268,7 +269,7 @@ def test_the_full_benchmark_routes_give_the_plans_in_run_order_and_start_with_th
     app = FastAPI()
     app.include_router(module.quick_check_router)
     client = TestClient(app)
-    plan = client.get("/certify/full_benchmark/plan").json()["packages"]
+    plan = client.get("/certify/full_benchmark/plan", params={"blenderExePath": "C:/chosen/blender.exe"}).json()["packages"]
     own = certification.certify_plan("full", test_media_dir=str(tmp_path))  # no pair: data-folder, recording, blender
     assert [(row["package"], row["total"], row["seconds_estimate"]) for row in plan] == [
         ("skellytracker", 38, 333), ("freemocap", 3, own["seconds_estimate"])]
@@ -278,11 +279,12 @@ def test_the_full_benchmark_routes_give_the_plans_in_run_order_and_start_with_th
     refused = client.post("/certify/full_benchmark", json={"remove_data": True})
     assert refused.status_code == 409 and refused.json()["detail"]["message"] == "busy"
     application.holds = ()
-    accepted = client.post("/certify/full_benchmark", json={"remove_data": False})
+    accepted = client.post("/certify/full_benchmark", json={"remove_data": False, "blenderExePath": "C:/chosen/blender.exe"})
     assert accepted.status_code == 202 and accepted.json()["level"] == "full" and accepted.json()["rows"] == []
     assert (started[0]["level"], started[0]["remove_data"], started[0]["seconds_estimate"], started[0]["pair"]) == (
         "full", False, 333 + own["seconds_estimate"], None)  # the total of the plans' estimates
     assert started[0]["not_counted"] == ["openvino@8086-a780-0"], "the pairs the plan does not run are not counted"
+    assert started[0]["blender_exe_path"] == "C:/chosen/blender.exe" and blender_paths[0] == blender_paths[-1] ==         "C:/chosen/blender.exe", "the plan and the run use the Blender path chosen in settings"
 
 
 def test_a_child_whose_backend_died_ends_by_itself_at_once_and_writes_no_report(base):

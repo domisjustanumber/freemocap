@@ -58,6 +58,7 @@ export function FullBenchmarkConsent({plans, removeData, onRemoveData, onStart, 
  */
 export function FullBenchmarkSection() {
     const {isConnected, serverPid, certification} = useAppSelector(state => state.connection);
+    const blenderExePath = useAppSelector(state => state.blender?.blenderExePath ?? null);
     const endpoint = serverUrls.getHttpUrl();
     const serverKey = `${endpoint}:${serverPid}:${isConnected}`;
     const [local, setLocal] = useState<{key: string; plans?: PackagePlan[]; planError?: string; refusal?: string; consent?: boolean}>(
@@ -72,18 +73,18 @@ export function FullBenchmarkSection() {
     useEffect(() => {
         if (!isConnected) return;
         const controller = new AbortController();
-        requestFullBenchmarkPlan(endpoint, controller.signal)
+        requestFullBenchmarkPlan(endpoint, controller.signal, fetch, blenderExePath)
             .then(plans => update(serverKey, {plans}))
             .catch(error => controller.signal.aborted || update(serverKey, {planError: String(error)}));
         return () => controller.abort();
-    }, [endpoint, serverKey, isConnected, update]);
+    }, [endpoint, serverKey, isConnected, update, blenderExePath]);
 
     const start = useCallback(async () => {
         const key = serverKey;
         update(key, {refusal: undefined});
-        const refusal = await requestFullBenchmark(endpoint, removeData).catch(error => String(error));
+        const refusal = await requestFullBenchmark(endpoint, removeData, fetch, blenderExePath).catch(error => String(error));
         if (current.current === key) update(key, refusal ? {refusal} : {refusal: undefined, consent: false});
-    }, [endpoint, serverKey, removeData, update]);
+    }, [endpoint, serverKey, removeData, update, blenderExePath]);
 
     const run = certification?.run?.level === 'full' ? certification.run : undefined;
     const rows = run ? run.rows ?? [] : certification?.full_rows ?? [];

@@ -8,7 +8,7 @@ this request with the current reason (other work runs, a check runs, the EP cann
 from dataclasses import asdict
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from freemocap.core.pipeline.realtime.camera_node_config import CameraNodeConfig
@@ -179,7 +179,7 @@ class StartCheckPlan(BaseModel):
     packages: list[PackagePlan] = Field(description="Each package's plan in its run order (skellycam's are not built).")
 
 
-def _raw_plans(level: str) -> tuple[dict, ...]:
+def _raw_plans(level: str, blender_exe_path: str | None = None) -> tuple[dict, ...]:
     """Each package's plan in its run order: freemocap then skellytracker at quick, skellytracker then freemocap at full."""
     import skellytracker
     from freemocap.certification import certify_plan
@@ -187,14 +187,15 @@ def _raw_plans(level: str) -> tuple[dict, ...]:
         return certify_plan(level), skellytracker.certify_plan(level)
     from freemocap.system.default_paths import get_test_media_dir
     media = get_test_media_dir()  # the full run's shared test media folder (format 2.8)
-    return skellytracker.certify_plan(level, test_media_dir=media), certify_plan(level, test_media_dir=media)
+    return (skellytracker.certify_plan(level, test_media_dir=media),
+            certify_plan(level, test_media_dir=media, blender_exe_path=blender_exe_path))
 
 
-def _plans(level: str = "quick") -> list[PackagePlan]:
+def _plans(level: str = "quick", blender_exe_path: str | None = None) -> list[PackagePlan]:
     return [PackagePlan(package=plan["package"], seconds_estimate=plan["seconds_estimate"], total=plan["total"],
                         risks=plan.get("risks", []), downloads=plan["downloads"], system_changes=plan.get("system_changes", []),
                         checks=(plan.get("details") or {}).get("checks", []))
-            for plan in _raw_plans(level)]
+            for plan in _raw_plans(level, blender_exe_path)]
 
 
 @quick_check_router.get("/start_check/plan")
@@ -230,15 +231,18 @@ def start_start_check(request: Request, body: StartCheckRequest | None = None) -
 
 
 @quick_check_router.get("/full_benchmark/plan")
-def get_full_benchmark_plan() -> StartCheckPlan:
+def get_full_benchmark_plan(blender_exe_path: str | None = Query(None, alias="blenderExePath", description=
+                            "The Blender path chosen in Blender settings; absent uses freemocap's best guess.")) -> StartCheckPlan:
     """What the full benchmark runs on this system, for the consent step: each package's checks, estimate, downloads,
     risks and changes, in the run order. Nothing is downloaded before the start."""
-    return StartCheckPlan(packages=_plans("full"))
+    return StartCheckPlan(packages=_plans("full", blender_exe_path))
 
 
 class FullBenchmarkRequest(BaseModel):
     remove_data: bool = Field(description="Remove what the run downloaded and its processing output after a successful "
                               "run; the report, bundled test images and files that were there before stay.")
+    blender_exe_path: str | None = Field(alias="blenderExePath", default=None, description="The Blender path chosen in "
+                                         "Blender settings; null uses freemocap's best guess.")
 
 
 @quick_check_router.post("/full_benchmark", status_code=202, responses={
@@ -250,11 +254,12 @@ def start_full_benchmark(body: FullBenchmarkRequest) -> QuickCheckRunState:
     the hand-in list."""
     from freemocap.app.freemocap_application import get_freemocap_app
     app = get_freemocap_app()
-    plans = _raw_plans("full")
+    plans = _raw_plans("full", body.blender_exe_path)
     try:
         run = app.quick_checks.start(pair=None, detector_type=_DEFAULTS.detector_type, rtmpose_model_name=None,
                                      seconds_estimate=sum(plan["seconds_estimate"] for plan in plans),
                                      holds=app.pipeline_holds, level="full", remove_data=body.remove_data,
+                                     blender_exe_path=body.blender_exe_path,
                                      not_counted=[label for plan in plans
                                                   for label in (plan.get("details") or {}).get("not_run", ())])
     except StartRefused as error:

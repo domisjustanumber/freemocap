@@ -5105,6 +5105,11 @@ export interface components {
              * @description Remove what the run downloaded and its processing output after a successful run; the report, bundled test images and files that were there before stay.
              */
             remove_data: boolean;
+            /**
+             * Blenderexepath
+             * @description The Blender path chosen in Blender settings; null uses freemocap's best guess.
+             */
+            blenderExePath?: string | null;
         };
         /**
          * QuickCheckRunRow
@@ -7960,7 +7965,10 @@ export interface operations {
     };
     get_full_benchmark_plan_freemocap_certify_full_benchmark_plan_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The Blender path chosen in Blender settings; absent uses freemocap's best guess. */
+                blenderExePath?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7974,6 +7982,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StartCheckPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

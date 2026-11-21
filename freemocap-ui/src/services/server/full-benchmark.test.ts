@@ -61,16 +61,23 @@ test('the full benchmark\'s requests: the plan, a start with the clean-up choice
     const sent: unknown[] = [];
     const answer = (response: Response) => (async (input: RequestInfo | URL, init?: RequestInit) => {
         const request = input instanceof Request ? input : new Request(String(input), init);
-        sent.push(`${request.method} ${new URL(request.url).pathname}`, request.method === 'POST' ? await request.json() : null);
+        sent.push(`${request.method} ${new URL(request.url).pathname}${new URL(request.url).search}`,
+            request.method === 'POST' ? await request.json() : null);
         return response;
     }) as typeof fetch;
     assert.deepEqual(await requestFullBenchmarkPlan('http://server.invalid', undefined, answer(Response.json({packages: [OWN]}))), [OWN]);
     assert.equal(await requestFullBenchmark('http://server.invalid', true, answer(Response.json({}, {status: 202}))), null);
+    // the Blender path chosen in settings reaches the plan's estimate and the run
+    await requestFullBenchmarkPlan('http://server.invalid', undefined, answer(Response.json({packages: [OWN]})), 'C:/b/blender.exe');
+    await requestFullBenchmark('http://server.invalid', true, answer(Response.json({}, {status: 202})), 'C:/b/blender.exe');
     const sentence = 'The full benchmark can start once the start check has passed on this system.';
     assert.equal(await requestFullBenchmark('http://server.invalid', false,
         answer(Response.json({detail: {code: 'start-check-not-passed', message: sentence}}, {status: 409}))), sentence);
-    assert.deepEqual(sent, ['GET /freemocap/certify/full_benchmark/plan', null, 'POST /freemocap/certify/full_benchmark', {remove_data: true},
-        'POST /freemocap/certify/full_benchmark', {remove_data: false}]);
+    assert.deepEqual(sent, ['GET /freemocap/certify/full_benchmark/plan', null,
+        'POST /freemocap/certify/full_benchmark', {remove_data: true, blenderExePath: null},
+        'GET /freemocap/certify/full_benchmark/plan?blenderExePath=C%3A%2Fb%2Fblender.exe', null,
+        'POST /freemocap/certify/full_benchmark', {remove_data: true, blenderExePath: 'C:/b/blender.exe'},
+        'POST /freemocap/certify/full_benchmark', {remove_data: false, blenderExePath: null}]);
 });
 
 test('freemocap\'s check names and the reason codes of its benchmark read as words; other names show as sent', () => {

@@ -1513,6 +1513,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/freemocap/certify/full_benchmark/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Full Benchmark Plan
+         * @description What the full benchmark runs on this system, for the consent step: each package's checks, estimate, downloads,
+         *     risks and changes, in the run order. Nothing is downloaded before the start.
+         */
+        get: operations["get_full_benchmark_plan_freemocap_certify_full_benchmark_plan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/freemocap/certify/full_benchmark": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Full Benchmark
+         * @description Start every package's level full in a child process, once the start check passed on this system. Refused like the
+         *     start check, and every start of work is refused while it runs; stop it with `DELETE /certify/quick_check`. Follow it
+         *     in `app_state.certification.run` (level full, with `rows`); `full_results` says how it ended, and its reports join
+         *     the hand-in list.
+         */
+        post: operations["start_full_benchmark_freemocap_certify_full_benchmark_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3045,7 +3089,8 @@ export interface components {
         };
         /**
          * PackagePlan
-         * @description One package's `certify_plan("quick")`, as the start check runs it.
+         * @description One package's `certify_plan(level)`, as the start check (quick) or the full benchmark (full) runs it. A download
+         *     item has `name`, `bytes`, and where the package gives them `source` and `sha256`.
          */
         PackagePlan: {
             /** Package */
@@ -4110,7 +4155,7 @@ export interface components {
         StartCheckPlan: {
             /**
              * Packages
-             * @description freemocap's own checks, then skellytracker's (skellycam's are not built).
+             * @description Each package's plan in its run order (skellycam's are not built).
              */
             packages: components["schemas"]["PackagePlan"][];
         };
@@ -4995,6 +5040,11 @@ export interface components {
             total: number | null;
             /** Seconds Estimate */
             seconds_estimate: number | null;
+            /**
+             * Rows
+             * @description Level full only: one row per EP and GPU.
+             */
+            rows?: components["schemas"]["QuickCheckRunRow"][];
         };
         /** QuickCheckCancel */
         QuickCheckCancel: {
@@ -5047,6 +5097,32 @@ export interface components {
              * @description The Blender path chosen in Blender settings; null uses freemocap's best guess.
              */
             blenderExePath?: string | null;
+        };
+        /** FullBenchmarkRequest */
+        FullBenchmarkRequest: {
+            /**
+             * Remove Data
+             * @description Remove what the run downloaded and its processing output after a successful run; the report, bundled test images and files that were there before stay.
+             */
+            remove_data: boolean;
+        };
+        /**
+         * QuickCheckRunRow
+         * @description A full benchmark's progress row (`CertificationRunRow`).
+         */
+        QuickCheckRunRow: {
+            /** Name */
+            name: string;
+            /** Package */
+            package: string;
+            /** Execution Provider */
+            execution_provider: string | null;
+            /** Device Key */
+            device_key: string | null;
+            /** State */
+            state: string;
+            /** Result */
+            result: string | null;
         };
     };
     responses: never;
@@ -7878,6 +7954,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RealtimeStartupResponse"];
+                };
+            };
+        };
+    };
+    get_full_benchmark_plan_freemocap_certify_full_benchmark_plan_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartCheckPlan"];
+                };
+            };
+        };
+    };
+    start_full_benchmark_freemocap_certify_full_benchmark_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FullBenchmarkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuickCheckRunState"];
+                };
+            };
+            /** @description `start-check-not-passed`, `pipelines-running` (with `gpu_held_by`) or `quick-check-running` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

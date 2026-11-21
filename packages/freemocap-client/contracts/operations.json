@@ -857,6 +857,32 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/freemocap/certify/full_benchmark/plan",
+      "operation_id": "get_full_benchmark_plan_freemocap_certify_full_benchmark_plan_get",
+      "handler": "get_full_benchmark_plan",
+      "source": "freemocap/api/http/certify/quick_check_router.py",
+      "owner": "Core integration",
+      "validation": [
+        "request path/query/body serialization matches declared aliases and optionality",
+        "response and error bodies retain contract distinctions",
+        "network failure and request abort surfaced without blind mutation retry"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/freemocap/certify/full_benchmark",
+      "operation_id": "start_full_benchmark_freemocap_certify_full_benchmark_post",
+      "handler": "start_full_benchmark",
+      "source": "freemocap/api/http/certify/quick_check_router.py",
+      "owner": "Core integration",
+      "validation": [
+        "request path/query/body serialization matches declared aliases and optionality",
+        "response and error bodies retain contract distinctions",
+        "network failure and request abort surfaced without blind mutation retry"
+      ]
+    },
+    {
       "method": "POST",
       "path": "/freemocap/certify/ep_pack/install",
       "operation_id": "install_ep_pack_freemocap_certify_ep_pack_install_post",

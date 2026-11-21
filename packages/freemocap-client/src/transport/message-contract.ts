@@ -294,6 +294,15 @@ export const CertificationSchema = z.object({
     total: z.number().int().optional(),
     seconds_estimate: z.number().optional(),
     package: z.string().optional(), // the package whose checks run now; a start check has no items
+    // Level full only: one row per EP and GPU (skellytracker's check label), or per other package.
+    rows: z.array(z.object({
+      name: z.string(),
+      package: z.string(),
+      execution_provider: z.string().optional(),
+      device_key: z.string().optional(),
+      state: z.string(),
+      result: z.string().optional(),
+    })).optional(),
   }).optional(),
   last_result: CertificationPairSchema.extend({
     result: z.string(),
@@ -319,6 +328,12 @@ export const CertificationSchema = z.object({
   // The start check (F15 step 4): needed now, and how each package's part of the last one ended.
   start_required: z.boolean().optional(),
   start_results: z.array(z.object({
+    package: z.string().optional(),
+    result: z.string(),
+    reason: z.string().optional(),
+  })).optional(),
+  // How each package's part of the last full benchmark ended, with the shape of `start_results`.
+  full_results: z.array(z.object({
     package: z.string().optional(),
     result: z.string(),
     reason: z.string().optional(),

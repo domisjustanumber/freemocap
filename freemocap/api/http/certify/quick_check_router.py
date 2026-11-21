@@ -1,10 +1,11 @@
-"""The quick check of one EP on one GPU (F9) and the start check of every package (decisions 13 to 17): their plans,
-starts and cancel.
+"""The quick check of one EP on one GPU (F9), the start check of every package (decisions 13 to 17) and the full
+benchmark (fifth grilling): their plans, starts and cancel.
 
 The running check, its progress and every EP's state ride the `certification` field of `app_state`. A refusal answers
 this request with the current reason (other work runs, a check runs, the EP cannot run here); nothing is queued.
 `admitted` is the route side of the busy rule for the starts that have no admission point in the application.
 """
+from dataclasses import asdict
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -73,6 +74,16 @@ class QuickCheckPairState(BaseModel):
     device_key: str | None
 
 
+class QuickCheckRunRow(BaseModel):
+    """A full benchmark's progress row (`CertificationRunRow`)."""
+    name: str
+    package: str
+    execution_provider: str | None
+    device_key: str | None
+    state: str
+    result: str | None
+
+
 class QuickCheckRunState(BaseModel):
     """The running check, as the `certification.run` field of `app_state` carries it."""
     level: str
@@ -81,12 +92,14 @@ class QuickCheckRunState(BaseModel):
     done: int
     total: int | None
     seconds_estimate: int | None
+    rows: list[QuickCheckRunRow] = Field(default_factory=list, description="Level full only: one row per EP and GPU.")
 
     @classmethod
     def of(cls, run: CertificationRun) -> "QuickCheckRunState":
         return cls(level=run.level, items=[QuickCheckPairState(execution_provider=item.execution_provider,
                                                                device_key=item.device_key) for item in run.items],
-                   state=run.state, done=run.done, total=run.total, seconds_estimate=run.seconds_estimate)
+                   state=run.state, done=run.done, total=run.total, seconds_estimate=run.seconds_estimate,
+                   rows=[QuickCheckRunRow(**asdict(row)) for row in run.rows])
 
 
 class QuickCheckCancel(BaseModel):
@@ -151,7 +164,8 @@ def cancel_quick_check() -> QuickCheckCancel:
 
 
 class PackagePlan(BaseModel):
-    """One package's `certify_plan("quick")`, as the start check runs it."""
+    """One package's `certify_plan(level)`, as the start check (quick) or the full benchmark (full) runs it. A download
+    item has `name`, `bytes`, and where the package gives them `source` and `sha256`."""
     package: str
     seconds_estimate: int = Field(description="A one-off upper estimate of the package's checks, in seconds.")
     total: int = Field(description="The count of checks that the run will do (report format 2.6).")
@@ -162,22 +176,24 @@ class PackagePlan(BaseModel):
 
 
 class StartCheckPlan(BaseModel):
-    packages: list[PackagePlan] = Field(description="freemocap's own checks, then skellytracker's (skellycam's are not built).")
+    packages: list[PackagePlan] = Field(description="Each package's plan in its run order (skellycam's are not built).")
 
 
-def _start_plans() -> list[PackagePlan]:
+def _plans(level: str = "quick") -> list[PackagePlan]:
+    """Each package's plan in its run order: freemocap then skellytracker at quick, skellytracker then freemocap at full."""
     import skellytracker
     from freemocap.certification import certify_plan
+    plans = (certify_plan(level), skellytracker.certify_plan(level))
     return [PackagePlan(package=plan["package"], seconds_estimate=plan["seconds_estimate"], total=plan["total"],
                         risks=plan.get("risks", []), downloads=plan["downloads"], system_changes=plan.get("system_changes", []),
                         checks=(plan.get("details") or {}).get("checks", []))
-            for plan in (certify_plan("quick"), skellytracker.certify_plan("quick"))]
+            for plan in (plans if level == "quick" else plans[::-1])]
 
 
 @quick_check_router.get("/start_check/plan")
 def get_start_check_plan() -> StartCheckPlan:
     """What the start check runs on this machine: each package's checks, estimate, downloads and changes."""
-    return StartCheckPlan(packages=_start_plans())
+    return StartCheckPlan(packages=_plans())
 
 
 class StartCheckRequest(BaseModel):
@@ -193,7 +209,7 @@ def start_start_check(request: Request, body: StartCheckRequest | None = None) -
     `DELETE /certify/quick_check`. Follow it in `app_state.certification.run` (no `items`); `start_results` says how it
     ended, and `start_required` turns false once it ended other than by a cancel."""
     from freemocap.app.freemocap_application import get_freemocap_app
-    seconds = sum(plan.seconds_estimate for plan in _start_plans())
+    seconds = sum(plan.seconds_estimate for plan in _plans())
     client = request.client.host if request.client else None
     app = get_freemocap_app()
     try:
@@ -201,6 +217,36 @@ def start_start_check(request: Request, body: StartCheckRequest | None = None) -
                                      seconds_estimate=seconds, holds=app.pipeline_holds,
                                      blender_exe_path=body.blender_exe_path if body else None,
                                      ui_remote=None if client is None else client not in ("127.0.0.1", "::1", "localhost"))
+    except StartRefused as error:
+        raise HTTPException(status_code=error.status, detail=error.detail) from None
+    return QuickCheckRunState.of(run)
+
+
+@quick_check_router.get("/full_benchmark/plan")
+def get_full_benchmark_plan() -> StartCheckPlan:
+    """What the full benchmark runs on this system, for the consent step: each package's checks, estimate, downloads,
+    risks and changes, in the run order. Nothing is downloaded before the start."""
+    return StartCheckPlan(packages=_plans("full"))
+
+
+class FullBenchmarkRequest(BaseModel):
+    remove_data: bool = Field(description="Remove what the run downloaded and its processing output after a successful "
+                              "run; the report, bundled test images and files that were there before stay.")
+
+
+@quick_check_router.post("/full_benchmark", status_code=202, responses={
+    409: {"description": "`start-check-not-passed`, `pipelines-running` (with `gpu_held_by`) or `quick-check-running`"}})
+def start_full_benchmark(body: FullBenchmarkRequest) -> QuickCheckRunState:
+    """Start every package's level full in a child process, once the start check passed on this system. Refused like the
+    start check, and every start of work is refused while it runs; stop it with `DELETE /certify/quick_check`. Follow it
+    in `app_state.certification.run` (level full, with `rows`); `full_results` says how it ended, and its reports join
+    the hand-in list."""
+    from freemocap.app.freemocap_application import get_freemocap_app
+    app = get_freemocap_app()
+    try:
+        run = app.quick_checks.start(pair=None, detector_type=_DEFAULTS.detector_type, rtmpose_model_name=None,
+                                     seconds_estimate=sum(plan.seconds_estimate for plan in _plans("full")),
+                                     holds=app.pipeline_holds, level="full", remove_data=body.remove_data)
     except StartRefused as error:
         raise HTTPException(status_code=error.status, detail=error.detail) from None
     return QuickCheckRunState.of(run)

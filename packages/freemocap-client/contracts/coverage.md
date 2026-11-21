@@ -71,6 +71,8 @@ errors, aborts, cancellation and asset ownership; compatibility records list act
 | DELETE | `/freemocap/certify/quick_check` | `cancel_quick_check_freemocap_certify_quick_check_delete` | Core integration |
 | GET | `/freemocap/certify/start_check/plan` | `get_start_check_plan_freemocap_certify_start_check_plan_get` | Core integration |
 | POST | `/freemocap/certify/start_check` | `start_start_check_freemocap_certify_start_check_post` | Core integration |
+| GET | `/freemocap/certify/full_benchmark/plan` | `get_full_benchmark_plan_freemocap_certify_full_benchmark_plan_get` | Core integration |
+| POST | `/freemocap/certify/full_benchmark` | `start_full_benchmark_freemocap_certify_full_benchmark_post` | Core integration |
 | POST | `/freemocap/certify/ep_pack/install` | `install_ep_pack_freemocap_certify_ep_pack_install_post` | Core integration |
 | POST | `/freemocap/certify/ep_pack/remove` | `remove_ep_pack_freemocap_certify_ep_pack_remove_post` | Core integration |
 | DELETE | `/freemocap/certify/ep_pack` | `cancel_ep_pack_freemocap_certify_ep_pack_delete` | Core integration |

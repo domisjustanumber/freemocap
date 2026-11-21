@@ -414,5 +414,15 @@ export const operationDefinitions = {
     "method": "POST",
     "path": "/freemocap/realtime/startup/stop",
     "asset": false
+  },
+  "get_full_benchmark_plan_freemocap_certify_full_benchmark_plan_get": {
+    "method": "GET",
+    "path": "/freemocap/certify/full_benchmark/plan",
+    "asset": false
+  },
+  "start_full_benchmark_freemocap_certify_full_benchmark_post": {
+    "method": "POST",
+    "path": "/freemocap/certify/full_benchmark",
+    "asset": false
   }
 } as const;

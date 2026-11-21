@@ -3941,6 +3941,73 @@
           }
         }
       }
+    },
+    "/freemocap/certify/full_benchmark/plan": {
+      "get": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Get Full Benchmark Plan",
+        "description": "What the full benchmark runs on this system, for the consent step: each package's checks, estimate, downloads,\nrisks and changes, in the run order. Nothing is downloaded before the start.",
+        "operationId": "get_full_benchmark_plan_freemocap_certify_full_benchmark_plan_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartCheckPlan"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/freemocap/certify/full_benchmark": {
+      "post": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Start Full Benchmark",
+        "description": "Start every package's level full in a child process, once the start check passed on this system. Refused like the\nstart check, and every start of work is refused while it runs; stop it with `DELETE /certify/quick_check`. Follow it\nin `app_state.certification.run` (level full, with `rows`); `full_results` says how it ended, and its reports join\nthe hand-in list.",
+        "operationId": "start_full_benchmark_freemocap_certify_full_benchmark_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FullBenchmarkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickCheckRunState"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`start-check-not-passed`, `pipelines-running` (with `gpu_held_by`) or `quick-check-running`"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7388,7 +7455,7 @@
           "checks"
         ],
         "title": "PackagePlan",
-        "description": "One package's `certify_plan(\"quick\")`, as the start check runs it."
+        "description": "One package's `certify_plan(level)`, as the start check (quick) or the full benchmark (full) runs it. A download\nitem has `name`, `bytes`, and where the package gives them `source` and `sha256`."
       },
       "PlaybackManifest": {
         "properties": {
@@ -9446,7 +9513,7 @@
             },
             "type": "array",
             "title": "Packages",
-            "description": "freemocap's own checks, then skellytracker's (skellycam's are not built)."
+            "description": "Each package's plan in its run order (skellycam's are not built)."
           }
         },
         "type": "object",
@@ -11929,6 +11996,14 @@
               }
             ],
             "title": "Seconds Estimate"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/QuickCheckRunRow"
+            },
+            "type": "array",
+            "title": "Rows",
+            "description": "Level full only: one row per EP and GPU."
           }
         },
         "type": "object",
@@ -12084,6 +12159,80 @@
         },
         "type": "object",
         "title": "StartCheckRequest"
+      },
+      "FullBenchmarkRequest": {
+        "properties": {
+          "remove_data": {
+            "type": "boolean",
+            "title": "Remove Data",
+            "description": "Remove what the run downloaded and its processing output after a successful run; the report, bundled test images and files that were there before stay."
+          }
+        },
+        "type": "object",
+        "required": [
+          "remove_data"
+        ],
+        "title": "FullBenchmarkRequest"
+      },
+      "QuickCheckRunRow": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "package": {
+            "type": "string",
+            "title": "Package"
+          },
+          "execution_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Provider"
+          },
+          "device_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Key"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "package",
+          "execution_provider",
+          "device_key",
+          "state",
+          "result"
+        ],
+        "title": "QuickCheckRunRow",
+        "description": "A full benchmark's progress row (`CertificationRunRow`)."
       }
     }
   },

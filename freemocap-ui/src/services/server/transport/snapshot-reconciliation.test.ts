@@ -33,7 +33,8 @@ test('the app-state golden with its certification field passes the transport val
     const certification = message.state.certification;
     assert.ok(certification);
     assert.deepEqual(certification.run, {level: 'quick', items: [{execution_provider: 'golden-ep', device_key: 'gpu:10de:2484:0'}],
-        state: 'running', done: 2, total: 5, seconds_estimate: 45});
+        state: 'running', done: 2, total: 5, seconds_estimate: 45, rows: []});
+    assert.deepEqual(certification.full_results, []);
     assert.deepEqual(certification.last_result,
         {execution_provider: 'other-ep', device_key: 'gpu:10de:2484:0', result: 'fail', reason: 'probe-l3-failed'});
     assert.equal(certification.items[0].label, 'Golden EP');

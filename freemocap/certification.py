@@ -82,10 +82,10 @@ def _check_level(level: str) -> None:
 def certify_plan(level: str, *, ui_remote: bool | None = None, blender_exe_path: str | None = None) -> dict:
     """What `certify(level)` runs: no download, no change outside freemocap's data folder, no question, no risk to a
     device. `total` counts the checks that run: the seven of `quick`, none of `full` (not built). `seconds_estimate` is
-    the budget that `posthoc-session` keeps to. It takes the options of `certify` (report format 2.2); neither changes the
+    the budget that `posthoc-session` keeps to, 0 at `full`. It takes the options of `certify` (report format 2.2); neither changes the
     plan."""
     _check_level(level)
-    return {"package": "freemocap", "kind": level, "seconds_estimate": QUICK_BUDGET_SECONDS,
+    return {"package": "freemocap", "kind": level, "seconds_estimate": QUICK_BUDGET_SECONDS if level == "quick" else 0,
             "total": len(QUICK_CHECKS) if level == "quick" else 0,
             "risks": [], "downloads": [], "system_changes": [], "questions": [],
             "details": {"checks": list(QUICK_CHECKS if level == "quick" else FULL_CHECKS)}}

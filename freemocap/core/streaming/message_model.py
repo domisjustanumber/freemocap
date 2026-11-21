@@ -684,19 +684,36 @@ class CertificationPair:
 
 
 @dataclass(frozen=True, slots=True)
+class CertificationRunRow:
+    """One row of a full benchmark's progress: an EP on a GPU, or the CPU, by skellytracker's check label (`name`, with
+    its EP key and device key), or one other package as a whole. `state` is waiting, running or done; `result` is the
+    row's result once done (its EP check's, else by the section rule of its checks)."""
+    name: str = ""
+    package: str = ""
+    execution_provider: str | None = None
+    device_key: str | None = None
+    state: str = "waiting"
+    result: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class CertificationRun:
     """The running check: skellytracker's latest progress, checks done of total, and the plan's one-off estimate."""
     level: str = "quick"
+    """quick (one EP on one GPU, or the start check) or full (the full benchmark of every package)."""
     items: tuple[CertificationPair, ...] = ()
     state: str = "starting"
-    """skellytracker's progress state: starting, running, cleaning-up or done."""
+    """The package's progress state: starting, running, cleaning-up or done; cancelling once a cancel was asked."""
     done: int = 0
+    """Checks done: of the running package, or at level full of every package so far."""
     total: int | None = None
     """None until the first progress message."""
     seconds_estimate: int | None = None
     package: str | None = None
     """The package whose checks run now (a start check runs freemocap's, then skellytracker's); None until the first
     progress message. A start check has no `items`."""
+    rows: tuple[CertificationRunRow, ...] = ()
+    """Level full only: one row per EP and GPU of every package so far, in the run's order."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -796,6 +813,8 @@ class CertificationSnapshot:
     start_required: bool = False
     """The start check is needed (decisions 13 to 15): the UI greys out and shows the Certification dialog for it."""
     start_results: tuple[StartCheckResult, ...] = ()
+    full_results: tuple[StartCheckResult, ...] = ()
+    """How each package's part of the last full benchmark of this server session ended."""
     pack_run: EpPackRun | None = None
     last_pack_result: EpPackResult | None = None
 

@@ -364,7 +364,7 @@ def test_the_certification_field_is_facts_only_and_decodes_on_its_own():
     certification = message["state"]["certification"]
     assert certification["host"]["os"] == "Windows 11"
     assert certification["run"] == {"level": "quick", "items": [{"execution_provider": EP, "device_key": DEVICE}],
-                                    "state": "starting", "done": 1, "total": 5, "seconds_estimate": 30}
+                                    "state": "starting", "done": 1, "total": 5, "seconds_estimate": 30, "rows": []}
     assert certification["items"] == [
         {"execution_provider": EP, "label": "Fake EP", "device_key": DEVICE, "device_name": "GPU " + DEVICE,
          "certified": True, "usable": True},
@@ -459,7 +459,7 @@ def test_routes_plan_start_refuse_and_cancel(route_client):
     accepted = client.post("/certify/quick_check", json=body)
     assert accepted.status_code == 202
     assert accepted.json() == {"level": "quick", "items": [{"execution_provider": EP, "device_key": DEVICE}],
-                               "state": "starting", "done": 0, "total": None, "seconds_estimate": 30}
+                               "state": "starting", "done": 0, "total": None, "seconds_estimate": 30, "rows": []}
     assert started[0]["detector_type"] == "rtmpose" and started[0]["rtmpose_model_name"] == "rtmw-x-l_256x192"
     assert client.post("/certify/quick_check", json=body).json()["detail"]["code"] == "quick-check-running"
     assert client.delete("/certify/quick_check").json()["run"]["items"] == [{"execution_provider": EP, "device_key": DEVICE}]

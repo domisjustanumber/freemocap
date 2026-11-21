@@ -8,6 +8,10 @@ complete progress message is the job state (decision 9). A check is refused whil
 
 The job reuses the posthoc worker machinery (`BaseNode`, `WorkerRegistry`, `PipelineIPC`), as `SyncJob` does. The
 child must not be daemonic: `certify()` runs its probe and image run in `spawn` children of its own.
+
+The full benchmark (fifth grilling, "Full benchmark") is the same job at level full: every package's `certify("full")`
+in the run order (`start_check.run_full_check`), started only once the start check passed, with the same refusals, crash
+record and cancel. Its progress has one row per EP and GPU (`_full_rows`) and a count of every package's finished checks.
 """
 import logging
 import multiprocessing
@@ -34,6 +38,7 @@ from freemocap.core.streaming.message_model import (
     CertificationPair,
     CertificationResult,
     CertificationRun,
+    CertificationRunRow,
     CertificationSnapshot,
     PendingReport,
     PipelineHold,
@@ -97,6 +102,33 @@ def _what(pair: CertificationPair | None, items: tuple[CertificationItem, ...] =
             f"{item and item.device_name or pair.device_key}")
 
 
+def _full_rows(message: dict, items: tuple[CertificationItem, ...]) -> tuple[CertificationRunRow, ...]:
+    """A full benchmark's progress rows from one package's progress message: for skellytracker one per EP on a GPU and one
+    for the CPU, by the label before the first `:` of its check names; one for any other package."""
+    package = str(message.get("package"))
+    step = message.get("step") if message.get("state") == "running" and isinstance(message.get("step"), dict) else {}
+    group = (lambda name: name.split(":")[0]) if package == "skellytracker" else (lambda name: package)
+    groups: dict[str, list[dict]] = {}
+    for row in message.get("checks") or ():
+        if isinstance(row, dict) and isinstance(row.get("name"), str):
+            groups.setdefault(group(row["name"]), []).append(row)
+    rows = []
+    for name, checks in groups.items():
+        results = [check.get("result") for check in checks]
+        rollup = next((check.get("result") for check in checks if check["name"] == name), None)
+        key, device_key = (name.split("@")[0], None) if package == "skellytracker" else (None, None)
+        if "@" in name:
+            from skellytracker.certification import _label  # shortcut: skellytracker's private label rule, as crash_record
+            device_key = next((item.device_key for item in items
+                               if item.execution_provider == key and _label(key, item.device_key) == name), None)
+        state = "running" if isinstance(step.get("name"), str) and group(step["name"]) == name \
+            else "done" if None not in results else "waiting"
+        result = rollup or next((result for result in ("fail", "pass", "record-only", "not-run") if result in results), None)
+        rows.append(CertificationRunRow(name=name, package=package, execution_provider=key, device_key=device_key,
+                                        state=state, result=result if state == "done" else None))
+    return tuple(rows)
+
+
 def _report_result(report: dict) -> tuple[str, str | None]:
     """The EP check's result and reason: the one check whose name has no `:` (decision 9's reader rule)."""
     row = next((row for row in report.get("checks", ()) if ":" not in str(row.get("name"))), None)
@@ -114,11 +146,14 @@ class QuickCheckJob(BaseNode):
     cancel: multiprocessing.synchronize.Event | None = None
     progress_received: int = 0
     record: dict | None = None  # the crash record's content (crash_record.py)
+    level: str = "quick"
+    packages: dict = field(default_factory=dict)  # level full: each package's (rows, done) from its newest message
 
     @classmethod
     def create(cls, *, pair: CertificationPair | None, detector_type: str, rtmpose_model_name: str | None,
                worker_registry: WorkerRegistry, global_kill_flag: Synchronized, certify=None, own_certify=None,
-               ui_remote: bool | None = None, blender_exe_path: str | None = None) -> "QuickCheckJob":
+               ui_remote: bool | None = None, blender_exe_path: str | None = None, level: str = "quick",
+               remove_data: bool = False) -> "QuickCheckJob":
         """`certify` and `own_certify` replace `skellytracker.certify` and freemocap's own in the child (module-level
         functions, for tests)."""
         ipc = PipelineIPC.create(global_kill_flag=global_kill_flag, heartbeat_timestamp=worker_registry.heartbeat_timestamp)
@@ -133,14 +168,16 @@ class QuickCheckJob(BaseNode):
             kwargs=dict(ipc=ipc, execution_provider=pair and pair.execution_provider, device_key=pair and pair.device_key,
                         detector_type=detector_type, rtmpose_model_name=rtmpose_model_name,
                         progress_pub=progress_queue, result_pub=result_queue, cancel=cancel, certify=certify,
-                        own_certify=own_certify, ui_remote=ui_remote, blender_exe_path=blender_exe_path))
+                        own_certify=own_certify, ui_remote=ui_remote, blender_exe_path=blender_exe_path, level=level,
+                        remove_data=remove_data))
         return cls(shutdown_self_flag=shutdown_self_flag, worker=worker, pair=pair, progress_subscription=progress_queue,
-                   result_subscription=result_queue, cancel=cancel)
+                   result_subscription=result_queue, cancel=cancel, level=level)
 
     @staticmethod
     def _run(*, ipc: PipelineIPC, execution_provider: str | None, device_key: str | None, detector_type: str,
              rtmpose_model_name: str | None, progress_pub, result_pub, cancel, shutdown_self_flag: Synchronized,
-             certify=None, own_certify=None, ui_remote: bool | None = None, blender_exe_path: str | None = None) -> None:
+             certify=None, own_certify=None, ui_remote: bool | None = None, blender_exe_path: str | None = None,
+             level: str = "quick", remove_data: bool = False) -> None:
         def watch() -> None:  # a stop, or the backend's exit or death, sets the cancel that certify() polls
             parent = multiprocessing.parent_process()
             # Poll, never `cancel.wait()`: a process that dies while waiting on a multiprocessing.Event makes the next
@@ -152,6 +189,11 @@ class QuickCheckJob(BaseNode):
 
         threading.Thread(target=watch, name="QuickCheckWatch", daemon=True).start()
         try:
+            if level == "full":
+                from freemocap.system.certify.start_check import run_full_check
+                result_pub.put(run_full_check(progress_pub.put, cancel, remove_data=remove_data, own_certify=own_certify,
+                                              certify=certify))
+                return
             if execution_provider is None:
                 from freemocap.system.certify.start_check import run_start_check
                 result_pub.put(run_start_check(progress_pub.put, cancel, ui_remote=ui_remote, blender_exe_path=blender_exe_path,
@@ -186,7 +228,10 @@ class QuickCheckJob(BaseNode):
 
     def end(self) -> None:
         """Cancel, give certify() time to stop its own children and write its report, then end the process tree."""
-        self.cancel.set()
+        # A child that died while its watch thread held the Event's lock makes `set()` block forever; a dead child needs
+        # no cancel. shortcut: a death between this check and `set()` can still block; a timed lock would close that gap.
+        if self.worker.is_alive():
+            self.cancel.set()
         self.worker.join(timeout=CANCEL_GRACE_SECONDS)
         if self.worker.is_alive() and self.worker.pid is not None:
             import psutil
@@ -240,6 +285,7 @@ class QuickCheckManager:
     own_certify: object = None  # tests only: a module-level stand-in for freemocap's own `certify`
     start_results: tuple[StartCheckResult, ...] = ()  # how the last start check of this server session ended
     start_released: bool = False  # a start check ended other than by a cancel in this server session (decision 14)
+    full_results: tuple[StartCheckResult, ...] = ()  # how the last full benchmark of this server session ended
     read_start_needed: object = None  # tests: a stand-in for `start_check.start_check_needed`
     _start_needed: bool | None = None  # None until the first status read: the gated starts are refused until then
     _parts: tuple | None = None
@@ -254,7 +300,9 @@ class QuickCheckManager:
         package = crash_record.recover(record)
         crash_record.remove()
         pair = record.get("pair")
-        if isinstance(pair, dict):
+        if record.get("level") == "full":
+            self.full_results = (StartCheckResult(package, "fail", "crashed"),)
+        elif isinstance(pair, dict):
             self.last_result = CertificationResult(str(pair.get("execution_provider")), pair.get("device_key"), "fail",
                                                    "crashed")
         else:
@@ -282,7 +330,7 @@ class QuickCheckManager:
             item = run.items[0] if run.items else None
             raise StartRefused(409, {
                 "code": "quick-check-running",
-                "message": f"{self.describe(item)} is running; the {kind} start was refused. Start again when the "
+                "message": f"{self.describe_run(run)} is running; the {kind} start was refused. Start again when the "
                            "check ends.",
                 "run": {"execution_provider": item and item.execution_provider, "device_key": item and item.device_key,
                         "done": run.done, "total": run.total}})
@@ -297,6 +345,9 @@ class QuickCheckManager:
         """`_what` with the labels of the cached status, capitalised for the start of a sentence."""
         text = _what(pair, self._parts[1] if self._parts else ())
         return text[0].upper() + text[1:]  # not str.capitalize(): it lowercases the labels
+
+    def describe_run(self, run: CertificationRun) -> str:
+        return "The full benchmark" if run.level == "full" else self.describe(run.items[0] if run.items else None)
 
     def status_changed(self) -> None:
         """Read skellytracker's status again at the next refresh (an EP pack install or remove ended)."""
@@ -325,41 +376,48 @@ class QuickCheckManager:
 
     def start(self, *, pair: CertificationPair | None, detector_type: str, rtmpose_model_name: str | None,
               seconds_estimate: int | None, holds: Callable[[], tuple[PipelineHold, ...]],
-              ui_remote: bool | None = None, blender_exe_path: str | None = None) -> CertificationRun:
+              ui_remote: bool | None = None, blender_exe_path: str | None = None, level: str = "quick",
+              remove_data: bool = False) -> CertificationRun:
         """`holds` lists what runs (claims included); it is read under the admission lock and must not take it.
-        `pair` None starts the start check of every package."""
+        `pair` None starts the start check of every package; `level` full the full benchmark (`pair` None), with
+        `remove_data` the person's clean-up choice."""
+        what = "full benchmark" if level == "full" else "quick check"
         with self.lock:
             with self.admission_lock:
                 if self.run is not None:
                     running = self.run.items[0] if self.run.items else None
                     raise StartRefused(409, {
                         "code": "quick-check-running",
-                        "message": f"{self.describe(running)} is running; the quick check start was refused. Start "
+                        "message": f"{self.describe_run(self.run)} is running; the {what} start was refused. Start "
                                    "again when the check ends.",
                         "run": {"execution_provider": running and running.execution_provider,
                                 "device_key": running and running.device_key}})
+                if level == "full" and self._start_needed is not False:  # a fact of now: the start check's pass is recorded
+                    raise StartRefused(409, {
+                        "code": "start-check-not-passed",
+                        "message": "The full benchmark can start once the start check has passed on this system."})
                 held = holds()
                 if held:  # the names `pipelines-running` and `gpu_held_by` are historical: they cover all work (H1)
                     raise StartRefused(409, {
                         "code": "pipelines-running",
-                        "message": "A quick check cannot start while other work runs: "
+                        "message": f"The {what} cannot start while other work runs: "
                                    + ", ".join(f"{hold.kind} {hold.id}" for hold in held) + ". Stop it first.",
                         "gpu_held_by": [{"kind": hold.kind, "id": hold.id} for hold in held]})
-                self.run = CertificationRun(level="quick", items=(pair,) if pair else (), seconds_estimate=seconds_estimate)
+                self.run = CertificationRun(level=level, items=(pair,) if pair else (), seconds_estimate=seconds_estimate)
             try:  # the spawn is outside the admission lock; the run set above refuses other starts meanwhile
                 job = QuickCheckJob.create(pair=pair, detector_type=detector_type, rtmpose_model_name=rtmpose_model_name,
                                            worker_registry=self.worker_registry, global_kill_flag=self.global_kill_flag,
                                            certify=self.certify, own_certify=self.own_certify, ui_remote=ui_remote,
-                                           blender_exe_path=blender_exe_path)
+                                           blender_exe_path=blender_exe_path, level=level, remove_data=remove_data)
                 job.start()
             except BaseException:
                 self.run = None
                 raise
-            job.record = {"level": "quick", "pair": asdict(pair) if pair else None,
+            job.record = {"level": level, "pair": asdict(pair) if pair else None,
                           "created_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "message": None}
             crash_record.write(job.record)
             self.job = job
-            logger.info("%s started", _what(pair).capitalize())
+            logger.info("%s started", self.describe_run(self.run))
             return self.run
 
     def cancel(self) -> CertificationRun | None:
@@ -367,6 +425,7 @@ class QuickCheckManager:
         with self.lock:
             if self.job is not None:
                 self.job.cancel.set()
+                self.run = replace(self.run, state="cancelling")  # the UI's lock of a full benchmark ends at once
             return self.run
 
     def refresh(self) -> None:
@@ -379,8 +438,14 @@ class QuickCheckManager:
                 if message is not None:
                     job.record["message"] = message
                     crash_record.write(job.record)
-                    self.run = replace(self.run, state=str(message.get("state")), done=int(message.get("done", 0)),
-                                       total=message.get("total"), package=message.get("package"))
+                    done, rows = int(message.get("done", 0)), ()
+                    if job.level == "full":
+                        job.packages[message.get("package")] = (_full_rows(message, self._parts[1] if self._parts else ()),
+                                                                done)
+                        rows = tuple(row for package_rows, _ in job.packages.values() for row in package_rows)
+                        done = sum(package_done for _, package_done in job.packages.values())
+                    self.run = replace(self.run, state="cancelling" if job.cancel.is_set() else str(message.get("state")),
+                                       done=done, total=message.get("total"), package=message.get("package"), rows=rows)
                 result = job.poll_result()
                 if result is None and not job.is_alive:
                     result = job.poll_result()  # a result sent just before the exit
@@ -389,13 +454,16 @@ class QuickCheckManager:
                 if result is not None:
                     if job.pair is not None:
                         self.last_result = CertificationResult(job.pair.execution_provider, job.pair.device_key, *result)
+                    elif job.level == "full":  # ("full", per-package results), or a crash or error of the whole child
+                        self.full_results = tuple(StartCheckResult(*row) for row in result[1]) if result[0] == "full" \
+                            else (StartCheckResult(None, *result),)
                     else:  # ("start", per-package results), or a crash or error of the whole child
                         self.start_results = tuple(StartCheckResult(*row) for row in result[1]) if result[0] == "start" \
                             else (StartCheckResult(None, *result),)
                         self.start_released |= all(row.reason != "cancelled" for row in self.start_results)
                     self.job, self.run, ended = None, None, True
-                    logger.info("%s ended: %s (%d progress messages)", _what(job.pair).capitalize(), result,
-                                job.progress_received)
+                    logger.info("%s ended: %s (%d progress messages)", "The full benchmark" if job.level == "full"
+                                else _what(job.pair).capitalize(), result, job.progress_received)
         if ended:
             job.end()
             if result[0] == "crashed":  # the child died: the same record as after a crash of the app
@@ -419,7 +487,7 @@ class QuickCheckManager:
         return CertificationSnapshot(host=host, run=self.run, last_result=self.last_result, items=items, auto=auto,
                                      gpu_held_by=holds, pending_reports=reports,
                                      start_required=self.start_required,
-                                     start_results=self.start_results)
+                                     start_results=self.start_results, full_results=self.full_results)
 
     def shutdown(self) -> None:
         with self.lock:

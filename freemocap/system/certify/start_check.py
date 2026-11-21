@@ -8,7 +8,8 @@ counts; GPU EPs never do (decision 15).
 
 `run_start_check` runs in the quick check's spawn child: freemocap's own checks, then skellytracker's `certify("quick")`
 with no EP named (every GPU EP with no reviewed row, the field-test ones included: a pass is their opt-in, decision 17).
-A pass of freemocap's checks is recorded under `<base data folder>/certify/start-check.json`.
+A pass of freemocap's checks is recorded under `<base data folder>/certify/start-check.json`. `run_full_check` runs the
+full benchmark in the same child, every package's level full in turn.
 """
 import importlib.metadata
 import json
@@ -123,3 +124,34 @@ def run_start_check(progress, cancel, *, ui_remote: bool | None, blender_exe_pat
             logger.exception("skellytracker's quick check raised")
             results.append(("skellytracker", "error", type(error).__name__))
     return "start", tuple(results)
+
+
+def run_full_check(progress, cancel, *, remove_data: bool, own_certify=None, certify=None) -> tuple:
+    """Each package's level full in the run order (fifth grilling): skellycam (not built; it will run first), skellytracker,
+    then freemocap; `("full", ((package, result, reason), ...))`. Nothing is passed that overrides a package's own
+    staging. A package whose full plan has no check does not run; after a cancel each later package is `not-run` with
+    `cancelled`. `remove_data`: the person's choice to remove the benchmark data after a successful run."""
+    from freemocap.certification import certify as freemocap_certify, certify_plan, module_result
+
+    def tracker(level, progress, cancel):
+        from skellytracker import certify as skellytracker_certify
+        return (certify or skellytracker_certify)(level, progress, cancel)
+
+    results = []
+    for package, run in (("skellytracker", tracker), ("freemocap", own_certify or freemocap_certify)):
+        if package == "freemocap" and certify_plan("full")["total"] == 0:
+            continue
+        if cancel.is_set():
+            results.append((package, "not-run", "cancelled"))
+            continue
+        try:
+            results.append((package, *module_result(run("full", progress, cancel))))
+        except Exception as error:  # noqa: BLE001 - the class name only: an error text can hold a path
+            logger.exception("%s's full level raised", package)
+            results.append((package, "error", type(error).__name__))
+    if remove_data and all(result in ("pass", "record-only") for _, result, _ in results):
+        # shortcut: no full level downloads anything or keeps processing output yet (skellytracker's uses its bundled
+        # frames and has no clean-up interface; freemocap's checks are not built), so nothing is removed. Remove
+        # freemocap's benchmark data here once its benchmark and the shared test media download exist.
+        logger.info("The full benchmark passed; it left no benchmark data to remove")
+    return "full", tuple(results)

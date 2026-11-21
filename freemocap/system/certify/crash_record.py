@@ -7,7 +7,8 @@ in any ordinary way. A file found at launch, or left by a certify child that die
 interrupted run (report format 2.5): the running check `fail` with `crashed`, each finished check with its result (the
 progress holds no reasons: a `fail` or `not-run` gets `reason-lost`), each other check `not-run` with `interrupted`. It
 joins freemocap's hand-in list. At level quick a crashed check of an EP on a GPU is stored as skellytracker's failed
-quick check of that pair, so Auto never chooses it. Nothing runs again by itself.
+quick check of that pair, so Auto never chooses it; at level full only a crashed probe or video check is. Nothing runs
+again by itself.
 """
 import logging
 import uuid
@@ -102,7 +103,8 @@ def recover(record: dict, exit_code: int | None = None) -> str | None:
         if report is not None:
             from freemocap.certification import _write_json, reports_dir
             _write_json(reports_dir() / f"{report['id']}.json", report)
-        if crashed is not None and record.get("level") == "quick":
+        # At level full only a crashed probe or video check fails its pair, as a failure of either does (fifth grilling).
+        if crashed is not None and (record.get("level") == "quick" or crashed.endswith((":probe", ":video"))):
             record_provider_failure(crashed, str(record.get("created_utc")))
     except Exception:  # noqa: BLE001
         logger.exception("The crash record of a certify run could not be kept")

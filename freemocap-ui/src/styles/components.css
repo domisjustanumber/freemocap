@@ -207,6 +207,28 @@
   margin-right: 9px;
 }
 
+.realtime-processing-label {
+  white-space: nowrap;
+}
+
+/* Below about 1100 px the toolbar would cover the strip's Certification button: its gaps narrow and its two button
+   labels wrap onto two lines, each kept whole (stable controls). */
+@media (max-width: 1100px) {
+  /* element and class: App.css's gap utilities load after this file */
+  div.streaming-bar-setting-action-bar,
+  div.live-action-buttons-group-3 {
+    gap: 4px;
+  }
+
+  .live-action-buttons-group-3 > .button.sm {
+    max-width: 100px;
+  }
+
+  .live-action-buttons-group-3 .realtime-processing-label {
+    white-space: normal;
+  }
+}
+
 /*
    CENTER INDICATOR
 */

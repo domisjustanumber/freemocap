@@ -11,6 +11,6 @@ export function RealtimeProcessingButton({connected, loading, onToggle}: {
         aria-label="Real-time processing" title="Real-time processing" aria-pressed={connected} aria-busy={busy}
         onClick={startup.pending ? startup.stop : onToggle}>
         <span aria-hidden className={`icon icon-size-20 ${busy ? 'loader-icon' : connected ? 'live-active-icon' : 'live-icon'}`}/>
-        <p className="text sm" style={{whiteSpace: 'nowrap'}}>Real-time processing</p>
+        <p className="text sm realtime-processing-label">Real-time processing</p>
     </button>;
 }

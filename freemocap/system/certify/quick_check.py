@@ -130,6 +130,8 @@ def _full_rows(message: dict, items: tuple[CertificationItem, ...]) -> tuple[Cer
         state = "running" if isinstance(step.get("name"), str) and group(step["name"]) == name \
             else "done" if None not in results else "waiting" if set(results) == {None} else "partly-done"
         result = rollup or next((result for result in ("fail", "pass", "record-only", "not-run") if result in results), None)
+        if any(check.get("crashed") for check in checks):  # a crashed timing check fails its row, not its pair (owner: TBC)
+            result = "fail"
         rows.append(CertificationRunRow(name=name, package=package, execution_provider=key, device_key=device_key,
                                         state=state, result=result if state == "done" else None))
     return tuple(rows)
@@ -137,11 +139,11 @@ def _full_rows(message: dict, items: tuple[CertificationItem, ...]) -> tuple[Cer
 
 def _ended(message: dict, crashed: bool) -> dict:
     """A package's newest progress message as its run ended, for the final rows: each unfinished check `not-run`, and the
-    running one `fail` after a crash, as the crash record has them."""
+    running one `fail` after a crash, as the crash record has them, marked so that its row reads failed."""
     step = message.get("step") if crashed and message.get("state") == "running" else None
     step = step.get("name") if isinstance(step, dict) else None
     return {**message, "state": "done", "checks": [
-        {**row, "result": "fail" if row.get("name") == step else "not-run"}
+        {**row, "result": "fail", "crashed": True} if row.get("name") == step else {**row, "result": "not-run"}
         if isinstance(row, dict) and row.get("result") is None else row for row in message.get("checks") or ()]}
 
 

@@ -221,7 +221,8 @@ def test_a_crash_during_the_full_benchmark_keeps_its_report_and_fails_no_pair_fo
         _wait(manager, lambda: not manager.running)
         assert manager.full_results == (StartCheckResult(None, "crashed", "exit-code-3"),)
         assert failures == [], "a crashed timing check does not fail its pair at level full"
-        assert [(row.name, row.state) for row in manager.full_rows] == [("cpu", "done"), (LABEL, "done")]
+        # the pair's crashed timing check fails its row; its EP check did not run
+        assert [(row.name, row.state, row.result) for row in manager.full_rows] == [("cpu", "done", "pass"), (LABEL, "done", "fail")]
         (row,) = [row for row in certification.pending_reports() if row["kind"] == "full"]  # kept in freemocap's folder
         assert row["package"] == "skellytracker", "the share list names the report's own package, not its folder's"
         assert next(new for new in hand_in_reports() if new["report_id"] == row["report_id"])["package"] == "skellytracker"

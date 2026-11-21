@@ -6,9 +6,10 @@ selects by default, and it runs on skellytracker's bundled test frames (`certify
     plan = freemocap.certify_plan("quick")          # show the plan, then get the consent of the person
     report = freemocap.certify("quick", progress=show, cancel=event)
 
-`certify(level, progress, cancel, *, ui_remote=None, blender_exe_path=None)` returns freemocap's module report;
-`certify_plan(level)` takes the same options and gives its plan. `import freemocap` does not import this module: the
-two names load it on first use. The level `quick` runs the seven checks below within `QUICK_BUDGET_SECONDS`.
+`certify(level, progress, cancel, *, ui_remote=None, blender_exe_path=None, abandon=None)` returns freemocap's module
+report; `certify_plan(level)` takes the same options but `abandon` and gives its plan. `import freemocap` does not
+import this module: the two names load it on first use. The level `quick` runs the seven checks below within
+`QUICK_BUDGET_SECONDS`.
 
 The level `full` (fifth grilling, "Full benchmark") is the end-to-end post-hoc benchmark on the freemocap sample
 recording: `data-folder` (write access only), `recording` (the archive `<sha256>.zip` in the shared test media folder,
@@ -39,8 +40,8 @@ check that did not run has no item, except Blender when it is not installed: its
 
 `test_media` (format 1.6.0, 3.9) names each file that a check of the run used, with the SHA-256 of the bytes it used:
 skellytracker's bundled `quick_frames.zip` when `posthoc-session` ran its session on them, `pass` or `fail`
-(`certify_frames()` reads them only from a file whose SHA-256 is the one of skellytracker's record), and `freemocap_sample_data.zip` (`shared`)
-once the `recording` check has checked the archive's SHA-256.
+(`certify_frames()` reads them only from a file whose SHA-256 is the one of skellytracker's record), and
+`freemocap_sample_data.zip` (`shared`) once the `recording` check has checked the archive's SHA-256.
 
 freemocap's reason codes (report format 5.4), besides the common ones (`models-missing`, `test-media-missing`,
 `over-budget`, `timed-out`, `crashed`, `hung-at-exit`):
@@ -385,8 +386,9 @@ def interrupted_media(checks: list[dict]) -> list[dict]:
     """`test_media` of an interrupted run (`crash_record`): its progress keeps results only, so a `posthoc-session` that
     ended `pass` or `fail` (a crash included) used the bundled frames, and a passed `recording` the checked archive."""
     results = {row.get("name"): row.get("result") for row in checks}
+    sample = _recording_media(SAMPLE_RECORDING["sha256"], SAMPLE_RECORDING["bytes"])
     return [*([_frames_media()] if results.get("posthoc-session") in ("pass", "fail") else []),
-            *([_recording_media(SAMPLE_RECORDING["sha256"], SAMPLE_RECORDING["bytes"])] if results.get("recording") == "pass" else [])]
+            *([sample] if results.get("recording") == "pass" else [])]
 
 
 def _posthoc(cancelled, cleanup: list, media: list) -> tuple[str, str | None, dict | None]:
@@ -698,10 +700,11 @@ def _blender(cancelled, blender_exe_path: str | None = None) -> tuple[str, str |
 
 def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = None,
             blender_exe_path: str | None = None, test_media_dir: str | os.PathLike | None = None,
-            remove_data: bool = False) -> dict:
+            remove_data: bool = False, abandon=None) -> dict:
     """Run freemocap's checks of `level` and return the module report. A check never raises; a cancel makes each check
-    that did not end `not-run` with `cancelled`. `ui_remote`: whether the UI runs on another machine (None: unknown).
-    `blender_exe_path`: the path chosen in Blender settings, if any. `test_media_dir`: the shared test media folder
+    that did not end `not-run` with `cancelled`. `abandon` (format 1.6.0, 2.4; an object with `is_set()`, as `cancel`):
+    the caller is gone; the run stops as for a cancel, wins over it, and keeps no report in the hand-in list.
+    `ui_remote`: whether the UI runs on another machine (None: unknown). `blender_exe_path`: the path chosen in Blender settings, if any. `test_media_dir`: the shared test media folder
     (format 2.8). `remove_data`: at `full`, remove the benchmark data after a run with no failed check and no cancel."""
     _check_level(level)
     begun = time.monotonic()
@@ -715,7 +718,8 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
     recording, usable, numbers_of = None, None, {}
     cleanup: list[dict] = []
     media: list[dict] = []  # `test_media`: each test media file that a check used
-    cancelled =lambda: cancel is not None and cancel.is_set()  # noqa: E731
+    abandoned = lambda: abandon is not None and abandon.is_set()  # noqa: E731
+    cancelled = lambda: (cancel is not None and cancel.is_set()) or abandoned()  # noqa: E731
 
     def send(state: str, step: str | None) -> None:
         nonlocal progress
@@ -807,9 +811,10 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
     if level == "full" and remove_data and stopped is None and not any(row["result"] == "fail" for row in checks):
         cleanup += remove_benchmark_data(bool(numbers_of.get("recording", {}).get("downloaded")), test_media_dir)
     report = {"schema": SCHEMA, "id": str(uuid.uuid4()), "package": package, "kind": level, "created_utc": created,
-              "host": _host(), "checks": checks, "cleanup": cleanup, "test_media": media, "evidence": {"valid": not reasons, "reasons": reasons},
+              "host": _host(), "checks": checks, "cleanup": cleanup, "test_media": media,
+              "evidence": {"valid": not reasons, "reasons": reasons},
               "summary": _component_items(checks) + (_benchmark_items(checks, pairs, BENCHMARK_FRAMES) if level == "full" else [])}
-    if any(row["result"] in ("pass", "fail") for row in checks):  # only those reach the hand-in list
+    if any(row["result"] in ("pass", "fail") for row in checks) and not abandoned():  # only those reach the hand-in list
         try:
             _write_json(reports_dir() / f"{report['id']}.json", report)
             _prune_reports()

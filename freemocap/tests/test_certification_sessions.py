@@ -122,3 +122,25 @@ def test_a_work_folder_that_cannot_be_removed_is_a_cleanup_row(quick, monkeypatc
     rows, report = quick()
     assert rows["posthoc-session"]["result"] == "pass"
     assert report["cleanup"] == [{"name": "posthoc-session:work-folder", "result": "fail", "reason": "PermissionError"}]
+
+
+@pytest.mark.parametrize("abandoned", [True, False])
+def test_an_abandon_ends_the_session_as_a_cancel_does_wins_over_the_cancel_and_keeps_no_report(quick, monkeypatch, tmp_path,
+                                                                                              abandoned):
+    """Format 1.6.0, 2.4: the caller is gone, so the run stops its session as for a cancel (the child ends it itself)
+    and keeps no report; a cancel alone keeps its report of the checks that passed."""
+    import threading
+    abandon, cancel, ended = threading.Event(), threading.Event(), tmp_path / "ended"
+    real = certification._spawn
+
+    def spawn(target, args, name, timeout, cancelled):
+        cancel.set()
+        if abandoned:
+            abandon.set()
+        return real(session_child, (str(ended),), name, timeout, cancelled)
+    monkeypatch.setattr(certification, "_spawn", spawn)
+    report = certification.certify("quick", None, cancel, abandon=abandon)
+    rows = {row["name"]: row for row in report["checks"]}
+    assert (rows["posthoc-session"]["result"], rows["posthoc-session"]["reason"]) == ("not-run", "cancelled")
+    assert rows["data-folder"]["result"] == "pass" and ended.exists(), "the session ended by itself, not by a kill"
+    assert [path.name for path in certification.reports_dir().glob("*.json")] == ([] if abandoned else [f"{report['id']}.json"])

@@ -99,16 +99,27 @@ def own_passes_and_returns_at_once(level, progress, cancel, **options):
     return {"checks": [{"name": name, "result": "pass"} for name in OWN_CHECKS], "evidence": {"reasons": []}}
 
 
-def backend_that_dies(pids):
-    """A backend that starts the full benchmark's child and dies while it runs."""
+def own_until_abandoned(level, progress, cancel, *, abandon, **options):
+    """freemocap's level full until the abandon of a dead backend, then a mark that it stopped by itself (format 2.4)."""
+    progress({"package": "freemocap", "kind": level, "state": "running", "step": {"name": "data-folder"},
+              "checks": [{"name": name, "result": None} for name in OWN_CHECKS], "done": 0, "total": 4, "seconds_left": None})
+    while not abandon.is_set():
+        time.sleep(0.05)
+    (Path(os.environ["FREEMOCAP_BASE_FOLDER"]) / "abandoned").write_text("stopped")
+    return {"checks": [], "evidence": {"reasons": ["cancelled"]}}
+
+
+def backend_that_dies(pids, certify=tracker_marks_its_report, own_certify=own_stand_in, package="skellytracker"):
+    """A backend that starts the full benchmark's child and dies while `package`'s certify() runs."""
     from skellylogs.handlers.websocket_log_queue_handler import create_websocket_log_queue
     create_websocket_log_queue()  # as the backend does at its start
     flag = multiprocessing.Value("b", False)
     job = QuickCheckJob.create(pair=None, detector_type="rtmpose", rtmpose_model_name=None, global_kill_flag=flag,
                                worker_registry=WorkerRegistry(global_kill_flag=flag, worker_mode=WorkerMode.PROCESS),
-                               certify=tracker_marks_its_report, own_certify=own_stand_in, level="full")
+                               certify=certify, own_certify=own_certify, level="full")
     job.start()
-    job.progress_subscription.get(timeout=120)  # certify() runs
+    while job.progress_subscription.get(timeout=120).get("package") != package:  # that certify() runs
+        pass
     pids.put(job.worker.pid)
     time.sleep(0.5)  # the queue's feeder hands the pid over before the exit
     os._exit(9)
@@ -373,18 +384,30 @@ def test_the_full_benchmark_routes_give_the_plans_in_run_order_and_start_with_th
 
 
 def test_a_child_whose_backend_died_ends_by_itself_at_once_and_writes_no_report(base):
-    """The crash record is the one report of a crash of the app: the orphaned child does not cancel into a second one."""
+    """The crash record is the one report of a crash of the app: the orphaned child does not cancel into a second one.
+    skellytracker at the pin takes no `abandon`, so its run ends at once."""
+    _orphan(base, (), 3)
+    assert not (base / "cancelled-report").exists()
+
+
+def test_a_child_whose_backend_died_abandons_freemocaps_run_which_stops_by_itself(base):
+    """Format 1.6.0, 2.4: freemocap's own certify() gets `abandon`, stops as for a cancel and writes nothing; then the
+    child ends."""
+    _orphan(base, (tracker_passes, own_until_abandoned, "freemocap"), 3 + 1)
+    assert (base / "abandoned").exists(), "it stopped on the abandon, not by a kill"
+
+
+def _orphan(base, options: tuple, seconds: float) -> None:
     import psutil
     pids = multiprocessing.Queue()
-    backend = multiprocessing.Process(target=backend_that_dies, args=(pids,))
+    backend = multiprocessing.Process(target=backend_that_dies, args=(pids, *options))
     backend.start()
     pid = pids.get(timeout=180)
     backend.join(timeout=30)
     with contextlib.suppress(psutil.NoSuchProcess):
         child = psutil.Process(pid)
         try:
-            child.wait(timeout=3)  # its watch polls every 0.2 s
+            child.wait(timeout=seconds)  # its watch polls every 0.2 s
         except psutil.TimeoutExpired:
             child.kill()
             pytest.fail("the orphaned child did not end by itself")
-    assert not (base / "cancelled-report").exists()

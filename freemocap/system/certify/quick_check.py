@@ -181,8 +181,8 @@ def _report_result(report: dict) -> tuple[str, str | None]:
 def _end_orphan() -> None:
     """The backend died: end now with certify()'s own children and write no report. The backend's crash record becomes
     the run's one report at the next launch; a cancel here would write a second, `cancelled` one. shortcut: what
-    certify() undoes on a cancel (a field-test EP's opt-in during its check) stays; ask skellytracker for a cancel that
-    writes no report if that matters."""
+    skellytracker's certify() undoes on a cancel (a field-test EP's opt-in during its check) stays until its `abandon`
+    reaches freemocap's pin (`_abandonable`)."""
     import psutil
     try:
         for child in psutil.Process().children(recursive=True):
@@ -190,6 +190,20 @@ def _end_orphan() -> None:
     except psutil.Error:
         pass
     os._exit(1)
+
+
+def _abandonable(certify, abandon: threading.Event, running: threading.Event):
+    """`certify` given `abandon` (format 1.6.0, 2.4): while it runs, a backend's death sets `abandon` instead of ending the
+    child at once, so the run stops its sessions as for a cancel and writes nothing; then the child ends."""
+    def run(*args, **options):
+        running.set()
+        try:
+            return certify(*args, abandon=abandon, **options)
+        finally:
+            running.clear()
+            if abandon.is_set():
+                _end_orphan()
+    return run
 
 
 @dataclass
@@ -234,12 +248,23 @@ class QuickCheckJob(BaseNode):
              rtmpose_model_name: str | None, progress_pub, result_pub, cancel, shutdown_self_flag: Synchronized,
              certify=None, own_certify=None, ui_remote: bool | None = None, blender_exe_path: str | None = None,
              level: str = "quick", remove_data: bool = False) -> None:
-        def watch() -> None:  # a stop or the backend's exit sets the cancel that certify() polls; its death ends the child
+        abandon, running = threading.Event(), threading.Event()
+        from freemocap.certification import certify as freemocap_certify
+        own_certify = _abandonable(own_certify or freemocap_certify, abandon, running)
+        # skellytracker at the pin 346b77eb takes no `abandon`; at the next pin move this one line passes it:
+        # certify = _abandonable(certify or skellytracker_certify, abandon, running)
+
+        def watch() -> None:  # a stop or the backend's exit sets the cancel that certify() polls; its death abandons the run
             parent = multiprocessing.parent_process()
+            abandoned = None
             # Poll, never `cancel.wait()`: a process that dies while waiting on a multiprocessing.Event makes the next
             # `set()` block forever (its Condition waits for the dead waiter to wake).
             while True:
-                if parent is not None and not parent.is_alive():
+                if abandoned is None and parent is not None and not parent.is_alive():
+                    abandoned = time.monotonic()
+                    abandon.set()
+                # a certify() that takes no `abandon` (or none running) ends at once; one that does gets the cancel's grace
+                if abandoned is not None and (not running.is_set() or time.monotonic() - abandoned > CANCEL_GRACE_SECONDS):
                     _end_orphan()
                 if not cancel.is_set() and (shutdown_self_flag.value or not ipc.should_continue):
                     cancel.set()

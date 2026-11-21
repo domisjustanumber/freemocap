@@ -1793,7 +1793,8 @@ Steps 1 to 4 of the order of work are done. Step 5 has started. Nothing is runni
 
 - Pin: `pyproject.toml` names `../skellytracker-pin`, this session's own clone, detached at `9a5f3912`
   (a local, unpushed commit of the skellytracker session), commit `9bd1a4bc`; moved to `346b77eb` on 2026-11-21
-  (see "Owner's answers of 2026-11-21 and the pin at 346b77eb"). A git-URL pin fails because an
+  (see "Owner's answers of 2026-11-21 and the pin at 346b77eb"), then to `0342ecb8` the same day (see "Pin at
+  0342ecb8, 2026-11-21"). A git-URL pin fails because an
   installed skellytracker holds no ONNX file; the clone has them hard-linked from `../skellytracker`.
   Move it with `git -C ../skellytracker-pin fetch ../skellytracker <hash>` and `git checkout --detach`.
 - Report format 1.4.0 (owner confirmed): head layout, benchmark table, five-column failed-checks table,
@@ -2274,6 +2275,81 @@ uncomment the `abandon` line of `_run` and drop the `getattr` default once skell
 Reading list: `../skellycertify/report-format.md` 2.4, 2.8, 3.3, 3.7, 3.9, 4.2 (what 1.6.0 requires);
 `freemocap/certification.py` `_frames_media`, `_posthoc`, `_recording`, `certify` (test media, abandon);
 `system/certify/quick_check.py` `_abandonable`, `_run` (the orphan and the next pin's line).
+
+### Pin at 0342ecb8, 2026-11-21
+
+Owner's authorizations for the unattended session of 2026-11-21: pin moves to pushed skellytracker commits with green
+CI; pushes of `sidecar-implementation` and `agents-and-adr-kit` to the fork after green suites; the merge of the kit
+branch and the migration of decisions; rulings relayed by peer sessions acted on only when they follow from the owner's
+earlier answers (held: skellycertify format 1.7.0, which exempts a `test_media` name from privacy rule 7; freemocap stays
+on 1.6.0); private source paths fixed where the change is behaviour-neutral; skellycam's certify part left alone.
+
+Pin: skellytracker `dom/sidecar-implementation` at `0342ecb830816f60d428a12009b97711d21cf508` (`346b77eb..0342ecb8`:
+`b981e586` ADR-889R, decision only; `d5dae2e5` format 1.5.0 with a MediaPipe `component` item; `ba690194` quick limit
+65 s, `abandon`, `check_label`, `record_failed_pair`, ADR-Q9R6; `87c68e8a` docs-site skill; `0342ecb8` format 1.6.0 and
+`package-in-use`, ADR-P47E). CI on that commit, all green: Fast tests, EP pack, Lint, Secret scan. `../skellytracker-pin`
+fetched and detached there; no new model or ONNX file, skellytracker's `pyproject.toml` unchanged, so no `uv sync`/`uv
+lock`. Commit `7257a2c8` updates the `pyproject.toml` comment. Tests only, no real window.
+
+- `76962fcd` public calls. `crash_record.record_provider_failure(check)` (the unused `created` argument dropped: skellytracker
+  stamps the time) maps the label to the device key by `check_label` over `gpu_device_keys` and calls `record_failed_pair`;
+  a `ValueError` (an EP or GPU this system no longer has) is logged, not raised. `certification._pairs`, `_usable_labels`
+  and `quick_check._full_rows` use `check_label`. No `_label` or `_record` is imported from skellytracker any more. Still
+  imported from skellytracker's internals (no underscore, not its top-level interface): `core.eps.certification`
+  (`frames_record`, `FramesUnavailableError`, `reports_dir`), `core.eps.evidence.gpu_id`, `core.system.host`
+  (`probe_host`, `gpu_device_keys`), `core.eps` (`install`, `remove`); the tests also import `core.eps._download`.
+- `753894b4` `abandon`. `_run` now wraps skellytracker's `certify` with `_abandonable` too, so the start check, the full
+  benchmark and the pair quick check all pass it. After the backend dies, a running certify() of either package gets
+  `abandon`, stops as for a cancel with its clean-up, and the child ends at its return or after `CANCEL_GRACE_SECONDS`;
+  between packages it ends at once. Tests: the real-process orphan test now covers skellytracker's run with a stand-in
+  that stops on `abandon`, and a certify() that ignores it is ended after the grace with no report. `abandoned` gets no
+  sentence: skellytracker's report after an abandon has no file and goes nowhere, and the orphaned child publishes
+  nothing, so the code never reaches the UI.
+- Quick limit: skellytracker's cap is 65 s (`QUICK_BUDGET_SECONDS`), freemocap's share stays 25 s; freemocap neither
+  passes nor assumes the cap, and the UI's "up to about N seconds" is the sum of the plans (at most 90 s). No text changed.
+- `759981cd` test media. The start check passes the shared folder to skellytracker always (skellytracker falls back to
+  its own file when the folder does not hold it). `seed_test_media` and `_frames_target` are removed: with the fallback
+  the full run reads the package's file, and its report says `bundled`, which is the truth; nothing is copied into the
+  shared folder any more. freemocap's `posthoc-session` now reads `certify_frames(test_media_dir)` and lists the item from
+  `frames_record(test_media_dir)`: `shared` when the folder holds the file (`dir` set), else `bundled`, the same file as
+  skellytracker's run. skellytracker has no public record of name, SHA-256, bytes and source beyond its report's
+  `test_media`, so `frames_record` stays (a `shortcut:` comment). The gap: the frames are listed once the session child
+  got them and did not answer `not-run` (`models-missing`), so a cancel while the session ran lists them, as a crash
+  does. A crash record still lists none for a cancelled `posthoc-session`: its progress cannot tell whether the session
+  had started. The pair quick check still passes no folder (skellytracker reads its own file).
+- `f0ee7f4d` `package-in-use` (owner to review the wording): `REASON_TEXT['package-in-use']` "this app is still using its
+  package; close FreeMoCap, start it again and run the removal before you use this EP". freemocap's install runs
+  `eps.install` in a thread of the backend, so the backend process holds the package until FreeMoCap closes; a session
+  or check on that EP registers it again in its process. Shown as "Remove of AMD GPU failed: this app is …".
+- `81f0c18a` `shared_memory_bytes` reads `GpuInfo.shared_memory_bytes` directly (the `getattr` default dropped).
+  `9970ddb5` docstring wording.
+
+Isolated quick run on `9970ddb5` (the same code as `374638f4`; only a test changed) (scratch EP store, cache, base folder, logs, test media; RTX 3070 and UHD 770,
+DirectML; the shared folder empty):
+
+| Package | Checks | Results | Plan estimate | Seconds |
+|---|---|---|---|---|
+| freemocap | 7 | 4 pass (`posthoc-session` 9.0 s), 3 record-only (`build-identity` `modified-tree`, `install-facts`, `blender`) | 25 s | 10.0 |
+| skellytracker | 11 | 11 pass: CPU video/live, DirectML on both GPUs, `mediapipe:smoke` 3.1 s; evidence valid | 48 s | 24.6 |
+
+Both modules declare 1.6.0 and list `[{"name": "quick_frames.zip", "sha256": "a973456f…94c1f4", "bytes": 6215661,
+"source": "bundled"}]`. skellytracker's summary ends with `{"group": "component", "name": "MediaPipe", "result":
+"pass"}`; both `host.gpus` carry `shared_memory_bytes` 51208134656. The built file prints the GPU table, then `| Module |
+Result |` with freemocap's seven rows and MediaPipe; the relay validator of the skellycertify working tree (with a peer's
+uncommitted changes) gives rule 0. `%LOCALAPPDATA%\freemocap` and `%LOCALAPPDATA%\skellytracker` unchanged; no
+`%LOCALAPPDATA%\skellycertify`.
+
+`374638f4`: the crashed-pair test names `fake-ep` (the EP-knowledge guard refused `cuda` in a test).
+
+Suites on `374638f4`: Python fast suite 1805 passed, 0 failed, 20 skipped (the race test passed; the first run on
+`9970ddb5` had 1 failure, the guard above); UI `npx tsc --noEmit` clean, main run 246 of 247 with 1 skipped, plus 10 and
+46. No OpenAPI or client contract change, so the client package did not run.
+
+Next action: the owner reviews the `package-in-use` sentence and confirms the coordinator's reading of Q80.
+
+Reading list: `../skellytracker-pin/skellytracker/certification.py` `certify`, `check_label`, `record_failed_pair`,
+`certify_frames`; `core/eps/certification.py` `frames_record` (the fallback); `system/certify/quick_check.py` `_run`;
+`freemocap/certification.py` `_frames_media`, `_posthoc`.
 
 ## Next actions
 

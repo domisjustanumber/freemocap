@@ -14,6 +14,7 @@ import {isElectron, useElectronIPC} from '@/services/electron-ipc/electron-ipc';
 import {recordingsDirFromBaseFolder} from '@/utils/dataFolder';
 import {SUPPORTED_LOCALES} from '@/i18n';
 import {useTutorial} from '@/components/tutorial';
+import {appLocked} from '@/services/server/full-benchmark';
 import type {MenuAction} from '../../electron/main/services/menu-builder';
 
 // i18n keys that the menu builder needs for translated labels
@@ -70,6 +71,9 @@ export function useMenuActions({ onToggleSidebar }: UseMenuActionsParams): void 
     const { startTour } = useTutorial();
 
     const isRecording = useAppSelector((state) => state.recording.isRecording);
+    // While the app is locked (the required start check or a running full benchmark) the native menu's actions wait,
+    // as everything behind the Certification dialog does; Shift+Space reaches the renderer as the menu's accelerator.
+    const locked = useAppSelector((state) => appLocked(state.connection.certification));
     // const currentLocale = useAppSelector(selectLocale);
 
     // Send translated menu labels + locale list to the main process whenever the language changes
@@ -89,7 +93,7 @@ export function useMenuActions({ onToggleSidebar }: UseMenuActionsParams): void 
 
     // Listen for menu actions dispatched from the native menu
     useEffect(() => {
-        if (!isElectron() || !window.electronAPI?.onMenuAction) return;
+        if (locked || !isElectron() || !window.electronAPI?.onMenuAction) return;
 
         const cleanup = window.electronAPI.onMenuAction(async (action: string) => {
             // Handle locale change actions (dynamic pattern: "change-locale:xx")
@@ -207,5 +211,5 @@ export function useMenuActions({ onToggleSidebar }: UseMenuActionsParams): void 
         });
 
         return cleanup;
-    }, [dispatch, navigate, isRecording, onToggleSidebar, api, startTour]);
+    }, [dispatch, navigate, isRecording, onToggleSidebar, api, startTour, locked]);
 }

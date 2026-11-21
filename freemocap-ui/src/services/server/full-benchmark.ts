@@ -89,6 +89,11 @@ export function fullResultLines(results: readonly StartCheckResult[]): {text: st
 export const fullBenchmarkLocks = (certification: Certification | null): boolean =>
     certification?.run?.level === 'full' && certification.run.state !== 'cancelling';
 
+/** The app's lock from the current server state: the required start check or a running full benchmark. The dialog
+ * stays usable; everything else, keyboard shortcuts and the native menu's actions included, waits. */
+export const appLocked = (certification: Certification | null): boolean =>
+    certification?.start_required === true || fullBenchmarkLocks(certification);
+
 /** What the full benchmark runs on this system, per package in the run order. */
 export async function requestFullBenchmarkPlan(baseUrl: string, signal?: AbortSignal, request: typeof fetch = fetch): Promise<PackagePlan[]> {
     const response = await createHttpClient({baseUrl, fetch: request}).responses

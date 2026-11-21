@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import type {Certification} from '@freemocap/client';
 import {
-    downloadRows, durationText, estimateLine, finishedText, FULL_BENCHMARK_TEXT, fullBenchmarkLocks, fullResultLines, fullRowName,
+    appLocked, downloadRows, durationText, estimateLine, finishedText, FULL_BENCHMARK_TEXT, fullBenchmarkLocks, fullResultLines, fullRowName,
     fullRowStatus, invitationText, requestFullBenchmark, requestFullBenchmarkPlan,
 } from './full-benchmark';
 import type {PackagePlan} from './start-check';
@@ -48,6 +48,9 @@ test('a running full benchmark locks the app until a cancel is asked; how it end
     assert.equal(fullBenchmarkLocks({...base, run: {...run, state: 'cancelling'}}), false);
     assert.equal(fullBenchmarkLocks({...base, run: {...run, level: 'quick'}}), false);
     assert.equal(fullBenchmarkLocks(null), false);
+    // The one gate of the inert layer, the keyboard shortcuts and the native menu's actions (Shift+Space, Connect).
+    assert.deepEqual([{...base, run}, {...base, start_required: true}, {...base, run: {...run, state: 'cancelling'}}, {...base}, null]
+        .map(appLocked), [true, true, false, false, false]);
     assert.deepEqual(fullResultLines([{package: 'skellytracker', result: 'pass'}, {package: 'skellytracker', result: 'not-run', reason: 'cancelled'},
         {package: 'skellytracker', result: 'fail', reason: 'crashed'}, {result: 'crashed', reason: 'exit-code-3'}]).map(line => line.text),
     ['skellytracker: finished', 'skellytracker: cancelled', 'skellytracker: stopped unexpectedly', 'Full benchmark: stopped unexpectedly']);

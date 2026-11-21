@@ -3,6 +3,7 @@ import {useEffect} from "react";
 import {useAppDispatch, useAppSelector} from "@/store";
 // import { localeToggled } from "@/store/slices/settings";
 import {pauseUnpauseCameras} from "@/store/slices/cameras";
+import {appLocked} from "@/services/server/full-benchmark";
 
 /**
  * Registers global keyboard shortcuts that should be active app-wide.
@@ -12,11 +13,11 @@ import {pauseUnpauseCameras} from "@/store/slices/cameras";
  */
 export function useKeyboardShortcuts(): void {
   const dispatch = useAppDispatch();
-  // The required start check's pop-up blocks input to everything behind it, shortcuts included.
-  const startRequired = useAppSelector((state) => state.connection.certification?.start_required === true);
+  // The app's lock (the required start check or a running full benchmark) blocks input behind its dialog, shortcuts included.
+  const locked = useAppSelector((state) => appLocked(state.connection.certification));
 
   useEffect(() => {
-    if (startRequired) return;
+    if (locked) return;
     const handleKeyDown = (e: KeyboardEvent): void => {
       // Ignore keystrokes aimed at text inputs
       if (
@@ -43,5 +44,5 @@ export function useKeyboardShortcuts(): void {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [dispatch, startRequired]);
+  }, [dispatch, locked]);
 }

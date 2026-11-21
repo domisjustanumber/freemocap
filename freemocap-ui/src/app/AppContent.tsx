@@ -13,7 +13,7 @@ import { fetchAllRecordings } from "@/store/slices/recording-status/recording-st
 import { WelcomeModal } from "@/components/ui-components/WelcomeModal";
 import { SettingsModal } from "@/components/ui-components/SettingsModal";
 import { CertificationDialog } from "@/components/certification/CertificationDialog";
-import { fullBenchmarkLocks } from "@/services/server/full-benchmark";
+import { appLocked } from "@/services/server/full-benchmark";
 import { TutorialProvider, TourController } from "@/components/tutorial";
 
 const WELCOME_SESSION_KEY = 'freemocap.welcomeShown';
@@ -43,8 +43,7 @@ export const AppContent = function () {
     // While the server says the start check is needed the dialog stays open with no dismiss (decision 14); it stays
     // open after the check ends, so its results show until the person closes it.
     // A running full benchmark locks the app the same way, until it ends or a cancel is asked.
-    const locked = useAppSelector(state => state.connection.certification?.start_required === true
-        || fullBenchmarkLocks(state.connection.certification));
+    const locked = useAppSelector(state => appLocked(state.connection.certification));
     React.useEffect(() => { if (locked) setCertificationOpen(true); }, [locked]);
 
     React.useEffect(() => {

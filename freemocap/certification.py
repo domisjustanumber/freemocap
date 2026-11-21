@@ -98,7 +98,7 @@ SPAWN_TIMEOUT_SECONDS = 120
 # worker instead counts as an unclean exit of the EP in skellytracker; two in a row mark the EP as failed on this PC.
 STOP_GRACE_SECONDS = 1.5
 BLENDER_TIMEOUT_SECONDS = 30
-QUICK_BUDGET_SECONDS = 15  # freemocap's share of the level quick (owner, Q53 to Q56)
+QUICK_BUDGET_SECONDS = 25  # freemocap's share of the level quick (owner, Q53 to Q56; raised from 15 s, Q58)
 POSTHOC_SECONDS = 10  # its estimate (8.5 to 9.1 s measured on one Windows PC, CPU): it starts only when it fits the budget
 POSTHOC_TIMEOUT_SECONDS = 30
 POSTHOC_FRAMES = 3

@@ -254,3 +254,12 @@ def test_a_download_that_breaks_or_is_cancelled_keeps_no_partial_file_and_remove
     assert sorted(path.name for path in bench.media.iterdir()) == ["kept-before.zip"], "no partial or final archive"
     assert report["cleanup"] == [] and certification._work().is_dir(), "a failed or cancelled run removes nothing"
     assert bench.sessions == []
+
+
+def test_the_shared_test_media_folder_is_freemocaps_unless_overridden(monkeypatch, tmp_path):
+    from freemocap.system.default_paths import TEST_MEDIA_DIR_ENV_VAR, get_test_media_dir
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.delenv(TEST_MEDIA_DIR_ENV_VAR)
+    assert get_test_media_dir() == str(tmp_path / "freemocap" / "test-media")  # owner, Q68
+    monkeypatch.setenv(TEST_MEDIA_DIR_ENV_VAR, str(tmp_path / "other"))
+    assert get_test_media_dir() == str(tmp_path / "other")

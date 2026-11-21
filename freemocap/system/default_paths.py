@@ -52,7 +52,7 @@ def get_test_media_dir() -> str:
     override = os.environ.get(TEST_MEDIA_DIR_ENV_VAR)
     if override:
         return str(Path(override))
-    return str(Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".cache") / "skellycertify" / "test-media")
+    return str(Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".cache") / "freemocap" / "test-media")  # owner, Q68
 
 
 def get_default_freemocap_recordings_path() -> str:

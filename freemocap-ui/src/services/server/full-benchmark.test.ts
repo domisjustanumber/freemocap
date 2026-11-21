@@ -100,3 +100,14 @@ test('freemocap\'s check names and the reason codes of its benchmark read as wor
         'freemocap: finished with failed checks: post-hoc processing on DirectML on GPU A',
         'freemocap: finished with failed checks: sample recording download and preparation']);
 });
+
+test('freemocap\'s sample recording joins the downloads, the total and the invitation\'s minutes', () => {
+    const own: PackagePlan = {package: 'freemocap', seconds_estimate: 165, total: 6, risks: [], system_changes: [], checks: [],
+        downloads: [{name: 'freemocap_sample_data.zip', bytes: 166_958_457, sha256: 'c2',
+            source: 'https://github.com/freemocap/skellysamples/releases/download/sample_data_v06_12_25/freemocap_sample_data.zip'}]};
+    assert.deepEqual(downloadRows([{...TRACKER, downloads: []}, own]), {rows: [
+        {name: 'freemocap_sample_data.zip', source: 'github.com', size: '167.0 MB'}], total: '167.0 MB'});
+    assert.equal(downloadRows([TRACKER, own]).total, '180.0 MB');
+    assert.match(invitationText([TRACKER, own]), /\(about 9 minutes\)/);  // 333 s + 165 s
+    assert.equal(estimateLine(own), 'freemocap: 6 checks, about 3 minutes');
+});

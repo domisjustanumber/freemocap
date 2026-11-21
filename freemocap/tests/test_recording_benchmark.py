@@ -14,6 +14,7 @@ import pytest
 
 from freemocap import certification
 from freemocap.system.certify import start_check
+from freemocap.tools.datasets.catalog import download as real_download  # before the guard and the stand-in wrap it
 
 PAIRS = [("fake-ep@10de-2484-0", "fake-ep", "gpu:10de:2484:0", "Fake EP"), ("cpu", "cpu", None, "CPU")]
 STAGES = {"inference.process_batch.images=3": {"total_s": 0.3, "ms_per_frame": 100.0, "fps": 10.0},
@@ -198,3 +199,58 @@ def test_the_full_check_passes_the_test_media_folder_and_the_clean_up_choice_onl
                                         "remove_data": removes})]
     from skellytracker.core.eps.certification import frames_record
     assert (bench.media / f"{frames_record()['sha256']}.zip").is_file(), "skellytracker's bundled frames, where it reads them"
+
+
+class _Response:
+    """`requests.get(..., stream=True)` of a download whose chunks come from `chunks()`: nothing leaves this machine."""
+    def __init__(self, chunks):
+        self.chunks = chunks
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def raise_for_status(self):
+        pass
+
+    def iter_content(self, chunk_size):
+        yield from self.chunks()
+
+
+@pytest.mark.parametrize("ending", ["broken", "cancel"])
+def test_a_download_that_breaks_or_is_cancelled_keeps_no_partial_file_and_removes_nothing(bench, monkeypatch, ending):
+    """The real `catalog.download` on a stand-in for `requests.get`: a broken download fails `recording` and leaves the
+    pairs `not-run`; a cancel stops it between chunks; neither keeps a partial file or removes anything."""
+    import time
+    import requests
+
+    def chunks():
+        yield b"part of the archive"
+        if ending == "broken":
+            raise requests.ConnectionError("the connection dropped")
+        bench.cancel.set()
+        while True:
+            yield b"more"
+
+    monkeypatch.setattr("freemocap.tools.datasets.catalog.download", real_download)
+    monkeypatch.setattr(requests, "get", lambda url, **options: _Response(chunks))
+    bench.media.mkdir()
+    (bench.media / "kept-before.zip").write_bytes(b"another package's file")
+    certification._work().mkdir(parents=True)  # an earlier run's work folder
+    started = time.monotonic()
+    report = certification.certify("full", None, bench.cancel, test_media_dir=bench.media, remove_data=True)
+    assert time.monotonic() - started < 5, "a cancel during the download ends the run promptly"
+    results = [(row["name"], row["result"], row["reason"]) for row in report["checks"]]
+    if ending == "broken":
+        assert results == [("data-folder", "pass", None), ("recording", "fail", "ConnectionError"),
+                           ("posthoc:fake-ep@10de-2484-0", "not-run", "recording-missing"),
+                           ("posthoc:cpu", "not-run", "recording-missing"), ("blender", "not-run", "not-installed")]
+    else:
+        assert results[1:] == [("recording", "not-run", "cancelled"), ("posthoc:fake-ep@10de-2484-0", "not-run", "cancelled"),
+                               ("posthoc:cpu", "not-run", "cancelled"), ("blender", "not-run", "cancelled")]
+        assert "cancelled" in report["evidence"]["reasons"]
+    assert sorted(path.name for path in bench.media.iterdir()) == ["kept-before.zip"], "no partial or final archive"
+    assert report["cleanup"] == [] and certification._work().is_dir(), "a failed or cancelled run removes nothing"
+    assert bench.sessions == []

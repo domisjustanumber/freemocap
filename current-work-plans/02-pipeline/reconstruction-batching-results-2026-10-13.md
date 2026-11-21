@@ -21,7 +21,7 @@ Detector logs report requested TensorRT falling back to CUDA (with CPU also list
 as an available provider); TensorRT-specific options were ignored. These are CUDA
 runs, not successful TensorRT runs. Source videos and shared calibration were kept
 unchanged. Detailed configurations, logs, and channel comparisons are in:
-`C:/Users/jonma/freemocap_data/testing/vbatch/comparison.json`.
+`C:/Users/<you>/freemocap_data/testing/vbatch/comparison.json`.
 
 Validation: 13 focused reconstruction tests, 13 backend transport tests, and one
 frontend reconciliation test passed. See websocket-static-reuse-audit.md for

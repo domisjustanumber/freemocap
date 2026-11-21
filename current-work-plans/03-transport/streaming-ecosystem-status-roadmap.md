@@ -1,7 +1,7 @@
 # Streaming ecosystem: current status and next owner expansions
 
 Reconciled on 2026-11-01 against canonical Core at
-`C:/Users/jonma/code-stuff/github/freemocap/project/repos/freemocap` and its
+`C:/Users/<you>/code-stuff/github/freemocap/project/repos/freemocap` and its
 `packages/freemocap-client` SDK. Canonical integration was committed and pushed as
 `64496c1d`, with a clean checkout verified by the coordinator. Historical W6
 evidence comes from its isolated checkout; do not copy its older runtime over

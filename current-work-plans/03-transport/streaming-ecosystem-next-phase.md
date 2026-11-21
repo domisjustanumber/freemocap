@@ -134,7 +134,7 @@ local tested source from installed artifacts, published packages and untested ho
 ## Current workspace and review
 
 The isolated workspace is already
-`C:/Users/jonma/.codex/worktrees/w6-server-sdk/project`; do not create a redundant
+`C:/Users/<you>/.codex/worktrees/w6-server-sdk/project`; do not create a redundant
 outer worktree. It contains isolated Core, SDK source and public documentation.
 Future Blender edits require an isolated add-on checkout before implementation;
 canonical editable dependencies remain shared and are not isolated by this root.

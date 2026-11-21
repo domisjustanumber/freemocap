@@ -1,7 +1,7 @@
 # Design-session handoff: FreeMoCap post hoc pipeline graph view
 
 Written 2026-10-30 from a code-reading session in the core checkout
-`C:/Users/jonma/code-stuff/github/freemocap/project/repos/freemocap`, branch `sfn26`, HEAD `8a58f7ba`
+`C:/Users/<you>/code-stuff/github/freemocap/project/repos/freemocap`, branch `sfn26`, HEAD `8a58f7ba`
 ("Document the production graph interface handoff"). Everything under "What exists" was read from the
 files named; everything under "Design" is a proposal that the user has partly approved (see "Decisions").
 Paths are relative to that checkout unless stated otherwise.

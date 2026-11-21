@@ -22,8 +22,8 @@ entry point can terminate the process occupying its preferred port. Do not repla
 this invocation with a generic `python -m freemocap` or Electron's executable picker.
 
 ```powershell
-$w6Core = 'C:/Users/jonma/code-stuff/github/freemocap/project/repos/freemocap'
-$w6Python = 'C:/Users/jonma/code-stuff/github/freemocap/project/repos/freemocap/.venv/Scripts/python.exe'
+$w6Core = 'C:/Users/<you>/code-stuff/github/freemocap/project/repos/freemocap'
+$w6Python = 'C:/Users/<you>/code-stuff/github/freemocap/project/repos/freemocap/.venv/Scripts/python.exe'
 Set-Location $w6Core
 if (Get-NetTCPConnection -State Listen -LocalPort 58117,17777 -ErrorAction SilentlyContinue) {
     throw 'A review port is occupied. Stop here; do not terminate the other process.'
@@ -47,7 +47,7 @@ Starting the server does not start camera capture.
 In a second terminal:
 
 ```powershell
-Set-Location 'C:/Users/jonma/code-stuff/github/freemocap/project/repos/freemocap/packages/freemocap-client'
+Set-Location 'C:/Users/<you>/code-stuff/github/freemocap/project/repos/freemocap/packages/freemocap-client'
 node examples/inspect-server.mjs http://127.0.0.1:58117
 node examples/stream.mjs http://127.0.0.1:58117 5
 node examples/recording.mjs http://127.0.0.1:58117 freemocap_test_data C:/tmp/fmc-4lokv7vn/p/freemocap_test_data/current/recordings
@@ -67,8 +67,8 @@ startup and `dist-electron` cleanup. In the second terminal, prepare a separate
 ignored HTML entry that sets the target before any app module executes:
 
 ```powershell
-$w6Core = 'C:/Users/jonma/code-stuff/github/freemocap/project/repos/freemocap'
-$w6Python = 'C:/Users/jonma/code-stuff/github/freemocap/project/repos/freemocap/.venv/Scripts/python.exe'
+$w6Core = 'C:/Users/<you>/code-stuff/github/freemocap/project/repos/freemocap'
+$w6Python = 'C:/Users/<you>/code-stuff/github/freemocap/project/repos/freemocap/.venv/Scripts/python.exe'
 Set-Location $w6Core
 if (Get-NetTCPConnection -State Listen -LocalPort 17777 -ErrorAction SilentlyContinue) {
     throw 'The browser review port is occupied. Stop here.'

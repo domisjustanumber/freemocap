@@ -2,7 +2,7 @@
 # It installs the pre-commit hooks, the commit-msg hook and the pre-push hook. Run it again after
 # this file changes.
 default_install_hook_types: [pre-commit, commit-msg, pre-push]
-# Without this line, the hooks with no `stages` (also check-yaml and black) run on each commit
+# Without this line, the hooks with no `stages` (also check-yaml) run on each commit
 # message and each push too.
 default_stages: [pre-commit]
 repos:
@@ -14,10 +14,6 @@ repos:
       # change that. Without this line, the hook changes files on each push and stops the push.
       - id: trailing-whitespace
         stages: [pre-commit]
-  - repo: https://github.com/psf/black
-    rev: 22.6.0
-    hooks:
-      - id: black
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:

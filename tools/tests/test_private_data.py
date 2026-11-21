@@ -5,6 +5,7 @@ The test strings are built from parts, so that this file does not contain the pa
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import check_private_data as cpd
@@ -84,6 +85,17 @@ def test_private_ip_addresses(text: str, expected: list[str]) -> None:
 )
 def test_tokens_are_reported(text: str) -> None:
     assert kinds(text) == ["token"]
+
+
+def test_generated_lock_files_are_skipped(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)  # noqa: S603, S607
+    names = ["uv.lock", "package-lock.json", "ui/package-lock.json", "npm-shrinkwrap.json"]
+    names += ["pnpm-lock.yaml", "package.json", "notes.md"]
+    for name in names:
+        (tmp_path / name).parent.mkdir(exist_ok=True)
+        (tmp_path / name).write_text("x", encoding="utf-8")
+    found = sorted(p.relative_to(tmp_path).as_posix() for p in cpd.repo_files(tmp_path))
+    assert found == ["notes.md", "package.json"]
 
 
 def test_private_terms_are_reported_without_the_term(tmp_path: Path) -> None:

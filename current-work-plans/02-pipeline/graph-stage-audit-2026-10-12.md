@@ -11,7 +11,7 @@ CUDA RTMPose plus ChArUco, annotated videos, Parquet and Blender. No CSV/NPY/NPZ
 exports were requested. Calibration was reused. These are single measurements,
 not repeated-run estimates or literal UI-click latency measurements.
 
-Evidence: `C:/Users/jonma/freemocap_data/testing/ab/graph/` contains each dataset's
+Evidence: `C:/Users/<you>/freemocap_data/testing/ab/graph/` contains each dataset's
 `current/processing.log`; `ab/comparison.json` preserves the configurations and
 old/new comparison. Both datasets passed comparison of all 36 saved channels,
 with maximum absolute numerical difference zero.

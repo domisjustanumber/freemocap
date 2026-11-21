@@ -6,7 +6,8 @@ Usage::
     python tools/check_private_data.py [ROOT]
 
 The tool reads each text file that git tracks, and each new file that git does not ignore. It skips
-generated lock files. It reports:
+generated lock files: each ``*.lock`` file and the npm lock files ``package-lock.json``,
+``npm-shrinkwrap.json`` and ``pnpm-lock.yaml``. It reports:
 
 - an absolute path in a user folder (``C:\\Users\\<name>``, ``/home/<name>``, ``/Users/<Name>``);
 - an email address that is not on the allowlist. The allowlist keeps ``noreply@anthropic.com``, so
@@ -32,6 +33,8 @@ from pathlib import Path
 PRIVATE_TERMS = ".private-terms"
 # Generated lock files hold four-part package versions that look like private IP addresses.
 SKIPPED_SUFFIXES = (".lock",)
+# npm lock files also hold the email addresses of third-party package authors.
+SKIPPED_NAMES = {"package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml"}
 
 # Reserved example domains (RFC 2606, RFC 6761), GitHub noreply addresses and public project contacts.
 ALLOWED_EMAIL_DOMAINS = re.compile(
@@ -83,7 +86,11 @@ def repo_files(root: Path) -> list[Path]:
     )
     names = sorted({n for n in out.stdout.decode("utf-8").split("\0") if n})
     return [
-        root / n for n in names if (root / n).is_file() and not n.endswith(SKIPPED_SUFFIXES)
+        root / n
+        for n in names
+        if (root / n).is_file()
+        and not n.endswith(SKIPPED_SUFFIXES)
+        and n.rsplit("/", 1)[-1] not in SKIPPED_NAMES
     ]
 
 

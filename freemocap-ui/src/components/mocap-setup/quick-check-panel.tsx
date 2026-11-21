@@ -58,7 +58,7 @@ export function QuickCheckPanel({value, onChange, providers}: {
         {quickCheck.refusal && <p className="settings-note settings-note-error" role="alert">
             {QUICK_CHECK_TEXT.couldNotStart}{quickCheck.refusal}</p>}
         {result && quickCheck.showsResult && (result.result === 'fail'
-            ? <div className="settings-note settings-note-dismissable" role="status">
+            ? <div className="settings-note settings-note-error settings-note-dismissable" role="status">
                 <span>{pairLabel(result, items)}: {quickCheckResultText(result)}</span>
                 {action(CERTIFICATION_TEXT.fileReport, openCertification)}
             </div>

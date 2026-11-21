@@ -18,7 +18,7 @@ import threading
 import time
 from collections.abc import Callable
 from contextlib import contextmanager
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from multiprocessing.sharedctypes import Synchronized
 from queue import Empty
 
@@ -39,6 +39,7 @@ from freemocap.core.streaming.message_model import (
     PipelineHold,
     StartCheckResult,
 )
+from freemocap.system.certify import crash_record
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,7 @@ class QuickCheckJob(BaseNode):
     result_subscription: multiprocessing.queues.Queue | None = None
     cancel: multiprocessing.synchronize.Event | None = None
     progress_received: int = 0
+    record: dict | None = None  # the crash record's content (crash_record.py)
 
     @classmethod
     def create(cls, *, pair: CertificationPair | None, detector_type: str, rtmpose_model_name: str | None,
@@ -243,6 +245,22 @@ class QuickCheckManager:
     _parts: tuple | None = None
     _parts_read_at: float = 0.0
 
+    def __post_init__(self) -> None:
+        """A crash record left by the last server session: that check crashed. Its report is kept, the gated starts
+        are released as after any ended start check, and nothing runs again by itself."""
+        record = crash_record.read()
+        if record is None:
+            return
+        package = crash_record.recover(record)
+        crash_record.remove()
+        pair = record.get("pair")
+        if isinstance(pair, dict):
+            self.last_result = CertificationResult(str(pair.get("execution_provider")), pair.get("device_key"), "fail",
+                                                   "crashed")
+        else:
+            self.start_results, self.start_released = (StartCheckResult(package, "fail", "crashed"),), True
+        logger.warning("A certify check of %s crashed in the last server session; its report is kept", package)
+
     @property
     def running(self) -> bool:
         return self.job is not None
@@ -337,6 +355,9 @@ class QuickCheckManager:
             except BaseException:
                 self.run = None
                 raise
+            job.record = {"level": "quick", "pair": asdict(pair) if pair else None,
+                          "created_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "message": None}
+            crash_record.write(job.record)
             self.job = job
             logger.info("%s started", _what(pair).capitalize())
             return self.run
@@ -356,6 +377,8 @@ class QuickCheckManager:
             if job is not None:
                 message = job.drain_progress()
                 if message is not None:
+                    job.record["message"] = message
+                    crash_record.write(job.record)
                     self.run = replace(self.run, state=str(message.get("state")), done=int(message.get("done", 0)),
                                        total=message.get("total"), package=message.get("package"))
                 result = job.poll_result()
@@ -375,6 +398,9 @@ class QuickCheckManager:
                                 job.progress_received)
         if ended:
             job.end()
+            if result[0] == "crashed":  # the child died: the same record as after a crash of the app
+                crash_record.recover(job.record, job.worker.exitcode)
+            crash_record.remove()
         if ended or self._parts is None or time.monotonic() - self._parts_read_at >= STATUS_REFRESH_SECONDS:
             try:
                 parts = self.read_status()
@@ -401,3 +427,4 @@ class QuickCheckManager:
         if job is not None:
             logger.info("Ending %s for the backend's exit", _what(job.pair))
             job.end()
+            crash_record.remove()

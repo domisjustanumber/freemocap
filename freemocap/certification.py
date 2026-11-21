@@ -24,6 +24,8 @@ freemocap's reason codes (report format 5.4), besides the common ones (`models-m
 - `import-failed`: a module of the bundle did not import in the spawn child (`numbers.failed` names them).
 - `not-found`: no Blender executable was found.
 - `session-failed`: the post-hoc session ended without completing.
+- `reason-lost`: in the report of an interrupted run (`system/certify/crash_record.py`), a check that ended before the
+  crash; the progress kept its result, not its reason.
 - an exception class name, for example `PermissionError`: the step raised it (never its message).
 
 The hand-in list, with the shapes of skellytracker's (`pending_reports`, `read_report`, `mark_reports`): `certify()`

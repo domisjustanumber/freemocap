@@ -166,6 +166,7 @@ const REASON_TEXT: Readonly<Record<string, string>> = {
     'video-not-passed': 'the video check did not pass',
     'cpu-reference-missing': 'the CPU reference check did not pass',
     'posthoc-session': 'a post-hoc processing session did not start and run on this system',
+    'crashed': 'it stopped unexpectedly while it ran and is not run again by itself',
 };
 export const reasonText = (reason: string): string => REASON_TEXT[reason] ?? reason;
 

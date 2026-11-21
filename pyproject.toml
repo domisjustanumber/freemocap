@@ -42,7 +42,7 @@ dependencies = [
 # Development uses the sibling checkouts managed by the project workspace.
 # Local stopgap (2026-11-19): upstream sfn26 with the shared pins and no Rust backend, until freemocap moves to skellycam's frame-ring API.
 skellycam = { path = "../skellycam-sfn26-pins", editable = true }
-# Pinned (owner, 2026-11-20): a separate clone at e17761b4, because the working checkout changes under the tests; its ONNX files are hard links to that checkout's.
+# Pinned (owner, 2026-11-21): a separate clone at 346b77eb (dom/sidecar-implementation, CI green), because the working checkout changes under the tests; its ONNX files are hard links to that checkout's.
 skellytracker = { path = "../skellytracker-pin", editable = true }
 skellyforge = { path = "../skellyforge", editable = true }
 freemocap_blender_addon = { path = "../freemocap_blender_addon", editable = true }

@@ -14,6 +14,7 @@ These entries are `accepted`.
 
 | # | Decision | Status |
 |---|----------|--------|
+| [JDH9](entries/JDH9-certification-dialog-layout-and-owner-texts.md) | Certification button and dialog: place, fixed labels, the owner's texts, view-report pop-up, footer, sending | accepted |
 
 ### Evidence
 

@@ -1857,6 +1857,26 @@ pair is written through skellytracker's private `_record` and `_label` (ask that
 call). Limits: 0.5 s refresh gap; no pair failure for `coreml` (check name without `@`); no real crash
 tested.
 
+### Full benchmark run, 2026-11-21 (commits `13c11cd0` server, `a30ffdc2` UI)
+
+The run itself at level full; not built: freemocap's recording benchmark, Blender, the shared test media download,
+skellycam's part. `QuickCheckManager.start(level="full", remove_data=...)` reuses the job, the refusals, the crash
+record and `DELETE /certify/quick_check`; the child runs `start_check.run_full_check` (skellytracker, then freemocap
+when its full plan has a check; today it has none). Routes `GET /certify/full_benchmark/plan` (each package's
+`certify_plan("full")` in run order) and `POST /certify/full_benchmark` `{remove_data}`; refused with
+`start-check-not-passed` unless `start_check_needed()` read false (the start check's pass is recorded). New message
+fields: `run.rows` (one per EP and GPU, the CPU, or a package; state and result) and `full_results`; a cancel sets
+`run.state` to `cancelling`, which ends the UI lock at once. At level full a crashed check fails its pair only for
+`:probe` and `:video`. UI: `FullBenchmarkSection` (invitation with the plans' total, the never-disabled button, the
+consent step, rows with turning icon, "N checks finished", "Cancel check", result lines); the lock is AppContent's
+`inert` layer, now `start_required` or a running full benchmark. `QuickCheckJob.end()` no longer sets the cancel of a
+dead child (it blocked forever when the child died holding the Event's lock).
+
+On the dev PC skellytracker's full plan: 38 checks, 333 s, no downloads, pairs DirectML on both GPUs, TensorRT RTX
+and CUDA on the RTX. The clean-up choice reaches the child and removes nothing: no full level downloads or keeps
+output yet, and skellytracker's has no clean-up interface. Suites: Python 1772 passed, 0 failed, 20 skipped; UI 238
+of 239 with 1 skipped; `npx tsc --noEmit` clean. No real full run yet.
+
 ## Next actions
 
 All as local commits on `sidecar-implementation`, in this order:

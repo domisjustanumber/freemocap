@@ -336,18 +336,22 @@ def test_the_start_check_runs_both_packages_records_freemocaps_pass_and_releases
             ("freemocap", "pass", None), ("skellytracker", "fail", "dml@x-0:video")]
         assert not manager.snapshot(()).start_required, "a finished check releases the UI, pass or fail"
         assert manager.last_result is None, "the EP quick check's result stays as it was"
-        assert (base / "certify" / "start-check.json").is_file()
+        assert "crashed" not in json.loads((base / "certify" / "start-check.json").read_text(encoding="utf-8")), \
+            "skellytracker's failure writes no freemocap marker (owner, Q80)"
     finally:
         manager.shutdown()
 
 
-def test_a_failed_start_check_releases_the_ui_but_records_no_pass(base):
+def test_a_failed_freemocap_check_releases_the_ui_and_skips_the_start_check_for_this_version_set(base):
     manager = _manager(own_fail)
     try:
         _run_to_end(manager)
         assert manager.start_results[0].result == "fail" and manager.start_results[0].reason == "data-folder"
         assert not manager.snapshot(()).start_required
-        assert not (base / "certify" / "start-check.json").exists()
+        # owner, Q80: the marker of Q59, not a pass, so the start check is not asked again at the next launch
+        record = json.loads((base / "certify" / "start-check.json").read_text(encoding="utf-8"))
+        assert record["crashed"] == "data-folder" and "report" not in record
+        assert not start_check.start_check_needed() and start_check.start_check_needed(crash_skips=False)
     finally:
         manager.shutdown()
 

@@ -98,8 +98,9 @@ def record_pass(report: dict) -> None:
 
 
 def record_crash(check: str | None) -> None:
-    """A start check that crashed in freemocap's own part is not asked for again until a package version changes (owner,
-    Q59); its report stays in the hand-in list and the Certification button still runs the check."""
+    """A start check that crashed in freemocap's own part (owner, Q59), or whose freemocap check failed or crashed in a
+    run that ended normally (owner, Q80), is not asked for again until a package version changes; its report stays in
+    the hand-in list, the Certification button still runs the check and a later pass overwrites the marker."""
     _write_record({"crashed": check})
 
 
@@ -127,6 +128,8 @@ def run_start_check(progress, cancel, *, ui_remote: bool | None, blender_exe_pat
         results.append(("freemocap", *module_result(report)))
         if results[0][1] == "pass":
             record_pass(report)
+        elif results[0][1] == "fail":  # its first failed check (owner, Q80); skellytracker's failures write no marker
+            record_crash(results[0][2])
     except Exception as error:  # noqa: BLE001 - the class name only: an error text can hold a path
         logger.exception("freemocap's own quick check raised")
         results.append(("freemocap", "error", type(error).__name__))

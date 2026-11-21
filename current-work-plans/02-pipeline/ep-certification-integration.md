@@ -2004,6 +2004,42 @@ Suites: Python 1785 passed, 0 failed, 20 skipped (no test reached the download g
 
 Open: the owner's choice of the package headings and of the crashed-row wording; all of it in the real window.
 
+### Defects of the second real run, 2026-11-21
+
+Tests only, no real window since. Commits:
+
+1. Stale consent (`4aad3443`): the plan is read again at each opening of the consent step, after each refused Start
+   and at each start and end of a full run (`planReadKey`: opening count and whether a full run is running). The
+   consent step shows only the plan read for the current key (`consentPlan`), else "Reading what the full benchmark
+   runs…". Server side: `POST /certify/full_benchmark` takes `downloads` (the names the consent listed; default empty)
+   and refuses with `downloads-changed` when the current plan needs another one: "The full benchmark now needs a
+   download you did not agree to (<names>); check the downloads and start again." The UI then reads the plan again and
+   shows the refreshed consent with that sentence. A consent that listed more than is needed now is not refused.
+2. Count (`baefdf66`): the child put its result on its own queue while the last progress message (every check ended)
+   was still in the progress queue's feeder thread. The backend reads the result first, so that message was lost and
+   the last check's kept row read "Not run". The child now closes and joins the progress queue before putting the
+   result. At level full each package's newest message is also kept during the drain. The end of a run shows no count
+   (the existing layout); "27 of 28" is the last running message, and the done message comes with the result.
+   Reproduced before the fix with a progress message that is slow to send.
+3. Share list (`d09501af`): `HandInReport.incomplete` (the hand-in route only, read per report through
+   `relay.report_incomplete`, by `report_file.incomplete`, the header's rule). The list line reads
+   "freemocap · <time> · full · incomplete · no failure". Spec 4.2 sets only the file. It says nothing against this.
+4. Cancelled rows (`29088d83`): a cancel stores, per package, the checks that had not ended. In the kept rows those
+   that ended `not-run` get `reason: "cancelled"` (new optional `CertificationRunRow.reason`), shown "Cancelled". After
+   a crash nothing changes. Golden fixtures unchanged; OpenAPI and client schema refreshed.
+5. Combined report time: not changed. Spec 4.2 says the name and the header carry "the UTC start time of the run". A
+   build time would also change the bytes between "View report" and "Send", which `file-changed` refuses, and defeat
+   the relay's SHA-256 duplicate check. The earliest `created_utc` stays. For several runs that is the owner's call
+   or a spec question.
+6. Start under the Close bar (`42b0de49`): `scrollPaddingBottom: '4em'` on the dialog. Keyboard focus and
+   scrollIntoView now keep Start clear of the bar. A mouse scroll still slides content under a sticky bar, by design.
+
+Suites: Python 1787 passed, 0 failed, 20 skipped (`%LOCALAPPDATA%\skellycertify` absent before and after); UI main run
+244 of 245 with 1 skipped; `npx tsc --noEmit` clean; client package 148 of 148.
+
+Open: all six in the real window, mostly the consent after a kept or deleted archive, the kept rows after a cancel, and
+Tab to Start at 1000×700. Item 5 is the owner's.
+
 ## Next actions
 
 All as local commits on `sidecar-implementation`, in this order:

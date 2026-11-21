@@ -116,6 +116,8 @@ def test_a_successful_run_benchmarks_the_usable_pairs_and_removes_only_what_it_d
     assert files == ["freemocap_sample_data_camera_calibration.toml", "synchronized_videos"]
     assert report["summary"] == [{"group": "component", "name": "Data folder", "device": None, "result": "pass"},
                                  {"group": "component", "name": "Sample recording", "device": None, "result": "pass"},
+                                 {"group": "component", "name": "Blender", "device": None, "result": "skipped",
+                                  "reason": "not-installed"},
                                  {"group": "benchmark", "name": "CPU", "device": None, "stage": "inference",
                                   "ms_per_frame": 100.0, "fps": 10.0},
                                  {"group": "benchmark", "name": "CPU", "device": None, "stage": "tracking",

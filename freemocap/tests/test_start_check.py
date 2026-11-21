@@ -28,7 +28,7 @@ def base(tmp_path, monkeypatch):
 
 @pytest.fixture
 def no_blender(monkeypatch):
-    monkeypatch.setattr(certification, "_blender", lambda cancelled, path=None: ("record-only", "not-found", {"found": False}))
+    monkeypatch.setattr(certification, "_blender", lambda cancelled, path=None: ("not-run", "not-installed", {"found": False}))
 
 
 @pytest.fixture
@@ -58,10 +58,11 @@ def test_the_quick_level_runs_its_seven_checks_in_order_and_obeys_the_report_for
     assert rows["install-facts"]["result"] == "record-only" and rows["install-facts"]["numbers"]["ui_remote"] is False
     assert rows["build-identity"]["result"] in ("pass", "record-only")
     assert report["schema"] == "skellycertify.report/1.6.0" and report["kind"] == "quick"
-    # format 1.5.0: one `component` item for each check that ran, named as its check's `module`; none for a Blender that
-    # is not installed
+    # format 1.5.0: one `component` item for each check that ran, named as its check's `module`; format 1.6.0: a Blender
+    # that is not installed is `skipped` with `not-installed`
     assert report["summary"] == [{"group": "component", "name": row["module"], "device": None, "result": row["result"]}
-                                 for row in report["checks"] if row["result"] != "not-run" and row["name"] != "blender"]
+                                 for row in report["checks"] if row["result"] != "not-run"] + [
+        {"group": "component", "name": "Blender", "device": None, "result": "skipped", "reason": "not-installed"}]
     assert [item["name"] for item in report["summary"]][:4] == ["Build identity", "Child process", "Bundle imports", "Data folder"]
     assert report["package"]["name"] == "freemocap" and re.fullmatch(r"[0-9a-f-]{36}", report["id"])
     assert report["evidence"]["valid"] is (not report["evidence"]["reasons"])
@@ -94,7 +95,7 @@ def test_the_blender_check_uses_the_chosen_path_else_the_best_guess(tmp_path, mo
                         SimpleNamespace(stdout="Blender 4.2.1"))
     monkeypatch.setattr("freemocap.core.blender.runtime.get_best_guess_of_blender_path", lambda: None)
     assert certification._blender(lambda: False, str(chosen))[2]["version_major"] == 4 and ran == [str(chosen)]
-    assert certification._blender(lambda: False)[1] == "not-found"  # no path chosen and no guess
+    assert certification._blender(lambda: False)[:2] == ("not-run", "not-installed")  # no path chosen and no guess
 
 
 def test_a_data_folder_that_cannot_be_written_fails_with_the_class_name(tmp_path, monkeypatch):

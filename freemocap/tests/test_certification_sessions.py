@@ -28,7 +28,7 @@ def quick(tmp_path, monkeypatch):
     """`certify("quick")` with the spawn child and Blender stood in; each call gives the rows by name and the report."""
     monkeypatch.setenv("FREEMOCAP_BASE_FOLDER", str(tmp_path))
     monkeypatch.setattr(certification, "_spawn_imports", lambda cancelled: ({"failed": [], "from_bundle": None}, None))
-    monkeypatch.setattr(certification, "_blender", lambda cancelled, path=None: ("record-only", "not-found", {"found": False}))
+    monkeypatch.setattr(certification, "_blender", lambda cancelled, path=None: ("not-run", "not-installed", {"found": False}))
 
     def run():
         report = certification.certify("quick")

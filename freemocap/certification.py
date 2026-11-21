@@ -34,18 +34,18 @@ freemocap's pub/sub refuses to start a realtime pipeline outside the backend's m
 
 Each check of freemocap's own module has `module` set to the name of its part (`COMPONENTS`; a `posthoc:<label>` check
 has the EP's name) and, when it ran, one summary item of the group `component` with its result (format 1.5.0, 3.7). A
-check that did not run has no item, and neither has Blender when it is not installed.
+check that did not run has no item, except Blender when it is not installed: its item is `skipped` with `not-installed`
+(format 1.6.0, 3.7), at both levels.
 
 freemocap's reason codes (report format 5.4), besides the common ones (`models-missing`, `test-media-missing`,
 `over-budget`, `timed-out`, `crashed`, `hung-at-exit`):
 - `spawn-failed`: the spawn child of `spawn-child` gave no answer, so the later checks did not run.
 - `import-failed`: a module of the bundle did not import in the spawn child (`numbers.failed` names them).
-- `not-found`: no Blender executable was found.
 - `session-failed`: the post-hoc session ended without completing.
 - `bad-hash`: the recording archive's SHA-256 is not the expected one (format 2.6); a downloaded one is deleted.
 - `recording-missing`: the recording was not ready, so the post-hoc benchmarks and the Blender export did not run.
 - `ep-not-passed`: skellytracker's status does not call the EP on that GPU usable after its checks of this run.
-- `not-installed`: Blender is not installed ("Blender: not installed"); the benchmark never installs it.
+- `not-installed`: no Blender executable was found ("Blender: not installed"); the benchmark never installs it.
 - `reason-lost`: in the report of an interrupted run (`system/certify/crash_record.py`), a check that ended before the
   crash; the progress kept its result, not its reason.
 - an exception class name, for example `PermissionError`: the step raised it (never its message).
@@ -543,9 +543,11 @@ def _blender_export(cancelled, recording: Path, blender: str):
 
 def _component_items(checks: list[dict]) -> list[dict]:
     """The `component` summary items (format 1.5.0, 3.7): one for each check of freemocap's own module that ran, with its
-    result; none for a `not-run` check, and none for Blender when it is not installed (`not-found` at quick)."""
-    return [{"group": "component", "name": row["module"], "device": None, "result": row["result"]} for row in checks
-            if row["name"] in COMPONENTS and row["result"] in ("pass", "fail", "record-only") and row["reason"] != "not-found"]
+    result; none for a `not-run` check, except Blender when it is not installed: `skipped` with `not-installed` (1.6.0)."""
+    return [{"group": "component", "name": row["module"], "device": None,
+             **({"result": row["result"]} if row["result"] != "not-run" else {"result": "skipped", "reason": "not-installed"})}
+            for row in checks if row["name"] in COMPONENTS and (row["result"] in ("pass", "fail", "record-only")
+                                                                or (row["name"], row["reason"]) == ("blender", "not-installed"))]
 
 
 def _benchmark_items(checks: list[dict], pairs: list[tuple], frames: int) -> list[dict]:
@@ -647,7 +649,7 @@ def _blender(cancelled, blender_exe_path: str | None = None) -> tuple[str, str |
     try:
         blender = executable(blender_exe_path)  # the path chosen in Blender settings, else the best guess
     except ValueError:
-        return "record-only", "not-found", {"found": False}
+        return "not-run", "not-installed", {"found": False}
     try:
         found = run_external([str(blender), "--version"], timeout=BLENDER_TIMEOUT_SECONDS, cancelled=cancelled,
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace")

@@ -173,7 +173,7 @@ def _row(cells: list[str]) -> str:
     return "|" + "|".join(f" {cell} " if cell else " " for cell in cells) + "|"
 
 
-SKIPPED = {"busy": "skipped (busy)", "reviewed": "skipped (already reviewed)"}
+SKIPPED = {"busy": "skipped (busy)", "reviewed": "skipped (already reviewed)", "not-installed": "skipped (not installed)"}
 
 
 def _result(item: dict) -> str:

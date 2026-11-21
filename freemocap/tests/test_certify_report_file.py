@@ -233,10 +233,12 @@ def test_the_valid_sample_is_the_file_the_writer_builds_from_its_own_data():
 def test_component_items_give_the_component_table_after_the_benchmark_table():
     bench = [{"group": "benchmark", "name": "CPU", "device": None, "stage": "tracking", "ms_per_frame": 82, "fps": 12.2}]
     parts = [{"group": "component", "name": "Data folder", "device": None, "result": "fail"},
-             {"group": "component", "name": "MediaPipe", "device": None, "result": "skipped", "reason": "reviewed"}]
+             {"group": "component", "name": "MediaPipe", "device": None, "result": "skipped", "reason": "reviewed"},
+             {"group": "component", "name": "Blender", "device": None, "result": "skipped", "reason": "not-installed"}]
     text = _head(build_report_file([_module(summary=SUMMARY + bench + parts)], None, None)[1])
     assert ("| - | CPU | tracking | 82.0 | 12.2 |\n\n| Module | Result |\n|---|---|\n| Data folder | fail |\n"
-            "| MediaPipe | skipped (already reviewed) |\n\nCameras: not checked on this system.\n") in text
+            "| MediaPipe | skipped (already reviewed) |\n| Blender | skipped (not installed) |\n\n"
+            "Cameras: not checked on this system.\n") in text
     assert f"{TABLE}\n| Module | Result |\n|---|---|\n| Data folder | fail |\n" in _head(
         build_report_file([_module(summary=SUMMARY + parts[:1])], None, None)[1]), "directly after the GPU table"
     assert "\n| Module | Result |" not in _head(build_report_file([_module()], None, None)[1])
@@ -344,6 +346,8 @@ def test_freemocaps_own_modules_obey_the_privacy_rules_and_the_relay_validator_b
     quick, full = certification.certify("quick", ui_remote=False), certification.certify("full")
     assert full["summary"] == [{"group": "component", "name": "Data folder", "device": None, "result": "pass"},
                                {"group": "component", "name": "Sample recording", "device": None, "result": "pass"},
+                               {"group": "component", "name": "Blender", "device": None, "result": "skipped",
+                                "reason": "not-installed"},
                                {"group": "benchmark", "name": "CPU", "device": None, "stage": "tracking",
                                 "ms_per_frame": 82.0, "fps": 12.2}]
     _, data = _sample("valid-quick.md")
@@ -354,7 +358,7 @@ def test_freemocaps_own_modules_obey_the_privacy_rules_and_the_relay_validator_b
     assert quick["schema"] == full["schema"] == "skellycertify.report/1.6.0"
     head = _head(body)
     assert "| - | CPU | tracking | 82.0 | 12.2 |\n\n| Module | Result |\n|---|---|\n| Build identity |" in head
-    assert "| Blender | record |" in head  # quick: Blender was found; full: not installed, so no second row
+    assert "| Blender | record |" in head and "| Blender | skipped (not installed) |" in head  # quick: found; full: not
     assert head.count("| Data folder | pass |") == 2
     if RELAY_SRC.is_dir() and shutil.which("node") is not None:
         assert _relay_verdict(body) == {"rule": 0}

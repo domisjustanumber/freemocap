@@ -40,7 +40,7 @@ def certify_crash(level, progress, cancel, **options):
 @pytest.fixture
 def failures(monkeypatch):
     calls = []
-    monkeypatch.setattr(crash_record, "record_provider_failure", lambda check, created: calls.append(check))
+    monkeypatch.setattr(crash_record, "record_provider_failure", lambda check: calls.append(check))
     yield calls
     crash_record.remove()
     start_check.record_path().unlink(missing_ok=True)
@@ -160,23 +160,21 @@ def test_a_start_check_that_crashed_in_skellytrackers_part_is_asked_for_again(fa
     assert not start_check.record_path().exists()
 
 
-def test_a_crashed_gpu_check_is_skellytrackers_failed_quick_check_of_that_pair(monkeypatch, tmp_path):
-    from skellytracker.core.eps import gate, store
-    monkeypatch.setenv(store.STORE_VARIABLE, str(tmp_path))  # not the suite's store: other tests read this GPU's result
-    from skellytracker.core.eps.catalog import load_catalog
+def test_a_crashed_gpu_check_is_skellytrackers_failed_quick_check_of_that_pair(monkeypatch):
+    """By skellytracker's public `check_label` and `record_failed_pair`; skellytracker's own tests cover what it stores."""
+    import skellytracker.certification as tracker
     from skellytracker.core.system import host as host_module
-    from skellytracker.core.system.records import GpuInfo
-    gpu = GpuInfo(key="0000:01:00.0", vendor="nvidia", pci_bus_id="0000:01:00.0", pci_vendor_id=0x10de,
-                  pci_device_id=0x2484)
-    other = GpuInfo(key="0000:02:00.0", vendor="nvidia", pci_bus_id="0000:02:00.0", pci_vendor_id=0x10de,
-                    pci_device_id=0x2204)
-    monkeypatch.setattr(host_module, "gpu_device_keys", lambda host=None: (("gpu:10de:2484:0", gpu), ("gpu:10de:2204:0", other)))
-    catalog, os_name = load_catalog(), host_module.probe_host().os_name
-    key = next(key for key in catalog.keys() if catalog.device_row(key) is not None)  # a GPU EP of skellytracker's catalog
-    crash_record.record_provider_failure("cpu:video", "2026-11-20T10:00:00Z")  # no pair: nothing stored
-    crash_record.record_provider_failure("posthoc-session", "2026-11-20T10:00:00Z")
-    assert gate.local_result(catalog, key, gpu, os_name) is None
-    crash_record.record_provider_failure(f"{key}@10de-2484-0:video", "2026-11-20T10:00:00Z")
-    assert gate.local_result(catalog, key, gpu, os_name) == "failed"
-    assert gate.check_reason(catalog, key, gpu, os_name) == "quick-check-failed"
-    assert gate.local_result(catalog, key, other, os_name) is None  # its provider on this GPU only
+    monkeypatch.setattr(host_module, "gpu_device_keys", lambda host=None: (("gpu:10de:2484:0", None), ("gpu:10de:2204:0", None)))
+    stored = []
+
+    def record_failed_pair(execution_provider, device_key):
+        if execution_provider == "gone":
+            raise ValueError(execution_provider)
+        stored.append((execution_provider, device_key))
+    monkeypatch.setattr(tracker, "record_failed_pair", record_failed_pair)
+    crash_record.record_provider_failure("cpu:video")  # no pair: nothing stored
+    crash_record.record_provider_failure("posthoc-session")
+    crash_record.record_provider_failure("cuda@10de-2484-0:video")
+    crash_record.record_provider_failure("cuda@10de-9999-0")  # a GPU this system does not have
+    crash_record.record_provider_failure("gone@10de-2204-0")  # skellytracker refuses it; logged, not raised
+    assert stored == [("cuda", "gpu:10de:2484:0")]

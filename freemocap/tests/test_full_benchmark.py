@@ -135,7 +135,7 @@ def base(tmp_path, monkeypatch):
 @pytest.fixture
 def failures(monkeypatch):
     calls = []
-    monkeypatch.setattr(crash_record, "record_provider_failure", lambda check, created: calls.append(check))
+    monkeypatch.setattr(crash_record, "record_provider_failure", lambda check: calls.append(check))
     yield calls
     crash_record.remove()
 

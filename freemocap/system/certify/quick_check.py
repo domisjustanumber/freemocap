@@ -124,9 +124,9 @@ def _full_rows(message: dict, items: tuple[CertificationItem, ...]) -> tuple[Cer
         label = name.split(":")[-1]
         key, device_key = (label.split("@")[0], None) if pair else (None, None)
         if pair and "@" in label:
-            from skellytracker.certification import _label  # shortcut: skellytracker's private label rule, as crash_record
+            from skellytracker.certification import check_label
             device_key = next((item.device_key for item in items
-                               if item.execution_provider == key and _label(key, item.device_key) == label), None)
+                               if item.execution_provider == key and check_label(key, item.device_key) == label), None)
         # partly-done: some of its checks ended and the rest come later in the run (the CPU's timings follow the pairs)
         state = "running" if isinstance(step.get("name"), str) and group(step["name"]) == name \
             else "done" if None not in results else "waiting" if set(results) == {None} else "partly-done"

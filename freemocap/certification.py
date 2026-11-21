@@ -172,14 +172,14 @@ def _pairs() -> list[tuple[str, str, str | None, str]]:
     reviewed state is `DeviceCheck.certified`; the known-fastest is the first reviewed pair in the order of `status().eps`,
     which skellytracker gives as its order of preference. Core keeps no EP knowledge of its own."""
     import skellytracker
-    from skellytracker.certification import SUMMARY_NAMES, _label  # shortcut: skellytracker's private label rule, as crash_record
+    from skellytracker.certification import SUMMARY_NAMES, check_label
     from freemocap.core.tracking.execution_providers import execution_provider_status
     details = skellytracker.certify_plan("full")["details"]
     runs = set(details["checks"]) - set(details["not_run"])
     rows = execution_provider_status().eps
-    gpu = [(_label(row.key, check.device_key), row.key, check.device_key, SUMMARY_NAMES.get(row.key, row.key), check.certified)
-           for row in rows for check in row.checks if _label(row.key, check.device_key) in runs]
-    cpu = [(_label(row.key, None), row.key, None, SUMMARY_NAMES.get(row.key, row.key)) for row in rows
+    gpu = [(check_label(row.key, check.device_key), row.key, check.device_key, SUMMARY_NAMES.get(row.key, row.key), check.certified)
+           for row in rows for check in row.checks if check_label(row.key, check.device_key) in runs]
+    cpu = [(check_label(row.key, None), row.key, None, SUMMARY_NAMES.get(row.key, row.key)) for row in rows
            if not row.uses_gpu and row.usable]
     unknown = [pair[:4] for pair in gpu if not pair[4]]
     known = [pair[:4] for pair in gpu if pair[4]]
@@ -188,11 +188,11 @@ def _pairs() -> list[tuple[str, str, str | None, str]]:
 
 def _usable_labels() -> set[str]:
     """The labels that skellytracker's status calls usable now: after its checks of this run, its pass or a reviewed pass."""
-    from skellytracker.certification import _label
+    from skellytracker.certification import check_label
     from freemocap.core.tracking.execution_providers import execution_provider_status
     rows = execution_provider_status().eps
-    return {_label(row.key, check.device_key) for row in rows for check in row.checks if check.usable} | \
-        {_label(row.key, None) for row in rows if not row.uses_gpu and row.usable}
+    return {check_label(row.key, check.device_key) for row in rows for check in row.checks if check.usable} | \
+        {check_label(row.key, None) for row in rows if not row.uses_gpu and row.usable}
 
 
 def _blender_path(blender_exe_path: str | None) -> str | None:

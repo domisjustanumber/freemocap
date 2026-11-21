@@ -78,23 +78,21 @@ def interrupted_report(record: dict, exit_code: int | None = None) -> tuple[dict
             **({"test_media": media} if media else {}), "evidence": {"valid": False, "reasons": [*reasons, "interrupted"]}}, crashed
 
 
-def record_provider_failure(check: str, created: str) -> None:
+def record_provider_failure(check: str) -> None:
     """Store a crashed check of an EP on a GPU (`<ep>@<device>` or one of its `:` parts) as the failed quick check of
     that pair, by skellytracker's own writer; the CPU and freemocap's checks have no pair."""
     label = check.split(":")[0]
     if "@" not in label:
         return
     key = label.split("@")[0]
-    import skellytracker.certification as tracker
-    from skellytracker.core.eps import certification, evidence, store
-    from skellytracker.core.eps.catalog import load_catalog
+    from skellytracker.certification import check_label, record_failed_pair
     from skellytracker.core.system.host import gpu_device_keys, probe_host
-    catalog, host = load_catalog(), probe_host()
-    for device_key, gpu in gpu_device_keys(host):
-        if tracker._label(key, device_key) == label:
-            # shortcut: skellytracker's private label rule and local-result writer, as its quick check calls them; ask
-            # skellytracker for a public call to record a failed pair.
-            tracker._record(certification, store, evidence, catalog, host, key, gpu, "fail", "", (), created, {})
+    for device_key, _ in gpu_device_keys(probe_host()):
+        if check_label(key, device_key) == label:
+            try:
+                record_failed_pair(key, device_key)
+            except ValueError:  # an EP or GPU this system no longer has (removed since the crash): nothing to store
+                logger.warning("The crashed check %s names no EP and GPU of this system", check)
 
 
 def recover(record: dict, exit_code: int | None = None) -> str | None:
@@ -107,7 +105,7 @@ def recover(record: dict, exit_code: int | None = None) -> str | None:
             _write_json(reports_dir() / f"{report['id']}.json", report)
         # At level full only a crashed probe or video check fails its pair, as a failure of either does (fifth grilling).
         if crashed is not None and (record.get("level") == "quick" or crashed.endswith((":probe", ":video"))):
-            record_provider_failure(crashed, str(record.get("created_utc")))
+            record_provider_failure(crashed)
         message = record.get("message") if isinstance(record.get("message"), dict) else {}
         if record.get("level") == "quick" and record.get("pair") is None and                 (message.get("package") or "freemocap") == "freemocap":  # the start check, in freemocap's own part
             from freemocap.system.certify.start_check import record_crash

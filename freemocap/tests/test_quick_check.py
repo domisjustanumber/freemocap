@@ -40,8 +40,9 @@ def _progress(progress, done, total=5, state="running"):
               "done": done, "total": total, "seconds_left": 0})
 
 
-def certify_pass(level, progress, cancel, *, execution_providers, device, pipeline):
+def certify_pass(level, progress, cancel, *, execution_providers, device, pipeline, abandon):
     assert (level, execution_providers, device) == ("quick", [EP], DEVICE) and pipeline is not None
+    assert not abandon.is_set()  # given by the job's child, for a backend that dies (format 2.4)
     for done in range(40):  # far faster than skellytracker's 10 a second: the backend keeps only the newest
         _progress(progress, min(done, 5))
         time.sleep(0.01)

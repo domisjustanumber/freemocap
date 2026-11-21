@@ -19,7 +19,7 @@ from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 from freemocap import certification
 from freemocap.core.streaming.message_model import CertificationHost, CertificationItem, CertificationRun, StartCheckResult
 from freemocap.system.certify import crash_record
-from freemocap.system.certify.quick_check import QuickCheckJob, QuickCheckManager, StartRefused, _counted, _ended, _full_rows
+from freemocap.system.certify.quick_check import CANCEL_GRACE_SECONDS, QuickCheckJob, QuickCheckManager, StartRefused, _counted, _ended, _full_rows
 from freemocap.system.certify.relay import hand_in_reports, report_file_for, report_incomplete
 
 EP, DEVICE = "fake-ep", "gpu:10de:2484:0"
@@ -36,7 +36,7 @@ def _message(step: str | None, done: int) -> dict:
 
 def tracker_until_cancelled(level, progress, cancel, **options):
     """skellytracker's level full until a cancel, then its cancelled report in its own store, as `certify()` writes it."""
-    assert level == "full" and set(options) == {"test_media_dir"}  # nothing overrides the package's own staging
+    assert level == "full" and set(options) == {"test_media_dir", "abandon"}  # nothing overrides the package's own staging
     progress(_message(f"{LABEL}:video", 3))
     while not cancel.is_set():
         time.sleep(0.05)
@@ -97,6 +97,15 @@ def own_passes_and_returns_at_once(level, progress, cancel, **options):
                   "checks": [{"name": name, "result": "pass" if index < done else None} for index, name in enumerate(OWN_CHECKS)],
                   "done": done, "total": len(OWN_CHECKS), "seconds_left": SlowToSend() if last else None})
     return {"checks": [{"name": name, "result": "pass"} for name in OWN_CHECKS], "evidence": {"reasons": []}}
+
+
+def tracker_until_abandoned(level, progress, cancel, *, abandon, **options):
+    """skellytracker's level full until the abandon of a dead backend, then a mark that its clean-up ran (format 2.4)."""
+    progress(_message(f"{LABEL}:video", 3))
+    while not abandon.is_set():
+        time.sleep(0.05)
+    (Path(os.environ["FREEMOCAP_BASE_FOLDER"]) / "abandoned").write_text("stopped")
+    return {"checks": [], "evidence": {"reasons": ["abandoned"]}}
 
 
 def own_until_abandoned(level, progress, cancel, *, abandon, **options):
@@ -383,10 +392,18 @@ def test_the_full_benchmark_routes_give_the_plans_in_run_order_and_start_with_th
     assert started[0]["blender_exe_path"] == "C:/chosen/blender.exe" and blender_paths[0] == blender_paths[-1] ==         "C:/chosen/blender.exe", "the plan and the run use the Blender path chosen in settings"
 
 
-def test_a_child_whose_backend_died_ends_by_itself_at_once_and_writes_no_report(base):
+def test_a_child_whose_backend_died_ends_by_itself_after_the_grace_and_writes_no_report(base):
     """The crash record is the one report of a crash of the app: the orphaned child does not cancel into a second one.
-    skellytracker at the pin takes no `abandon`, so its run ends at once."""
-    _orphan(base, (), 3)
+    A certify() that does not stop on `abandon` is ended after the cancel's grace."""
+    _orphan(base, (), CANCEL_GRACE_SECONDS + 2)
+    assert not (base / "cancelled-report").exists()
+
+
+def test_a_child_whose_backend_died_abandons_skellytrackers_run_which_stops_by_itself(base):
+    """Format 1.6.0, 2.4: skellytracker's certify() gets `abandon` too, stops as for a cancel (its clean-up runs), and the
+    child ends."""
+    _orphan(base, (tracker_until_abandoned,), 3 + 1)
+    assert (base / "abandoned").exists(), "it stopped on the abandon, not by a kill"
     assert not (base / "cancelled-report").exists()
 
 

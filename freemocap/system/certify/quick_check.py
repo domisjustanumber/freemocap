@@ -180,9 +180,8 @@ def _report_result(report: dict) -> tuple[str, str | None]:
 
 def _end_orphan() -> None:
     """The backend died: end now with certify()'s own children and write no report. The backend's crash record becomes
-    the run's one report at the next launch; a cancel here would write a second, `cancelled` one. shortcut: what
-    skellytracker's certify() undoes on a cancel (a field-test EP's opt-in during its check) stays until its `abandon`
-    reaches freemocap's pin (`_abandonable`)."""
+    the run's one report at the next launch; a cancel here would write a second, `cancelled` one. A running certify()
+    of either package got `abandon` first (`_abandonable`), so its clean-up ran unless it outlived the grace."""
     import psutil
     try:
         for child in psutil.Process().children(recursive=True):
@@ -253,8 +252,7 @@ class QuickCheckJob(BaseNode):
         own_certify = _abandonable(own_certify or freemocap_certify, abandon, running)
         if certify is None:
             from skellytracker import certify
-        # skellytracker at the pin 346b77eb takes no `abandon`; at the next pin move this one line passes it:
-        # certify = _abandonable(certify, abandon, running)
+        certify = _abandonable(certify, abandon, running)
 
         def watch() -> None:  # a stop or the backend's exit sets the cancel that certify() polls; its death abandons the run
             parent = multiprocessing.parent_process()
@@ -265,7 +263,7 @@ class QuickCheckJob(BaseNode):
                 if abandoned is None and parent is not None and not parent.is_alive():
                     abandoned = time.monotonic()
                     abandon.set()
-                # a certify() that takes no `abandon` (or none running) ends at once; one that does gets the cancel's grace
+                # with no certify() running (between packages) it ends at once; a running one gets the cancel's grace
                 if abandoned is not None and (not running.is_set() or time.monotonic() - abandoned > CANCEL_GRACE_SECONDS):
                     _end_orphan()
                 if not cancel.is_set() and (shutdown_self_flag.value or not ipc.should_continue):

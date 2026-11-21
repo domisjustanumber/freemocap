@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import type {Certification} from '@freemocap/client';
 import {
-    appLocked, checkText, downloadRows, durationText, estimateLine, finishedText, FULL_BENCHMARK_TEXT, fullBenchmarkLocks, fullResultLines, fullRowName,
-    fullRowStatus, invitationText, requestFullBenchmark, requestFullBenchmarkPlan,
+    appLocked, checkText, consentPlan, downloadRows, durationText, estimateLine, finishedText, FULL_BENCHMARK_TEXT, fullBenchmarkLocks, fullResultLines, fullRowName,
+    fullRowStatus, invitationText, planReadKey, requestFullBenchmark, requestFullBenchmarkPlan,
 } from './full-benchmark';
 import type {PackagePlan} from './start-check';
 
@@ -71,15 +71,28 @@ test('the full benchmark\'s requests: the plan, a start with the clean-up choice
     assert.equal(await requestFullBenchmark('http://server.invalid', true, answer(Response.json({}, {status: 202}))), null);
     // the Blender path chosen in settings reaches the plan's estimate and the run
     await requestFullBenchmarkPlan('http://server.invalid', undefined, answer(Response.json({packages: [OWN]})), 'C:/b/blender.exe');
-    await requestFullBenchmark('http://server.invalid', true, answer(Response.json({}, {status: 202})), 'C:/b/blender.exe');
+    await requestFullBenchmark('http://server.invalid', true, answer(Response.json({}, {status: 202})), 'C:/b/blender.exe', [TRACKER, OWN]);
     const sentence = 'The full benchmark can start once the start check has passed on this system.';
     assert.equal(await requestFullBenchmark('http://server.invalid', false,
         answer(Response.json({detail: {code: 'start-check-not-passed', message: sentence}}, {status: 409}))), sentence);
     assert.deepEqual(sent, ['GET /freemocap/certify/full_benchmark/plan', null,
-        'POST /freemocap/certify/full_benchmark', {remove_data: true, blenderExePath: null},
+        'POST /freemocap/certify/full_benchmark', {remove_data: true, blenderExePath: null, downloads: []},
         'GET /freemocap/certify/full_benchmark/plan?blenderExePath=C%3A%2Fb%2Fblender.exe', null,
-        'POST /freemocap/certify/full_benchmark', {remove_data: true, blenderExePath: 'C:/b/blender.exe'},
-        'POST /freemocap/certify/full_benchmark', {remove_data: false, blenderExePath: null}]);
+        'POST /freemocap/certify/full_benchmark', {remove_data: true, blenderExePath: 'C:/b/blender.exe',
+            downloads: ['test-video.mp4', 'frames.zip']},  // what the consent step listed, for the server to compare
+        'POST /freemocap/certify/full_benchmark', {remove_data: false, blenderExePath: null, downloads: []}]);
+});
+
+test('the consent step shows only the plan read at its opening in the current full-run state, never an older one', () => {
+    const idle = {host: {name: 'h', os: 'o'}, items: [], gpu_held_by: [], pending_reports: []} as Certification;
+    const running = {...idle, run: {level: 'full', items: [], state: 'running', done: 0}};
+    const read = {plans: [TRACKER], readFor: planReadKey(1, idle)};
+    assert.deepEqual(consentPlan(read, planReadKey(1, idle)).plans, [TRACKER]);
+    assert.deepEqual(consentPlan(read, planReadKey(2, idle)), {}, 'opened again (or a Start refused): "Reading..." until the new read');
+    assert.deepEqual(consentPlan(read, planReadKey(1, running)), {}, 'a full run started since');
+    assert.deepEqual(consentPlan({plans: [TRACKER], readFor: planReadKey(1, running)}, planReadKey(1, idle)), {}, 'a full run ended since');
+    assert.equal(planReadKey(1, {...idle, run: {...running.run, level: 'quick'}}), planReadKey(1, idle), 'a quick check changes no download');
+    assert.deepEqual(consentPlan({planError: 'HTTP 500', readFor: planReadKey(3, idle)}, planReadKey(3, idle)), {plans: undefined, planError: 'HTTP 500'});
 });
 
 test('freemocap\'s check names and the reason codes of its benchmark read as words; other names show as sent', () => {

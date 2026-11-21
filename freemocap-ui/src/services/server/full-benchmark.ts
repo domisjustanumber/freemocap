@@ -128,12 +128,25 @@ export async function requestFullBenchmarkPlan(baseUrl: string, signal?: AbortSi
     return data.packages;
 }
 
-/** Start the full benchmark with the clean-up choice and the Blender path chosen in settings (null: the server's best
- * guess). Null when accepted, else the server's one sentence. */
+/** The plan that the consent step may show: only one read at this opening of the step and in this full-run state. An
+ * older read can list the wrong downloads (an archive that a run kept or removed since), so until the new read arrives
+ * the step shows that it is reading. Each opening, each refused Start and each start and end of a full run read again. */
+export const planReadKey = (opened: number, certification: Certification | null): string =>
+    `${opened}:${certification?.run?.level === 'full'}`;
+
+export function consentPlan(read: {plans?: PackagePlan[]; planError?: string; readFor?: string}, key: string):
+    {plans?: PackagePlan[]; planError?: string} {
+    return read.readFor === key ? {plans: read.plans, planError: read.planError} : {};
+}
+
+/** Start the full benchmark with the clean-up choice, the Blender path chosen in settings (null: the server's best
+ * guess) and the plans the consent step showed, whose downloads the server compares with what it would download now.
+ * Null when accepted, else the server's one sentence. */
 export async function requestFullBenchmark(baseUrl: string, removeData: boolean, request: typeof fetch = fetch,
-    blenderExePath: string | null = null): Promise<string | null> {
+    blenderExePath: string | null = null, consented: readonly PackagePlan[] = []): Promise<string | null> {
+    const downloads = consented.flatMap(plan => plan.downloads.map(download => String(download.name ?? '')));
     const response = await createHttpClient({baseUrl, fetch: request}).responses
-        .start_full_benchmark_freemocap_certify_full_benchmark_post({body: {remove_data: removeData, blenderExePath}});
+        .start_full_benchmark_freemocap_certify_full_benchmark_post({body: {remove_data: removeData, blenderExePath, downloads}});
     if (response.ok) return null;
     const body: unknown = await response.json().catch(() => null);
     return describeError(body) || `HTTP ${response.status}`;

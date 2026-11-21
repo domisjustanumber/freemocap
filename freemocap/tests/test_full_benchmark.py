@@ -334,11 +334,18 @@ def test_the_full_benchmark_routes_give_the_plans_in_run_order_and_start_with_th
         ("skellytracker", 38, 333), ("freemocap", 3, own["seconds_estimate"])]
     assert plan[0]["downloads"] == [download] and plan[1]["downloads"] == own["downloads"] == [certification._download_item()]
     assert client.post("/certify/full_benchmark", json={}).status_code == 422  # the clean-up choice is always sent
+    consented = [download["name"], own["downloads"][0]["name"]]
     application.holds = ("work",)
-    refused = client.post("/certify/full_benchmark", json={"remove_data": True})
+    refused = client.post("/certify/full_benchmark", json={"remove_data": True, "downloads": consented})
     assert refused.status_code == 409 and refused.json()["detail"]["message"] == "busy"
     application.holds = ()
-    accepted = client.post("/certify/full_benchmark", json={"remove_data": False, "blenderExePath": "C:/chosen/blender.exe"})
+    # The consent step listed only skellytracker's download (the sample archive was there then): nothing downloads unasked.
+    changed = client.post("/certify/full_benchmark", json={"remove_data": True, "downloads": [download["name"]]})
+    assert (changed.status_code, changed.json()["detail"]) == (409, {"code": "downloads-changed", "message":
+        "The full benchmark now needs a download you did not agree to (freemocap_sample_data.zip); check the downloads and "
+        "start again."}) and started == []
+    accepted = client.post("/certify/full_benchmark", json={"remove_data": False, "blenderExePath": "C:/chosen/blender.exe",
+                                                            "downloads": consented})
     assert accepted.status_code == 202 and accepted.json()["level"] == "full" and accepted.json()["rows"] == []
     assert (started[0]["level"], started[0]["remove_data"], started[0]["seconds_estimate"], started[0]["pair"]) == (
         "full", False, 333 + own["seconds_estimate"], None)  # the total of the plans' estimates

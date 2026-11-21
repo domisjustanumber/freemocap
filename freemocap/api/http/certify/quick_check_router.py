@@ -244,10 +244,13 @@ class FullBenchmarkRequest(BaseModel):
                               "run; the report, bundled test images and files that were there before stay.")
     blender_exe_path: str | None = Field(alias="blenderExePath", default=None, description="The Blender path chosen in "
                                          "Blender settings; null uses freemocap's best guess.")
+    downloads: list[str] = Field(default_factory=list, description="The `name` of each download that the consent step "
+                                 "listed; the start is refused when the current plan needs another one.")
 
 
 @quick_check_router.post("/full_benchmark", status_code=202, responses={
-    409: {"description": "`start-check-not-passed`, `pipelines-running` (with `gpu_held_by`) or `quick-check-running`"}})
+    409: {"description": "`downloads-changed`, `start-check-not-passed`, `pipelines-running` (with `gpu_held_by`) or "
+                         "`quick-check-running`"}})
 def start_full_benchmark(body: FullBenchmarkRequest) -> QuickCheckRunState:
     """Start every package's level full in a child process, once the start check passed on this system. Refused like the
     start check, and every start of work is refused while it runs; stop it with `DELETE /certify/quick_check`. Follow it
@@ -256,6 +259,13 @@ def start_full_benchmark(body: FullBenchmarkRequest) -> QuickCheckRunState:
     from freemocap.app.freemocap_application import get_freemocap_app
     app = get_freemocap_app()
     plans = _raw_plans("full", body.blender_exe_path)
+    # Nothing downloads without consent: the archive the consent step saw may since have been removed (format 2.6).
+    unlisted = [name for plan in plans for name in (str(item.get("name") or "") for item in plan.get("downloads", ()))
+                if name not in body.downloads]
+    if unlisted:
+        raise HTTPException(status_code=409, detail={
+            "code": "downloads-changed", "message": f"The full benchmark now needs a download you did not agree to "
+                                                   f"({', '.join(unlisted)}); check the downloads and start again."})
     try:
         run = app.quick_checks.start(pair=None, detector_type=_DEFAULTS.detector_type, rtmpose_model_name=None,
                                      seconds_estimate=sum(plan["seconds_estimate"] for plan in plans),

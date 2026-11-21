@@ -7,8 +7,8 @@ import {requestQuickCheckCancel} from '@/services/server/execution-providers';
 import {CERTIFICATION_TEXT} from '@/services/server/certification-hand-in';
 import type {PackagePlan} from '@/services/server/start-check';
 import {
-    downloadRows, estimateLine, finishedText, FULL_BENCHMARK_TEXT, fullResultLines, fullRowName, fullRowStatus, invitationText,
-    requestFullBenchmark, requestFullBenchmarkPlan,
+    consentPlan, downloadRows, estimateLine, finishedText, FULL_BENCHMARK_TEXT, fullResultLines, fullRowName, fullRowStatus, invitationText,
+    planReadKey, requestFullBenchmark, requestFullBenchmarkPlan,
 } from '@/services/server/full-benchmark';
 
 const cell = {padding: '4px 6px', verticalAlign: 'middle' as const};
@@ -54,49 +54,59 @@ export function FullBenchmarkConsent({plans, removeData, onRemoveData, onStart, 
  * benchmark" button (never disabled or relabelled), its consent step, the running benchmark's rows (one per EP and GPU,
  * with a turning icon while it runs), its count of finished checks and "Cancel check", then how the last one ended with
  * its rows as they ended (the server keeps them until the next one starts).
- * The plan and the refusal belong to one server identity; the rest is the server's current state.
+ * The plan and the refusal belong to one server identity; the consent step shows only the plan read for its opening and
+ * the current full-run state (`planReadKey`); the rest is the server's current state.
  */
 export function FullBenchmarkSection() {
     const {isConnected, serverPid, certification} = useAppSelector(state => state.connection);
     const blenderExePath = useAppSelector(state => state.blender?.blenderExePath ?? null);
     const endpoint = serverUrls.getHttpUrl();
     const serverKey = `${endpoint}:${serverPid}:${isConnected}`;
-    const [local, setLocal] = useState<{key: string; plans?: PackagePlan[]; planError?: string; refusal?: string; consent?: boolean}>(
-        {key: serverKey});
+    type Local = {key: string; plans?: PackagePlan[]; planError?: string; readFor?: string; opened?: number; refusal?: string;
+        consent?: boolean};
+    const [local, setLocal] = useState<Local>({key: serverKey});
     const [removeData, setRemoveData] = useState(true);
     const current = useRef(serverKey);
     current.current = serverKey;
-    const mine = local.key === serverKey ? local : {key: serverKey} as typeof local;
-    const update = useCallback((key: string, change: Partial<typeof local>) =>
-        setLocal(previous => ({...(previous.key === key ? previous : {key}), ...change})), []);
+    const mine: Local = local.key === serverKey ? local : {key: serverKey};
+    const update = useCallback((key: string, change: Partial<Local> | ((previous: Local) => Partial<Local>)) =>
+        setLocal(previous => {
+            const base = previous.key === key ? previous : {key};
+            return {...base, ...(typeof change === 'function' ? change(base) : change)};
+        }), []);
+    const readKey = planReadKey(mine.opened ?? 0, certification);
+    const shown = consentPlan(mine, readKey);
 
     useEffect(() => {
         if (!isConnected) return;
         const controller = new AbortController();
         requestFullBenchmarkPlan(endpoint, controller.signal, fetch, blenderExePath)
-            .then(plans => update(serverKey, {plans}))
-            .catch(error => controller.signal.aborted || update(serverKey, {planError: String(error)}));
+            .then(plans => controller.signal.aborted || update(serverKey, {plans, planError: undefined, readFor: readKey}))
+            .catch(error => controller.signal.aborted || update(serverKey, {plans: undefined, planError: String(error), readFor: readKey}));
         return () => controller.abort();
-    }, [endpoint, serverKey, isConnected, update, blenderExePath]);
+    }, [endpoint, serverKey, isConnected, update, blenderExePath, readKey]);
 
     const start = useCallback(async () => {
         const key = serverKey;
         update(key, {refusal: undefined});
-        const refusal = await requestFullBenchmark(endpoint, removeData, fetch, blenderExePath).catch(error => String(error));
-        if (current.current === key) update(key, refusal ? {refusal} : {refusal: undefined, consent: false});
-    }, [endpoint, serverKey, removeData, update, blenderExePath]);
+        const refusal = await requestFullBenchmark(endpoint, removeData, fetch, blenderExePath, shown.plans).catch(error => String(error));
+        // A refusal reads the plan again: the step then shows what a Start would download now, with the sentence beside it.
+        if (current.current === key) update(key, refusal ? previous => ({refusal, opened: (previous.opened ?? 0) + 1})
+            : {refusal: undefined, consent: false});
+    }, [endpoint, serverKey, removeData, update, blenderExePath, shown.plans]);
 
     const run = certification?.run?.level === 'full' ? certification.run : undefined;
     const rows = run ? run.rows ?? [] : certification?.full_rows ?? [];
     return <div className="flex flex-col gap-2 bg-secondary p-2 br-1">
         <p className="text sm text-white">{invitationText(mine.plans)}</p>
         <div className="flex flex-row">
-            <ButtonSm text={FULL_BENCHMARK_TEXT.button} buttonType="secondary" onClick={() => update(serverKey, {consent: true})}/>
+            <ButtonSm text={FULL_BENCHMARK_TEXT.button} buttonType="secondary" onClick={() =>
+                update(serverKey, previous => ({consent: true, opened: (previous.opened ?? 0) + 1}))}/>
         </div>
-        {mine.consent && (mine.plans
-            ? <FullBenchmarkConsent plans={mine.plans} removeData={removeData} onRemoveData={setRemoveData} onStart={start}
+        {mine.consent && (shown.plans
+            ? <FullBenchmarkConsent plans={shown.plans} removeData={removeData} onRemoveData={setRemoveData} onStart={start}
                                     onCancel={() => update(serverKey, {consent: false, refusal: undefined})} refusal={mine.refusal}/>
-            : <p className="text sm text-gray">{mine.planError ? FULL_BENCHMARK_TEXT.couldNotReadPlan + mine.planError : FULL_BENCHMARK_TEXT.loadingPlan}</p>)}
+            : <p className="text sm text-gray">{shown.planError ? FULL_BENCHMARK_TEXT.couldNotReadPlan + shown.planError : FULL_BENCHMARK_TEXT.loadingPlan}</p>)}
         {rows.length > 0 && <table className="certify-table text sm" style={table}>
             <tbody>
             {rows.map((row, index) => {

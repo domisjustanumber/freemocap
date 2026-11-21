@@ -5115,6 +5115,11 @@ export interface components {
              * @description The Blender path chosen in Blender settings; null uses freemocap's best guess.
              */
             blenderExePath?: string | null;
+            /**
+             * Downloads
+             * @description The `name` of each download that the consent step listed; the start is refused when the current plan needs another one.
+             */
+            downloads?: string[];
         };
         /**
          * QuickCheckRunRow
@@ -8027,7 +8032,7 @@ export interface operations {
                     "application/json": components["schemas"]["QuickCheckRunState"];
                 };
             };
-            /** @description `start-check-not-passed`, `pipelines-running` (with `gpu_held_by`) or `quick-check-running` */
+            /** @description `downloads-changed`, `start-check-not-passed`, `pipelines-running` (with `gpu_held_by`) or `quick-check-running` */
             409: {
                 headers: {
                     [name: string]: unknown;

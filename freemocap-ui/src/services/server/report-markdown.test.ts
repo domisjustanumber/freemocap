@@ -32,3 +32,10 @@ test('inline bold and code; anything else, HTML included, stays text', () => {
     assert.deepEqual(parseInline('**a b:** x `c` <i>y</i>'), [{kind: 'bold', text: 'a b:'}, {kind: 'text', text: ' x '},
         {kind: 'code', text: 'c'}, {kind: 'text', text: ' <i>y</i>'}]);
 });
+
+test('the component table of format 1.5.0 reads as a table of its own after the benchmark table', () => {
+    const blocks = parseReportMarkdown(['| GPU | Module | Stage | ms/frame | FPS |', '|---|---|---|---|---|', '| - | CPU | tracking | 82.0 | 12.2 |', '',
+        '| Module | Result |', '|---|---|', '| Data folder | pass |', '| Blender | record |', '', 'Cameras: not checked on this system.'].join('\n'));
+    assert.deepEqual(blocks.slice(1), [{kind: 'table', header: ['Module', 'Result'], rows: [['Data folder', 'pass'], ['Blender', 'record']]},
+        {kind: 'paragraph', lines: ['Cameras: not checked on this system.']}]);
+});

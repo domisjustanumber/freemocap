@@ -1,9 +1,13 @@
-"""The certify report file: one Markdown file that merges module reports (skellycertify report format 1.4.0, section 4).
+"""The certify report file: one Markdown file that merges module reports (skellycertify report format 1.5.0, section 4).
 
 `build_report_file()` is pure: the same module reports, note and app block give the same bytes, so the file the
 person views is the file that is sent. It refuses a file that breaks privacy rules 1 to 11 of section 6, the rules
 the relay checks; `scrub_note()` applies rules 12 and 13 to the person's note before the file is built, and
 `clean_note()` (rules 18 and 20) cleans whatever note reaches `build_report_file()`.
+
+The file declares 1.5.0, the format of its layout. Each module report keeps its own schema id: a package that still
+writes 1.4.0 (skellytracker at freemocap's pin) is a module the reader of major version 1 accepts (spec 8), and the JSON
+block holds each report as its package wrote it.
 """
 
 import getpass
@@ -19,7 +23,7 @@ from pathlib import Path
 import freemocap
 from freemocap.build_info import BUILD_GIT_SHA
 
-SCHEMA = "skellycertify.report/1.4.0"  # the file declares the format of its Markdown layout (spec 4.1, 4.2)
+SCHEMA = "skellycertify.report/1.5.0"  # the file declares the format of its Markdown layout (spec 4.1, 4.2)
 NOTE_MAX_CHARS = 2000
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
 CREATED_UTC = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$")
@@ -225,7 +229,7 @@ def incomplete(module: dict) -> bool:
 
 
 def _markdown(modules: list[dict], note: str | None, app: dict | None, created: str) -> list[str]:
-    """The Markdown part before `## Data`: the short summary for a person (spec 4.2 parts 1 to 8)."""
+    """The Markdown part before `## Data`: the short summary for a person (spec 4.2 parts 1 to 9)."""
     def run(module: dict) -> str:
         package = module.get("package") or {}
         return f"{_cell(package.get('name'))} {_cell(package.get('version'))} · {_cell(module.get('kind'))} run"
@@ -279,9 +283,12 @@ def _markdown(modules: list[dict], note: str | None, app: dict | None, created: 
                         _figure(item.get("fps"))]) for index, item in items if item.get("group") == "benchmark"]
     if benchmarks:
         lines += ["| GPU | Module | Stage | ms/frame | FPS |", "|---|---|---|---|---|", *benchmarks, ""]
+    components = [_row([_cell(item.get("name")), _result(item)]) for _, item in items if item.get("group") == "component"]
+    if components:  # spec 4.2 part 6
+        lines += ["| Module | Result |", "|---|---|", *components, ""]
     cameras = [_row([_cell(item.get("name")), _result(item)]) for _, item in items if item.get("group") == "camera"]
     lines += ["| Camera | Result |", "|---|---|", *cameras, ""] if cameras else ["Cameras: not checked on this system.", ""]
-    # Spec 4.2 part 7: each failed check, each not-run check whose `module` names a partial or failed item of its module
+    # Spec 4.2 part 8: each failed check, each not-run check whose `module` names a partial or failed item of its module
     # report (not every check that cannot run here), then each failed section with no check of its own.
     rows = []
     for index, module in enumerate(modules):
@@ -310,7 +317,7 @@ def build_report_file(modules: list[dict], note: str | None, app: dict | None) -
     """The file name and the UTF-8 bytes of the report file (section 4.2) that holds `modules` in their order.
 
     The name and the time line use the earliest `created_utc` of the modules. A module with no `summary` gives no row
-    to the GPU, benchmark or camera table (spec 3.7).
+    to the GPU, benchmark, component or camera table (spec 3.7).
     """
     if not modules:
         raise ReportFileError("bad-module", "a report file holds at least one module report")

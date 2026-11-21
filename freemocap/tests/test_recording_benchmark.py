@@ -114,7 +114,9 @@ def test_a_successful_run_benchmarks_the_usable_pairs_and_removes_only_what_it_d
     [(label, key, device, frames, files)] = bench.sessions
     assert (label, key, device, frames) == ("cpu", "cpu", None, [3, 3, 3])  # the cut recording, in the sample's codec
     assert files == ["freemocap_sample_data_camera_calibration.toml", "synchronized_videos"]
-    assert report["summary"] == [{"group": "benchmark", "name": "CPU", "device": None, "stage": "inference",
+    assert report["summary"] == [{"group": "component", "name": "Data folder", "device": None, "result": "pass"},
+                                 {"group": "component", "name": "Sample recording", "device": None, "result": "pass"},
+                                 {"group": "benchmark", "name": "CPU", "device": None, "stage": "inference",
                                   "ms_per_frame": 100.0, "fps": 10.0},
                                  {"group": "benchmark", "name": "CPU", "device": None, "stage": "tracking",
                                   "ms_per_frame": 200.0, "fps": 5.0}]
@@ -175,6 +177,7 @@ def test_the_benchmark_session_reads_the_post_hoc_timings_as_the_dataset_tools_d
 
     monkeypatch.setattr(certification, "_session", session)
     numbers = certification._benchmark_session(recording, "cpu", None)["numbers"]
+    # one frame set (format 1.5.0, 3.7): 30 s over 300 synchronized frames of three images each, not 33.3 ms per image
     assert numbers["stages"]["graph.load_and_track"] == {"total_s": 30.0, "ms_per_frame": 100.0, "fps": 10.0}
     assert (numbers["frames"], numbers["images"], numbers["startup_seconds"]) == (300, 900, 1.5)
     assert numbers["execution_providers"] == {"person": "cpu", "wholebody": "cpu"}

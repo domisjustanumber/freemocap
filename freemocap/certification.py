@@ -1,4 +1,4 @@
-"""freemocap's own certify checks (skellycertify report format 1.4.0; ep-certification-integration.md, "freemocap's own
+"""freemocap's own certify checks (skellycertify report format 1.5.0; ep-certification-integration.md, "freemocap's own
 checks"): only what freemocap owns. No check uses a camera. Only `posthoc-session` loads models, on the EP that the app
 selects by default, and it runs on skellytracker's bundled test frames (`certify_frames`), downloading none.
 
@@ -20,7 +20,9 @@ staging order: no reviewed pass first, then the known-fastest (the first reviewe
 order), then the CPU, then the rest. A pair runs only when skellytracker's status calls it usable after skellytracker's
 own run (a pass in this run or a reviewed pass, and no failed check here). Timings are summary items of the group
 `benchmark` (ms/frame and FPS of each stage, measured by the post-hoc session's `PerformanceReport` and read with the
-dataset tools' `parse_performance` and `normalized_stages`); a slow result never fails. With `remove_data` (the app passes
+dataset tools' `parse_performance` and `normalized_stages`); a slow result never fails. ms/frame is the stage's total time
+over the run divided by the synchronized frames, so it is the time of one frame set, one frame of each camera of the
+recording (three in the sample; format 3.7), and FPS is frame sets per second. With `remove_data` (the app passes
 it only when the earlier packages succeeded), a run with no failed check and no cancel removes the work folder, and the
 archive when this run downloaded it.
 
@@ -29,6 +31,10 @@ post-hoc session (`MocapPipeline`, as the backend starts it) reads a 3-frame vid
 to skellytracker's run and writes the observations to the recording's Parquet file, from which the check reads the run
 record back. skellytracker's own quick run proves its pipeline on these frames. A realtime session check is not built:
 freemocap's pub/sub refuses to start a realtime pipeline outside the backend's main process, and certify runs in a child.
+
+Each check of freemocap's own module has `module` set to the name of its part (`COMPONENTS`; a `posthoc:<label>` check
+has the EP's name) and, when it ran, one summary item of the group `component` with its result (format 1.5.0, 3.7). A
+check that did not run has no item, and neither has Blender when it is not installed.
 
 freemocap's reason codes (report format 5.4), besides the common ones (`models-missing`, `test-media-missing`,
 `over-budget`, `timed-out`, `crashed`, `hung-at-exit`):
@@ -71,12 +77,15 @@ import freemocap
 
 logger = logging.getLogger(__name__)
 
-SCHEMA = "skellycertify.report/1.4.0"  # `summary` at `full` only: its `benchmark` items
+SCHEMA = "skellycertify.report/1.5.0"  # `summary`: the `component` items, and at `full` the `benchmark` items
 SCHEMA_PREFIX = "skellycertify.report/1."
 REPORT_STATES = ("pending", "opened", "covered")  # as skellytracker's: `opened` = issue form opened, `covered` = an issue holds it
 REPORT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$")  # a safe file name only; ids are v4 UUIDs, never parsed
 QUICK_CHECKS = ("build-identity", "spawn-child", "bundle-imports", "data-folder", "posthoc-session", "install-facts", "blender")
 FULL_CHECKS = ("data-folder", "recording")  # then one `posthoc:<label>` for each pair, then `blender`
+COMPONENTS = {"build-identity": "Build identity", "spawn-child": "Child process", "bundle-imports": "Bundle imports",
+              "data-folder": "Data folder", "posthoc-session": "Post-hoc session", "install-facts": "Install facts",
+              "recording": "Sample recording", "blender": "Blender"}  # check -> `module` and `component` item name
 SAMPLE_RECORDING = {"name": "freemocap_sample_data.zip", "bytes": 166958457, "sha256":
                     "c23d6a24f9ed8cca74bccf171128543d661b47e5780df5b446d60063ac4acf4f"}  # its `source`: catalog.SAMPLE_DATA
 # 300 frames (10 s of the 30 fps sample, three cameras): measured on one Windows PC (i7-14700K, RTX 3070, 2026-11-21), the CPU
@@ -532,6 +541,13 @@ def _blender_export(cancelled, recording: Path, blender: str):
     return answer["result"], answer["reason"], answer.get("numbers")
 
 
+def _component_items(checks: list[dict]) -> list[dict]:
+    """The `component` summary items (format 1.5.0, 3.7): one for each check of freemocap's own module that ran, with its
+    result; none for a `not-run` check, and none for Blender when it is not installed (`not-found` at quick)."""
+    return [{"group": "component", "name": row["module"], "device": None, "result": row["result"]} for row in checks
+            if row["name"] in COMPONENTS and row["result"] in ("pass", "fail", "record-only") and row["reason"] != "not-found"]
+
+
 def _benchmark_items(checks: list[dict], pairs: list[tuple], frames: int) -> list[dict]:
     """The `benchmark` summary items (format 3.7): each stage of each passed pair, then the Blender export."""
     from skellytracker.core.eps import evidence
@@ -656,9 +672,8 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
     pairs = _pairs() if level == "full" else []
     by_name = {f"posthoc:{label}": (label, key, device_key, module) for label, key, device_key, module in pairs}
     names = QUICK_CHECKS if level == "quick" else _full_names(pairs)
-    checks = [{"name": name, "result": None, "reason": None,
-               **({"module": by_name[name][3]} if name in by_name else {"module": "Blender"} if name == "blender" and
-                  level == "full" else {})} for name in names]
+    checks = [{"name": name, "result": None, "reason": None, "module": by_name[name][3] if name in by_name else COMPONENTS[name]}
+              for name in names]
     recording, usable, numbers_of = None, None, {}
     cleanup: list[dict] = []
     cancelled =lambda: cancel is not None and cancel.is_set()  # noqa: E731
@@ -753,9 +768,8 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
     if level == "full" and remove_data and stopped is None and not any(row["result"] == "fail" for row in checks):
         cleanup += remove_benchmark_data(bool(numbers_of.get("recording", {}).get("downloaded")), test_media_dir)
     report = {"schema": SCHEMA, "id": str(uuid.uuid4()), "package": package, "kind": level, "created_utc": created,
-              "host": _host(), "checks": checks, "cleanup": cleanup, "evidence": {"valid": not reasons, "reasons": reasons}}
-    if level == "full":
-        report["summary"] = _benchmark_items(checks, pairs, BENCHMARK_FRAMES)
+              "host": _host(), "checks": checks, "cleanup": cleanup, "evidence": {"valid": not reasons, "reasons": reasons},
+              "summary": _component_items(checks) + (_benchmark_items(checks, pairs, BENCHMARK_FRAMES) if level == "full" else [])}
     if any(row["result"] in ("pass", "fail") for row in checks):  # only those reach the hand-in list
         try:
             _write_json(reports_dir() / f"{report['id']}.json", report)

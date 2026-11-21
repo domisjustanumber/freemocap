@@ -57,7 +57,12 @@ def test_the_quick_level_runs_its_seven_checks_in_order_and_obeys_the_report_for
     assert [path.name for path in (base / "certify" / "reports").iterdir()] == [f"{report['id']}.json"]
     assert rows["install-facts"]["result"] == "record-only" and rows["install-facts"]["numbers"]["ui_remote"] is False
     assert rows["build-identity"]["result"] in ("pass", "record-only")
-    assert report["schema"] == "skellycertify.report/1.4.0" and report["kind"] == "quick"
+    assert report["schema"] == "skellycertify.report/1.5.0" and report["kind"] == "quick"
+    # format 1.5.0: one `component` item for each check that ran, named as its check's `module`; none for a Blender that
+    # is not installed
+    assert report["summary"] == [{"group": "component", "name": row["module"], "device": None, "result": row["result"]}
+                                 for row in report["checks"] if row["result"] != "not-run" and row["name"] != "blender"]
+    assert [item["name"] for item in report["summary"]][:4] == ["Build identity", "Child process", "Bundle imports", "Data folder"]
     assert report["package"]["name"] == "freemocap" and re.fullmatch(r"[0-9a-f-]{36}", report["id"])
     assert report["evidence"]["valid"] is (not report["evidence"]["reasons"])
     assert messages[0]["state"] == "starting" and messages[-1]["state"] == "done" and messages[-1]["done"] == 7

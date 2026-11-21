@@ -157,13 +157,15 @@ export const QUICK_CHECK_TEXT = {
     cancelled: 'Quick check cancelled',
 } as const;
 
-/** Plain sentences for skellytracker's reason codes (its REASON_CODES.md) that a person sees; any other code shows as sent. */
+/** Plain sentences for skellytracker's reason codes (its REASON_CODES.md) that a person sees, and for freemocap's checks
+ * (a failed freemocap module names its failed check); any other code shows as sent. */
 const REASON_TEXT: Readonly<Record<string, string>> = {
     'models-missing': 'a model file it needs is not on this system',
     'test-media-missing': 'its test images are missing or damaged',
     'over-budget': 'it did not fit in the time the quick check allows',
     'video-not-passed': 'the video check did not pass',
     'cpu-reference-missing': 'the CPU reference check did not pass',
+    'posthoc-session': 'a post-hoc processing session did not start and run on this system',
 };
 export const reasonText = (reason: string): string => REASON_TEXT[reason] ?? reason;
 

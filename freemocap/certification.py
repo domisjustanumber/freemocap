@@ -1,5 +1,6 @@
 """freemocap's own certify checks (skellycertify report format 1.4.0; ep-certification-integration.md, "freemocap's own
-checks"): only what freemocap owns, so no check loads an EP, a model or a camera, and none uses a GPU.
+checks"): only what freemocap owns. No check uses a camera. Only `posthoc-session` loads models, on the EP that the app
+selects by default, and it runs on skellytracker's bundled test frames (`certify_frames`), downloading none.
 
     import freemocap
     plan = freemocap.certify_plan("quick")          # show the plan, then get the consent of the person
@@ -7,14 +8,22 @@ checks"): only what freemocap owns, so no check loads an EP, a model or a camera
 
 `certify(level, progress, cancel, *, ui_remote=None, blender_exe_path=None)` returns freemocap's module report;
 `certify_plan(level)` takes the same options and gives its plan. `import freemocap` does not import this module: the
-two names load it on first use. The level `quick` runs the six checks below. The level `full` (reference-posthoc,
-concurrent-runs, exports, live-numbers) is not built: each of its checks is `not-run` with `not-built`, and the report
-is not valid as evidence (`partial-run`, report format 7.1 statement 4) (F13, G12).
+two names load it on first use. The level `quick` runs the seven checks below within `QUICK_BUDGET_SECONDS`. The level
+`full` (reference-posthoc, concurrent-runs, exports, live-numbers) is not built: each of its checks is `not-run` with
+`not-built`, and the report is not valid as evidence (`partial-run`, report format 7.1 statement 4) (F13, G12).
 
-freemocap's reason codes (report format 5.4), besides the common ones:
+`posthoc-session` (report format 2.7 rule 3) proves freemocap's side around the tracker, in its own spawn child: the app's
+post-hoc session (`MocapPipeline`, as the backend starts it) reads a 3-frame video of the bundled frames, hands each frame
+to skellytracker's run and writes the observations to the recording's Parquet file, from which the check reads the run
+record back. skellytracker's own quick run proves its pipeline on these frames. A realtime session check is not built:
+freemocap's pub/sub refuses to start a realtime pipeline outside the backend's main process, and certify runs in a child.
+
+freemocap's reason codes (report format 5.4), besides the common ones (`models-missing`, `test-media-missing`,
+`over-budget`, `timed-out`, `crashed`, `hung-at-exit`):
 - `spawn-failed`: the spawn child of `spawn-child` gave no answer, so the later checks did not run.
 - `import-failed`: a module of the bundle did not import in the spawn child (`numbers.failed` names them).
 - `not-found`: no Blender executable was found.
+- `session-failed`: the post-hoc session ended without completing.
 - an exception class name, for example `PermissionError`: the step raised it (never its message).
 
 The hand-in list, with the shapes of skellytracker's (`pending_reports`, `read_report`, `mark_reports`): `certify()`
@@ -33,6 +42,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import uuid
@@ -47,13 +57,17 @@ SCHEMA = "skellycertify.report/1.4.0"  # no `summary`: no group of format 3.7 fi
 SCHEMA_PREFIX = "skellycertify.report/1."
 REPORT_STATES = ("pending", "opened", "covered")  # as skellytracker's: `opened` = issue form opened, `covered` = an issue holds it
 REPORT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$")  # a safe file name only; ids are v4 UUIDs, never parsed
-QUICK_CHECKS = ("build-identity", "spawn-child", "bundle-imports", "data-folder", "install-facts", "blender")
+QUICK_CHECKS = ("build-identity", "spawn-child", "bundle-imports", "data-folder", "posthoc-session", "install-facts", "blender")
 FULL_CHECKS = ("reference-posthoc", "concurrent-runs", "exports", "live-numbers")
 # skellytracker first: it sets ONNX Runtime's telemetry switch before onnxruntime is imported (decision 3).
 BUNDLE_MODULES = ("numpy", "cv2", "pyarrow", "av", "scipy", "numba", "skellyforge", "skellytracker", "onnxruntime")
 OPTIONAL_MODULES = ("numba",)  # imported only when shipped
 SPAWN_TIMEOUT_SECONDS = 120
 BLENDER_TIMEOUT_SECONDS = 30
+QUICK_BUDGET_SECONDS = 15  # freemocap's share of the level quick (owner, Q53 to Q56)
+POSTHOC_SECONDS = 10  # its estimate (8.5 to 9.1 s measured on one Windows PC, CPU): it starts only when it fits the budget
+POSTHOC_TIMEOUT_SECONDS = 30
+POSTHOC_FRAMES = 3
 SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
 
@@ -65,10 +79,12 @@ def _check_level(level: str) -> None:
 
 def certify_plan(level: str, *, ui_remote: bool | None = None, blender_exe_path: str | None = None) -> dict:
     """What `certify(level)` runs: no download, no change outside freemocap's data folder, no question, no risk to a
-    device. `total` counts the checks that run: the six of `quick`, none of `full` (not built). It takes the options of
-    `certify` (report format 2.2); neither changes the plan."""
+    device. `total` counts the checks that run: the seven of `quick`, none of `full` (not built). `seconds_estimate` is
+    the budget that `posthoc-session` keeps to. It takes the options of `certify` (report format 2.2); neither changes the
+    plan."""
     _check_level(level)
-    return {"package": "freemocap", "kind": level, "seconds_estimate": 30, "total": len(QUICK_CHECKS) if level == "quick" else 0,
+    return {"package": "freemocap", "kind": level, "seconds_estimate": QUICK_BUDGET_SECONDS,
+            "total": len(QUICK_CHECKS) if level == "quick" else 0,
             "risks": [], "downloads": [], "system_changes": [], "questions": [],
             "details": {"checks": list(QUICK_CHECKS if level == "quick" else FULL_CHECKS)}}
 
@@ -90,12 +106,17 @@ def _import_child(queue, modules: tuple[str, ...]) -> None:
 
 
 def _spawn_imports(cancelled) -> tuple[dict | None, str | None]:
-    """Run `_import_child` in a `spawn` child: (its answer, None) or (None, the reason it gave none)."""
+    return _spawn(_import_child, (BUNDLE_MODULES,), "freemocap-certify-imports", SPAWN_TIMEOUT_SECONDS, cancelled)
+
+
+def _spawn(target, args: tuple, name: str, timeout: int | float, cancelled) -> tuple[dict | None, str | None]:
+    """Run `target(queue, *args)` in a `spawn` child: (its answer, None) or (None, the reason it gave none). A child that
+    is still alive at the end is killed with the processes it started."""
     context = multiprocessing.get_context("spawn")
     queue = context.Queue()
-    child = context.Process(target=_import_child, args=(queue, BUNDLE_MODULES), name="freemocap-certify-imports")
+    child = context.Process(target=target, args=(queue, *args), name=name)
     child.start()
-    deadline, answer, reason = time.monotonic() + SPAWN_TIMEOUT_SECONDS, None, None
+    deadline, answer, reason = time.monotonic() + timeout, None, None
     try:
         while answer is None:
             try:
@@ -113,8 +134,119 @@ def _spawn_imports(cancelled) -> tuple[dict | None, str | None]:
         return (answer, None) if child.exitcode == 0 else (None, "hung-at-exit" if child.is_alive() else "crashed")
     finally:
         if child.is_alive():
+            import psutil
+            try:
+                descendants = psutil.Process(child.pid).children(recursive=True)  # a session's worker processes
+            except psutil.Error:
+                descendants = []
             child.kill()
             child.join()
+            for process in descendants:
+                try:
+                    process.kill()
+                except psutil.Error:
+                    pass
+
+
+# - The post-hoc session check, on skellytracker's bundled frames -
+
+def _models_missing(detector_type: str, rtmpose_model_name: str | None) -> bool:
+    """skellytracker's rule for its own `models-missing`: the pipeline check warns of a missing dependency."""
+    from skellytracker.core.pipelines import check_pipeline
+    from freemocap.core.tracking.pipeline_runs import load_detector_pipeline
+    check = check_pipeline(load_detector_pipeline(detector_type, rtmpose_model_name))
+    return any(warning.code == "missing_dependency" for warning in check.warnings)
+
+
+def _posthoc_session(frames: list[bytes], work: Path) -> dict:
+    """The app's post-hoc session on a recording of `frames` (JPEG bytes) in `work`, up to its observations (one
+    camera: no calibration and no 3D), then the run record that it wrote to the recording's Parquet file."""
+    import cv2
+    import numpy as np
+    from skellycam.core.ipc.process_management.managed_worker import WorkerMode
+    from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
+    from skellycam.core.recorders.videos.recording_info import RecordingInfo
+    from skellylogs.handlers.websocket_log_queue_handler import create_websocket_log_queue
+    from freemocap.core.pipeline.posthoc.mocap_pipeline import MocapPipeline
+    from freemocap.core.pipeline.posthoc.pipeline_phases import AggregatorPhase
+    from freemocap.core.recording.parquet_storage.parquet_reader import read_metadata
+    from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
+    from freemocap.system.recording_structure.recording_structure import RecordingStructure
+    config = PosthocMocapPipelineConfig(stop_stage="observations")  # the app's defaults otherwise
+    if _models_missing(config.detector_type, config.rtmpose_model_name):
+        return {"result": "not-run", "reason": "models-missing"}
+    recording = work / "certify_recording"
+    (recording / "synchronized_videos").mkdir(parents=True)
+    images = [cv2.imdecode(np.frombuffer(frame, np.uint8), cv2.IMREAD_COLOR) for frame in frames]
+    writer = cv2.VideoWriter(str(recording / "synchronized_videos" / "camera_0.avi"), cv2.VideoWriter_fourcc(*"MJPG"), 30.0,
+                             images[0].shape[1::-1])
+    try:
+        for image in images:
+            writer.write(image)
+    finally:
+        writer.release()
+    create_websocket_log_queue()  # each pipeline's IPC takes the app's log queue; nothing reads it in this child
+    flag = multiprocessing.Value("b", False)
+    registry = WorkerRegistry(global_kill_flag=flag, worker_mode=WorkerMode.PROCESS)  # as the app's backend makes it
+    registry.start_heartbeat()
+    try:
+        pipeline = MocapPipeline.create(pipeline_id="certify", config=config, worker_registry=registry, global_kill_flag=flag,
+                                        recording_info=RecordingInfo(recording_name=recording.name, recording_directory=str(work)))
+        pipeline.start()
+        ended = (AggregatorPhase.COMPLETE, AggregatorPhase.FAILED)
+        phase = lambda: next((item.phase for item in pipeline.get_progress_messages()  # noqa: E731
+                              if item.pipeline_id == pipeline.id), None)
+        try:
+            while pipeline.alive and phase() not in ended:
+                time.sleep(0.02)
+        finally:
+            pipeline.shutdown()
+    finally:
+        registry.shutdown_all()
+    if phase() != AggregatorPhase.COMPLETE:  # the newest message, also one sent just before the worker ended
+        return {"result": "fail", "reason": "session-failed"}
+    metadata = read_metadata(path=RecordingStructure(base_directory=work, recording_name=recording.name).data_parquet_path)
+    saved = next(item for name, item in metadata.runs[0].sources.items() if name.startswith("keypoint_model:"))
+    return {"result": "pass", "reason": None, "numbers": {"frames": len(images), "execution_providers": {
+        node: model["execution_provider"] for node, model in saved.definition["skellytracker"]["models"].items()}}}
+
+
+def _posthoc_child(queue, frames: list[bytes], work: str) -> None:
+    """The spawn child of `posthoc-session`: its answer, `{"result", "reason", "numbers"?}`."""
+    try:
+        answer = _posthoc_session(frames, Path(work))
+    except Exception as error:  # noqa: BLE001 - the class name only: an error text can hold a path
+        logger.exception("freemocap's post-hoc session check raised")
+        answer = {"result": "fail", "reason": type(error).__name__}
+    queue.put(answer)
+
+
+def _posthoc(cancelled, cleanup: list) -> tuple[str, str | None, dict | None]:
+    """Run `posthoc-session` in its own spawn child, with scratch files in a work folder of freemocap's certify folder that
+    is removed afterwards; a removal that fails is a row of `cleanup` (report format 2.5)."""
+    from skellytracker.certification import certify_frames
+    from skellytracker.core.eps.certification import FramesUnavailableError
+    try:
+        frames = certify_frames()  # hash checked; the quick level downloads nothing
+    except FramesUnavailableError:
+        return "not-run", "test-media-missing", None
+    started = time.monotonic()
+    try:
+        reports_dir().parent.mkdir(parents=True, exist_ok=True)
+        work = tempfile.mkdtemp(prefix="work-", dir=reports_dir().parent)
+    except OSError as error:
+        return "fail", type(error).__name__, None
+    try:
+        answer, reason = _spawn(_posthoc_child, (frames[:POSTHOC_FRAMES], work), "freemocap-certify-posthoc",
+                                POSTHOC_TIMEOUT_SECONDS, cancelled)
+    finally:
+        try:
+            shutil.rmtree(work)
+        except OSError as error:
+            cleanup.append({"name": "posthoc-session:work-folder", "result": "fail", "reason": type(error).__name__})
+    if answer is None:
+        return ("not-run" if reason == "cancelled" else "fail"), reason, None
+    return answer["result"], answer["reason"], {**answer.get("numbers", {}), "seconds": round(time.monotonic() - started, 3)}
 
 
 def _identity() -> tuple[dict, list[str]]:
@@ -191,11 +323,13 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
     that did not end `not-run` with `cancelled`. `ui_remote`: whether the UI runs on another machine (None: unknown).
     `blender_exe_path`: the path chosen in Blender settings, if any."""
     _check_level(level)
+    begun = time.monotonic()
     created = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     package, reasons = _identity()
     names = QUICK_CHECKS if level == "quick" else FULL_CHECKS
     checks = [{"name": name, "result": None, "reason": None} for name in names]
-    cancelled = lambda: cancel is not None and cancel.is_set()  # noqa: E731
+    cleanup: list[dict] = []
+    cancelled =lambda: cancel is not None and cancel.is_set()  # noqa: E731
 
     def send(state: str, step: str | None) -> None:
         nonlocal progress
@@ -238,6 +372,13 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
                    {"failed": answer["failed"], "from_bundle": answer["from_bundle"]})
         elif name == "data-folder":
             record(row, *_data_folder())
+        elif name == "posthoc-session":
+            if time.monotonic() - begun + POSTHOC_SECONDS > QUICK_BUDGET_SECONDS:  # it would not end in the budget
+                record(row, "not-run", "over-budget")
+            else:
+                record(row, *_posthoc(cancelled, cleanup))
+                if row["reason"] == "cancelled":
+                    stopped = "cancelled"
         elif name == "install-facts":
             record(row, "record-only", None, _install_facts(ui_remote))
         elif name == "blender":
@@ -252,7 +393,7 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
     if stopped == "cancelled":
         reasons.append("cancelled")
     report = {"schema": SCHEMA, "id": str(uuid.uuid4()), "package": package, "kind": level, "created_utc": created,
-              "host": _host(), "checks": checks, "cleanup": [], "evidence": {"valid": not reasons, "reasons": reasons}}
+              "host": _host(), "checks": checks, "cleanup": cleanup, "evidence": {"valid": not reasons, "reasons": reasons}}
     if any(row["result"] in ("pass", "fail") for row in checks):  # only those reach the hand-in list
         try:
             _write_json(reports_dir() / f"{report['id']}.json", report)

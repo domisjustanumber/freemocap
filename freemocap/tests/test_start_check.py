@@ -31,9 +31,15 @@ def no_blender(monkeypatch):
     monkeypatch.setattr(certification, "_blender", lambda cancelled, path=None: ("record-only", "not-found", {"found": False}))
 
 
+@pytest.fixture
+def no_posthoc(monkeypatch):
+    monkeypatch.setattr(certification, "_posthoc", lambda cancelled, cleanup: ("not-run", "models-missing", None))
+
+
 # - freemocap's own checks -
 
-def test_the_quick_level_runs_its_six_checks_in_order_and_obeys_the_report_format(base, no_blender):
+def test_the_quick_level_runs_its_seven_checks_in_order_and_obeys_the_report_format(base, no_blender):
+    """The real checks, the post-hoc session on skellytracker's bundled frames and models included (about 10 s)."""
     messages = []
     report = certification.certify("quick", messages.append, None, ui_remote=False)
     assert [row["name"] for row in report["checks"]] == list(certification.QUICK_CHECKS)
@@ -41,14 +47,20 @@ def test_the_quick_level_runs_its_six_checks_in_order_and_obeys_the_report_forma
     assert rows["spawn-child"]["result"] == "pass" and rows["bundle-imports"]["result"] == "pass", rows
     assert rows["bundle-imports"]["numbers"] == {"failed": [], "from_bundle": None}  # not frozen
     assert rows["data-folder"]["result"] == "pass" and rows["data-folder"]["numbers"]["free_bytes"] > 0
-    assert [path.name for path in base.iterdir()] == ["certify"]  # the probe file is gone; the report is kept
+    posthoc = rows["posthoc-session"]
+    if posthoc["reason"] != "models-missing":  # an installed skellytracker without its model files
+        assert (posthoc["result"], posthoc["reason"]) == ("pass", None), posthoc
+        assert posthoc["numbers"]["frames"] == 3 and set(posthoc["numbers"]["execution_providers"]) == {"person", "wholebody"}
+    assert report["cleanup"] == []
+    assert [path.name for path in base.iterdir()] == ["certify"]  # the probe file and the session's work folder are gone
+    assert [path.name for path in (base / "certify").iterdir()] == ["reports"]
     assert [path.name for path in (base / "certify" / "reports").iterdir()] == [f"{report['id']}.json"]
     assert rows["install-facts"]["result"] == "record-only" and rows["install-facts"]["numbers"]["ui_remote"] is False
     assert rows["build-identity"]["result"] in ("pass", "record-only")
     assert report["schema"] == "skellycertify.report/1.4.0" and report["kind"] == "quick"
     assert report["package"]["name"] == "freemocap" and re.fullmatch(r"[0-9a-f-]{36}", report["id"])
     assert report["evidence"]["valid"] is (not report["evidence"]["reasons"])
-    assert messages[0]["state"] == "starting" and messages[-1]["state"] == "done" and messages[-1]["done"] == 6
+    assert messages[0]["state"] == "starting" and messages[-1]["state"] == "done" and messages[-1]["done"] == 7
     assert not PATH.search(json.dumps(report)), "no path in a report (privacy rule 1)"
     assert certification.module_result(report) == ("pass", None)
 
@@ -94,7 +106,7 @@ def test_the_full_level_is_not_built_not_evidence_and_a_bad_level_raises(base):
     assert "partial-run" in report["evidence"]["reasons"] and report["evidence"]["valid"] is False  # format 7.1 statement 4
     assert certification.certify_plan("quick")["details"]["checks"] == list(certification.QUICK_CHECKS)
     # format 2.6: `total` counts the checks that run, and a quick plan has no risks
-    assert [(plan["total"], plan["risks"]) for plan in map(certification.certify_plan, ("quick", "full"))] == [(6, []), (0, [])]
+    assert [(plan["total"], plan["risks"]) for plan in map(certification.certify_plan, ("quick", "full"))] == [(7, []), (0, [])]
     assert certification.certify_plan("quick", ui_remote=True, blender_exe_path=None) == certification.certify_plan("quick")
     with pytest.raises(ValueError):
         certification.certify("medium")
@@ -117,7 +129,8 @@ def _keep(created: str, results: dict, kind: str = "quick") -> str:
     return report_id
 
 
-def test_own_reports_are_kept_with_the_hand_in_states_and_not_sent_makes_them_pending(base, no_blender, monkeypatch):
+def test_own_reports_are_kept_with_the_hand_in_states_and_not_sent_makes_them_pending(base, no_blender, no_posthoc,
+                                                                                     monkeypatch):
     monkeypatch.setattr(certification, "_spawn_imports", lambda cancelled: ({"failed": ["cv2-ImportError"], "from_bundle": None}, None))
     failed = certification.certify("quick")
     [row] = certification.pending_reports()
@@ -160,14 +173,14 @@ def test_a_new_quick_pass_prunes_older_passes_not_handed_in(base):
     assert kept == {handed_in, failure, full, other, newest} and not kept & {old, smaller}
 
 
-def test_each_quick_pass_of_certify_replaces_the_one_before(base, no_blender, monkeypatch):
+def test_each_quick_pass_of_certify_replaces_the_one_before(base, no_blender, no_posthoc, monkeypatch):
     monkeypatch.setattr(certification, "_spawn_imports", lambda cancelled: PASSED)
     certification.certify("quick")
     certification.certify("quick")
     assert len(certification.pending_reports()) == 1
 
 
-def test_a_data_folder_that_cannot_be_written_still_gives_the_report(tmp_path, no_blender, monkeypatch):
+def test_a_data_folder_that_cannot_be_written_still_gives_the_report(tmp_path, no_blender, no_posthoc, monkeypatch):
     blocked = tmp_path / "a-file"
     blocked.write_text("")
     monkeypatch.setenv("FREEMOCAP_BASE_FOLDER", str(blocked))
@@ -424,12 +437,13 @@ def test_the_start_check_routes_give_each_packages_plan_and_start_or_refuse(monk
     client = TestClient(app)
     plan = client.get("/certify/start_check/plan").json()
     assert [(row["package"], row["checks"], row["total"], row["risks"]) for row in plan["packages"]] == [
-        ("freemocap", list(certification.QUICK_CHECKS), 6, []), ("skellytracker", ["dml@x-0"], 6, [])]  # the plan's total, not its count of pairs
+        ("freemocap", list(certification.QUICK_CHECKS), 7, []), ("skellytracker", ["dml@x-0"], 6, [])]  # the plan's total, not its count of pairs
     application.holds = (PipelineHold("realtime", "rt1"),)
     assert client.post("/certify/start_check").status_code == 409
     application.holds = ()
     accepted = client.post("/certify/start_check")
-    assert accepted.status_code == 202 and accepted.json()["items"] == [] and accepted.json()["seconds_estimate"] == 120
+    assert accepted.status_code == 202 and accepted.json()["items"] == []
+    assert accepted.json()["seconds_estimate"] == certification.QUICK_BUDGET_SECONDS + 90  # the two plans' estimates
     assert started[0]["pair"] is None and started[0]["ui_remote"] is True  # the test client's host is not loopback
     assert client.post("/certify/start_check", json={"blenderExePath": "C:/Blender/blender.exe"}).status_code == 202
     assert started[0]["blender_exe_path"] is None and started[1]["blender_exe_path"] == "C:/Blender/blender.exe"

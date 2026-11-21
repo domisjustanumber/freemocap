@@ -160,6 +160,9 @@ def test_the_progress_has_one_row_per_ep_and_gpu_with_its_state_and_result():
     ended["checks"][3]["result"] = "fail"  # its video check failed; the EP check gives the row's result
     ended["checks"][7]["result"] = "fail"
     assert [(row.state, row.result) for row in _full_rows(ended, items)] == [("done", "pass"), ("done", "fail")]
+    reported = {**_message(None, len(CHECKS)), "state": "done"}
+    reported["checks"][6]["result"] = reported["checks"][8]["result"] = "fail"  # a JPEG check and a CPU timing (owner, Q62)
+    assert [(row.state, row.result) for row in _full_rows(reported, items)] == [("done", "pass"), ("done", "pass")]
     # freemocap's checks: a row each, its benchmark of a pair named by the pair, apart from skellytracker's by its package
     names = ["data-folder", "recording", f"posthoc:{LABEL}", "posthoc:cpu", "blender"]
     own = _full_rows({"package": "freemocap", "state": "running", "step": {"name": "posthoc:cpu"},

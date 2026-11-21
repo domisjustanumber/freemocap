@@ -732,10 +732,13 @@ class CertificationResult:
 class StartCheckResult:
     """How one package's part of the last start check of this server session ended: `pass`, `fail`, `record-only` or
     `not-run` (a cancel gives `cancelled`) by the section rule of its report, `error` (`reason` is the exception class),
-    or, with no package, `crashed` / `error` of the whole check. `reason` of a fail is the first failed check's name."""
+    or, with no package, `crashed` / `error` of the whole check. `reason` of a fail is the first failed check's name.
+    At level full, `reported_only` names the failed checks that do not change `result` (JPEG checks and timings, owner
+    Q62): when they are the only failed checks, `result` is that of the other checks."""
     package: str | None = None
     result: str = ""
     reason: str | None = None
+    reported_only: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

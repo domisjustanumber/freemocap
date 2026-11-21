@@ -61,6 +61,21 @@ test('a running full benchmark locks the app until a cancel is asked; how it end
     ['skellytracker: finished', 'skellytracker: cancelled', 'skellytracker: stopped unexpectedly', 'Full benchmark: stopped unexpectedly']);
 });
 
+test('failed checks that the server lists as reported only follow a finished package\'s line, in words (owner, Q62)', () => {
+    const items = [{execution_provider: 'dml', label: 'DirectML', device_key: 'gpu:1:2:0', device_name: 'GPU A', certified: false, usable: true}];
+    const rows = [{name: 'dml@1-2-0', package: 'skellytracker', execution_provider: 'dml', device_key: 'gpu:1:2:0', state: 'done', result: 'pass'},
+        {name: 'cpu', package: 'skellytracker', execution_provider: 'cpu', state: 'done', result: 'pass'}];
+    const reported = ['dml@1-2-0:jpeg', 'dml@1-2-0:jpeg:gpu_decode.baseline_420', 'cpu:pipeline-6'];
+    assert.deepEqual(fullResultLines([{package: 'skellytracker', result: 'pass', reported_only: reported},
+        {package: 'freemocap', result: 'pass', reported_only: []}], items, rows), [
+        {text: 'skellytracker: finished', failed: false},
+        {text: 'Reported only: JPEG checks on DirectML on GPU A, timings on CPU: they did not pass, and they do not change the result.',
+            failed: false},
+        {text: 'freemocap: finished', failed: false}]);
+    assert.equal(fullResultLines([{package: 'skellytracker', result: 'pass', reported_only: ['dml@1-2-0:pipeline-1']}])[1].text,
+        'Reported only: timings on dml@1-2-0: they did not pass, and they do not change the result.', 'after a restart the server has no rows');
+});
+
 test('the full benchmark\'s requests: the plan, a start with the clean-up choice, and the server\'s one-sentence refusal', async () => {
     const sent: unknown[] = [];
     const answer = (response: Response) => (async (input: RequestInfo | URL, init?: RequestInit) => {

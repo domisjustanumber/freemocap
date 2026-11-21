@@ -46,6 +46,7 @@ from freemocap.core.streaming.message_model import (
     StartCheckResult,
 )
 from freemocap.system.certify import crash_record
+from freemocap.system.certify.start_check import REPORTED_ONLY
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +130,9 @@ def _full_rows(message: dict, items: tuple[CertificationItem, ...]) -> tuple[Cer
         # partly-done: some of its checks ended and the rest come later in the run (the CPU's timings follow the pairs)
         state = "running" if isinstance(step.get("name"), str) and group(step["name"]) == name \
             else "done" if None not in results else "waiting" if set(results) == {None} else "partly-done"
-        result = rollup or next((result for result in ("fail", "pass", "record-only", "not-run") if result in results), None)
+        # a row with no roll-up check (the CPU) takes no result from its reported-only checks (owner, Q62)
+        counted = [check.get("result") for check in checks if not REPORTED_ONLY.match(check["name"])] or results
+        result = rollup or next((result for result in ("fail", "pass", "record-only", "not-run") if result in counted), None)
         if any(check.get("crashed") for check in checks):  # a crashed timing check fails its row, not its pair (owner: TBC)
             result = "fail"
         source = next((check for check in checks if check["name"] == name), None)             or next((check for check in checks if check.get("result") == result), {})

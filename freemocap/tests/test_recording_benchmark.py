@@ -207,6 +207,26 @@ def test_the_full_check_passes_the_test_media_folder_and_the_clean_up_choice_onl
     from skellytracker.core.eps.certification import frames_record
     assert (bench.media / f"{frames_record()['sha256']}.zip").is_file(), "skellytracker's bundled frames, where it reads them"
 
+    # owner, Q62: failed JPEG checks and timings are reported only; the package finished and the clean-up still happens
+    def reported(level, progress, cancel, **options):
+        return {"checks": [{"name": "cpu:video", "result": "pass"}, {"name": "cpu:pipeline-6", "result": "fail"},
+                           {"name": "dml@1-2-0:jpeg", "result": "fail"},
+                           {"name": "dml@1-2-0:jpeg:gpu_decode.baseline_420", "result": "fail"}], "evidence": {"reasons": []}}
+
+    def video(level, progress, cancel, **options):
+        return {"checks": [{"name": "dml@1-2-0:video", "result": "fail"}, {"name": "dml@1-2-0:jpeg", "result": "fail"}],
+                "evidence": {"reasons": []}}
+
+    calls.clear()
+    assert start_check.run_full_check(lambda message: None, multiprocessing.Event(), remove_data=True, own_certify=own,
+                                      certify=reported) == ("full", (
+        ("skellytracker", "pass", None, ("cpu:pipeline-6", "dml@1-2-0:jpeg", "dml@1-2-0:jpeg:gpu_decode.baseline_420")),
+        ("freemocap", "pass", None, ())))
+    assert calls[-1][0] == "freemocap" and calls[-1][1]["remove_data"] is True
+    # a failed video check still fails the package, which then lists no check apart
+    assert start_check.run_full_check(lambda message: None, multiprocessing.Event(), remove_data=True, own_certify=own,
+                                      certify=video)[1][0] == ("skellytracker", "fail", "dml@1-2-0:video", ())
+
 
 class _Response:
     """`requests.get(..., stream=True)` of a download whose chunks come from `chunks()`: nothing leaves this machine."""

@@ -335,12 +335,15 @@ export const CertificationSchema = z.object({
     package: z.string().optional(),
     result: z.string(),
     reason: z.string().optional(),
+    reported_only: z.array(z.string()).optional(),
   })).optional(),
-  // How each package's part of the last full benchmark ended, with the shape of `start_results`.
+  // How each package's part of the last full benchmark ended, with the shape of `start_results`; `reported_only` names
+  // the failed checks that do not change the result (JPEG checks and timings).
   full_results: z.array(z.object({
     package: z.string().optional(),
     result: z.string(),
     reason: z.string().optional(),
+    reported_only: z.array(z.string()).optional(),
   })).optional(),
   // The last full benchmark's rows as it ended (each done), until the next one starts.
   full_rows: z.array(CertificationRunRowSchema).optional(),

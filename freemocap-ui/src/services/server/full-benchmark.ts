@@ -96,17 +96,31 @@ export function fullRowStatus(row: FullRunRow): {kind: 'waiting' | 'running' | '
 /** The count of finished checks; no percentage and no time remaining. */
 export const finishedText = (run: CertificationRun): string => `${plural(run.done, 'check')} finished`;
 
+/** The failed checks that the server lists as reported only (owner, Q62: JPEG checks and timings), in words: one part
+ * per kind and pair, the pair by the run's rows when the server still has them, else by its label. */
+export function reportedOnlyText(names: readonly string[], items: readonly CertificationItem[] = [],
+    rows: readonly FullRunRow[] = []): string {
+    const parts = names.map(name => {
+        const [label, kind] = name.split(':');
+        const row = rows.find(row => row.name === label && row.execution_provider);
+        return `${kind === 'jpeg' ? 'JPEG checks' : 'timings'} on ${row ? fullRowName(row, items) : label === 'cpu' ? 'CPU' : label}`;
+    });
+    return `Reported only: ${[...new Set(parts)].join(', ')}: they did not pass, and they do not change the result.`;
+}
+
 /** How each package's part of the last full benchmark ended (a crash of the whole run names no package); a failed
- * check is named in words, by the server's items and the run's rows. */
+ * check is named in words, by the server's items and the run's rows. Failed checks that the server lists as reported
+ * only follow their package's line. */
 export function fullResultLines(results: readonly StartCheckResult[], items: readonly CertificationItem[] = [],
     rows: readonly FullRunRow[] = []): {text: string; failed: boolean}[] {
-    return results.map(({package: name, result, reason}) => {
+    return results.flatMap(({package: name, result, reason, reported_only: reported}) => {
         const why = checkText(reason ?? result, items, rows);
         const ended = result === 'crashed' || reason === 'crashed' ? 'stopped unexpectedly'
             : result === 'pass' || result === 'record-only' ? 'finished'
                 : result === 'fail' ? `finished with failed checks: ${why}`
                     : result === 'not-run' ? (reason === 'cancelled' ? 'cancelled' : `not run: ${why}`) : `could not run: ${why}`;
-        return {text: `${name ?? FULL_BENCHMARK_TEXT.button}: ${ended}`, failed: result !== 'pass' && result !== 'record-only' && result !== 'not-run'};
+        return [{text: `${name ?? FULL_BENCHMARK_TEXT.button}: ${ended}`, failed: result !== 'pass' && result !== 'record-only' && result !== 'not-run'},
+            ...(reported?.length ? [{text: reportedOnlyText(reported, items, rows), failed: false}] : [])];
     });
 }
 

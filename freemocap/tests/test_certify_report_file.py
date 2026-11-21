@@ -1,9 +1,10 @@
-"""The certify report file against skellycertify's contract (report format 1.5.0, section 4).
+"""The certify report file against skellycertify's contract (report format 1.6.0, section 4).
 
 `fixtures/certify/valid.md`, `valid-quick.md` and `refused-privacy.md` are copies of skellycertify `relay/samples/` at
-`9e6d575` (format 1.4.0, unchanged at `0966552`, format 1.5.0); `build_report_file` reproduces the two valid files byte
-for byte but for the file's schema id, which is now 1.5.0. `valid-component.md` is freemocap's own: the writer built it
-(format 1.5.0) from a freemocap module with `component` items and the first skellytracker module of `valid-quick.md`.
+`9e6d575` (format 1.4.0, unchanged at `0966552`, format 1.5.0, and at `ba9a071`, format 1.6.0); `build_report_file`
+reproduces the two valid files byte for byte but for the file's schema id, which is now 1.6.0. `valid-component.md` is
+freemocap's own: the writer built it (format 1.6.0) from a freemocap module with `component` items and the first
+skellytracker module of `valid-quick.md`.
 When the skellycertify checkout and node are present, the relay's own validator (`relay/src/report.js`, `relay/src/privacy.js`) checks the built file.
 """
 
@@ -73,9 +74,9 @@ def _module(name="skellytracker", created="2026-11-20T00:25:51Z", checks=(), sum
     return module if summary is None else {**module, "summary": summary}
 
 
-def _as_1_5_0(sample: str) -> str:
-    """A 1.4.0 sample as the writer builds it now: the file's own schema id is 1.5.0, each module keeps its own."""
-    return sample.replace('{\n "schema": "skellycertify.report/1.4.0",', '{\n "schema": "skellycertify.report/1.5.0",', 1)
+def _as_1_6_0(sample: str) -> str:
+    """A 1.4.0 sample as the writer builds it now: the file's own schema id is 1.6.0, each module keeps its own."""
+    return sample.replace('{\n "schema": "skellycertify.report/1.4.0",', '{\n "schema": "skellycertify.report/1.6.0",', 1)
 
 
 def _head(body: bytes) -> str:
@@ -226,7 +227,7 @@ def test_a_long_note_line_is_wrapped_under_the_2000_character_rule():
 
 def test_the_valid_sample_is_the_file_the_writer_builds_from_its_own_data():
     text, data = _sample("valid.md")
-    assert build_report_file(data["modules"], data["note"], data["app"])[1].decode("utf-8") == _as_1_5_0(text)
+    assert build_report_file(data["modules"], data["note"], data["app"])[1].decode("utf-8") == _as_1_6_0(text)
 
 
 def test_component_items_give_the_component_table_after_the_benchmark_table():
@@ -243,7 +244,7 @@ def test_component_items_give_the_component_table_after_the_benchmark_table():
 
 def test_the_component_sample_is_the_file_the_writer_builds_and_the_relay_accepts_its_mixed_versions():
     text, data = _sample("valid-component.md")
-    assert [module["schema"] for module in data["modules"]] == ["skellycertify.report/1.5.0", "skellycertify.report/1.4.0"]
+    assert [module["schema"] for module in data["modules"]] == ["skellycertify.report/1.6.0", "skellycertify.report/1.4.0"]
     _, body = build_report_file(data["modules"], data["note"], data["app"])
     assert body.decode("utf-8") == text and "| Module | Result |\n|---|---|\n| Build identity | pass |\n" in text
     if RELAY_SRC.is_dir() and shutil.which("node") is not None:
@@ -308,14 +309,14 @@ def test_the_relay_validator_accepts_the_built_file():
     assert _relay_verdict(body.replace(b"Windows 11 Home 26H2", b"C:\\\\Users\\\\x"))["rule"] == 1
 
 
-def test_modules_with_ids_pass_through_unchanged_in_a_file_that_declares_1_5_0():
+def test_modules_with_ids_pass_through_unchanged_in_a_file_that_declares_1_6_0():
     sample, data = _sample("valid-quick.md")  # two quick reports of one package, each with a v4 UUID id
     modules = copy.deepcopy(data["modules"])
     _, body = build_report_file(modules, data["note"], data["app"])
     text = body.decode("utf-8")
-    assert text == _as_1_5_0(sample)  # its "Checks that did not pass:" table included
+    assert text == _as_1_6_0(sample)  # its "Checks that did not pass:" table included
     built = json.loads(text.split("```json\n")[1].rsplit("```", 1)[0])
-    assert built["schema"] == "skellycertify.report/1.5.0" and built["modules"] == data["modules"]
+    assert built["schema"] == "skellycertify.report/1.6.0" and built["modules"] == data["modules"]
     if RELAY_SRC.is_dir() and shutil.which("node") is not None:
         assert _relay_verdict(body) == {"rule": 0}
         bad_id = body.replace(b"3f2b8c1e-9a4d-4e7b-b6a1-0c5d2e8f7a90", b"quick-20261119T100000Z")
@@ -349,8 +350,8 @@ def test_freemocaps_own_modules_obey_the_privacy_rules_and_the_relay_validator_b
     # build_report_file applies freemocap's Python copy of privacy rules 1 to 11 and raises on a break
     _, body = build_report_file([quick, full, *data["modules"]], "freemocap and skellytracker", report_file.app_block())
     built = json.loads(body.decode("utf-8").split("```json\n")[1].rsplit("```", 1)[0])
-    assert built["schema"] == "skellycertify.report/1.5.0" and built["modules"][:2] == [quick, full]
-    assert quick["schema"] == full["schema"] == "skellycertify.report/1.5.0"
+    assert built["schema"] == "skellycertify.report/1.6.0" and built["modules"][:2] == [quick, full]
+    assert quick["schema"] == full["schema"] == "skellycertify.report/1.6.0"
     head = _head(body)
     assert "| - | CPU | tracking | 82.0 | 12.2 |\n\n| Module | Result |\n|---|---|\n| Build identity |" in head
     assert "| Blender | record |" in head  # quick: Blender was found; full: not installed, so no second row

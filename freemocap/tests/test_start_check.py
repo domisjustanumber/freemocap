@@ -57,7 +57,7 @@ def test_the_quick_level_runs_its_seven_checks_in_order_and_obeys_the_report_for
     assert [path.name for path in (base / "certify" / "reports").iterdir()] == [f"{report['id']}.json"]
     assert rows["install-facts"]["result"] == "record-only" and rows["install-facts"]["numbers"]["ui_remote"] is False
     assert rows["build-identity"]["result"] in ("pass", "record-only")
-    assert report["schema"] == "skellycertify.report/1.5.0" and report["kind"] == "quick"
+    assert report["schema"] == "skellycertify.report/1.6.0" and report["kind"] == "quick"
     # format 1.5.0: one `component` item for each check that ran, named as its check's `module`; none for a Blender that
     # is not installed
     assert report["summary"] == [{"group": "component", "name": row["module"], "device": None, "result": row["result"]}

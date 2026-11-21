@@ -28,13 +28,13 @@ Cameras: not checked on this system.
 
 Note of the person:
 
-> Example note: freemocap's own quick report of format 1.5.0 beside a skellytracker report of format 1.4.0. This file is a sample for freemocap's tests. It holds example values only.
+> Example note: freemocap's own quick report of format 1.6.0 beside a skellytracker report of format 1.4.0. This file is a sample for freemocap's tests. It holds example values only.
 
 ## Data
 
 ```json
 {
- "schema": "skellycertify.report/1.5.0",
+ "schema": "skellycertify.report/1.6.0",
  "app": {
   "name": "freemocap",
   "version": "2.0.0",
@@ -42,7 +42,7 @@ Note of the person:
  },
  "modules": [
   {
-   "schema": "skellycertify.report/1.5.0",
+   "schema": "skellycertify.report/1.6.0",
    "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
    "package": {
     "name": "freemocap",
@@ -282,6 +282,6 @@ Note of the person:
    }
   }
  ],
- "note": "Example note: freemocap's own quick report of format 1.5.0 beside a skellytracker report of format 1.4.0. This file is a sample for freemocap's tests. It holds example values only."
+ "note": "Example note: freemocap's own quick report of format 1.6.0 beside a skellytracker report of format 1.4.0. This file is a sample for freemocap's tests. It holds example values only."
 }
 ```

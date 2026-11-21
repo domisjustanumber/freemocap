@@ -1,4 +1,4 @@
-"""freemocap's own certify checks (skellycertify report format 1.5.0; ep-certification-integration.md, "freemocap's own
+"""freemocap's own certify checks (skellycertify report format 1.6.0; ep-certification-integration.md, "freemocap's own
 checks"): only what freemocap owns. No check uses a camera. Only `posthoc-session` loads models, on the EP that the app
 selects by default, and it runs on skellytracker's bundled test frames (`certify_frames`), downloading none.
 
@@ -77,7 +77,7 @@ import freemocap
 
 logger = logging.getLogger(__name__)
 
-SCHEMA = "skellycertify.report/1.5.0"  # `summary`: the `component` items, and at `full` the `benchmark` items
+SCHEMA = "skellycertify.report/1.6.0"  # `summary`: the `component` items, and at `full` the `benchmark` items
 SCHEMA_PREFIX = "skellycertify.report/1."
 REPORT_STATES = ("pending", "opened", "covered")  # as skellytracker's: `opened` = issue form opened, `covered` = an issue holds it
 REPORT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$")  # a safe file name only; ids are v4 UUIDs, never parsed

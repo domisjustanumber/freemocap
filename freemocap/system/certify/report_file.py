@@ -1,11 +1,11 @@
-"""The certify report file: one Markdown file that merges module reports (skellycertify report format 1.5.0, section 4).
+"""The certify report file: one Markdown file that merges module reports (skellycertify report format 1.6.0, section 4).
 
 `build_report_file()` is pure: the same module reports, note and app block give the same bytes, so the file the
 person views is the file that is sent. It refuses a file that breaks privacy rules 1 to 11 of section 6, the rules
 the relay checks; `scrub_note()` applies rules 12 and 13 to the person's note before the file is built, and
 `clean_note()` (rules 18 and 20) cleans whatever note reaches `build_report_file()`.
 
-The file declares 1.5.0, the format of its layout. Each module report keeps its own schema id: a package that still
+The file declares 1.6.0, the format of its layout. Each module report keeps its own schema id: a package that still
 writes 1.4.0 (skellytracker at freemocap's pin) is a module the reader of major version 1 accepts (spec 8), and the JSON
 block holds each report as its package wrote it.
 """
@@ -23,7 +23,7 @@ from pathlib import Path
 import freemocap
 from freemocap.build_info import BUILD_GIT_SHA
 
-SCHEMA = "skellycertify.report/1.5.0"  # the file declares the format of its Markdown layout (spec 4.1, 4.2)
+SCHEMA = "skellycertify.report/1.6.0"  # the file declares the format of its Markdown layout (spec 4.1, 4.2)
 NOTE_MAX_CHARS = 2000
 COMMIT = re.compile(r"^[0-9a-f]{40}$")
 CREATED_UTC = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$")

@@ -358,6 +358,20 @@ def test_a_failed_freemocap_check_releases_the_ui_and_skips_the_start_check_for_
         manager.shutdown()
 
 
+def test_freemocaps_check_that_raises_writes_the_marker_as_a_failed_one(base):
+    """The coordinator's reading of Q80, for the owner to confirm: an `error` (an exception) is a `fail` here."""
+    def own_raises(level, progress, cancel, **options):
+        raise PermissionError("C:/private")
+
+    def tracker(level, progress, cancel, **options):
+        return {"checks": [{"name": "cpu:video", "result": "pass"}], "evidence": {"reasons": []}}
+    assert start_check.run_start_check(lambda message: None, multiprocessing.Event(), ui_remote=False, own_certify=own_raises,
+                                       certify=tracker) == ("start", (("freemocap", "error", "PermissionError"),
+                                                                      ("skellytracker", "pass", None)))
+    assert json.loads(start_check.record_path().read_text(encoding="utf-8"))["crashed"] == "PermissionError"
+    assert not start_check.start_check_needed() and start_check.start_check_needed(crash_skips=False)
+
+
 def test_a_cancelled_start_check_keeps_the_ui_grey_and_skips_skellytracker(base):
     manager = _manager(own_until_cancelled)
     try:

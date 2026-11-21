@@ -8,7 +8,8 @@ counts; GPU EPs never do (decision 15).
 
 `run_start_check` runs in the quick check's spawn child: freemocap's own checks, then skellytracker's `certify("quick")`
 with no EP named (every GPU EP with no reviewed row, the field-test ones included: a pass is their opt-in, decision 17).
-A pass of freemocap's checks is recorded under `<base data folder>/certify/start-check.json`. `run_full_check` runs the
+A pass of freemocap's checks is recorded under `<base data folder>/certify/start-check.json`, and so is a start check
+that crashed in freemocap's own part (`crash_record.recover`). `run_full_check` runs the
 full benchmark in the same child, every package's level full in turn.
 """
 import importlib.metadata
@@ -91,10 +92,20 @@ def start_check_needed() -> bool:
 
 def record_pass(report: dict) -> None:
     """Keep freemocap's passed module report with the version set and the OS key (decision 13)."""
+    _write_record({"report": report})
+
+
+def record_crash(check: str | None) -> None:
+    """A start check that crashed in freemocap's own part is not asked for again until a package version changes (owner,
+    Q59); its report stays in the hand-in list and the Certification button still runs the check."""
+    _write_record({"crashed": check})
+
+
+def _write_record(entry: dict) -> None:
     path = record_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps({"versions": version_set(), "os": os_key(), "report": report}, indent=1), encoding="utf-8")
+    temporary.write_text(json.dumps({"versions": version_set(), "os": os_key(), **entry}, indent=1), encoding="utf-8")
     temporary.replace(path)
 
 

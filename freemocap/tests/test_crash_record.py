@@ -1,5 +1,6 @@
 """The crash record of a certify run: written while a check runs, removed after an ordinary end, and found at launch or
 after a dead child it becomes an incomplete report, the crashed pair's failure, and nothing that runs again."""
+import json
 import multiprocessing
 import os
 import time
@@ -10,7 +11,7 @@ from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
 
 from freemocap import certification
 from freemocap.core.streaming.message_model import CertificationPair, CertificationResult, StartCheckResult
-from freemocap.system.certify import crash_record
+from freemocap.system.certify import crash_record, start_check
 from freemocap.system.certify.quick_check import QuickCheckManager
 from freemocap.system.certify.relay import report_file_for
 
@@ -42,6 +43,7 @@ def failures(monkeypatch):
     monkeypatch.setattr(crash_record, "record_provider_failure", lambda check, created: calls.append(check))
     yield calls
     crash_record.remove()
+    start_check.record_path().unlink(missing_ok=True)
 
 
 def _manager(**options):
@@ -140,6 +142,19 @@ def test_a_start_check_found_at_launch_releases_the_gated_starts(failures):
     assert manager.start_released and not manager.start_required and not manager.running
     assert failures == ["posthoc-session"]  # no pair: `record_provider_failure` stores nothing for it (next test)
     assert [check["result"] for check in _new_report(before)["checks"]] == ["pass", "fail", "not-run"]
+    # owner, Q59: not asked for again until a package version changes; the report stays in the hand-in list
+    record = json.loads(start_check.record_path().read_text(encoding="utf-8"))
+    assert (record["versions"], record["crashed"]) == (start_check.version_set(), "posthoc-session")
+    assert start_check.start_check_needed() is False
+    start_check.record_path().write_text(json.dumps({**record, "versions": {**record["versions"], "freemocap": "0.0.0"}}),
+                                         encoding="utf-8")
+    assert start_check.start_check_needed() is start_check._has_checks()  # a new version set: asked for again
+
+
+def test_a_start_check_that_crashed_in_skellytrackers_part_is_asked_for_again(failures):
+    crash_record.write({"level": "quick", "pair": None, "created_utc": "2026-11-20T10:00:00Z", "message": RUNNING})
+    _manager()
+    assert not start_check.record_path().exists()
 
 
 def test_a_crashed_gpu_check_is_skellytrackers_failed_quick_check_of_that_pair(monkeypatch, tmp_path):

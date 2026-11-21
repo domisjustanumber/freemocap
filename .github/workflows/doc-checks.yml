@@ -1,0 +1,24 @@
+name: Doc checks
+
+on:
+  push:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  doc-checks:
+    name: Decision log, links and private data
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v10.0.0
+        with:
+          python-version: "3.12"
+      # The doc checks use only the standard library. `uv sync` needs the sibling checkouts of
+      # [tool.uv.sources], which CI does not have. The pytest version is the one in uv.lock.
+      - run: uv run --no-project --with pytest==9.1.1 pytest tools/tests

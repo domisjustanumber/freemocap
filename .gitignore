@@ -167,8 +167,6 @@ upx.exe
 .docusaurus/
 */.docusaurus/
 */.claude/*
-/.claude/
-/CLAUDE.md
 .aider*
 freemocap-ui/freemocap_server
 /.codex/*
@@ -177,3 +175,17 @@ freemocap-ui/tsconfig.node.tsbuildinfo
 # Isolated editable-install metadata
 /freemocap.egg-info/
 /build/
+
+# Local working notes (decision 0001)
+plans/
+# Tracked documentation pages, not local working notes.
+!freemocap-docs/docs/proposals/*/plans/
+
+# Claude Code: track only the skills. Local settings and worktrees stay out of git.
+.claude/*
+!.claude/skills/
+
+# Secrets and private data (decision 0001). Never commit them. (.env* is above.)
+*.pem
+*.key
+.private-terms

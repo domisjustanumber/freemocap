@@ -192,6 +192,8 @@ dev = [
 # =============================================================================
 
 [tool.pytest.ini_options]
+# A bare `pytest` runs the backend tests, the tools tests and the doc checks in tools/tests/.
+testpaths = ["freemocap/tests", "tools"]
 asyncio_mode = "auto"
 log_cli = true
 log_cli_level = "INFO"

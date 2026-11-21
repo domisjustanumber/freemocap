@@ -1842,6 +1842,21 @@ Suites at `8be2785e`: Python 1758 passed, 0 failed, 20 skipped; UI 230 of 231 wi
 The crash record for both levels (fifth grilling, "Crash, both levels"), then the consent step and the
 lock of the Full benchmark. The realtime check waits for Q57.
 
+### Crash record, 2026-11-21 (commit `f22419ba`)
+
+`freemocap/system/certify/crash_record.py`, wired into `quick_check.py`. File
+`<data>/certify/running-check.json` (level, pair, newest progress message), rewritten on each new progress
+message, removed on every ordinary end. Found at launch: running check `fail`/`crashed`, unfinished checks
+`not-run`/`interrupted` (spec 2.5), report marked incomplete in the share list, the pair stored as a failed
+quick check, nothing re-run. A child-process crash ends in the same record. Suites: Python 1763 passed,
+0 failed, 20 skipped; UI 230 of 231.
+
+Open with the owner: a lasting skip after a crash in freemocap's own part (today the start check is asked
+again at the launch after next); the code `reason-lost` (progress messages carry no reasons); the failed
+pair is written through skellytracker's private `_record` and `_label` (ask that session for a public
+call). Limits: 0.5 s refresh gap; no pair failure for `coreml` (check name without `@`); no real crash
+tested.
+
 ## Next actions
 
 All as local commits on `sidecar-implementation`, in this order:

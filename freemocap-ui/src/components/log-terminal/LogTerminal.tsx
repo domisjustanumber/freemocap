@@ -322,7 +322,11 @@ const LogTerminalFull = ({
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `freemocap-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+        // Local time, as the pipeline metrics snapshot and recording names are: the clock shifted by the local offset.
+        const now = new Date();
+        const stamp = new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString()
+            .replace(/\.\d+Z$/, '').replace(/[-:]/g, '').replace('T', '-');
+        a.download = `freemocap-logs-${stamp}.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);

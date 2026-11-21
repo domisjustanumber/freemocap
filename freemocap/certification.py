@@ -8,9 +8,21 @@ selects by default, and it runs on skellytracker's bundled test frames (`certify
 
 `certify(level, progress, cancel, *, ui_remote=None, blender_exe_path=None)` returns freemocap's module report;
 `certify_plan(level)` takes the same options and gives its plan. `import freemocap` does not import this module: the
-two names load it on first use. The level `quick` runs the seven checks below within `QUICK_BUDGET_SECONDS`. The level
-`full` (reference-posthoc, concurrent-runs, exports, live-numbers) is not built: each of its checks is `not-run` with
-`not-built`, and the report is not valid as evidence (`partial-run`, report format 7.1 statement 4) (F13, G12).
+two names load it on first use. The level `quick` runs the seven checks below within `QUICK_BUDGET_SECONDS`.
+
+The level `full` (fifth grilling, "Full benchmark") is the end-to-end post-hoc benchmark on the freemocap sample
+recording: `data-folder` (write access only), `recording` (the archive `<sha256>.zip` in the shared test media folder,
+report format 2.8, downloaded only when absent; extracted and cut to `BENCHMARK_FRAMES` frames in freemocap's work folder
+`<base data folder>/certify/benchmark`), one `posthoc:<label>` for each EP and GPU that skellytracker's full plan runs and
+the CPU, each in its own spawn child through the app's post-hoc session (`MocapPipeline`, as `posthoc-session`), then
+`blender` (the app's Blender export of one finished recording, only when Blender is installed). The pairs run in the
+staging order: no reviewed pass first, then the known-fastest (the first reviewed pair in skellytracker's preference
+order), then the CPU, then the rest. A pair runs only when skellytracker's status calls it usable after skellytracker's
+own run (a pass in this run or a reviewed pass, and no failed check here). Timings are summary items of the group
+`benchmark` (ms/frame and FPS of each stage, measured by the post-hoc session's `PerformanceReport` and read with the
+dataset tools' `parse_performance` and `normalized_stages`); a slow result never fails. With `remove_data` (the app passes
+it only when the earlier packages succeeded), a run with no failed check and no cancel removes the work folder, and the
+archive when this run downloaded it.
 
 `posthoc-session` (report format 2.7 rule 3) proves freemocap's side around the tracker, in its own spawn child: the app's
 post-hoc session (`MocapPipeline`, as the backend starts it) reads a 3-frame video of the bundled frames, hands each frame
@@ -24,6 +36,10 @@ freemocap's reason codes (report format 5.4), besides the common ones (`models-m
 - `import-failed`: a module of the bundle did not import in the spawn child (`numbers.failed` names them).
 - `not-found`: no Blender executable was found.
 - `session-failed`: the post-hoc session ended without completing.
+- `bad-hash`: the recording archive's SHA-256 is not the expected one (format 2.6); a downloaded one is deleted.
+- `recording-missing`: the recording was not ready, so the post-hoc benchmarks and the Blender export did not run.
+- `ep-not-passed`: skellytracker's status does not call the EP on that GPU usable after its checks of this run.
+- `not-installed`: Blender is not installed ("Blender: not installed"); the benchmark never installs it.
 - `reason-lost`: in the report of an interrupted run (`system/certify/crash_record.py`), a check that ended before the
   crash; the progress kept its result, not its reason.
 - an exception class name, for example `PermissionError`: the step raised it (never its message).
@@ -55,12 +71,25 @@ import freemocap
 
 logger = logging.getLogger(__name__)
 
-SCHEMA = "skellycertify.report/1.4.0"  # no `summary`: no group of format 3.7 fits freemocap's checks
+SCHEMA = "skellycertify.report/1.4.0"  # `summary` at `full` only: its `benchmark` items
 SCHEMA_PREFIX = "skellycertify.report/1."
 REPORT_STATES = ("pending", "opened", "covered")  # as skellytracker's: `opened` = issue form opened, `covered` = an issue holds it
 REPORT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$")  # a safe file name only; ids are v4 UUIDs, never parsed
 QUICK_CHECKS = ("build-identity", "spawn-child", "bundle-imports", "data-folder", "posthoc-session", "install-facts", "blender")
-FULL_CHECKS = ("reference-posthoc", "concurrent-runs", "exports", "live-numbers")
+FULL_CHECKS = ("data-folder", "recording")  # then one `posthoc:<label>` for each pair, then `blender`
+SAMPLE_RECORDING = {"name": "freemocap_sample_data.zip", "bytes": 166958457, "sha256":
+                    "c23d6a24f9ed8cca74bccf171128543d661b47e5780df5b446d60063ac4acf4f"}  # its `source`: catalog.SAMPLE_DATA
+# 300 frames (10 s of the 30 fps sample, three cameras): measured on one Windows PC (i7-14700K, RTX 3070, 2026-11-21), the CPU
+# pair took 40 s from start to end (post-hoc session 35.8 s, its tracking 82 ms/frame), in the 30 to 60 s that the owner set.
+BENCHMARK_FRAMES = 300
+BENCHMARK_STAGES = (("inference.process_batch", "inference"), ("graph.load_and_track", "tracking"),
+                    ("graph.match_and_triangulate", "triangulation"), ("graph.filter_trajectories", "filtering"),
+                    ("graph.reconstruct_skeletons", "reconstruction"), ("graph.save_spatial", "saving"),
+                    ("export.channel_exports", "exports"))  # PerformanceReport stage (name prefix) -> `stage` of the item
+# Estimates from the same measurement: the download at about 8 MB/s (2.4 s there), the extraction and cut (5.4 s), one
+# pair (24 s DirectML on the RTX 3070, 40 s CPU, 67 s DirectML on the UHD 770) and the Blender export (11.6 s).
+DOWNLOAD_SECONDS, PREPARE_SECONDS, PAIR_SECONDS, BLENDER_SECONDS = 20, 10, 45, 20
+PAIR_TIMEOUT_SECONDS, BLENDER_EXPORT_TIMEOUT_SECONDS = 600, 600
 # skellytracker first: it sets ONNX Runtime's telemetry switch before onnxruntime is imported (decision 3).
 BUNDLE_MODULES = ("numpy", "cv2", "pyarrow", "av", "scipy", "numba", "skellyforge", "skellytracker", "onnxruntime")
 OPTIONAL_MODULES = ("numba",)  # imported only when shipped
@@ -79,16 +108,81 @@ def _check_level(level: str) -> None:
         raise ValueError(f"level must be 'quick' or 'full', not {level!r}")
 
 
-def certify_plan(level: str, *, ui_remote: bool | None = None, blender_exe_path: str | None = None) -> dict:
-    """What `certify(level)` runs: no download, no change outside freemocap's data folder, no question, no risk to a
-    device. `total` counts the checks that run: the seven of `quick`, none of `full` (not built). `seconds_estimate` is
-    the budget that `posthoc-session` keeps to, 0 at `full`. It takes the options of `certify` (report format 2.2); neither changes the
-    plan."""
+def certify_plan(level: str, *, ui_remote: bool | None = None, blender_exe_path: str | None = None,
+                 test_media_dir: str | os.PathLike | None = None, remove_data: bool = False) -> dict:
+    """What `certify(level)` runs: no change outside freemocap's data folder and the test media folder, no question, no
+    risk to a device. `total` counts the checks that run. At `quick`: its seven checks, no download, and the budget that
+    `posthoc-session` keeps to. At `full`: its checks for the pairs of this system, the sample recording in `downloads`
+    when it is not yet in the test media folder, and the measured estimate. It takes the options of `certify` (report
+    format 2.2)."""
     _check_level(level)
-    return {"package": "freemocap", "kind": level, "seconds_estimate": QUICK_BUDGET_SECONDS if level == "quick" else 0,
-            "total": len(QUICK_CHECKS) if level == "quick" else 0,
-            "risks": [], "downloads": [], "system_changes": [], "questions": [],
-            "details": {"checks": list(QUICK_CHECKS if level == "quick" else FULL_CHECKS)}}
+    if level == "quick":
+        return {"package": "freemocap", "kind": level, "seconds_estimate": QUICK_BUDGET_SECONDS, "total": len(QUICK_CHECKS),
+                "risks": [], "downloads": [], "system_changes": [], "questions": [], "details": {"checks": list(QUICK_CHECKS)}}
+    pairs = _pairs()
+    names = _full_names(pairs)
+    present = _archive(test_media_dir).is_file()
+    seconds = (0 if present else DOWNLOAD_SECONDS) + PREPARE_SECONDS + PAIR_SECONDS * len(pairs) + \
+        (BLENDER_SECONDS if _blender_path(blender_exe_path) else 0)
+    return {"package": "freemocap", "kind": level, "seconds_estimate": seconds, "total": len(names), "risks": [],
+            "downloads": [] if present else [_download_item()], "system_changes": [], "questions": [],
+            "details": {"checks": names}}
+
+
+def _download_item() -> dict:
+    from freemocap.tools.datasets.catalog import SAMPLE_DATA
+    return {**SAMPLE_RECORDING, "source": SAMPLE_DATA.url}
+
+
+def _archive(test_media_dir) -> Path:
+    """The sample recording's archive by the name rule of format 2.8; with no test media folder, in freemocap's own."""
+    folder = Path(test_media_dir) if test_media_dir is not None else reports_dir().parent / "media"
+    return folder / f"{SAMPLE_RECORDING['sha256']}.zip"
+
+
+def _work() -> Path:
+    return reports_dir().parent / "benchmark"
+
+
+def _full_names(pairs: list[tuple]) -> list[str]:
+    return [*FULL_CHECKS, *(f"posthoc:{label}" for label, *_ in pairs), "blender"]
+
+
+def _pairs() -> list[tuple[str, str, str | None, str]]:
+    """`(label, ep key, device key, module)` of each EP and GPU that skellytracker's full plan runs, and of the CPU, in the
+    staging order (fifth grilling): no reviewed pass first, then the known-fastest, then the CPU, then the rest. The
+    reviewed state is `DeviceCheck.certified`; the known-fastest is the first reviewed pair in the order of `status().eps`,
+    which skellytracker gives as its order of preference. Core keeps no EP knowledge of its own."""
+    import skellytracker
+    from skellytracker.certification import SUMMARY_NAMES, _label  # shortcut: skellytracker's private label rule, as crash_record
+    from freemocap.core.tracking.execution_providers import execution_provider_status
+    details = skellytracker.certify_plan("full")["details"]
+    runs = set(details["checks"]) - set(details["not_run"])
+    rows = execution_provider_status().eps
+    gpu = [(_label(row.key, check.device_key), row.key, check.device_key, SUMMARY_NAMES.get(row.key, row.key), check.certified)
+           for row in rows for check in row.checks if _label(row.key, check.device_key) in runs]
+    cpu = [(_label(row.key, None), row.key, None, SUMMARY_NAMES.get(row.key, row.key)) for row in rows
+           if not row.uses_gpu and row.usable]
+    unknown = [pair[:4] for pair in gpu if not pair[4]]
+    known = [pair[:4] for pair in gpu if pair[4]]
+    return [*unknown, *known[:1], *cpu, *known[1:]]
+
+
+def _usable_labels() -> set[str]:
+    """The labels that skellytracker's status calls usable now: after its checks of this run, its pass or a reviewed pass."""
+    from skellytracker.certification import _label
+    from freemocap.core.tracking.execution_providers import execution_provider_status
+    rows = execution_provider_status().eps
+    return {_label(row.key, check.device_key) for row in rows for check in row.checks if check.usable} | \
+        {_label(row.key, None) for row in rows if not row.uses_gpu and row.usable}
+
+
+def _blender_path(blender_exe_path: str | None) -> str | None:
+    from freemocap.core.blender.runtime import executable
+    try:
+        return str(executable(blender_exe_path))
+    except ValueError:
+        return None
 
 
 def _import_child(queue, modules: tuple[str, ...]) -> None:
@@ -165,15 +259,7 @@ def _posthoc_session(frames: list[bytes], work: Path) -> dict:
     camera: no calibration and no 3D), then the run record that it wrote to the recording's Parquet file."""
     import cv2
     import numpy as np
-    from skellycam.core.ipc.process_management.managed_worker import WorkerMode
-    from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
-    from skellycam.core.recorders.videos.recording_info import RecordingInfo
-    from skellylogs.handlers.websocket_log_queue_handler import create_websocket_log_queue
-    from freemocap.core.pipeline.posthoc.mocap_pipeline import MocapPipeline
-    from freemocap.core.pipeline.posthoc.pipeline_phases import AggregatorPhase
-    from freemocap.core.recording.parquet_storage.parquet_reader import read_metadata
     from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
-    from freemocap.system.recording_structure.recording_structure import RecordingStructure
     config = PosthocMocapPipelineConfig(stop_stage="observations")  # the app's defaults otherwise
     if _models_missing(config.detector_type, config.rtmpose_model_name):
         return {"result": "not-run", "reason": "models-missing"}
@@ -187,13 +273,28 @@ def _posthoc_session(frames: list[bytes], work: Path) -> dict:
             writer.write(image)
     finally:
         writer.release()
+    if not _session(recording, config):
+        return {"result": "fail", "reason": "session-failed"}
+    return {"result": "pass", "reason": None, "numbers": {"frames": len(images), "execution_providers": _providers(recording)}}
+
+
+def _session(recording: Path, config) -> bool:
+    """Run the app's post-hoc session (`MocapPipeline`, as the backend starts it) on `recording`; true when it completed.
+    It waits for the worker's end, so its `PerformanceReport` is logged before it returns."""
+    from skellycam.core.ipc.process_management.managed_worker import WorkerMode
+    from skellycam.core.ipc.process_management.worker_registry import WorkerRegistry
+    from skellycam.core.recorders.videos.recording_info import RecordingInfo
+    from skellylogs.handlers.websocket_log_queue_handler import create_websocket_log_queue
+    from freemocap.core.pipeline.posthoc.mocap_pipeline import MocapPipeline
+    from freemocap.core.pipeline.posthoc.pipeline_phases import AggregatorPhase
     create_websocket_log_queue()  # each pipeline's IPC takes the app's log queue; nothing reads it in this child
     flag = multiprocessing.Value("b", False)
     registry = WorkerRegistry(global_kill_flag=flag, worker_mode=WorkerMode.PROCESS)  # as the app's backend makes it
     registry.start_heartbeat()
     try:
         pipeline = MocapPipeline.create(pipeline_id="certify", config=config, worker_registry=registry, global_kill_flag=flag,
-                                        recording_info=RecordingInfo(recording_name=recording.name, recording_directory=str(work)))
+                                        recording_info=RecordingInfo(recording_name=recording.name,
+                                                                     recording_directory=str(recording.parent)))
         pipeline.start()
         ended = (AggregatorPhase.COMPLETE, AggregatorPhase.FAILED)
         phase = lambda: next((item.phase for item in pipeline.get_progress_messages()  # noqa: E731
@@ -201,16 +302,23 @@ def _posthoc_session(frames: list[bytes], work: Path) -> dict:
         try:
             while pipeline.alive and phase() not in ended:
                 time.sleep(0.02)
+            deadline = time.monotonic() + 30
+            while pipeline.alive and time.monotonic() < deadline:  # the worker logs its timings as it ends
+                time.sleep(0.02)
         finally:
             pipeline.shutdown()
     finally:
         registry.shutdown_all()
-    if phase() != AggregatorPhase.COMPLETE:  # the newest message, also one sent just before the worker ended
-        return {"result": "fail", "reason": "session-failed"}
-    metadata = read_metadata(path=RecordingStructure(base_directory=work, recording_name=recording.name).data_parquet_path)
+    return phase() == AggregatorPhase.COMPLETE  # the newest message, also one sent just before the worker ended
+
+
+def _providers(recording: Path) -> dict:
+    """The EP of each model of the run, as the session wrote it to the recording's Parquet file."""
+    from freemocap.core.recording.parquet_storage.parquet_reader import read_metadata
+    from freemocap.system.recording_structure.recording_structure import RecordingStructure
+    metadata = read_metadata(path=RecordingStructure(base_directory=recording.parent, recording_name=recording.name).data_parquet_path)
     saved = next(item for name, item in metadata.runs[0].sources.items() if name.startswith("keypoint_model:"))
-    return {"result": "pass", "reason": None, "numbers": {"frames": len(images), "execution_providers": {
-        node: model["execution_provider"] for node, model in saved.definition["skellytracker"]["models"].items()}}}
+    return {node: model["execution_provider"] for node, model in saved.definition["skellytracker"]["models"].items()}
 
 
 def _posthoc_child(queue, frames: list[bytes], work: str) -> None:
@@ -251,6 +359,195 @@ def _posthoc(cancelled, cleanup: list) -> tuple[str, str | None, dict | None]:
     return answer["result"], answer["reason"], {**answer.get("numbers", {}), "seconds": round(time.monotonic() - started, 3)}
 
 
+# - The full benchmark on the sample recording -
+
+def _sha256(path: Path) -> str:
+    import hashlib
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def _cut(source: Path, target: Path, frames: int, cancelled) -> None:
+    """A copy of the recording `source` with its first `frames` frames, in the codec of the sample (MPEG-4, `mp4v`)."""
+    import cv2
+    from concurrent.futures import CancelledError
+    videos = target / "synchronized_videos"
+    videos.mkdir(parents=True)
+    for file in source.iterdir():
+        if file.is_file():  # the calibration TOML and the board
+            shutil.copy2(file, target / file.name)
+    for video in sorted((source / "synchronized_videos").glob("*.mp4")):
+        capture, writer = cv2.VideoCapture(str(video)), None
+        try:
+            for _ in range(frames):
+                if cancelled():
+                    raise CancelledError("cancelled")
+                ok, image = capture.read()
+                if not ok:
+                    raise ValueError("the recording has fewer frames than the benchmark")
+                if writer is None:
+                    writer = cv2.VideoWriter(str(videos / video.name), cv2.VideoWriter_fourcc(*"mp4v"),
+                                             capture.get(cv2.CAP_PROP_FPS) or 30.0, image.shape[1::-1])
+                writer.write(image)
+        finally:
+            capture.release()
+            if writer is not None:
+                writer.release()
+
+
+def _recording(cancelled, test_media_dir) -> tuple[str, str | None, dict, Path | None]:
+    """The `recording` check: the archive in the test media folder (downloaded when absent, hash checked), extracted and
+    cut to `BENCHMARK_FRAMES` frames in a new work folder. `numbers.downloaded` tells the clean-up what this run fetched."""
+    from concurrent.futures import CancelledError
+    from freemocap.tools.datasets.catalog import SAMPLE_DATA, download, extract_recording
+    archive, numbers = _archive(test_media_dir), {"downloaded": False, "frames": BENCHMARK_FRAMES}
+    started = time.monotonic()
+    try:
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        if archive.is_file():
+            if _sha256(archive) != SAMPLE_RECORDING["sha256"]:
+                return "fail", "bad-hash", numbers, None  # never used, never removed: it was there before the run
+        else:
+            partial = archive.with_name(f"{archive.name}.{uuid.uuid4().hex}.part")
+            try:
+                if download(SAMPLE_DATA.url, partial, cancelled) != SAMPLE_RECORDING["sha256"]:
+                    return "fail", "bad-hash", numbers, None
+                os.replace(partial, archive)
+            finally:
+                partial.unlink(missing_ok=True)  # a partial or wrong file is never kept
+            numbers.update(downloaded=True, download_seconds=round(time.monotonic() - started, 3))
+        work = _work()
+        if work.exists():
+            shutil.rmtree(work)  # the work folder of an earlier run
+        work.mkdir(parents=True)
+        source = extract_recording(archive, work / "source", "the sample recording")
+        _cut(source, work / "recording", BENCHMARK_FRAMES, cancelled)
+        shutil.rmtree(work / "source")
+        numbers["seconds"] = round(time.monotonic() - started, 3)
+        return "pass", None, numbers, work / "recording"
+    except CancelledError:
+        return "not-run", "cancelled", numbers, None
+    except Exception as error:  # noqa: BLE001 - the class name only: an error text can hold a path
+        logger.exception("freemocap's benchmark recording could not be prepared")
+        return "fail", type(error).__name__, numbers, None
+
+
+def _benchmark_session(recording: Path, execution_provider: str, device_key: str | None) -> dict:
+    """The app's post-hoc session on the cut recording on one EP and GPU, to its exports (no Blender), with the timings
+    of its `PerformanceReport` per stage, read as `machine_benchmarks.py` reads them."""
+    from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
+    from freemocap.tools.datasets.reporting import normalized_stages, parse_performance
+    config = PosthocMocapPipelineConfig(execution_provider=execution_provider, execution_device=device_key,
+                                        calibration_toml_path=str(next(recording.glob("*.toml"))), export_to_blender=False)
+    if _models_missing(config.detector_type, config.rtmpose_model_name):
+        return {"result": "not-run", "reason": "models-missing"}
+    lines: list[str] = []
+    handler = logging.Handler(logging.INFO)
+    handler.emit = lambda record: lines.append(record.getMessage())
+    timings = logging.getLogger("freemocap.core.pipeline.performance_report")
+    timings.setLevel(logging.INFO)  # a spawn child has no logging set up
+    timings.addHandler(handler)
+    try:
+        if not _session(recording, config):
+            return {"result": "fail", "reason": "session-failed"}
+    finally:
+        timings.removeHandler(handler)
+    report = next(report for report in parse_performance(lines) if report["source"] == "structured")
+    stages = {name: {"total_s": round(stage["total_s"], 4), "ms_per_frame": stage["amortized_ms_per_frame"],
+                     "fps": stage["synchronized_frames_per_second"]} for name, stage in normalized_stages(report)}
+    return {"result": "pass", "reason": None, "numbers": {
+        "frames": report["frames"], "images": report["images"], "wall_seconds": round(report["elapsed_s"], 3),
+        "startup_seconds": (stages.get("inference.session_setup") or {}).get("total_s"), "stages": stages,
+        "execution_providers": _providers(recording)}}
+
+
+def _benchmark_child(queue, recording: str, execution_provider: str, device_key: str | None) -> None:
+    try:
+        answer = _benchmark_session(Path(recording), execution_provider, device_key)
+    except Exception as error:  # noqa: BLE001 - the class name only
+        logger.exception("freemocap's post-hoc benchmark raised")
+        answer = {"result": "fail", "reason": type(error).__name__}
+    queue.put(answer)
+
+
+def _benchmark(cancelled, recording: Path, label: str, execution_provider: str, device_key: str | None):
+    """One `posthoc:<label>` check in its own spawn child, on a fresh copy of the cut recording."""
+    target = recording.parent / label
+    try:
+        shutil.copytree(recording, target)
+    except OSError as error:
+        return "fail", type(error).__name__, None
+    answer, reason = _spawn(_benchmark_child, (str(target), execution_provider, device_key), "freemocap-certify-benchmark",
+                            PAIR_TIMEOUT_SECONDS, cancelled)
+    if answer is None:
+        return ("not-run" if reason == "cancelled" else "fail"), reason, None
+    return answer["result"], answer["reason"], answer.get("numbers")
+
+
+def _blender_child(queue, recording: str, blender: str) -> None:
+    """The app's Blender export (`export_to_blender`, the defaults of the post-hoc settings), timed."""
+    try:
+        from freemocap.core.blender.export_to_blender import export_to_blender
+        from freemocap.core.tasks.mocap.mocap_task_config import PosthocMocapPipelineConfig
+        config = PosthocMocapPipelineConfig()
+        started = time.perf_counter()
+        export_to_blender(recording_folder_path=recording, blender_exe_path=blender, open_file_on_completion=False,
+                          route=config.blender_import_route, package=config.blender_package,
+                          run_id=config.base_run_id, blender_export_config=config.blender_export.model_dump())
+        seconds = time.perf_counter() - started
+        queue.put({"result": "record-only", "reason": None, "numbers": {"seconds": round(seconds, 3)}})
+    except Exception as error:  # noqa: BLE001 - the class name only
+        logger.exception("freemocap's Blender export benchmark raised")
+        queue.put({"result": "fail", "reason": type(error).__name__})
+
+
+def _blender_export(cancelled, recording: Path, blender: str):
+    answer, reason = _spawn(_blender_child, (str(recording), blender), "freemocap-certify-blender",
+                            BLENDER_EXPORT_TIMEOUT_SECONDS, cancelled)
+    if answer is None:
+        return ("not-run" if reason == "cancelled" else "fail"), reason, None
+    return answer["result"], answer["reason"], answer.get("numbers")
+
+
+def _benchmark_items(checks: list[dict], pairs: list[tuple], frames: int) -> list[dict]:
+    """The `benchmark` summary items (format 3.7): each stage of each passed pair, then the Blender export."""
+    from skellytracker.core.eps import evidence
+    from skellytracker.core.system.host import gpu_device_keys
+    gpus = dict(gpu_device_keys())
+    rows = {row["name"]: row for row in checks}
+    items = []
+    for label, _, device_key, module in pairs:
+        row = rows[f"posthoc:{label}"]
+        if row["result"] != "pass":
+            continue
+        device = evidence.gpu_id(gpus.get(device_key)) if device_key else None
+        for prefix, stage in BENCHMARK_STAGES:
+            timed = next((value for name, value in row["numbers"]["stages"].items() if name.startswith(prefix)), None)
+            if timed and timed["ms_per_frame"] is not None and timed["fps"] is not None:
+                items.append({"group": "benchmark", "name": module, "device": device, "stage": stage,
+                              "ms_per_frame": round(timed["ms_per_frame"], 3), "fps": round(timed["fps"], 3)})
+    blender = rows.get("blender") or {}
+    if blender.get("result") == "record-only" and (blender.get("numbers") or {}).get("seconds"):
+        seconds = blender["numbers"]["seconds"]
+        items.append({"group": "benchmark", "name": "Blender", "device": None, "stage": "export",
+                      "ms_per_frame": round(1000 * seconds / frames, 3), "fps": round(frames / seconds, 3)})
+    return items
+
+
+def remove_benchmark_data(downloaded: bool, test_media_dir) -> list[dict]:
+    """Remove the work folder, and the archive when this run downloaded it; a removal that fails is a `cleanup` row."""
+    rows = []
+    for name, path in (("work-folder", _work()), *((("recording", _archive(test_media_dir)),) if downloaded else ())):
+        try:
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink(missing_ok=True)
+        except OSError as error:
+            rows.append({"name": f"benchmark:{name}", "result": "fail", "reason": type(error).__name__})
+    return rows
+
+
 def _identity() -> tuple[dict, list[str]]:
     from freemocap.build_info import BUILD_TREE_MODIFIED
     from freemocap.system.certify.report_file import app_block
@@ -263,13 +560,16 @@ def _identity() -> tuple[dict, list[str]]:
 
 
 def _host() -> dict:
+    from skellytracker.core.eps import evidence
     from skellytracker.core.system.host import probe_host
     host = probe_host()
     arch = host.arch.lower()
     return {"os": {"name": "macOS" if host.os_name == "Darwin" else host.os_name, "release": host.os_release,
                    "version": host.os_version, "build": host.os_build, "label": host.os_label,
                    "arch": {"amd64": "x86_64", "x64": "x86_64", "aarch64": "arm64"}.get(arch, arch)},
-            "cpu": {"name": host.cpu_name}, "memory_bytes": host.memory_total_bytes}
+            "cpu": {"name": host.cpu_name}, "memory_bytes": host.memory_total_bytes,
+            "gpus": [{"vendor": gpu.vendor, "name": gpu.name, "id": evidence.gpu_id(gpu), "driver_version": gpu.driver_version,
+                      "vram_bytes": gpu.vram_total_bytes} for gpu in host.gpus]}  # as skellytracker's: the benchmark's GPU names
 
 
 def _install_dir() -> Path:
@@ -320,16 +620,23 @@ def _blender(cancelled, blender_exe_path: str | None = None) -> tuple[str, str |
 
 
 def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = None,
-            blender_exe_path: str | None = None) -> dict:
+            blender_exe_path: str | None = None, test_media_dir: str | os.PathLike | None = None,
+            remove_data: bool = False) -> dict:
     """Run freemocap's checks of `level` and return the module report. A check never raises; a cancel makes each check
     that did not end `not-run` with `cancelled`. `ui_remote`: whether the UI runs on another machine (None: unknown).
-    `blender_exe_path`: the path chosen in Blender settings, if any."""
+    `blender_exe_path`: the path chosen in Blender settings, if any. `test_media_dir`: the shared test media folder
+    (format 2.8). `remove_data`: at `full`, remove the benchmark data after a run with no failed check and no cancel."""
     _check_level(level)
     begun = time.monotonic()
     created = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     package, reasons = _identity()
-    names = QUICK_CHECKS if level == "quick" else FULL_CHECKS
-    checks = [{"name": name, "result": None, "reason": None} for name in names]
+    pairs = _pairs() if level == "full" else []
+    by_name = {f"posthoc:{label}": (label, key, device_key, module) for label, key, device_key, module in pairs}
+    names = QUICK_CHECKS if level == "quick" else _full_names(pairs)
+    checks = [{"name": name, "result": None, "reason": None,
+               **({"module": by_name[name][3]} if name in by_name else {"module": "Blender"} if name == "blender" and
+                  level == "full" else {})} for name in names]
+    recording, usable, numbers_of = None, None, {}
     cleanup: list[dict] = []
     cancelled =lambda: cancel is not None and cancel.is_set()  # noqa: E731
 
@@ -357,8 +664,36 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
             continue
         send("running", row["name"])
         name = row["name"]
-        if level == "full":
-            record(row, "not-run", "not-built")
+        if name == "recording":
+            result, reason, numbers, recording = _recording(cancelled, test_media_dir)
+            numbers_of["recording"] = numbers
+            record(row, result, reason, numbers)
+            if reason == "cancelled":
+                stopped = "cancelled"
+        elif name in by_name:
+            label, key, device_key, _ = by_name[name]
+            if usable is None and recording is not None:
+                usable = _usable_labels()  # read once, after skellytracker's checks of this run
+            if recording is None:
+                record(row, "not-run", "recording-missing")
+            elif label not in usable:
+                record(row, "not-run", "ep-not-passed")
+            else:
+                record(row, *_benchmark(cancelled, recording, label, key, device_key))
+                if row["reason"] == "cancelled":
+                    stopped = "cancelled"
+        elif name == "blender" and level == "full":
+            blender = _blender_path(blender_exe_path)
+            done = next((recording.parent / by_name[other["name"]][0] for other in checks  # a finished recording
+                         if other["name"] in by_name and other["result"] == "pass"), None) if recording else None
+            if blender is None:
+                record(row, "not-run", "not-installed")
+            elif done is None:
+                record(row, "not-run", "recording-missing")
+            else:
+                record(row, *_blender_export(cancelled, done, blender))
+                if row["reason"] == "cancelled":
+                    stopped = "cancelled"
         elif name == "build-identity":
             record(row, "record-only" if reasons else "pass", reasons[0] if reasons else None,
                    {"evidence_reasons": list(reasons)})
@@ -390,12 +725,14 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
                 record(row, "not-run", stopped)
             else:
                 record(row, *result)
-    if level == "full":  # its checks are not built, so the run did not select each check of its level (7.1 statement 4)
-        reasons.append("partial-run")
     if stopped == "cancelled":
         reasons.append("cancelled")
+    if level == "full" and remove_data and stopped is None and not any(row["result"] == "fail" for row in checks):
+        cleanup += remove_benchmark_data(bool(numbers_of.get("recording", {}).get("downloaded")), test_media_dir)
     report = {"schema": SCHEMA, "id": str(uuid.uuid4()), "package": package, "kind": level, "created_utc": created,
               "host": _host(), "checks": checks, "cleanup": cleanup, "evidence": {"valid": not reasons, "reasons": reasons}}
+    if level == "full":
+        report["summary"] = _benchmark_items(checks, pairs, BENCHMARK_FRAMES)
     if any(row["result"] in ("pass", "fail") for row in checks):  # only those reach the hand-in list
         try:
             _write_json(reports_dir() / f"{report['id']}.json", report)

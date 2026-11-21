@@ -305,12 +305,21 @@ def test_freemocaps_own_modules_obey_the_privacy_rules_and_the_relay_validator_b
         "pass", None, {"frames": 3, "execution_providers": {"person": "cpu", "wholebody": "cpu"}, "seconds": 8.5}))
     monkeypatch.setattr(certification, "_blender", lambda cancelled, path=None: (
         "record-only", None, {"found": True, "version_major": 5, "version_minor": 2, "version_patch": 3}))
+    # the level full with stand-ins for its recording, its pairs, its post-hoc session and Blender: nothing downloads
+    monkeypatch.setattr(certification, "_pairs", lambda: [("cpu", "cpu", None, "CPU")])
+    monkeypatch.setattr(certification, "_recording", lambda cancelled, media: ("pass", None, {"downloaded": False}, tmp_path))
+    monkeypatch.setattr(certification, "_usable_labels", lambda: {"cpu"})
+    monkeypatch.setattr(certification, "_benchmark", lambda *args: ("pass", None, {"frames": 300, "stages": {
+        "graph.load_and_track": {"total_s": 24.6, "ms_per_frame": 82.0, "fps": 12.2}}}))
+    monkeypatch.setattr(certification, "_blender_path", lambda path: None)
     quick, full = certification.certify("quick", ui_remote=False), certification.certify("full")
-    assert "partial-run" in full["evidence"]["reasons"] and full["evidence"]["valid"] is False
+    assert full["summary"] == [{"group": "benchmark", "name": "CPU", "device": None, "stage": "tracking",
+                                "ms_per_frame": 82.0, "fps": 12.2}]
     _, data = _sample("valid-quick.md")
     # build_report_file applies freemocap's Python copy of privacy rules 1 to 11 and raises on a break
     _, body = build_report_file([quick, full, *data["modules"]], "freemocap and skellytracker", report_file.app_block())
     built = json.loads(body.decode("utf-8").split("```json\n")[1].rsplit("```", 1)[0])
     assert built["schema"] == "skellycertify.report/1.4.0" and built["modules"][:2] == [quick, full]
+    assert "| - | CPU | tracking | 82.0 | 12.2 |" in body.decode("utf-8")  # the benchmark table of the head
     if RELAY_SRC.is_dir() and shutil.which("node") is not None:
         assert _relay_verdict(body) == {"rule": 0}

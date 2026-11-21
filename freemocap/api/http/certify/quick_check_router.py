@@ -183,8 +183,11 @@ def _raw_plans(level: str) -> tuple[dict, ...]:
     """Each package's plan in its run order: freemocap then skellytracker at quick, skellytracker then freemocap at full."""
     import skellytracker
     from freemocap.certification import certify_plan
-    plans = (certify_plan(level), skellytracker.certify_plan(level))
-    return plans if level == "quick" else plans[::-1]
+    if level == "quick":
+        return certify_plan(level), skellytracker.certify_plan(level)
+    from freemocap.system.default_paths import get_test_media_dir
+    media = get_test_media_dir()  # the full run's shared test media folder (format 2.8)
+    return skellytracker.certify_plan(level, test_media_dir=media), certify_plan(level, test_media_dir=media)
 
 
 def _plans(level: str = "quick") -> list[PackagePlan]:

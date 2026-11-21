@@ -36,7 +36,7 @@ def _message(step: str | None, done: int) -> dict:
 
 def tracker_until_cancelled(level, progress, cancel, **options):
     """skellytracker's level full until a cancel, then its cancelled report in its own store, as `certify()` writes it."""
-    assert level == "full" and options == {}  # nothing overrides the package's own staging
+    assert level == "full" and set(options) == {"test_media_dir"}  # nothing overrides the package's own staging
     progress(_message(f"{LABEL}:video", 3))
     while not cancel.is_set():
         time.sleep(0.05)
@@ -85,6 +85,7 @@ def backend_that_dies(pids):
 @pytest.fixture
 def base(tmp_path, monkeypatch):
     monkeypatch.setenv("FREEMOCAP_BASE_FOLDER", str(tmp_path))  # a spawn child inherits it
+    monkeypatch.setenv("FREEMOCAP_TEST_MEDIA_DIR", str(tmp_path / "test-media"))
     return tmp_path
 
 
@@ -184,7 +185,8 @@ def test_every_start_is_refused_while_it_runs_and_a_cancel_leaves_an_incomplete_
         assert [(row.name, row.state) for row in snapshot.run.rows] == [("cpu", "partly-done"), (LABEL, "running")]
         assert manager.cancel().state == "cancelling"  # the UI's lock ends at once
         _wait(manager, lambda: not manager.running)
-        assert manager.full_results == (StartCheckResult("skellytracker", "not-run", "cancelled"),)
+        assert manager.full_results == (StartCheckResult("skellytracker", "not-run", "cancelled"),
+                                        StartCheckResult("freemocap", "not-run", "cancelled"))  # its benchmark did not start
         assert manager.snapshot(()).full_results == manager.full_results and manager.start_results == ()
         # The rows stay as the run ended, each done, in the server's state until the next full benchmark starts.
         assert [(row.name, row.state, row.result) for row in manager.snapshot(()).full_rows] == [
@@ -229,11 +231,14 @@ def test_a_full_benchmark_found_at_launch_fails_its_pair_only_for_a_probe_or_vid
     assert failures == failed and not manager.running
 
 
-def test_the_full_benchmark_routes_give_the_plans_in_run_order_and_start_with_the_clean_up_choice(monkeypatch):
+def test_the_full_benchmark_routes_give_the_plans_in_run_order_and_start_with_the_clean_up_choice(monkeypatch, tmp_path):
     import skellytracker
     from freemocap.api.http.certify import quick_check_router as module
     download = {"name": "test-video.mp4", "bytes": 12_000_000, "source": "https://media.example/v.mp4", "sha256": "ab" * 32}
-    monkeypatch.setattr(skellytracker, "certify_plan", lambda level: {
+    monkeypatch.setenv("FREEMOCAP_TEST_MEDIA_DIR", str(tmp_path))
+    monkeypatch.setattr(certification, "_pairs", lambda: [])
+    monkeypatch.setattr(certification, "_blender_path", lambda path: None)
+    monkeypatch.setattr(skellytracker, "certify_plan", lambda level, **options: {
         "package": "skellytracker", "kind": level, "seconds_estimate": 333, "total": 38, "risks": [], "downloads": [download],
         "system_changes": [], "questions": [], "details": {"checks": [LABEL, "openvino@8086-a780-0"],
                                                            "not_run": {"openvino@8086-a780-0": "ep-not-installed"}}})
@@ -252,9 +257,10 @@ def test_the_full_benchmark_routes_give_the_plans_in_run_order_and_start_with_th
     app.include_router(module.quick_check_router)
     client = TestClient(app)
     plan = client.get("/certify/full_benchmark/plan").json()["packages"]
-    assert [(row["package"], row["total"], row["seconds_estimate"]) for row in plan] == [("skellytracker", 38, 333),
-                                                                                        ("freemocap", 0, 0)]
-    assert plan[0]["downloads"] == [download] and plan[1]["downloads"] == []
+    own = certification.certify_plan("full", test_media_dir=str(tmp_path))  # no pair: data-folder, recording, blender
+    assert [(row["package"], row["total"], row["seconds_estimate"]) for row in plan] == [
+        ("skellytracker", 38, 333), ("freemocap", 3, own["seconds_estimate"])]
+    assert plan[0]["downloads"] == [download] and plan[1]["downloads"] == own["downloads"] == [certification._download_item()]
     assert client.post("/certify/full_benchmark", json={}).status_code == 422  # the clean-up choice is always sent
     application.holds = ("work",)
     refused = client.post("/certify/full_benchmark", json={"remove_data": True})
@@ -263,7 +269,7 @@ def test_the_full_benchmark_routes_give_the_plans_in_run_order_and_start_with_th
     accepted = client.post("/certify/full_benchmark", json={"remove_data": False})
     assert accepted.status_code == 202 and accepted.json()["level"] == "full" and accepted.json()["rows"] == []
     assert (started[0]["level"], started[0]["remove_data"], started[0]["seconds_estimate"], started[0]["pair"]) == (
-        "full", False, 333, None)  # the total of the plans' estimates
+        "full", False, 333 + own["seconds_estimate"], None)  # the total of the plans' estimates
     assert started[0]["not_counted"] == ["openvino@8086-a780-0"], "the pairs the plan does not run are not counted"
 
 

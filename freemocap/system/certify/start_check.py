@@ -126,32 +126,51 @@ def run_start_check(progress, cancel, *, ui_remote: bool | None, blender_exe_pat
     return "start", tuple(results)
 
 
+def seed_test_media(test_media_dir) -> None:
+    """Put skellytracker's bundled test frames file in the shared test media folder by the name rule of report format
+    2.8, where skellytracker's `certify(test_media_dir=...)` reads it; a bundled file, so the clean-up keeps it."""
+    from skellytracker.core.eps.certification import frames_file, frames_record
+    record = frames_record()
+    target = Path(test_media_dir) / f"{record['sha256']}{Path(record['path']).suffix}"
+    if not target.is_file():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_name(target.name + ".tmp")
+        temporary.write_bytes(frames_file({"frames": record}))
+        temporary.replace(target)
+
+
 def run_full_check(progress, cancel, *, remove_data: bool, own_certify=None, certify=None) -> tuple:
     """Each package's level full in the run order (fifth grilling): skellycam (not built; it will run first), skellytracker,
-    then freemocap; `("full", ((package, result, reason), ...))`. Nothing is passed that overrides a package's own
-    staging. A package whose full plan has no check does not run; after a cancel each later package is `not-run` with
-    `cancelled`. `remove_data`: the person's choice to remove the benchmark data after a successful run."""
+    then freemocap; `("full", ((package, result, reason), ...))`. Each gets the shared test media folder and nothing that
+    overrides its own staging. A package whose full plan has no check does not run; after a cancel each later package is
+    `not-run` with `cancelled`. `remove_data`: the person's choice to remove the benchmark data after a successful run;
+    freemocap, which runs last, gets it only when every earlier package succeeded (skellytracker downloads and keeps
+    nothing, and the frames file it reads is a bundled one)."""
     from freemocap.certification import certify as freemocap_certify, certify_plan, module_result
+    from freemocap.system.default_paths import get_test_media_dir
+    media = get_test_media_dir()
 
     def tracker(level, progress, cancel):
         from skellytracker import certify as skellytracker_certify
-        return (certify or skellytracker_certify)(level, progress, cancel)
+        return (certify or skellytracker_certify)(level, progress, cancel, test_media_dir=media)
+
+    def own(level, progress, cancel):
+        succeeded = all(result in ("pass", "record-only") for _, result, _ in results)
+        return (own_certify or freemocap_certify)(level, progress, cancel, test_media_dir=media,
+                                                  remove_data=remove_data and succeeded)
 
     results = []
-    for package, run in (("skellytracker", tracker), ("freemocap", own_certify or freemocap_certify)):
-        if package == "freemocap" and certify_plan("full")["total"] == 0:
-            continue
+    for package, run in (("skellytracker", tracker), ("freemocap", own)):
         if cancel.is_set():
             results.append((package, "not-run", "cancelled"))
             continue
+        if package == "freemocap" and certify_plan("full", test_media_dir=media)["total"] == 0:
+            continue
         try:
+            if package == "skellytracker":
+                seed_test_media(media)
             results.append((package, *module_result(run("full", progress, cancel))))
         except Exception as error:  # noqa: BLE001 - the class name only: an error text can hold a path
             logger.exception("%s's full level raised", package)
             results.append((package, "error", type(error).__name__))
-    if remove_data and all(result in ("pass", "record-only") for _, result, _ in results):
-        # shortcut: no full level downloads anything or keeps processing output yet (skellytracker's uses its bundled
-        # frames and has no clean-up interface; freemocap's checks are not built), so nothing is removed. Remove
-        # freemocap's benchmark data here once its benchmark and the shared test media download exist.
-        logger.info("The full benchmark passed; it left no benchmark data to remove")
     return "full", tuple(results)

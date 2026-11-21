@@ -100,14 +100,13 @@ def test_a_data_folder_that_cannot_be_written_fails_with_the_class_name(tmp_path
     assert result == "fail" and re.fullmatch(r"[A-Za-z]+Error", reason) and numbers == {}
 
 
-def test_the_full_level_is_not_built_not_evidence_and_a_bad_level_raises(base):
-    report = certification.certify("full")
-    assert {(row["result"], row["reason"]) for row in report["checks"]} == {("not-run", "not-built")}
-    assert "partial-run" in report["evidence"]["reasons"] and report["evidence"]["valid"] is False  # format 7.1 statement 4
-    assert certification.certify_plan("quick")["details"]["checks"] == list(certification.QUICK_CHECKS)
-    # format 2.6: `total` counts the checks that run, and a quick plan has no risks
-    assert [(plan["total"], plan["risks"]) for plan in map(certification.certify_plan, ("quick", "full"))] == [(7, []), (0, [])]
-    assert certification.certify_plan("quick", ui_remote=True, blender_exe_path=None) == certification.certify_plan("quick")
+def test_the_quick_plan_counts_its_seven_checks_and_a_bad_level_raises(base):
+    """The level full: test_recording_benchmark.py."""
+    plan = certification.certify_plan("quick")
+    assert plan["details"]["checks"] == list(certification.QUICK_CHECKS)
+    # format 2.6: `total` counts the checks that run, and a quick plan has no risks and no download
+    assert (plan["total"], plan["risks"], plan["downloads"]) == (7, [], [])
+    assert certification.certify_plan("quick", ui_remote=True, blender_exe_path=None) == plan
     with pytest.raises(ValueError):
         certification.certify("medium")
 
@@ -155,7 +154,6 @@ def test_own_reports_are_kept_with_the_hand_in_states_and_not_sent_makes_them_pe
     cancel = multiprocessing.Event()
     cancel.set()
     certification.certify("quick", None, cancel)
-    certification.certify("full")
     assert len(list(certification.reports_dir().glob("*.json"))) == 1, "a run with no pass or fail is not kept"
 
 

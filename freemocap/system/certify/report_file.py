@@ -5,9 +5,9 @@ person views is the file that is sent. It refuses a file that breaks privacy rul
 the relay checks; `scrub_note()` applies rules 12 and 13 to the person's note before the file is built, and
 `clean_note()` (rules 18 and 20) cleans whatever note reaches `build_report_file()`.
 
-The file declares 1.6.0, the format of its layout. Each module report keeps its own schema id: a package that still
-writes 1.4.0 (skellytracker at freemocap's pin) is a module the reader of major version 1 accepts (spec 8), and the JSON
-block holds each report as its package wrote it.
+The file declares 1.6.0, the format of its layout. Each module report keeps its own schema id: a module of an older
+1.x report (one kept from an earlier version of a package) is a module the reader of major version 1 accepts (spec 8),
+and the JSON block holds each report as its package wrote it.
 """
 
 import getpass

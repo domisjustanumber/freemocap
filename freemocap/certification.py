@@ -94,6 +94,9 @@ PAIR_TIMEOUT_SECONDS, BLENDER_EXPORT_TIMEOUT_SECONDS = 600, 600
 BUNDLE_MODULES = ("numpy", "cv2", "pyarrow", "av", "scipy", "numba", "skellyforge", "skellytracker", "onnxruntime")
 OPTIONAL_MODULES = ("numba",)  # imported only when shipped
 SPAWN_TIMEOUT_SECONDS = 120
+# A session child ends its pipeline cleanly in 0.6 to 1.3 s after a stop (RTX 3070, DirectML, 2026-11-21). A kill of its
+# worker instead counts as an unclean exit of the EP in skellytracker; two in a row mark the EP as failed on this PC.
+STOP_GRACE_SECONDS = 1.5
 BLENDER_TIMEOUT_SECONDS = 30
 QUICK_BUDGET_SECONDS = 15  # freemocap's share of the level quick (owner, Q53 to Q56)
 POSTHOC_SECONDS = 10  # its estimate (8.5 to 9.1 s measured on one Windows PC, CPU): it starts only when it fits the budget
@@ -205,12 +208,27 @@ def _spawn_imports(cancelled) -> tuple[dict | None, str | None]:
     return _spawn(_import_child, (BUNDLE_MODULES,), "freemocap-certify-imports", SPAWN_TIMEOUT_SECONDS, cancelled)
 
 
+_stop = None  # in a spawn child of `_spawn`: the event its parent sets to ask it to end
+
+
+def _stopping() -> bool:
+    return _stop is not None and _stop.is_set()
+
+
+def _stoppable(target, stop, queue, *args) -> None:
+    global _stop  # noqa: PLW0603 - one parent per spawn child
+    _stop = stop
+    target(queue, *args)
+
+
 def _spawn(target, args: tuple, name: str, timeout: int | float, cancelled) -> tuple[dict | None, str | None]:
     """Run `target(queue, *args)` in a `spawn` child: (its answer, None) or (None, the reason it gave none). A child that
-    is still alive at the end is killed with the processes it started."""
+    is still alive at the end is asked to end (`_stopping()`), and after `STOP_GRACE_SECONDS` killed with the processes
+    it started."""
     context = multiprocessing.get_context("spawn")
     queue = context.Queue()
-    child = context.Process(target=target, args=(queue, *args), name=name)
+    stop = context.Event()
+    child = context.Process(target=_stoppable, args=(target, stop, queue, *args), name=name)
     child.start()
     deadline, answer, reason = time.monotonic() + timeout, None, None
     try:
@@ -229,6 +247,9 @@ def _spawn(target, args: tuple, name: str, timeout: int | float, cancelled) -> t
         child.join(timeout=10)
         return (answer, None) if child.exitcode == 0 else (None, "hung-at-exit" if child.is_alive() else "crashed")
     finally:
+        if child.is_alive():
+            stop.set()
+            child.join(timeout=STOP_GRACE_SECONDS)
         if child.is_alive():
             import psutil
             try:
@@ -288,6 +309,8 @@ def _session(recording: Path, config) -> bool:
     from freemocap.core.pipeline.posthoc.mocap_pipeline import MocapPipeline
     from freemocap.core.pipeline.posthoc.pipeline_phases import AggregatorPhase
     create_websocket_log_queue()  # each pipeline's IPC takes the app's log queue; nothing reads it in this child
+    if _stopping():
+        return False
     flag = multiprocessing.Value("b", False)
     registry = WorkerRegistry(global_kill_flag=flag, worker_mode=WorkerMode.PROCESS)  # as the app's backend makes it
     registry.start_heartbeat()
@@ -300,10 +323,10 @@ def _session(recording: Path, config) -> bool:
         phase = lambda: next((item.phase for item in pipeline.get_progress_messages()  # noqa: E731
                               if item.pipeline_id == pipeline.id), None)
         try:
-            while pipeline.alive and phase() not in ended:
+            while pipeline.alive and phase() not in ended and not _stopping():
                 time.sleep(0.02)
             deadline = time.monotonic() + 30
-            while pipeline.alive and time.monotonic() < deadline:  # the worker logs its timings as it ends
+            while pipeline.alive and time.monotonic() < deadline and not _stopping():  # it logs its timings as it ends
                 time.sleep(0.02)
         finally:
             pipeline.shutdown()

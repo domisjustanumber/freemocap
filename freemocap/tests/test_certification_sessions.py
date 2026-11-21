@@ -17,6 +17,12 @@ def hang(queue):
     time.sleep(60)
 
 
+def session_child(queue, ended: str):  # a pair child: it ends its session when asked, as `_session` does
+    while not certification._stopping():
+        time.sleep(0.02)
+    open(ended, "w").close()
+
+
 @pytest.fixture
 def quick(tmp_path, monkeypatch):
     """`certify("quick")` with the spawn child and Blender stood in; each call gives the rows by name and the report."""
@@ -78,6 +84,17 @@ def test_the_spawn_child_reports_a_crash_and_a_time_out():
     started = time.monotonic()
     assert certification._spawn(hang, (), "freemocap-certify-test", 1, lambda: False) == (None, "timed-out")
     assert time.monotonic() - started < 30
+
+
+def test_a_cancel_lets_the_child_end_its_session_itself_and_kills_one_that_does_not(tmp_path):
+    """A kill of a session's worker counts as an unclean exit of its EP in skellytracker; the child ends it first."""
+    ended, started = tmp_path / "ended", time.monotonic()
+    cancelled = lambda: time.monotonic() - started > 0.5  # noqa: E731
+    assert certification._spawn(session_child, (str(ended),), "freemocap-certify-test", 30, cancelled) == (None, "cancelled")
+    assert ended.exists(), "the child ended by itself, not by a kill"
+    started = time.monotonic()
+    assert certification._spawn(hang, (), "freemocap-certify-test", 30, cancelled) == (None, "cancelled")
+    assert time.monotonic() - started < 0.5 + certification.STOP_GRACE_SECONDS + 1.5
 
 
 def test_a_work_folder_that_cannot_be_removed_is_a_cleanup_row(quick, monkeypatch):

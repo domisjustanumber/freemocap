@@ -1,0 +1,5 @@
+# gitleaks configuration (decision 0001). The default rules apply. Add an [[allowlists]] table only
+# for a reviewed false positive, and give its reason.
+
+[extend]
+useDefault = true

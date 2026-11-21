@@ -444,7 +444,7 @@ def _load_manifest_videos(recording_path: Path) -> dict[str, str] | None:
 
 # Example usage
 if __name__ == "__main__":
-    video_path = Path(r"C:\Users\jonma\Downloads\2025-07-01_ferret_757_EyeCameras_P33_EO5_1m_20s-2m_20s(2).mp4")
+    video_path = Path.home() / "Downloads" / "2025-07-01_ferret_757_EyeCameras_P33_EO5_1m_20s-2m_20s(2).mp4"
 
     # Using context manager for automatic cleanup
     with VideoHelper.from_video_path(

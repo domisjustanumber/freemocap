@@ -5,7 +5,7 @@ user's screenshot, task `20c48cd6-0bb7-4f86-9255-38a76f560729`. The test run is
 `8e636ff1-2760-4949-b8a3-db7fe052d98f`. A separate 12.162-second cancelled run of
 the current pipeline is excluded from this comparison.
 
-Source: `C:/Users/jonma/skellylogs_data/logs/log_2026-10-12T12_31_42ms243_gmt-4.log`,
+Source: `C:/Users/<you>/skellylogs_data/logs/log_2026-10-12T12_31_42ms243_gmt-4.log`,
 performance summaries at lines 644 and 1380. Test completed at 12:38:04; sample at
 12:44:53, America/New_York. Extracted numeric evidence is retained locally in
 `.test-artifacts/latest-app-runs.json`.

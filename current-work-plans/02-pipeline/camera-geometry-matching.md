@@ -251,7 +251,7 @@ the initial-binding fast path, rolling live policy with exhausted-search latch, 
 and shared settings. Do not treat the helper tests as end-to-end app validation.
 
 Real-data QA fixture supplied by the user:
-`C:/Users/jonma/freemocap_data/recordings/freemocap_test_data_vid_switch`.
+`C:/Users/<you>/freemocap_data/recordings/freemocap_test_data_vid_switch`.
 Its synchronized video filenames have been changed. Compare inferred source-to-geometry
 assignment against `freemocap_test_data` using actual video content, not renamed labels.
 Check healthy initial binding, renamed inputs, recovery after ordering changes and posthoc

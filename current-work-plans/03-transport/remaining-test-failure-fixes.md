@@ -83,7 +83,7 @@ metadata, and recording-reader checks passed; 35 PubSub/WebSocket/manager/worker
 checks passed; 47 final timestamp/PubSub boundary checks passed.
 
 Logs and JUnit reports are retained outside the repositories at
-`C:/Users/jonma/AppData/Local/Temp/fmc-fixes-e68bfa1d`.
+`C:/Users/<you>/AppData/Local/Temp/fmc-fixes-e68bfa1d`.
 Real-camera reports are ignored under core's `.test-artifacts/remaining-fixes/`.
 Prepared-data and Blender prerequisites are recorded in the existing ignored
 `.test-artifacts/api-cleanup/full-validation/paths.json` manifest.

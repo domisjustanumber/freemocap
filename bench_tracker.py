@@ -27,9 +27,7 @@ from freemocap.core.tracking.tracker_factory import (
     skeleton_tracker_config,
 )
 
-RECORDING = Path(
-    r"C:\Users\jonma\freemocap_data\recordings\2026-08-24_08-08-44_GMT-4_calibration"
-)
+RECORDING = Path.home() / "freemocap_data" / "recordings" / "2026-08-24_08-08-44_GMT-4_calibration"
 N_FRAMES = 220
 MODEL = "rtmw-x-l_256x192"
 

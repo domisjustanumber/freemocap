@@ -42,7 +42,7 @@ descriptor missing `inputs`. Publication and playback rejected that output. Moca
 existing metadata before creating workers; playback reports a file-specific 422 error. Eight
 focused tests pass, including rejection before worker creation and preservation of invalid input.
 The affected Parquet and JSON mirror were hash-verified into
-`C:/Users/jonma/freemocap_data/recovery_backups/freemocap_test_data_2026-09-06_metadata`
+`C:/Users/<you>/freemocap_data/recovery_backups/freemocap_test_data_2026-09-06_metadata`
 and removed from the recording folder; original videos and calibration remain in place.
 Next acceptance action: restart the app/backend and process `freemocap_test_data` again.
 

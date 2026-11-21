@@ -19,7 +19,7 @@
 | **FreeMoCap `core/kinematics`** | An early, **mostly-disabled** alignment attempt (`BodyKinematicsState`, `StreamingKinematics`, `inertial/`) + live `segment_lengths.py` | Thin / stubbed / disabled |
 | **`bs/kinematics_core`** | A **mature rigid-body kinematics engine**: per-segment pose + quaternion orientation + linear/angular velocity & acceleration + `ReferenceGeometry` + tidy serialization | Complete; **not integrated** |
 
-(C:\Users\jonma\github_repos\freemocap_organization\bs\python_code\kinematics_core)
+(`C:\Users\<you>\github_repos\freemocap_organization\bs\python_code\kinematics_core`)
 
 
 `clients/bs/python_code/kinematics_core/` contents: `RigidBodyKinematics` (position + `orientation`

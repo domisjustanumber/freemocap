@@ -394,7 +394,7 @@ def main(*, csv_filepath: str, trajectory_type: str = "3d_xyz", create_skeleton:
 
 if __name__ == "__main__" or __name__ =='<run_path>':
     # UPDATE THIS PATH
-    CSV_FILE = r"C:\Users\jonma\freemocap_data\recording_sessions\freemocap_test_data\output_data\freemocap_data_by_frame.csv"
+    CSV_FILE = str(Path.home() / "freemocap_data" / "recording_sessions" / "freemocap_test_data" / "output_data" / "freemocap_data_by_frame.csv")
     try:
         main(
             csv_filepath=CSV_FILE,

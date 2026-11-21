@@ -237,7 +237,7 @@ pass. The final checklist acknowledges these explicit remaining limitations.
 
 The ignored manifest `.test-artifacts/api-cleanup/full-validation/paths.json`
 records Blender, add-on wheel/archive/profile, and the temporary output roots.
-Current roots are `C:/Users/jonma/AppData/Local/Temp/fmc-api-gsr9_xoo` (logs and
+Current roots are `C:/Users/<you>/AppData/Local/Temp/fmc-api-gsr9_xoo` (logs and
 JUnit) and `C:/tmp/fmc-4lokv7vn` (prepared recordings and short-path test outputs).
 Short output paths avoid Windows path-length failures in Blender dependencies and
 long sample video filenames. Failed initial attempts are retained as diagnostics.

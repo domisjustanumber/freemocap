@@ -8,7 +8,7 @@ Create a separate graph-based configuration and progress interface for FreeMoCap
 
 For now, work only in the Graph Lab experiment. Do not modify or connect controls to the running application. Preserve the accepted synthetic exploration. Do not redesign the pipeline scheduler to accommodate the UI.
 
-Core repository: `C:/Users/jonma/code-stuff/github/freemocap/project/repos/freemocap`.
+Core repository: `C:/Users/<you>/code-stuff/github/freemocap/project/repos/freemocap`.
 All paths below are relative to that repository unless stated otherwise.
 
 ## Responsibility split

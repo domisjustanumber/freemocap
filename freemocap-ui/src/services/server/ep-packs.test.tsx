@@ -35,7 +35,11 @@ test('progress and results say what the server says, with "machine" for the comp
     assert.equal(result('remove', 'done', 'was-present'),
         'AMD GPU removed from this app; its package was on this system before and stays');
     assert.equal(result('remove', 'failed', 'no-record'), 'Nothing to remove: no install of AMD GPU by this app is recorded');
-    assert.equal(result('remove', 'failed', 'package-not-removed'), 'Remove of AMD GPU failed: package-not-removed');
+    // Reason codes read as sentences, never as keys; a code with no sentence shows as sent.
+    assert.equal(result('remove', 'failed', 'package-not-removed'), 'Remove of AMD GPU failed: Windows did not remove its package');
+    assert.equal(result('remove', 'failed', 'package-not-removed, package-unknown'), 'Remove of AMD GPU failed: Windows did not '
+        + 'remove its package; which package this app installed is not known, so nothing was removed');
+    assert.equal(result('remove', 'error', 'thread-not-started'), 'Remove of AMD GPU could not run: the system could not start the work');
     const every = [EP_PACK_TEXT.confirmRemove('AMD GPU'), result('remove', 'done', 'was-present')].join(' ');
     assert.ok(!/\bPC\b|\bdevice\b/.test(every));
     assert.ok(renderToStaticMarkup(<p>{EP_PACK_TEXT.confirmRemove('AMD GPU')}</p>).includes('Remove AMD GPU?'));

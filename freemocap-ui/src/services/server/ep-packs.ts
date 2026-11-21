@@ -2,6 +2,7 @@ import {createHttpClient} from '@freemocap/client/http';
 import type {Certification} from '@freemocap/client';
 import type {ExecutionProviderOption} from '@/types/execution-provider';
 import {describeError} from '@/store/slices/thunk-helpers';
+import {reasonText} from './execution-providers';
 
 export type EpPackRun = NonNullable<Certification['pack_run']>;
 export type EpPackResult = NonNullable<Certification['last_pack_result']>;
@@ -50,8 +51,10 @@ export function packResultText({action, result, reason, message}: EpPackResult, 
     if (result === 'failed' && action === 'remove' && reason === 'no-record') {
         return `Nothing to remove: no install of ${label} by this app is recorded`;
     }
-    if (result === 'failed') return `${verb} of ${label} failed: ${message ?? reason ?? result}`;
-    return `${verb} of ${label} could not run: ${reason ?? result}`;
+    // A remove can fail with several codes, joined by ", ".
+    const why = (reason ?? result).split(', ').map(reasonText).join('; ');
+    if (result === 'failed') return `${verb} of ${label} failed: ${message ?? why}`;
+    return `${verb} of ${label} could not run: ${why}`;
 }
 
 /** Start an install or remove of one EP. Null when accepted, else the server's reason. */

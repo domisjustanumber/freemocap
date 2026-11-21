@@ -175,6 +175,12 @@ const REASON_TEXT: Readonly<Record<string, string>> = {
     'cancelled': 'it was cancelled before it ended',
     'interrupted': 'the run was interrupted before it ended',
     'reason-lost': 'it ended before the run was interrupted, and its reason was not kept',
+    // An EP install or remove (skellytracker's Windows ML remove codes, and freemocap's own).
+    'package-not-removed': 'Windows did not remove its package',
+    'package-name-mismatch': 'the package on this system is not the one this app installed, so it stays',
+    'package-unknown': 'which package this app installed is not known, so nothing was removed',
+    'record-refused': 'its install record is not of a Windows ML EP, so nothing was removed',
+    'thread-not-started': 'the system could not start the work',
 };
 export const reasonText = (reason: string): string => REASON_TEXT[reason] ?? reason;
 

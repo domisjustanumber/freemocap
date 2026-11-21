@@ -88,7 +88,7 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
         {/* Anchored at a fixed top, so the one step when the reports appear grows downward and nothing above moves. */}
         <Centred zIndex={1000} top block={required}>
         <div className="settings-modal bg-primary border-1 border-black elevated-sharp p-1 flex flex-col br-2" role="dialog" ref={dialogRef} tabIndex={-1}
-             aria-label={CERTIFICATION_TEXT.title} style={{...UNTRANSFORMED, width: 560, outline: 'none'}}>
+             aria-label={CERTIFICATION_TEXT.title} style={{...UNTRANSFORMED, width: 560, outline: 'none', scrollPaddingBottom: '4em'}}>
             <div className="flex flex-col p-2 gap-2 bg-middark br-1">
                 <div className="flex justify-content-space-between items-center">
                     <SubactionHeader text={CERTIFICATION_TEXT.title}/>
@@ -150,7 +150,8 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                 {/* Offered once the start check is not required; the server refuses a start until it passed. */}
                 {certification && !certification.start_required && <FullBenchmarkSection/>}
 
-                {/* Sticky: the dialog scrolls at 80vh, and Continue must stay in sight. */}
+                {/* Sticky: the dialog scrolls at 80vh, and Continue must stay in sight; the dialog's scroll padding keeps a
+                    focused control (the consent's Start) clear of it. */}
                 {bottom && <div className="flex flex-row gap-2 bg-middark pt-1" style={{justifyContent: 'flex-end', position: 'sticky', bottom: 0}}>
                     <ButtonSm text={bottom} textColor="text-white" className={bottom === CERTIFICATION_TEXT.continue ? 'primary accent' : ''}
                               buttonType={bottom === CERTIFICATION_TEXT.continue ? '' : 'secondary'} onClick={onClose}/>

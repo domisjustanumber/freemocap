@@ -101,12 +101,16 @@ def record_pass(report: dict) -> None:
 def run_start_check(progress, cancel, *, ui_remote: bool | None, blender_exe_path: str | None = None, own_certify=None,
                     certify=None) -> tuple:
     """Each package's quick check in turn; `("start", ((package, result, reason), ...))`. A module that raises is
-    `error` with the exception class name; after a cancel the next module is `not-run` with `cancelled`."""
+    `error` with the exception class name; after a cancel the next module is `not-run` with `cancelled`. The shared test
+    media folder lets a package find media already there; the quick level downloads and writes nothing in it, so
+    skellytracker, which then reads its frames only from that folder, gets it only when its frames file is there."""
     from freemocap.certification import certify as freemocap_certify, module_result
+    from freemocap.system.default_paths import get_test_media_dir
+    media = get_test_media_dir()
     results = []
     try:
         report = (own_certify or freemocap_certify)("quick", progress, cancel, ui_remote=ui_remote,
-                                                 blender_exe_path=blender_exe_path)
+                                                 blender_exe_path=blender_exe_path, test_media_dir=media)
         results.append(("freemocap", *module_result(report)))
         if results[0][1] == "pass":
             record_pass(report)
@@ -119,23 +123,30 @@ def run_start_check(progress, cancel, *, ui_remote: bool | None, blender_exe_pat
         try:
             if certify is None:
                 from skellytracker import certify
-            results.append(("skellytracker", *module_result(certify("quick", progress, cancel))))
+            options = {"test_media_dir": media} if _frames_target(media).is_file() else {}
+            results.append(("skellytracker", *module_result(certify("quick", progress, cancel, **options))))
         except Exception as error:  # noqa: BLE001
             logger.exception("skellytracker's quick check raised")
             results.append(("skellytracker", "error", type(error).__name__))
     return "start", tuple(results)
 
 
-def seed_test_media(test_media_dir) -> None:
-    """Put skellytracker's bundled test frames file in the shared test media folder by the name rule of report format
-    2.8, where skellytracker's `certify(test_media_dir=...)` reads it; a bundled file, so the clean-up keeps it."""
-    from skellytracker.core.eps.certification import frames_file, frames_record
+def _frames_target(test_media_dir) -> Path:
+    """skellytracker's test frames file in the shared test media folder, by the name rule of report format 2.8."""
+    from skellytracker.core.eps.certification import frames_record
     record = frames_record()
-    target = Path(test_media_dir) / f"{record['sha256']}{Path(record['path']).suffix}"
+    return Path(test_media_dir) / f"{record['sha256']}{Path(record['path']).suffix}"
+
+
+def seed_test_media(test_media_dir) -> None:
+    """Put skellytracker's bundled test frames file in the shared test media folder, where skellytracker's
+    `certify(test_media_dir=...)` reads it; a bundled file, so the clean-up keeps it."""
+    from skellytracker.core.eps.certification import frames_file, frames_record
+    target = _frames_target(test_media_dir)
     if not target.is_file():
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.with_name(target.name + ".tmp")
-        temporary.write_bytes(frames_file({"frames": record}))
+        temporary.write_bytes(frames_file({"frames": frames_record()}))
         temporary.replace(target)
 
 

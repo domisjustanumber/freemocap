@@ -170,7 +170,7 @@ test('the six result lines, a cancel included, from last_result', () => {
     assert.equal(quickCheckResultText({result: 'not-run', reason: 'models-missing'}), 'Quick check did not run: a model file it needs is not on this system');
     assert.equal(quickCheckResultText({result: 'crashed', reason: 'exit-code-3'}), 'Quick check stopped unexpectedly');
     assert.equal(quickCheckResultText({result: 'fail', reason: 'crashed'}),
-        'Quick check failed: it stopped unexpectedly while it ran and is not run again by itself');
+        'Quick check failed: it stopped unexpectedly and will not run again automatically');
     assert.equal(quickCheckResultText({result: 'error', reason: 'ValueError'}), 'Quick check could not start: ValueError');
     assert.equal(quickCheckResultText({result: 'not-run', reason: 'cancelled'}), 'Quick check cancelled');
 });

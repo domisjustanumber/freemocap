@@ -171,7 +171,7 @@ const REASON_TEXT: Readonly<Record<string, string>> = {
     'video-not-passed': 'the video check did not pass',
     'cpu-reference-missing': 'the CPU reference check did not pass',
     'posthoc-session': 'a post-hoc processing session did not start and run on this system',
-    'crashed': 'it stopped unexpectedly while it ran and is not run again by itself',
+    'crashed': 'it stopped unexpectedly and will not run again automatically',
     'bad-hash': 'the sample recording is not the expected file, so it was not used',
     'recording-missing': 'the sample recording was not ready, so it did not run',
     'ep-not-passed': 'its execution provider did not pass its checks on this system in this run',

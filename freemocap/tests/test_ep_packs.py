@@ -94,7 +94,7 @@ def test_cancel_reaches_skellytrackers_cancel_and_the_end_says_cancelled():
 
 def test_an_error_in_the_work_gives_only_its_class_name():
     def broken(key, progress, cancel):
-        raise OSError("C:/Users/someone/secret path")
+        raise OSError("C:/Users/<you>/secret path")
     manager = _manager(install=broken)
     manager.start("install", KEY, _holds(manager))
     _until_ended(manager)

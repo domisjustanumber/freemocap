@@ -1474,7 +1474,7 @@ To do next, in order (items 1 to 3 below are older; see the update above for wha
 
 Update 2026-11-19, after the fourth grilling (decisions J1 to J20, above):
 (a) On this machine the app opens blocked until a start check has run, because
-`C:\Users\Dom\freemocap_data\certify\start-check.json` does not exist and no reviewed OS row exists. Running it
+`C:\Users\<you>\freemocap_data\certify\start-check.json` does not exist and no reviewed OS row exists. Running it
 also runs DirectML checks and writes this machine's EP store.
 (b) Which repository holds freemocap's commits for `package.commit` is the user's open decision: the branch is local
 with no upstream, and the remotes are the user's fork and the organisation's repository.

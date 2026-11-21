@@ -67,7 +67,7 @@ def certify_crash(level, progress, cancel, **options):
 
 
 def certify_raise(level, progress, cancel, **options):
-    raise RuntimeError("C:/Users/someone/private path")
+    raise RuntimeError("C:/Users/<you>/private path")
 
 
 def _checks(**options):

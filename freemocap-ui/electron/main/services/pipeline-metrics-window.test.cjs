@@ -32,7 +32,7 @@ test('Save snapshot offers a PNG named in local time in Downloads and writes the
     }
     const stubs = {
         electron: {
-            app: {getPath: name => name === 'downloads' ? 'C:\\Users\\person\\Downloads' : assert.fail(name)},
+            app: {getPath: name => name === 'downloads' ? 'C:\\Users\\<you>\\Downloads' : assert.fail(name)},
             BrowserWindow,
             dialog: {showSaveDialog: async (window, options) => {
                 dialogs.push(options);
@@ -51,7 +51,7 @@ test('Save snapshot offers a PNG named in local time in Downloads and writes the
     module.exports.openPipelineMetricsWindow();
     assert.equal(windows[0].openHandler({url: 'freemocap-snapshot:pipeline-metrics'}).action, 'deny');
     await new Promise(resolve => setImmediate(resolve));
-    assert.equal(dialogs[0].defaultPath, path.join('C:\\Users\\person\\Downloads', 'pipeline-metrics-20261121-143005.png'));
+    assert.equal(dialogs[0].defaultPath, path.join('C:\\Users\\<you>\\Downloads', 'pipeline-metrics-20261121-143005.png'));
     assert.equal(JSON.stringify(dialogs[0].filters), '[{"name":"PNG image","extensions":["png"]}]');  // made in the vm's realm
     assert.deepEqual(writes, [['D:\\picked\\metrics.png', 'png-bytes']]);
 });

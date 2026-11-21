@@ -155,6 +155,7 @@ dev = [
     "pyinstaller==6.22.3",  # the skellytracker pin
     "ruff>=0.9.0",
     "poethepoet>=0.32.0",
+    "pre-commit==4.7.0",  # the hooks of .pre-commit-config.yaml (decision 0001)
     # The legacy tracker benchmark only (the old YOLOX dynamic batch); the pin of skellytracker's onnx extra.
     # Deleted with the legacy tracker benchmark at skellytracker stage 2.4 (user ruling D1 a).
     "onnx==1.22.0",

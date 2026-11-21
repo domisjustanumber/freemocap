@@ -127,7 +127,7 @@ export function certificationButtonSuffix(certification: Certification | null, r
     if (!certification) return '';
     const {run, pending_reports: pending, host} = certification;
     const failures = pending.filter(report => report.has_failure).length;
-    const parts = [run ? `· quick check${run.total === undefined ? '' : ` ${run.done} of ${run.total}`}`
+    const parts = [run ? `· ${run.level === 'full' ? 'full benchmark' : 'quick check'}${run.total === undefined ? '' : ` ${run.done} of ${run.total}`}`
         : failures ? `· ${plural(failures, 'failure')} to file` : pending.length ? `· ${pending.length} to file` : ''];
     if (remote) parts.push(`@ ${host.name}`);
     return parts.filter(Boolean).join(' ');

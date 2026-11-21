@@ -27,6 +27,7 @@ test('the button suffix follows the server state: progress, then failures, then 
     const run = {level: 'quick', items: [], state: 'running', done: 1, total: 3};
     assert.equal(certificationButtonSuffix({...BASE, run, pending_reports: pending(true)}, false), '· quick check 1 of 3');
     assert.equal(certificationButtonSuffix({...BASE, run: {...run, total: undefined}}, false), '· quick check');
+    assert.equal(certificationButtonSuffix({...BASE, run: {...run, level: 'full'}}, false), '· full benchmark 1 of 3');
     assert.equal(certificationButtonSuffix({...BASE, pending_reports: pending(false)}, true), '· 1 to file @ lab-machine');
     assert.equal(certificationButtonSuffix(BASE, true), '@ lab-machine');
     assert.deepEqual(['localhost', '127.0.0.1', '::1', 'LOCALHOST', '192.168.1.5', 'lab'].map(isLocalHost), [true, true, true, true, false, false]);

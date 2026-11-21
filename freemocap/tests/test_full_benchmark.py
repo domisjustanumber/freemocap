@@ -72,6 +72,33 @@ def own_stand_in(level, progress, cancel, **options):
     return {"checks": [], "evidence": {"reasons": []}}
 
 
+OWN_CHECKS = ["data-folder", "recording", "posthoc:cpu", "blender"]
+
+
+def tracker_passes(level, progress, cancel, **options):
+    """skellytracker's level full that passes: its last progress message has every check ended."""
+    progress({**_message(None, len(CHECKS)), "state": "done"})
+    return {"checks": [{"name": name, "result": "pass"} for name in CHECKS], "evidence": {"reasons": []}}
+
+
+class SlowToSend:
+    """Sent as 0 after a second: the progress queue's feeder thread is still sending it when the result is put."""
+    def __reduce__(self):
+        time.sleep(1.0)
+        return int, (0,)
+
+
+def own_passes_and_returns_at_once(level, progress, cancel, **options):
+    """freemocap's level full that passes; its last progress message (every check ended) goes right before its return
+    and is slow to send, so the child puts the result on its other queue while that message is still being sent."""
+    for done in range(len(OWN_CHECKS) + 1):
+        last = done == len(OWN_CHECKS)
+        progress({"package": "freemocap", "kind": level, "state": "done" if last else "running", "step": None,
+                  "checks": [{"name": name, "result": "pass" if index < done else None} for index, name in enumerate(OWN_CHECKS)],
+                  "done": done, "total": len(OWN_CHECKS), "seconds_left": SlowToSend() if last else None})
+    return {"checks": [{"name": name, "result": "pass"} for name in OWN_CHECKS], "evidence": {"reasons": []}}
+
+
 def backend_that_dies(pids):
     """A backend that starts the full benchmark's child and dies while it runs."""
     from skellylogs.handlers.websocket_log_queue_handler import create_websocket_log_queue
@@ -209,6 +236,23 @@ def test_every_start_is_refused_while_it_runs_and_a_cancel_leaves_an_incomplete_
         assert (new["package"], new["kind"]) == ("skellytracker", "full")
         text = report_file_for([new["report_id"]], None)[1].decode("utf-8")
         assert "full run · incomplete · not valid as evidence:" in text  # the rest of its checks are `not-run`, `cancelled`
+    finally:
+        manager.shutdown()
+
+
+def test_a_finished_run_keeps_every_counted_check_finished_in_its_rows(base, failures):
+    """The child's last progress messages reach the backend before its result: the ended rows have each check's result,
+    none left `not-run` by a message that was still in the progress queue when the result arrived."""
+    manager = _manager(tracker_passes)
+    manager.own_certify = own_passes_and_returns_at_once
+    try:
+        manager.refresh()
+        _start(manager)
+        _wait(manager, lambda: not manager.running)
+        assert manager.full_results == (StartCheckResult("skellytracker", "pass", None), StartCheckResult("freemocap", "pass", None))
+        assert [(row.package, row.name, row.state, row.result) for row in manager.full_rows] == [
+            ("skellytracker", "cpu", "done", "pass"), ("skellytracker", LABEL, "done", "pass"),
+            *(("freemocap", name, "done", "pass") for name in OWN_CHECKS)]
     finally:
         manager.shutdown()
 

@@ -232,30 +232,38 @@ class QuickCheckJob(BaseNode):
                 time.sleep(0.2)
 
         threading.Thread(target=watch, name="QuickCheckWatch", daemon=True).start()
+
+        def publish(result) -> None:
+            # Each queue has its own feeder thread: flush every progress message (the last one says each check ended)
+            # into its pipe before the result, which the backend reads first and then ends the run.
+            progress_pub.close()
+            progress_pub.join_thread()
+            result_pub.put(result)
+
         try:
             if level == "full":
                 from freemocap.system.certify.start_check import run_full_check
-                result_pub.put(run_full_check(progress_pub.put, cancel, remove_data=remove_data,
-                                              blender_exe_path=blender_exe_path, own_certify=own_certify, certify=certify))
+                publish(run_full_check(progress_pub.put, cancel, remove_data=remove_data,
+                                       blender_exe_path=blender_exe_path, own_certify=own_certify, certify=certify))
                 return
             if execution_provider is None:
                 from freemocap.system.certify.start_check import run_start_check
-                result_pub.put(run_start_check(progress_pub.put, cancel, ui_remote=ui_remote, blender_exe_path=blender_exe_path,
-                                               own_certify=own_certify,
-                                               certify=certify))
+                publish(run_start_check(progress_pub.put, cancel, ui_remote=ui_remote, blender_exe_path=blender_exe_path,
+                                        own_certify=own_certify, certify=certify))
                 return
             if certify is None:
                 from skellytracker import certify
             from freemocap.core.tracking.pipeline_runs import load_detector_pipeline
             report = certify("quick", progress_pub.put, cancel, execution_providers=[execution_provider],
                              device=device_key, pipeline=load_detector_pipeline(detector_type, rtmpose_model_name))
-            result_pub.put(_report_result(report))
+            publish(_report_result(report))
         except Exception as error:  # noqa: BLE001 - the class name only: an error text can hold a path
             logger.exception("The quick check of %s on %s raised", execution_provider or "every package", device_key)
-            result_pub.put(("error", type(error).__name__))
+            publish(("error", type(error).__name__))
 
     def drain_progress(self) -> dict | None:
-        """The newest of the waiting progress messages (each is the complete state), or None."""
+        """The newest of the waiting progress messages (each is the complete state of its package), or None; at level
+        full each package's newest goes to `packages`, so one package's last message is not lost to the next's first."""
         latest = None
         while True:
             try:
@@ -263,6 +271,8 @@ class QuickCheckJob(BaseNode):
             except (Empty, OSError, ValueError):
                 return latest
             self.progress_received += 1
+            if self.level == "full":
+                self.packages[latest.get("package")] = latest
 
     def poll_result(self) -> tuple | None:  # (result, reason), or ("start", per-package rows)
         try:
@@ -489,7 +499,6 @@ class QuickCheckManager:
                     crash_record.write(job.record)
                     done, total, rows = int(message.get("done", 0)), message.get("total"), ()
                     if job.level == "full":  # every package so far, counted as their plans count
-                        job.packages[message.get("package")] = message
                         counts = [_counted(package, job.not_counted) for package in job.packages.values()]
                         done, total = sum(done for done, _ in counts), sum(total for _, total in counts)
                         rows = tuple(row for package in job.packages.values()

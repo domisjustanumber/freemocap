@@ -39,6 +39,8 @@ test('progress and results say what the server says, with "machine" for the comp
     assert.equal(result('remove', 'failed', 'package-not-removed'), 'Remove of AMD GPU failed: Windows did not remove its package');
     assert.equal(result('remove', 'failed', 'package-not-removed, package-unknown'), 'Remove of AMD GPU failed: Windows did not '
         + 'remove its package; which package this app installed is not known, so nothing was removed');
+    assert.equal(result('remove', 'failed', 'package-in-use'), 'Remove of AMD GPU failed: this app is still using its package; '
+        + 'close FreeMoCap, start it again and run the removal before you use this EP');
     assert.equal(result('remove', 'error', 'thread-not-started'), 'Remove of AMD GPU could not run: the system could not start the work');
     const every = [EP_PACK_TEXT.confirmRemove('AMD GPU'), result('remove', 'done', 'was-present')].join(' ');
     assert.ok(!/\bPC\b|\bdevice\b/.test(every));

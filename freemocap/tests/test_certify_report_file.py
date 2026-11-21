@@ -332,13 +332,13 @@ def test_freemocaps_own_modules_obey_the_privacy_rules_and_the_relay_validator_b
 
     monkeypatch.setenv("FREEMOCAP_BASE_FOLDER", str(tmp_path))
     monkeypatch.setattr(certification, "_spawn_imports", lambda cancelled: ({"failed": [], "from_bundle": None}, None))
-    monkeypatch.setattr(certification, "_posthoc", lambda cancelled, cleanup: (
+    monkeypatch.setattr(certification, "_posthoc", lambda cancelled, cleanup, media: (
         "pass", None, {"frames": 3, "execution_providers": {"person": "cpu", "wholebody": "cpu"}, "seconds": 8.5}))
     monkeypatch.setattr(certification, "_blender", lambda cancelled, path=None: (
         "record-only", None, {"found": True, "version_major": 5, "version_minor": 2, "version_patch": 3}))
     # the level full with stand-ins for its recording, its pairs, its post-hoc session and Blender: nothing downloads
     monkeypatch.setattr(certification, "_pairs", lambda: [("cpu", "cpu", None, "CPU")])
-    monkeypatch.setattr(certification, "_recording", lambda cancelled, media: ("pass", None, {"downloaded": False}, tmp_path))
+    monkeypatch.setattr(certification, "_recording", lambda cancelled, folder, media: ("pass", None, {"downloaded": False}, tmp_path))
     monkeypatch.setattr(certification, "_usable_labels", lambda: {"cpu"})
     monkeypatch.setattr(certification, "_benchmark", lambda *args: ("pass", None, {"frames": 300, "stages": {
         "graph.load_and_track": {"total_s": 24.6, "ms_per_frame": 82.0, "fps": 12.2}}}))

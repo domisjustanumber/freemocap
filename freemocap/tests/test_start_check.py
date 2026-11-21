@@ -33,7 +33,7 @@ def no_blender(monkeypatch):
 
 @pytest.fixture
 def no_posthoc(monkeypatch):
-    monkeypatch.setattr(certification, "_posthoc", lambda cancelled, cleanup: ("not-run", "models-missing", None))
+    monkeypatch.setattr(certification, "_posthoc", lambda cancelled, cleanup, media: ("not-run", "models-missing", None))
 
 
 # - freemocap's own checks -
@@ -51,6 +51,7 @@ def test_the_quick_level_runs_its_seven_checks_in_order_and_obeys_the_report_for
     if posthoc["reason"] != "models-missing":  # an installed skellytracker without its model files
         assert (posthoc["result"], posthoc["reason"]) == ("pass", None), posthoc
         assert posthoc["numbers"]["frames"] == 3 and set(posthoc["numbers"]["execution_providers"]) == {"person", "wholebody"}
+        assert report["test_media"] == [certification._frames_media()]
     assert report["cleanup"] == []
     assert [path.name for path in base.iterdir()] == ["certify"]  # the probe file and the session's work folder are gone
     assert [path.name for path in (base / "certify").iterdir()] == ["reports"]

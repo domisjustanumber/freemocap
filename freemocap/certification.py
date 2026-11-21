@@ -37,6 +37,11 @@ has the EP's name) and, when it ran, one summary item of the group `component` w
 check that did not run has no item, except Blender when it is not installed: its item is `skipped` with `not-installed`
 (format 1.6.0, 3.7), at both levels.
 
+`test_media` (format 1.6.0, 3.9) names each file that a check of the run used, with the SHA-256 of the bytes it used:
+skellytracker's bundled `quick_frames.zip` when `posthoc-session` ran its session on them, `pass` or `fail`
+(`certify_frames()` reads them only from a file whose SHA-256 is the one of skellytracker's record), and `freemocap_sample_data.zip` (`shared`)
+once the `recording` check has checked the archive's SHA-256.
+
 freemocap's reason codes (report format 5.4), besides the common ones (`models-missing`, `test-media-missing`,
 `over-budget`, `timed-out`, `crashed`, `hung-at-exit`):
 - `spawn-failed`: the spawn child of `spawn-child` gave no answer, so the later checks did not run.
@@ -363,9 +368,31 @@ def _posthoc_child(queue, frames: list[bytes], work: str) -> None:
     queue.put(answer)
 
 
-def _posthoc(cancelled, cleanup: list) -> tuple[str, str | None, dict | None]:
+def _frames_media() -> dict:
+    """The `test_media` item (format 3.9) of skellytracker's bundled frames file, from its record (`frames_record`): the
+    SHA-256 that `certify_frames()` checks the file's bytes against before it gives a frame."""
+    from skellytracker.core.eps.certification import frames_record
+    record = frames_record()
+    return {"name": Path(record["path"]).name, "sha256": record["sha256"], "bytes": record["bytes"], "source": "bundled"}
+
+
+def _recording_media(sha256: str, size: int) -> dict:
+    # `shared`: the archive in the test media folder (format 2.8); with no folder, the copy in freemocap's own work folder
+    return {"name": SAMPLE_RECORDING["name"], "sha256": sha256, "bytes": size, "source": "shared"}
+
+
+def interrupted_media(checks: list[dict]) -> list[dict]:
+    """`test_media` of an interrupted run (`crash_record`): its progress keeps results only, so a `posthoc-session` that
+    ended `pass` or `fail` (a crash included) used the bundled frames, and a passed `recording` the checked archive."""
+    results = {row.get("name"): row.get("result") for row in checks}
+    return [*([_frames_media()] if results.get("posthoc-session") in ("pass", "fail") else []),
+            *([_recording_media(SAMPLE_RECORDING["sha256"], SAMPLE_RECORDING["bytes"])] if results.get("recording") == "pass" else [])]
+
+
+def _posthoc(cancelled, cleanup: list, media: list) -> tuple[str, str | None, dict | None]:
     """Run `posthoc-session` in its own spawn child, with scratch files in a work folder of freemocap's certify folder that
-    is removed afterwards; a removal that fails is a row of `cleanup` (report format 2.5)."""
+    is removed afterwards; a removal that fails is a row of `cleanup` (report format 2.5). The frames file is a row of
+    `media` when the session ran on its frames (the check ended `pass` or `fail`)."""
     from skellytracker.certification import certify_frames
     from skellytracker.core.eps.certification import FramesUnavailableError
     try:
@@ -387,8 +414,13 @@ def _posthoc(cancelled, cleanup: list) -> tuple[str, str | None, dict | None]:
         except OSError as error:
             cleanup.append({"name": "posthoc-session:work-folder", "result": "fail", "reason": type(error).__name__})
     if answer is None:
-        return ("not-run" if reason == "cancelled" else "fail"), reason, None
-    return answer["result"], answer["reason"], {**answer.get("numbers", {}), "seconds": round(time.monotonic() - started, 3)}
+        result, numbers = ("not-run" if reason == "cancelled" else "fail"), None
+    else:
+        result, reason = answer["result"], answer["reason"]
+        numbers = {**answer.get("numbers", {}), "seconds": round(time.monotonic() - started, 3)}
+    if result in ("pass", "fail"):  # the session ran on the frames, a crash included (as `interrupted_media`)
+        media.append(_frames_media())
+    return result, reason, numbers
 
 
 # - The full benchmark on the sample recording -
@@ -427,9 +459,10 @@ def _cut(source: Path, target: Path, frames: int, cancelled) -> None:
                 writer.release()
 
 
-def _recording(cancelled, test_media_dir) -> tuple[str, str | None, dict, Path | None]:
+def _recording(cancelled, test_media_dir, media: list) -> tuple[str, str | None, dict, Path | None]:
     """The `recording` check: the archive in the test media folder (downloaded when absent, hash checked), extracted and
-    cut to `BENCHMARK_FRAMES` frames in a new work folder. `numbers.downloaded` tells the clean-up what this run fetched."""
+    cut to `BENCHMARK_FRAMES` frames in a new work folder. `numbers.downloaded` tells the clean-up what this run fetched.
+    The archive is a row of `media`, with the SHA-256 computed from its bytes, once that matches."""
     from concurrent.futures import CancelledError
     from freemocap.tools.datasets.catalog import SAMPLE_DATA, download, extract_recording
     archive, numbers = _archive(test_media_dir), {"downloaded": False, "frames": BENCHMARK_FRAMES}
@@ -437,17 +470,20 @@ def _recording(cancelled, test_media_dir) -> tuple[str, str | None, dict, Path |
     try:
         archive.parent.mkdir(parents=True, exist_ok=True)
         if archive.is_file():
-            if _sha256(archive) != SAMPLE_RECORDING["sha256"]:
+            digest = _sha256(archive)
+            if digest != SAMPLE_RECORDING["sha256"]:
                 return "fail", "bad-hash", numbers, None  # never used, never removed: it was there before the run
         else:
             partial = archive.with_name(f"{archive.name}.{uuid.uuid4().hex}.part")
             try:
-                if download(SAMPLE_DATA.url, partial, cancelled) != SAMPLE_RECORDING["sha256"]:
+                digest = download(SAMPLE_DATA.url, partial, cancelled)
+                if digest != SAMPLE_RECORDING["sha256"]:
                     return "fail", "bad-hash", numbers, None
                 os.replace(partial, archive)
             finally:
                 partial.unlink(missing_ok=True)  # a partial or wrong file is never kept
             numbers.update(downloaded=True, download_seconds=round(time.monotonic() - started, 3))
+        media.append(_recording_media(digest, archive.stat().st_size))
         work = _work()
         if work.exists():
             shutil.rmtree(work)  # the work folder of an earlier run
@@ -678,6 +714,7 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
               for name in names]
     recording, usable, numbers_of = None, None, {}
     cleanup: list[dict] = []
+    media: list[dict] = []  # `test_media`: each test media file that a check used
     cancelled =lambda: cancel is not None and cancel.is_set()  # noqa: E731
 
     def send(state: str, step: str | None) -> None:
@@ -705,7 +742,7 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
         send("running", row["name"])
         name = row["name"]
         if name == "recording":
-            result, reason, numbers, recording = _recording(cancelled, test_media_dir)
+            result, reason, numbers, recording = _recording(cancelled, test_media_dir, media)
             numbers_of["recording"] = numbers
             record(row, result, reason, numbers)
             if reason == "cancelled":
@@ -753,7 +790,7 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
             if time.monotonic() - begun + POSTHOC_SECONDS > QUICK_BUDGET_SECONDS:  # it would not end in the budget
                 record(row, "not-run", "over-budget")
             else:
-                record(row, *_posthoc(cancelled, cleanup))
+                record(row, *_posthoc(cancelled, cleanup, media))
                 if row["reason"] == "cancelled":
                     stopped = "cancelled"
         elif name == "install-facts":
@@ -770,7 +807,7 @@ def certify(level: str, progress=None, cancel=None, *, ui_remote: bool | None = 
     if level == "full" and remove_data and stopped is None and not any(row["result"] == "fail" for row in checks):
         cleanup += remove_benchmark_data(bool(numbers_of.get("recording", {}).get("downloaded")), test_media_dir)
     report = {"schema": SCHEMA, "id": str(uuid.uuid4()), "package": package, "kind": level, "created_utc": created,
-              "host": _host(), "checks": checks, "cleanup": cleanup, "evidence": {"valid": not reasons, "reasons": reasons},
+              "host": _host(), "checks": checks, "cleanup": cleanup, "test_media": media, "evidence": {"valid": not reasons, "reasons": reasons},
               "summary": _component_items(checks) + (_benchmark_items(checks, pairs, BENCHMARK_FRAMES) if level == "full" else [])}
     if any(row["result"] in ("pass", "fail") for row in checks):  # only those reach the hand-in list
         try:

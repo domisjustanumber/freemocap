@@ -47,7 +47,7 @@ def test_models_missing_is_not_run_and_does_not_fail_the_module(quick, monkeypat
     monkeypatch.setattr(certification, "_spawn", answer("not-run", "models-missing"))
     rows, report = quick()
     assert (rows["posthoc-session"]["result"], rows["posthoc-session"]["reason"]) == ("not-run", "models-missing")
-    assert certification.module_result(report) == ("pass", None)
+    assert certification.module_result(report) == ("pass", None) and report["test_media"] == []  # it used no frame
     assert sorted(path.name for path in (tmp_path / "certify").iterdir()) == ["reports"], "the work folder is removed"
 
 
@@ -60,7 +60,25 @@ def test_missing_or_damaged_frames_are_test_media_missing(quick, monkeypatch):
     monkeypatch.setattr(skellytracker.certification, "certify_frames", unavailable)
     rows, report = quick()
     assert (rows["posthoc-session"]["result"], rows["posthoc-session"]["reason"]) == ("not-run", "test-media-missing")
-    assert certification.module_result(report) == ("pass", None)
+    assert certification.module_result(report) == ("pass", None) and report["test_media"] == []
+
+
+@pytest.mark.parametrize("ending", [(None, "crashed"), ({"result": "pass", "reason": None}, None)])
+def test_the_frames_file_the_session_ran_on_is_listed_with_the_hash_of_the_bytes_of_its_frames(quick, monkeypatch, ending):
+    """Format 3.9 (owner: "it's very important to know which files the test ran on"): the frames given to the session's
+    child are the first frames of the bundled file whose SHA-256 and size `test_media` lists, computed here from its bytes."""
+    import hashlib
+    import io
+    import zipfile
+    from skellytracker.core.eps.certification import frames_file, frames_record
+    given = []
+    monkeypatch.setattr(certification, "_spawn", lambda target, args, *rest: given.append(args[0]) or ending)
+    rows, report = quick()
+    data = frames_file({"frames": frames_record()})  # the bundled file, as skellytracker reads it
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        assert given == [[archive.read(name) for name in sorted(archive.namelist())][:certification.POSTHOC_FRAMES]]
+    assert report["test_media"] == [{"name": "quick_frames.zip", "sha256": hashlib.sha256(data).hexdigest(),
+                                     "bytes": len(data), "source": "bundled"}]
 
 
 def test_a_session_that_does_not_fit_the_budget_is_over_budget_and_not_started(quick, monkeypatch):
@@ -68,6 +86,7 @@ def test_a_session_that_does_not_fit_the_budget_is_over_budget_and_not_started(q
     monkeypatch.setattr(certification, "_spawn", lambda *args: pytest.fail("started"))
     rows, report = quick()
     assert (rows["posthoc-session"]["result"], rows["posthoc-session"]["reason"]) == ("not-run", "over-budget")
+    assert report["test_media"] == []
     assert certification.module_result(report) == ("pass", None)
 
 

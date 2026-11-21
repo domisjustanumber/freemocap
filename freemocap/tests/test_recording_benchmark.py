@@ -123,6 +123,9 @@ def test_a_successful_run_benchmarks_the_usable_pairs_and_removes_only_what_it_d
                                  {"group": "benchmark", "name": "CPU", "device": None, "stage": "tracking",
                                   "ms_per_frame": 200.0, "fps": 5.0}]
     assert report["cleanup"] == [] and not {"partial-run", "cancelled"} & set(report["evidence"]["reasons"])
+    # format 3.9: the archive the run used, with the SHA-256 and size of the bytes it downloaded and extracted
+    assert report["test_media"] == [{"name": "freemocap_sample_data.zip", "sha256": hashlib.sha256(bench.payload).hexdigest(),
+                                     "bytes": len(bench.payload), "source": "shared"}]
     assert sorted(path.name for path in bench.media.iterdir()) == ["kept-before.zip"]  # the download is gone
     assert not certification._work().exists(), "the processing output is gone"
     assert [path.name for path in certification.reports_dir().iterdir()] == [f"{report['id']}.json"]  # the report stays
@@ -146,12 +149,15 @@ def test_an_archive_that_was_there_before_stays_and_one_with_a_wrong_hash_is_nev
     report = certification.certify("full", None, None, test_media_dir=bench.media, remove_data=True)
     assert report["checks"][1]["numbers"]["downloaded"] is False and bench.downloads == []
     assert archive.is_file() and not certification._work().exists()
+    assert [(item["sha256"], item["bytes"]) for item in report["test_media"]] == [
+        (hashlib.sha256(archive.read_bytes()).hexdigest(), len(bench.payload))]  # the file that was there
     archive.write_bytes(b"not the recording")
     report = certification.certify("full", None, None, test_media_dir=bench.media, remove_data=True)
     assert [(row["name"], row["result"], row["reason"]) for row in report["checks"][1:4]] == [
         ("recording", "fail", "bad-hash"), ("posthoc:fake-ep@10de-2484-0", "not-run", "recording-missing"),
         ("posthoc:cpu", "not-run", "recording-missing")]
     assert archive.read_bytes() == b"not the recording", "a file that was there before is never removed"
+    assert report["test_media"] == [], "a file with a wrong hash is never used"
     archive.unlink()
     bench.payload = b"a download with the wrong hash"
     report = certification.certify("full", None, None, test_media_dir=bench.media)

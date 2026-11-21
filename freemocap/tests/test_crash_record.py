@@ -124,6 +124,7 @@ def test_a_record_found_at_launch_is_an_incomplete_report_and_a_failure_of_its_p
         ("cpu:video", "pass", None), ("cpu:live", "not-run", "reason-lost"), (f"{LABEL}:probe", "pass", None),
         (f"{LABEL}:video", "fail", "crashed"), (f"{LABEL}:live", "not-run", "interrupted"), (LABEL, "not-run", "interrupted")]
     assert report["package"]["name"] == "skellytracker" and report["evidence"]["valid"] is False
+    assert "test_media" not in report  # skellytracker's progress does not tell which file its checks read
     _, data = report_file_for([report["id"]], None)
     text = data.decode("utf-8")
     assert "skellytracker" in text and "quick run · incomplete · not valid as evidence:" in text
@@ -141,7 +142,9 @@ def test_a_start_check_found_at_launch_releases_the_gated_starts(failures):
     assert manager.start_results == (StartCheckResult("freemocap", "fail", "crashed"),)
     assert manager.start_released and not manager.start_required and not manager.running
     assert failures == ["posthoc-session"]  # no pair: `record_provider_failure` stores nothing for it (next test)
-    assert [check["result"] for check in _new_report(before)["checks"]] == ["pass", "fail", "not-run"]
+    report = _new_report(before)
+    assert [check["result"] for check in report["checks"]] == ["pass", "fail", "not-run"]
+    assert report["test_media"] == [certification._frames_media()]  # the crashed session had its frames (format 3.9)
     # owner, Q59: not asked for again until a package version changes; the report stays in the hand-in list
     record = json.loads(start_check.record_path().read_text(encoding="utf-8"))
     assert (record["versions"], record["crashed"]) == (start_check.version_set(), "posthoc-session")

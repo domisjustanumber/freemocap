@@ -67,6 +67,7 @@ def interrupted_report(record: dict, exit_code: int | None = None) -> tuple[dict
         else:
             checks.append({"name": row["name"], "result": "not-run", "reason": "interrupted"})
     name = message.get("package") or "freemocap"
+    media = certification.interrupted_media(checks) if name == "freemocap" else []
     if name == "freemocap":
         package, reasons = certification._identity()
     else:  # the package's own commit and tree state are not in its progress
@@ -74,7 +75,7 @@ def interrupted_report(record: dict, exit_code: int | None = None) -> tuple[dict
                             ["no-commit", "modified-tree"])
     return {"schema": certification.SCHEMA, "id": str(uuid.uuid4()), "package": package, "kind": record.get("level"),
             "created_utc": record.get("created_utc"), "host": certification._host(), "checks": checks,
-            "evidence": {"valid": False, "reasons": [*reasons, "interrupted"]}}, crashed
+            **({"test_media": media} if media else {}), "evidence": {"valid": False, "reasons": [*reasons, "interrupted"]}}, crashed
 
 
 def record_provider_failure(check: str, created: str) -> None:

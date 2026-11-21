@@ -41,3 +41,13 @@ test('the "Full benchmark" button keeps its label and is never disabled, also wh
         if (run) assert.match(text(html), /CPU Running Cancel check 2 checks finished/);
     }
 });
+
+test('after a full benchmark ends its rows stay with how each ended, from the server, with no Cancel check', () => {
+    const certification = {host: {name: 'h', os: 'o'}, items: [], gpu_held_by: [], pending_reports: [],
+        full_results: [{package: 'skellytracker', result: 'not-run', reason: 'cancelled'}],
+        full_rows: [{name: 'cpu', package: 'skellytracker', execution_provider: 'cpu', state: 'done', result: 'pass'}]};
+    const store = configureStore({reducer: () => ({connection: {isConnected: false, serverPid: null, certification}})});
+    const html = text(renderToStaticMarkup(<Provider store={store}><FullBenchmarkSection/></Provider>));
+    assert.match(html, /CPU Passed skellytracker: cancelled/);
+    assert.ok(!/Cancel check/.test(html), html);
+});

@@ -122,12 +122,23 @@ def _full_rows(message: dict, items: tuple[CertificationItem, ...]) -> tuple[Cer
             from skellytracker.certification import _label  # shortcut: skellytracker's private label rule, as crash_record
             device_key = next((item.device_key for item in items
                                if item.execution_provider == key and _label(key, item.device_key) == name), None)
+        # partly-done: some of its checks ended and the rest come later in the run (the CPU's timings follow the pairs)
         state = "running" if isinstance(step.get("name"), str) and group(step["name"]) == name \
-            else "done" if None not in results else "waiting"
+            else "done" if None not in results else "waiting" if set(results) == {None} else "partly-done"
         result = rollup or next((result for result in ("fail", "pass", "record-only", "not-run") if result in results), None)
         rows.append(CertificationRunRow(name=name, package=package, execution_provider=key, device_key=device_key,
                                         state=state, result=result if state == "done" else None))
     return tuple(rows)
+
+
+def _ended(message: dict, crashed: bool) -> dict:
+    """A package's newest progress message as its run ended, for the final rows: each unfinished check `not-run`, and the
+    running one `fail` after a crash, as the crash record has them."""
+    step = message.get("step") if crashed and message.get("state") == "running" else None
+    step = step.get("name") if isinstance(step, dict) else None
+    return {**message, "state": "done", "checks": [
+        {**row, "result": "fail" if row.get("name") == step else "not-run"}
+        if isinstance(row, dict) and row.get("result") is None else row for row in message.get("checks") or ()]}
 
 
 def _counted(message: dict, not_counted: frozenset[str] = frozenset()) -> tuple[int, int]:
@@ -313,6 +324,7 @@ class QuickCheckManager:
     start_results: tuple[StartCheckResult, ...] = ()  # how the last start check of this server session ended
     start_released: bool = False  # a start check ended other than by a cancel in this server session (decision 14)
     full_results: tuple[StartCheckResult, ...] = ()  # how the last full benchmark of this server session ended
+    full_rows: tuple[CertificationRunRow, ...] = ()  # its rows as it ended, until the next one starts
     read_start_needed: object = None  # tests: a stand-in for `start_check.start_check_needed`
     _start_needed: bool | None = None  # None until the first status read: the gated starts are refused until then
     _parts: tuple | None = None
@@ -431,6 +443,8 @@ class QuickCheckManager:
                                    + ", ".join(f"{hold.kind} {hold.id}" for hold in held) + ". Stop it first.",
                         "gpu_held_by": [{"kind": hold.kind, "id": hold.id} for hold in held]})
                 self.run = CertificationRun(level=level, items=(pair,) if pair else (), seconds_estimate=seconds_estimate)
+                if level == "full":
+                    self.full_rows = ()
             try:  # the spawn is outside the admission lock; the run set above refuses other starts meanwhile
                 job = QuickCheckJob.create(pair=pair, detector_type=detector_type, rtmpose_model_name=rtmpose_model_name,
                                            worker_registry=self.worker_registry, global_kill_flag=self.global_kill_flag,
@@ -462,6 +476,7 @@ class QuickCheckManager:
         with self.lock:
             job = self.job
             if job is not None:
+                result = job.poll_result()  # before the drain: the progress sent before the result is then taken too
                 message = job.drain_progress()
                 if message is not None:
                     job.record["message"] = message
@@ -475,7 +490,6 @@ class QuickCheckManager:
                                      for row in _full_rows(package, self._parts[1] if self._parts else ()))
                     self.run = replace(self.run, state="cancelling" if job.cancel.is_set() else str(message.get("state")),
                                        done=done, total=total, package=message.get("package"), rows=rows)
-                result = job.poll_result()
                 if result is None and not job.is_alive:
                     result = job.poll_result()  # a result sent just before the exit
                     if result is None:
@@ -486,6 +500,8 @@ class QuickCheckManager:
                     elif job.level == "full":  # ("full", per-package results), or a crash or error of the whole child
                         self.full_results = tuple(StartCheckResult(*row) for row in result[1]) if result[0] == "full" \
                             else (StartCheckResult(None, *result),)
+                        self.full_rows = tuple(row for package in job.packages.values() for row in _full_rows(
+                            _ended(package, result[0] == "crashed"), self._parts[1] if self._parts else ()))
                     else:  # ("start", per-package results), or a crash or error of the whole child
                         self.start_results = tuple(StartCheckResult(*row) for row in result[1]) if result[0] == "start" \
                             else (StartCheckResult(None, *result),)
@@ -516,7 +532,8 @@ class QuickCheckManager:
         return CertificationSnapshot(host=host, run=self.run, last_result=self.last_result, items=items, auto=auto,
                                      gpu_held_by=holds, pending_reports=reports,
                                      start_required=self.start_required,
-                                     start_results=self.start_results, full_results=self.full_results)
+                                     start_results=self.start_results, full_results=self.full_results,
+                                     full_rows=self.full_rows)
 
     def shutdown(self) -> None:
         with self.lock:

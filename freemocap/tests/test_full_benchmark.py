@@ -121,7 +121,8 @@ def test_the_progress_has_one_row_per_ep_and_gpu_with_its_state_and_result():
     items = (CertificationItem(execution_provider=EP, label="Fake EP", device_key=DEVICE),)
     rows = _full_rows(_message(f"{LABEL}:live", 4), items)
     assert [(row.name, row.execution_provider, row.device_key, row.state, row.result) for row in rows] == [
-        ("cpu", "cpu", None, "waiting", None), (LABEL, EP, DEVICE, "running", None)]
+        ("cpu", "cpu", None, "partly-done", None), (LABEL, EP, DEVICE, "running", None)]  # the CPU's timings come later
+    assert _full_rows(_message(None, 0), items)[0].state == "waiting"
     ended = {**_message(None, len(CHECKS)), "state": "done"}
     ended["checks"][3]["result"] = "fail"  # its video check failed; the EP check gives the row's result
     ended["checks"][7]["result"] = "fail"
@@ -180,11 +181,14 @@ def test_every_start_is_refused_while_it_runs_and_a_cancel_leaves_an_incomplete_
         _wait(manager, lambda: manager.run is not None and manager.run.rows)
         snapshot = manager.snapshot(())
         assert snapshot.run.level == "full" and (snapshot.run.done, snapshot.run.total) == (3, len(CHECKS))
-        assert [(row.name, row.state) for row in snapshot.run.rows] == [("cpu", "waiting"), (LABEL, "running")]
+        assert [(row.name, row.state) for row in snapshot.run.rows] == [("cpu", "partly-done"), (LABEL, "running")]
         assert manager.cancel().state == "cancelling"  # the UI's lock ends at once
         _wait(manager, lambda: not manager.running)
         assert manager.full_results == (StartCheckResult("skellytracker", "not-run", "cancelled"),)
         assert manager.snapshot(()).full_results == manager.full_results and manager.start_results == ()
+        # The rows stay as the run ended, each done, in the server's state until the next full benchmark starts.
+        assert [(row.name, row.state, row.result) for row in manager.snapshot(()).full_rows] == [
+            ("cpu", "done", "pass"), (LABEL, "done", "not-run")]
         assert not crash_record.path().exists() and failures == []
         manager.release(manager.claim("cameras"))  # the lock ended with the run
         (new,) = [row for row in hand_in_reports() if row["report_id"] not in before]
@@ -203,6 +207,7 @@ def test_a_crash_during_the_full_benchmark_keeps_its_report_and_fails_no_pair_fo
         _wait(manager, lambda: not manager.running)
         assert manager.full_results == (StartCheckResult(None, "crashed", "exit-code-3"),)
         assert failures == [], "a crashed timing check does not fail its pair at level full"
+        assert [(row.name, row.state) for row in manager.full_rows] == [("cpu", "done"), (LABEL, "done")]
         (row,) = [row for row in certification.pending_reports() if row["kind"] == "full"]  # kept in freemocap's folder
         assert row["package"] == "skellytracker", "the share list names the report's own package, not its folder's"
         assert next(new for new in hand_in_reports() if new["report_id"] == row["report_id"])["package"] == "skellytracker"

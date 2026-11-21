@@ -36,6 +36,7 @@ test('the progress has one row per EP and GPU with its state, and a count of fin
     assert.equal(fullRowName({name: 'cpu', package: 'skellytracker', execution_provider: 'cpu', state: 'waiting'}), 'CPU');
     assert.equal(fullRowName({name: 'freemocap', package: 'freemocap', state: 'waiting'}), 'freemocap');
     assert.deepEqual(['waiting', 'running'].map(state => fullRowStatus({name: 'x', package: 'p', state}).kind), ['waiting', 'running']);
+    assert.deepEqual(fullRowStatus({name: 'cpu', package: 'p', state: 'partly-done'}), {kind: 'waiting', text: 'Partly done'});
     assert.deepEqual(['pass', 'fail', 'not-run'].map(result => fullRowStatus({name: 'x', package: 'p', state: 'done', result}).text),
         ['Passed', 'Failed', 'Not run']);
     assert.equal(finishedText({level: 'full', items: [], state: 'running', done: 1, rows: []}), '1 check finished');

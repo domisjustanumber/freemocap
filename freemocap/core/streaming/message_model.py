@@ -686,8 +686,9 @@ class CertificationPair:
 @dataclass(frozen=True, slots=True)
 class CertificationRunRow:
     """One row of a full benchmark's progress: an EP on a GPU, or the CPU, by skellytracker's check label (`name`, with
-    its EP key and device key), or one other package as a whole. `state` is waiting, running or done; `result` is the
-    row's result once done (its EP check's, else by the section rule of its checks)."""
+    its EP key and device key), or one other package as a whole. `state` is waiting, running, partly-done (some of its
+    checks ended, the rest come later in the run) or done; `result` is the row's result once done (its EP check's, else
+    by the section rule of its checks)."""
     name: str = ""
     package: str = ""
     execution_provider: str | None = None
@@ -815,6 +816,8 @@ class CertificationSnapshot:
     start_results: tuple[StartCheckResult, ...] = ()
     full_results: tuple[StartCheckResult, ...] = ()
     """How each package's part of the last full benchmark of this server session ended."""
+    full_rows: tuple[CertificationRunRow, ...] = ()
+    """The rows of the last full benchmark of this server session as it ended (each done), until the next one starts."""
     pack_run: EpPackRun | None = None
     last_pack_result: EpPackResult | None = None
 

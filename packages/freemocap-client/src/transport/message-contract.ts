@@ -284,6 +284,16 @@ const CertificationPairSchema = z.object({
   device_key: z.string().optional(),
 });
 
+// One row of a full benchmark's progress; `state` is waiting, running, partly-done or done.
+const CertificationRunRowSchema = z.object({
+  name: z.string(),
+  package: z.string(),
+  execution_provider: z.string().optional(),
+  device_key: z.string().optional(),
+  state: z.string(),
+  result: z.string().optional(),
+});
+
 export const CertificationSchema = z.object({
   host: z.object({ name: z.string(), os: z.string() }),
   run: z.object({
@@ -295,14 +305,7 @@ export const CertificationSchema = z.object({
     seconds_estimate: z.number().optional(),
     package: z.string().optional(), // the package whose checks run now; a start check has no items
     // Level full only: one row per EP and GPU (skellytracker's check label), or per other package.
-    rows: z.array(z.object({
-      name: z.string(),
-      package: z.string(),
-      execution_provider: z.string().optional(),
-      device_key: z.string().optional(),
-      state: z.string(),
-      result: z.string().optional(),
-    })).optional(),
+    rows: z.array(CertificationRunRowSchema).optional(),
   }).optional(),
   last_result: CertificationPairSchema.extend({
     result: z.string(),
@@ -338,6 +341,8 @@ export const CertificationSchema = z.object({
     result: z.string(),
     reason: z.string().optional(),
   })).optional(),
+  // The last full benchmark's rows as it ended (each done), until the next one starts.
+  full_rows: z.array(CertificationRunRowSchema).optional(),
   gpu_held_by: z.array(z.object({ kind: z.string(), id: z.string() })),
   pending_reports: z.array(z.object({ report_id: z.string(), has_failure: z.boolean() })),
   // A Windows ML EP install or remove (F15 step 5): `fraction` is Windows ML's 0 to 1, absent before its first value.

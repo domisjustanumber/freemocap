@@ -52,7 +52,8 @@ export function FullBenchmarkConsent({plans, removeData, onRemoveData, onStart, 
 /**
  * The full benchmark in the Certification dialog: the invitation with the total of the plans' estimates, the "Full
  * benchmark" button (never disabled or relabelled), its consent step, the running benchmark's rows (one per EP and GPU,
- * with a turning icon while it runs), its count of finished checks and "Cancel check", then how the last one ended.
+ * with a turning icon while it runs), its count of finished checks and "Cancel check", then how the last one ended with
+ * its rows as they ended (the server keeps them until the next one starts).
  * The plan and the refusal belong to one server identity; the rest is the server's current state.
  */
 export function FullBenchmarkSection() {
@@ -85,6 +86,7 @@ export function FullBenchmarkSection() {
     }, [endpoint, serverKey, removeData, update]);
 
     const run = certification?.run?.level === 'full' ? certification.run : undefined;
+    const rows = run ? run.rows ?? [] : certification?.full_rows ?? [];
     return <div className="flex flex-col gap-2 bg-secondary p-2 br-1">
         <p className="text sm text-white">{invitationText(mine.plans)}</p>
         <div className="flex flex-row">
@@ -94,30 +96,28 @@ export function FullBenchmarkSection() {
             ? <FullBenchmarkConsent plans={mine.plans} removeData={removeData} onRemoveData={setRemoveData} onStart={start}
                                     onCancel={() => update(serverKey, {consent: false, refusal: undefined})} refusal={mine.refusal}/>
             : <p className="text sm text-gray">{mine.planError ? FULL_BENCHMARK_TEXT.couldNotReadPlan + mine.planError : FULL_BENCHMARK_TEXT.loadingPlan}</p>)}
-        {run && <>
-            <table className="certify-table text sm" style={table}>
-                <tbody>
-                {(run.rows ?? []).map(row => {
-                    const status = fullRowStatus(row);
-                    return <tr key={`${row.package}:${row.name}`} className="border-1">
-                        <td style={{...cell, width: '62%'}} className="text-white">{fullRowName(row, certification?.items)}</td>
-                        <td style={cell} role="status">
-                            <span className="flex flex-row items-center gap-1">
-                                {status.kind === 'running' && <span className="icon loader-icon icon-size-20" role="img" aria-label="Running"/>}
-                                <span className={status.kind === 'failed' ? 'settings-note-error' : status.kind === 'waiting' ? 'text-gray'
-                                    : 'text-white'}>{status.text}</span>
-                            </span>
-                        </td>
-                    </tr>;
-                })}
-                </tbody>
-            </table>
-            <div className="flex flex-row gap-2 items-center">
-                <ButtonSm text={CERTIFICATION_TEXT.cancelCheck} buttonType="secondary" onClick={() =>
-                    requestQuickCheckCancel(endpoint).catch(error => console.warn('Could not cancel the full benchmark:', error))}/>
-                <p className="text sm text-gray" role="status">{finishedText(run)}</p>
-            </div>
-        </>}
+        {rows.length > 0 && <table className="certify-table text sm" style={table}>
+            <tbody>
+            {rows.map(row => {
+                const status = fullRowStatus(row);
+                return <tr key={`${row.package}:${row.name}`} className="border-1">
+                    <td style={{...cell, width: '62%'}} className="text-white">{fullRowName(row, certification?.items)}</td>
+                    <td style={cell} role="status">
+                        <span className="flex flex-row items-center gap-1">
+                            {status.kind === 'running' && <span className="icon loader-icon icon-size-20" role="img" aria-label="Running"/>}
+                            <span className={status.kind === 'failed' ? 'settings-note-error' : status.kind === 'waiting' ? 'text-gray'
+                                : 'text-white'}>{status.text}</span>
+                        </span>
+                    </td>
+                </tr>;
+            })}
+            </tbody>
+        </table>}
+        {run && <div className="flex flex-row gap-2 items-center">
+            <ButtonSm text={CERTIFICATION_TEXT.cancelCheck} buttonType="secondary" onClick={() =>
+                requestQuickCheckCancel(endpoint).catch(error => console.warn('Could not cancel the full benchmark:', error))}/>
+            <p className="text sm text-gray" role="status">{finishedText(run)}</p>
+        </div>}
         {!run && fullResultLines(certification?.full_results ?? []).map(line =>
             <p key={line.text} className={`text sm ${line.failed ? 'settings-note-error' : 'text-white'}`}>{line.text}</p>)}
     </div>;

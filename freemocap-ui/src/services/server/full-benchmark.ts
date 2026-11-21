@@ -61,9 +61,11 @@ export function fullRowName(row: FullRunRow, items: readonly CertificationItem[]
     return row.execution_provider ? pairLabel({execution_provider: row.execution_provider, device_key: row.device_key}, items) : row.name;
 }
 
-/** A progress row's status: waiting, running (with the turning icon), or how it ended. */
+/** A progress row's status: waiting, running (with the turning icon), partly done (some checks ended, the rest come later
+ * in the run, as the CPU's timings after the pairs), or how it ended. */
 export function fullRowStatus(row: FullRunRow): {kind: 'waiting' | 'running' | 'passed' | 'failed' | 'done'; text: string} {
     if (row.state === 'running') return {kind: 'running', text: 'Running'};
+    if (row.state === 'partly-done') return {kind: 'waiting', text: 'Partly done'};
     if (row.state !== 'done') return {kind: 'waiting', text: 'Waiting'};
     if (row.result === 'pass') return {kind: 'passed', text: 'Passed'};
     if (row.result === 'fail') return {kind: 'failed', text: 'Failed'};

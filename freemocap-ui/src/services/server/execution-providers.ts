@@ -168,6 +168,13 @@ const REASON_TEXT: Readonly<Record<string, string>> = {
     'cpu-reference-missing': 'the CPU reference check did not pass',
     'posthoc-session': 'a post-hoc processing session did not start and run on this system',
     'crashed': 'it stopped unexpectedly while it ran and is not run again by itself',
+    'bad-hash': 'the sample recording is not the expected file, so it was not used',
+    'recording-missing': 'the sample recording was not ready, so it did not run',
+    'ep-not-passed': 'its execution provider did not pass its checks on this system in this run',
+    'not-installed': 'it is not installed on this system',
+    'cancelled': 'it was cancelled before it ended',
+    'interrupted': 'the run was interrupted before it ended',
+    'reason-lost': 'it ended before the run was interrupted, and its reason was not kept',
 };
 export const reasonText = (reason: string): string => REASON_TEXT[reason] ?? reason;
 

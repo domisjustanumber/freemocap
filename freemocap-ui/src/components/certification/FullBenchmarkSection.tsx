@@ -123,7 +123,7 @@ export function FullBenchmarkSection() {
                 requestQuickCheckCancel(endpoint).catch(error => console.warn('Could not cancel the full benchmark:', error))}/>
             <p className="text sm text-gray" role="status">{finishedText(run)}</p>
         </div>}
-        {!run && fullResultLines(certification?.full_results ?? []).map(line =>
+        {!run && fullResultLines(certification?.full_results ?? [], certification?.items, rows).map(line =>
             <p key={line.text} className={`text sm ${line.failed ? 'settings-note-error' : 'text-white'}`}>{line.text}</p>)}
     </div>;
 }

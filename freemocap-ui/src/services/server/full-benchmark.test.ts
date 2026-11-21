@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import type {Certification} from '@freemocap/client';
 import {
-    appLocked, downloadRows, durationText, estimateLine, finishedText, FULL_BENCHMARK_TEXT, fullBenchmarkLocks, fullResultLines, fullRowName,
+    appLocked, checkText, downloadRows, durationText, estimateLine, finishedText, FULL_BENCHMARK_TEXT, fullBenchmarkLocks, fullResultLines, fullRowName,
     fullRowStatus, invitationText, requestFullBenchmark, requestFullBenchmarkPlan,
 } from './full-benchmark';
 import type {PackagePlan} from './start-check';
@@ -71,4 +71,25 @@ test('the full benchmark\'s requests: the plan, a start with the clean-up choice
         answer(Response.json({detail: {code: 'start-check-not-passed', message: sentence}}, {status: 409}))), sentence);
     assert.deepEqual(sent, ['GET /freemocap/certify/full_benchmark/plan', null, 'POST /freemocap/certify/full_benchmark', {remove_data: true},
         'POST /freemocap/certify/full_benchmark', {remove_data: false}]);
+});
+
+test('freemocap\'s check names and the reason codes of its benchmark read as words; other names show as sent', () => {
+    const items = [{execution_provider: 'dml', label: 'DirectML', device_key: 'gpu:1:2:0', device_name: 'GPU A', certified: false, usable: true}];
+    const rows = [{name: 'posthoc:dml@1-2-0', package: 'freemocap', execution_provider: 'dml', device_key: 'gpu:1:2:0', state: 'done', result: 'fail'}];
+    assert.deepEqual(['recording', 'data-folder', 'blender', 'posthoc:cpu', 'posthoc:dml@1-2-0'].map(name => checkText(name, items, rows)), [
+        'sample recording download and preparation', 'data folder write access', 'Blender export', 'post-hoc processing on CPU',
+        'post-hoc processing on DirectML on GPU A']);
+    assert.equal(checkText('posthoc:dml@1-2-0'), 'post-hoc processing on dml@1-2-0', 'after a restart the server has no rows');
+    assert.deepEqual(['bad-hash', 'recording-missing', 'ep-not-passed', 'not-installed', 'cancelled', 'interrupted', 'reason-lost',
+        'dml@1-2-0:video'].map(code => checkText(code)), [
+        'the sample recording is not the expected file, so it was not used', 'the sample recording was not ready, so it did not run',
+        'its execution provider did not pass its checks on this system in this run', 'it is not installed on this system',
+        'it was cancelled before it ended', 'the run was interrupted before it ended',
+        'it ended before the run was interrupted, and its reason was not kept', 'dml@1-2-0:video']);
+    assert.deepEqual([{name: 'recording', package: 'freemocap', state: 'done'}, {name: 'blender', package: 'freemocap', state: 'waiting'},
+        ...rows].map(row => fullRowName(row, items)), ['Sample recording download and preparation', 'Blender export', 'DirectML on GPU A']);
+    assert.deepEqual(fullResultLines([{package: 'freemocap', result: 'fail', reason: 'posthoc:dml@1-2-0'},
+        {package: 'freemocap', result: 'fail', reason: 'recording'}], items, rows).map(line => line.text), [
+        'freemocap: finished with failed checks: post-hoc processing on DirectML on GPU A',
+        'freemocap: finished with failed checks: sample recording download and preparation']);
 });

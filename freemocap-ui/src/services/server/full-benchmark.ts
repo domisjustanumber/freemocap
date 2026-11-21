@@ -55,10 +55,29 @@ export function downloadRows(plans: readonly PackagePlan[]): {rows: {name: strin
 export const estimateLine = (plan: PackagePlan): string =>
     `${plan.package}: ${plan.total ? `${plural(plan.total, 'check')}, about ${durationText(plan.seconds_estimate)}` : 'nothing to check'}`;
 
-/** A progress row's name: the EP on its GPU by the server's item names, the CPU, or the package. */
+/** freemocap's own full benchmark checks in words, where the rows and the result lines print them; the report file
+ * keeps the names. Its `posthoc:<label>` checks read "post-hoc processing on <pair>". */
+const CHECK_TEXT: Readonly<Record<string, string>> = {
+    'data-folder': 'data folder write access',
+    'recording': 'sample recording download and preparation',
+    'blender': 'Blender export',
+};
+const POSTHOC = 'posthoc:';
+
+/** A check's name, or a reason code, in words: a freemocap pair by its progress row when the server still has it. */
+export function checkText(name: string, items: readonly CertificationItem[] = [], rows: readonly FullRunRow[] = []): string {
+    if (!name.startsWith(POSTHOC)) return CHECK_TEXT[name] ?? reasonText(name);
+    const row = rows.find(row => row.package === 'freemocap' && row.name === name && row.execution_provider);
+    const label = name.slice(POSTHOC.length);
+    return `post-hoc processing on ${row ? fullRowName(row, items) : label === 'cpu' ? 'CPU' : label}`;
+}
+
+/** A progress row's name: the EP on its GPU by the server's item names, the CPU, or freemocap's check in words, else its name. */
 export function fullRowName(row: FullRunRow, items: readonly CertificationItem[] = []): string {
     if (row.execution_provider === 'cpu') return 'CPU';
-    return row.execution_provider ? pairLabel({execution_provider: row.execution_provider, device_key: row.device_key}, items) : row.name;
+    if (row.execution_provider) return pairLabel({execution_provider: row.execution_provider, device_key: row.device_key}, items);
+    const text = CHECK_TEXT[row.name];
+    return text ? text[0].toUpperCase() + text.slice(1) : row.name;
 }
 
 /** A progress row's status: waiting, running (with the turning icon), partly done (some checks ended, the rest come later
@@ -75,10 +94,12 @@ export function fullRowStatus(row: FullRunRow): {kind: 'waiting' | 'running' | '
 /** The count of finished checks; no percentage and no time remaining. */
 export const finishedText = (run: CertificationRun): string => `${plural(run.done, 'check')} finished`;
 
-/** How each package's part of the last full benchmark ended (a crash of the whole run names no package). */
-export function fullResultLines(results: readonly StartCheckResult[]): {text: string; failed: boolean}[] {
+/** How each package's part of the last full benchmark ended (a crash of the whole run names no package); a failed
+ * check is named in words, by the server's items and the run's rows. */
+export function fullResultLines(results: readonly StartCheckResult[], items: readonly CertificationItem[] = [],
+    rows: readonly FullRunRow[] = []): {text: string; failed: boolean}[] {
     return results.map(({package: name, result, reason}) => {
-        const why = reasonText(reason ?? result);
+        const why = checkText(reason ?? result, items, rows);
         const ended = result === 'crashed' || reason === 'crashed' ? 'stopped unexpectedly'
             : result === 'pass' || result === 'record-only' ? 'finished'
                 : result === 'fail' ? `finished with failed checks: ${why}`

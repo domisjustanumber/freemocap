@@ -28,7 +28,7 @@ it only when the earlier packages succeeded), a run with no failed check and no 
 archive when this run downloaded it.
 
 `posthoc-session` (report format 2.7 rule 3) proves freemocap's side around the tracker, in its own spawn child: the app's
-post-hoc session (`MocapPipeline`, as the backend starts it) reads a 3-frame video of the bundled frames, hands each frame
+post-hoc session (`MocapPipeline`, as the backend starts it) reads a 3-frame video of skellytracker's test frames, hands each frame
 to skellytracker's run and writes the observations to the recording's Parquet file, from which the check reads the run
 record back. skellytracker's own quick run proves its pipeline on these frames. A realtime session check is not built:
 freemocap's pub/sub refuses to start a realtime pipeline outside the backend's main process, and certify runs in a child.
@@ -282,7 +282,7 @@ def _spawn(target, args: tuple, name: str, timeout: int | float, cancelled) -> t
                     pass
 
 
-# - The post-hoc session check, on skellytracker's bundled frames -
+# - The post-hoc session check, on skellytracker's test frames -
 
 def _models_missing(detector_type: str, rtmpose_model_name: str | None) -> bool:
     """skellytracker's rule for its own `models-missing`: the pipeline check warns of a missing dependency."""

@@ -20,10 +20,6 @@ export const CERTIFICATION_TEXT = {
     invitation: "We'd love your help to know this is a good configuration for FreeMoCap to run on in the future. If you'd "
         + 'like to submit your anonymous certification report, click the Submit report button below. If you want to see '
         + "what we'll get before it sends, click the View report button first.",
-    fullBenchmark: 'Full benchmark',
-    fullBenchmarkInvitation: "If you have the time (approx 5 to 10 mins), we'd really appreciate the results from a full "
-        + 'benchmark run on your system.',
-    notAvailableYet: 'Not available yet',
     reports: 'Help FreeMoCap by sharing your (anonymous) results',
     nothingPending: 'Nothing to share right now.',
     noteLabel: "Anything you'd like to tell us?",

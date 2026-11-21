@@ -12,6 +12,7 @@ import {
 import {START_CHECK_TEXT} from '@/services/server/start-check';
 import {ReportMarkdown} from './ReportMarkdown';
 import {StartCheckSection} from './StartCheckSection';
+import {FullBenchmarkSection} from './FullBenchmarkSection';
 
 /** The button after the Streaming and Playback tabs, clear of the pages' toolbars at the right: a fixed label with a suffix from the server state (25). */
 export function CertificationButton() {
@@ -30,10 +31,10 @@ const link = (url: string, text: string) => <a href={url} target="_blank" rel="n
  * The Certification dialog (decision 26, the SettingsModal pattern; the owner's notes of 2026-11-20): the title, the
  * start check's table with its run and cancel, and the reports to hand in: the invitation, note, "Submit Report",
  * "View report" with the exact file, "Save file and open issue form", the hand-ins already made and the kept files,
- * each with "Not sent", and the full benchmark (not available yet). Everything shown comes from the current server
- * state and the answers to this window's requests; no label changes with history and no working button is greyed out.
- * `required` (the server's `start_required`, decision 14): the start check is needed, so the dialog has no dismiss and
- * no overlay; the layout greys out the rest of the UI except the server connection and the log terminal.
+ * each with "Not sent", and the full benchmark, offered once the start check is not required. Everything shown comes
+ * from the current server state and the answers to this window's requests; no label changes with history and no working
+ * button is greyed out. `required` (the server's `start_required`, decision 14, or a running full benchmark): the dialog
+ * has no dismiss and no overlay; the layout greys out the rest of the UI except the server connection and the log terminal.
  */
 export function CertificationDialog({open, onClose, required = false}: {open: boolean; onClose: () => void; required?: boolean}) {
     const {isConnected, serverPid, certification} = useAppSelector(state => state.connection);
@@ -93,7 +94,7 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                     <SubactionHeader text={CERTIFICATION_TEXT.title}/>
                     {!required && <IconButton icon="close-icon" onClick={onClose}/>}
                 </div>
-                <p className="text sm text-white">{required ? START_CHECK_TEXT.required : START_CHECK_TEXT.optional}</p>
+                <p className="text sm text-white">{certification?.start_required ? START_CHECK_TEXT.required : START_CHECK_TEXT.optional}</p>
 
                 <StartCheckSection/>
 
@@ -146,14 +147,8 @@ export function CertificationDialog({open, onClose, required = false}: {open: bo
                     </div>)}
                 </div>
 
-                <div className={section}>
-                    <p className="text sm text-white">{CERTIFICATION_TEXT.fullBenchmarkInvitation}</p>
-                    <div className="flex flex-row">
-                        {/* shortcut: the full benchmark is not built yet; enable and wire it when its route exists. */}
-                        <ButtonSm text={CERTIFICATION_TEXT.fullBenchmark} buttonType="secondary" disabled tooltip
-                                  tooltipText={CERTIFICATION_TEXT.notAvailableYet} title={CERTIFICATION_TEXT.notAvailableYet}/>
-                    </div>
-                </div>
+                {/* Offered once the start check is not required; the server refuses a start until it passed. */}
+                {certification && !certification.start_required && <FullBenchmarkSection/>}
 
                 {/* Sticky: the dialog scrolls at 80vh, and Continue must stay in sight. */}
                 {bottom && <div className="flex flex-row gap-2 bg-middark pt-1" style={{justifyContent: 'flex-end', position: 'sticky', bottom: 0}}>

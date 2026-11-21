@@ -44,7 +44,7 @@ export function StartCheckSection() {
         if (current.current === key) setLocal(previous => ({...(previous.key === key ? previous : {key}), refusal: refusal ?? undefined}));
     }, [endpoint, serverKey, blenderExePath]);
 
-    const running = certification?.run;
+    const running = certification?.run?.level === 'quick' ? certification.run : undefined;  // the full benchmark has its own section
     const packages = mine.plans?.map(plan => plan.package) ?? [...START_CHECK_PACKAGES];
     const statuses = startCheckRowStatus(packages, running, certification?.start_results ?? [],
         certification?.start_required === true);

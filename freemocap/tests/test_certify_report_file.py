@@ -188,6 +188,14 @@ def test_two_modules_of_two_packages_print_the_system_once_and_a_line_for_each_m
         f"{SYSTEM}\n{TABLE}\nCameras: not checked on this system.\n")
 
 
+def test_a_file_with_two_reports_of_one_package_takes_the_oldest_time_in_its_name_and_header():
+    """Spec 4.2 (format 1.6.0): the oldest `created_utc` of the module reports, whatever their order in the file."""
+    modules = [_module(created="2026-11-21T09:30:00Z"), _module(created="2026-11-20T23:05:59Z")]
+    name, body = build_report_file(modules, None, {"name": "freemocap", "version": "2.0.0", "commit": None})
+    assert name == "certify-report-20261120T230559Z.md"
+    assert body.decode("utf-8").startswith("# Certify report\n\nfreemocap 2.0.0 · 2026-11-20 23:05 UTC\n\n")
+
+
 def test_display_names_shorten_only_the_markdown():
     assert report_file.gpu_display_name("NVIDIA GeForce RTX 3070") == "NVIDIA RTX 3070"
     assert report_file.gpu_display_name("Intel(R) UHD Graphics 770") == "Intel UHD 770"

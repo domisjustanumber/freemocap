@@ -59,6 +59,8 @@ def test_the_quick_level_runs_its_seven_checks_in_order_and_obeys_the_report_for
     assert rows["install-facts"]["result"] == "record-only" and rows["install-facts"]["numbers"]["ui_remote"] is False
     assert rows["build-identity"]["result"] in ("pass", "record-only")
     assert report["schema"] == "skellycertify.report/1.6.0" and report["kind"] == "quick"
+    # format 1.6.0, 3.3: null while skellytracker's GPU query at the pin gives no shared memory
+    assert all(gpu["shared_memory_bytes"] is None or gpu["shared_memory_bytes"] >= 0 for gpu in report["host"]["gpus"])
     # format 1.5.0: one `component` item for each check that ran, named as its check's `module`; format 1.6.0: a Blender
     # that is not installed is `skipped` with `not-installed`
     assert report["summary"] == [{"group": "component", "name": row["module"], "device": None, "result": row["result"]}

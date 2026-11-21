@@ -648,7 +648,11 @@ def _host() -> dict:
                    "arch": {"amd64": "x86_64", "x64": "x86_64", "aarch64": "arm64"}.get(arch, arch)},
             "cpu": {"name": host.cpu_name}, "memory_bytes": host.memory_total_bytes,
             "gpus": [{"vendor": gpu.vendor, "name": gpu.name, "id": evidence.gpu_id(gpu), "driver_version": gpu.driver_version,
-                      "vram_bytes": gpu.vram_total_bytes} for gpu in host.gpus]}  # as skellytracker's: the benchmark's GPU names
+                      "vram_bytes": gpu.vram_total_bytes,
+                      # format 1.6.0, 3.3: skellytracker's GpuInfo has no such field at the pin 346b77eb (null); its next
+                      # pin gives DXGI's SharedSystemMemory here
+                      "shared_memory_bytes": getattr(gpu, "shared_memory_bytes", None)}
+                     for gpu in host.gpus]}  # as skellytracker's: the benchmark's GPU names
 
 
 def _install_dir() -> Path:

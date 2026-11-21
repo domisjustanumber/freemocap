@@ -48,6 +48,7 @@ export const CERTIFICATION_TEXT = {
     cancelCheck: 'Cancel check',
     fileReport: 'File report',
     recordWaits: 'A recording can start once the quick check ends. ',
+    recordWaitsFull: 'A recording can start once the full benchmark ends. ',
     close: 'Close',
     continue: 'Continue',
     doNotSend: 'Do not send and open FreeMoCap',

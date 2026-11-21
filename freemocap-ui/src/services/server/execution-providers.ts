@@ -138,13 +138,14 @@ export function pairLabel(pair: {execution_provider: string; device_key?: string
     return `${item?.label ?? pair.execution_provider} on ${item?.device_name ?? pair.device_key ?? 'its device'}`;
 }
 
-/** The running check as F10 words it: checks done of total, and the plan's one-off estimate; no countdown. */
+/** The running check as F10 words it: checks done of total, and the plan's one-off estimate; no countdown. A full
+ * benchmark is named as such. */
 export function quickCheckProgressText(run: CertificationRun, items?: readonly CertificationItem[], machine = 'this system'): string {
     const done = run.total === undefined ? 'starting' : `${run.done} of ${run.total} checks done`;
     const estimate = run.seconds_estimate === undefined ? '' : `, up to about ${run.seconds_estimate} seconds`;
     // A start check has no items: it checks this machine, one package after the other.
     const what = run.items[0] ? pairLabel(run.items[0], items) : `${machine}${run.package ? ` (${run.package})` : ''}`;
-    return `Quick check of ${what}: ${done}${estimate}.`;
+    return `${run.level === 'full' ? 'Full benchmark' : 'Quick check'} of ${what}: ${done}${estimate}.`;
 }
 
 /** The six lines saying how a quick check ended (user-confirmed wording, 2026-11-19), in one place. */

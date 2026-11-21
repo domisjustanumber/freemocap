@@ -150,7 +150,8 @@ export const RecordingControlPanel: React.FC = () => {
         {/* Record's waiting line (decision 27, F7): a start is refused while a quick check runs. */}
         {certification?.run && !recordingInfo.isRecording && (
           <p className="settings-note" role="status">
-            {CERTIFICATION_TEXT.recordWaits}{quickCheckProgressText(certification.run, certification.items)}
+            {certification.run.level === 'full' ? CERTIFICATION_TEXT.recordWaitsFull : CERTIFICATION_TEXT.recordWaits}
+            {quickCheckProgressText(certification.run, certification.items)}
           </p>
         )}
         {/* Secondary options start collapsed; Start Recording stays visible. */}

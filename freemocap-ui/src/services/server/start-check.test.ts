@@ -1,6 +1,7 @@
 // Bundle with esbuild --bundle --platform=node --format=cjs, then node --test.
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import {CERTIFICATION_TEXT} from './certification-hand-in';
 import {quickCheckProgressText} from './execution-providers';
 import {planLines, requestStartCheck, requestStartCheckPlan, START_CHECK_TEXT, startCheckRowStatus, startResultLines} from './start-check';
 
@@ -73,4 +74,12 @@ test("each package's status cell follows the current run, else how its part of t
     // An EP pair's quick check (a run with items) is not the start check: the rows keep the last start check's results.
     assert.deepEqual(startCheckRowStatus(packages, {...run, items: [{execution_provider: 'dml'}]}, []).map(row => row.text), ['Waiting', 'Waiting']);
     assert.ok(Object.values(START_CHECK_TEXT).every(text => !/machine/.test(text)), 'this dialog says "system"');
+});
+
+test('a running full benchmark is named as such in its progress and the record line; the quick wording stays', () => {
+    const run = {level: 'full', items: [], state: 'running', done: 2, total: 22, package: 'skellytracker', seconds_estimate: 192};
+    assert.equal(CERTIFICATION_TEXT.recordWaitsFull + quickCheckProgressText(run), 'A recording can start once the full benchmark '
+        + 'ends. Full benchmark of this system (skellytracker): 2 of 22 checks done, up to about 192 seconds.');
+    assert.equal(CERTIFICATION_TEXT.recordWaits + quickCheckProgressText({...run, level: 'quick'}), 'A recording can start once the '
+        + 'quick check ends. Quick check of this system (skellytracker): 2 of 22 checks done, up to about 192 seconds.');
 });

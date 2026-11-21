@@ -134,7 +134,7 @@ def test_own_reports_are_kept_with_the_hand_in_states_and_not_sent_makes_them_pe
     monkeypatch.setattr(certification, "_spawn_imports", lambda cancelled: ({"failed": ["cv2-ImportError"], "from_bundle": None}, None))
     failed = certification.certify("quick")
     [row] = certification.pending_reports()
-    assert row == {"report_id": failed["id"], "kind": "quick", "created_utc": failed["created_utc"], "has_failure": True,
+    assert row == {"report_id": failed["id"], "package": "freemocap", "kind": "quick", "created_utc": failed["created_utc"], "has_failure": True,
                    "evidence_valid": failed["evidence"]["valid"], "state": "pending", "reference": None}
     assert certification.read_report(failed["id"]) == failed
     certification.mark_reports([failed["id"]], "covered", reference=ISSUE)

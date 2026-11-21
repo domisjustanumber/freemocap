@@ -80,8 +80,9 @@ def _stores() -> dict:
 
 
 def hand_in_reports(include_handed_in: bool = False) -> list[dict]:
-    """Every package's `pending_reports()` rows in one list, each with its `package`, the oldest first."""
-    rows = [{**row, "package": package} for package, store in _stores().items()
+    """Every package's `pending_reports()` rows in one list, each with its `package` (the report's own when the row
+    gives it, else its store's), the oldest first."""
+    rows = [{"package": package, **row} for package, store in _stores().items()
             for row in store.pending_reports(include_handed_in=include_handed_in)]
     return sorted(rows, key=lambda row: (row.get("created_utc") or "", row["report_id"]))
 

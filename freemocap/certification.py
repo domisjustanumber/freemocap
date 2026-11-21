@@ -443,7 +443,8 @@ def _marks() -> dict:
 
 def pending_reports(include_handed_in: bool = False) -> list[dict]:
     """freemocap's reports that the person did not hand in, the oldest first; with `include_handed_in`, each report in
-    each state. Each row is `{"report_id", "kind", "created_utc", "has_failure", "evidence_valid", "state", "reference"}`."""
+    each state. Each row is `{"report_id", "package", "kind", "created_utc", "has_failure", "evidence_valid", "state",
+    "reference"}`; `package` is the report's own (a crash record keeps skellytracker's interrupted run here too)."""
     marks, rows = _marks(), []
     for path in sorted(reports_dir().glob("*.json")):
         report = _read_json(path)
@@ -455,7 +456,8 @@ def pending_reports(include_handed_in: bool = False) -> list[dict]:
         mark = marks.get(path.stem) if isinstance(marks.get(path.stem), dict) else {}
         state = mark.get("state") if mark.get("state") in REPORT_STATES else "pending"
         if state == "pending" or include_handed_in:
-            rows.append({"report_id": path.stem, "kind": report.get("kind"), "created_utc": report.get("created_utc"),
+            rows.append({"report_id": path.stem, "package": str((report.get("package") or {}).get("name") or "freemocap"),
+                         "kind": report.get("kind"), "created_utc": report.get("created_utc"),
                          "has_failure": "fail" in results, "evidence_valid": bool((report.get("evidence") or {}).get("valid")),
                          "state": state, "reference": mark.get("reference") if state != "pending" else None})
     return sorted(rows, key=lambda row: (row["created_utc"] or "", row["report_id"]))

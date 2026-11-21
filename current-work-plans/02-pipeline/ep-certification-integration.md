@@ -1973,6 +1973,37 @@ Open (owner's decisions or gaps):
 - macOS `coreml` (no device key) is not in the pair list. A test stand-in is needed so that no test runs the real full
   level: one did, and downloaded the archive twice before it was stubbed.
 
+### Recording benchmark in the UI, 2026-11-21
+
+Closed the UI gaps above; tests only, no real window. Commits:
+
+- `a5e6eb63` guard: in the fast suite the real `catalog.download` raises unless the test stubs it or `requests.get`
+  (in-process only; the full benchmark job tests now give the child `own_stand_in` for freemocap's `certify`), and
+  conftest points `FREEMOCAP_TEST_MEDIA_DIR` at scratch.
+- `b77d8267` rows: freemocap's progress has one row per check (`_full_rows`): `posthoc:<label>` rows carry the pair's EP
+  and device key, so they read as the pair; `data-folder`, `recording`, `blender` are rows of their own. The UI puts
+  each package's rows under a heading with its name ("skellytracker", "freemocap"); proposed to the owner, not chosen
+  by them. Counting is unchanged (`_counted`), so the row count of freemocap equals its plan total.
+- `40b4d6b3` words: `REASON_TEXT` gains `bad-hash`, `recording-missing`, `ep-not-passed`, `not-installed`,
+  `cancelled`, `interrupted`, `reason-lost`; `checkText` names freemocap's full checks ("data folder write access",
+  "sample recording download and preparation", "Blender export", "post-hoc processing on <pair>", the pair from the
+  run's rows, else the label) in the rows and the result lines. Report files keep the names; quick wording unchanged.
+- `b374cfe9` Blender path: `GET /certify/full_benchmark/plan?blenderExePath=` and `POST /certify/full_benchmark`
+  `{blenderExePath}` reach `certify_plan`/`certify` through `run_full_check`; contract refreshed.
+- `4810aee2` test media at quick: `run_start_check` passes `test_media_dir` to freemocap (unused at quick) and to
+  skellytracker only when its frames file is already there: given a folder, skellytracker reads its frames only from it
+  (no fallback to the bundled file), and the quick level must write nothing. A fresh system's start check therefore
+  runs as before; after a full benchmark seeded the folder it reads the same bytes from there.
+- `b8b68718` download through the consent step (read and tested with stand-ins for `requests.get`): a broken download
+  fails `recording` with the exception class, the pairs are `not-run`/`recording-missing`; a cancel stops between 1 MB
+  chunks; neither keeps a `.part` file or the final name, and nothing is removed. Limit: a stalled connection is only
+  noticed at the next chunk or the 300 s read timeout.
+- `8a2167a2` (separable; revert if the owner declines): a row with a crashed check reads "Failed" (`_ended` marks it).
+
+Suites: Python 1785 passed, 0 failed, 20 skipped (no test reached the download guard; `%LOCALAPPDATA%\skellycertify` was absent before and after); UI 243 of 244 with 1 skipped; `npx tsc --noEmit` clean; client package 148 of 148.
+
+Open: the owner's choice of the package headings and of the crashed-row wording; all of it in the real window.
+
 ## Next actions
 
 All as local commits on `sidecar-implementation`, in this order:

@@ -2045,6 +2045,58 @@ Suites: Python 1787 passed, 0 failed, 20 skipped (`%LOCALAPPDATA%\skellycertify`
 Open: all six in the real window, mostly the consent after a kept or deleted archive, the kept rows after a cancel, and
 Tab to Start at 1000×700. Item 5 is the owner's.
 
+### Smaller defects, 2026-11-21
+
+Step 6 of the order of work. Tests only, no real window. Fixed:
+
+1. Stale refused-camera banner (`e5e096cf`): the camera slice keeps the refusal's `code`
+   (`cameras.errorCode`). An app_state whose `certification.start_required` is not `true` clears a
+   `start-check-required` refusal. A new request also clears it. Other camera errors are unchanged. The other
+   slices (calibration, mocap, realtime) were not changed: no stale banner of theirs was reported.
+2. Welcome window behind the pop-up (`445e752b`): the Welcome modal shows only while the Certification dialog is
+   closed and the app is not locked. On a first launch it appears after "Continue". If the start check is not
+   required, it can show for a moment before the first app_state arrives.
+4. Red borders (`67ec93db`): `.settings-note-dismissable` had the danger border for every bordered note. It now
+   has the neutral hairline, and the danger border stays for `.settings-note-error`. A failed quick-check result
+   line now carries `settings-note-error`, so its text is red too. The legacy-EP notice and the old-threshold prompt
+   also become neutral.
+5. EP pack keys (`0fc20866`): `packResultText` reads reason codes through `reasonText`. A remove's comma-joined
+   codes are worded one by one. New sentences, not yet reviewed by the owner: `package-not-removed`,
+   `package-name-mismatch`, `package-unknown`, `record-refused`, `thread-not-started`. Left: the server's
+   refusal sentences still name the EP by its key and the kind `ep-pack` ("the ep-pack start was refused").
+   Those sentences are shared with the quick check's refusals, so changing them is the owner's call.
+6. EP menu keys (`69ecb4b7`): a saved choice takes its name from the EP list or from `certification.items`,
+   whichever arrives first. Before either, it shows "…". After the EP list is read, a key that the server does
+   not list still shows as saved.
+7. Narrow strip (`d503d75a`): below 1100 px the toolbar's gaps shrink to 4 px. Its two buttons get a 100 px
+   maximum width, so "Real-time processing" and "Processing settings" wrap onto two lines. Every label is kept
+   whole. Not measured in a window.
+9. Snapshot (`f744efa4`): the button is the pipeline metrics window's "Save snapshot"
+   (`electron/main/services/pipeline-metrics-window.ts`). It offers `pipeline-metrics-<YYYYMMDD-HHMMSS>.png`
+   in Downloads and writes the captured PNG where the person picks. The name is now in local time, as recording
+   names are; it was UTC. The new test `pipeline-metrics-window.test.cjs` covers this with stand-ins for Electron
+   and fs. Left in UTC: the log terminal's export name (`LogTerminal.tsx`), calibration export names and certify
+   report names (UTC by the spec).
+
+Not found:
+
+3. Camera actions during the lock: every Electron menu item only sends a renderer action, and the renderer ignores
+   these while `appLocked`. The only other items open docs links. The main process makes no server call besides
+   `/shutdown`. The in-window camera controls sit in AppContent's `inert` layer. `CameraSettingsModal` is portaled
+   out of that layer, but it closes on any click outside it, and the server refuses the start anyway.
+8. Install progress scale: skellytracker gives `fraction` from 0 to 1 (`windows_ml._ensure_ready` divides by 100).
+   `EpPackManager` passes it on unchanged, and `packProgressText` multiplies by 100. Already tested:
+   `test_ep_packs.py` (stub progress 0.25 and 0.5 reach `run.fraction` and the message) and `ep-packs.test.tsx`
+   (0.256 shows 26%).
+
+Suites: Python 1788 passed, 0 failed, 20 skipped (`%LOCALAPPDATA%\skellycertify` absent afterwards); UI main run 244
+of 245 with 1 skipped, plus 10 and 46; `npx tsc --noEmit` clean; `node --test` of the new snapshot test 1 of 1;
+`check-ui-styles` 30 errors as before, none of them new. No contract change, so the client package suite was not run.
+
+Real window: the banner clearing after the start check passes, Welcome after "Continue" on a fresh profile, note
+borders in the dialog and the EP panel, the EP menu right after connect, the strip at 1000 px and 1100 px on
+Streaming, and Save snapshot.
+
 ## Next actions
 
 All as local commits on `sidecar-implementation`, in this order:
